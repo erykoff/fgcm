@@ -5,6 +5,7 @@ import fitsio
 import scipy.interpolate as interpolate
 import scipy.integrate as integrate
 import fgcm_y3a1_tools
+import os
 
 class FgcmLUT(object):
     """
@@ -25,8 +26,29 @@ class FgcmLUT(object):
     def _readLUTFile(self,lutFile):
         """
         """
-        self.lut = fitsio.read(lutFile,ext='LUT')
-        self.ccdDelta = fitsio.read(lutFile,ext='CCD')
+        lutFlat = fitsio.read(lutFile,ext='LUT')
+        indexVals = fitsio.read(lutFile,ext='INDEX')
+
+        self.bands = indexVals['BANDS'][0]
+        self.pmb = indexVals['PMB'][0]
+        self.pwv = indexVals['PWV'][0]
+        self.o3 = indexVals['O3'][0]
+        self.tau = indexVals['TAU'][0]
+        self.alpha = indexVals['ALPHA'][0]
+        self.zenith = indexVals['ZENITH'][0]
+        self.nCCD = indexVals['NCCD'][0]
+
+        self.lut = lutFlat.reshape((self.bands.size,
+                                    self.pmb.size,
+                                    self.pwv.size,
+                                    self.o3.size,
+                                    self.tau.size,
+                                    self.alpha.size,
+                                    self.zenith.size))
+        ccdDeltaFlat = fitsio.read(lutFile,ext='CCD')
+
+        self.ccdDelta = ccdDeltaFlat.reshape((indexVals['BANDS'].size,
+                                              indexVals['NCCD']))
 
         stdVals = fitsio.read(lutFile,ext='STD')
 
@@ -39,6 +61,7 @@ class FgcmLUT(object):
         self.lambdaRange = stdVals['LAMBDARANGE']
         self.lambdaStep = stdVals['LAMBDASTEP']
         self.lambdaStd = stdVals['LAMBDASTD']
+        self.lambdaB = stdVals['LAMBDAB']
         self.atmLambda = stdVals['ATMLAMBDA']
         self.atmStdTrans = stdVals['ATMSTDTRANS']
 
@@ -67,7 +90,7 @@ class FgcmLUT(object):
         self.lutConfig = lutConfig
 
         # this will generate an exception if things aren't set up properly
-        self.modGen = fgcm_y3a1_tools.ModTranGenerator(self.lutConfig['elevation'])
+        self.modGen = fgcm_y3a1_tools.ModtranGenerator(self.lutConfig['elevation'])
 
         self.bands = np.array(self.lutConfig['bands'])
 
@@ -91,14 +114,19 @@ class FgcmLUT(object):
         self.zenithStd = np.arccos(1./self.secZenithStd)*180./np.pi
 
         if ('lambdaRange' in self.lutConfig):
-            self.lambdaRange = self.lutConfig['lambdaRange']
+            self.lambdaRange = np.array(self.lutConfig['lambdaRange'])
         else:
-            self.lambdaRange = [300.0,1100.0]
+            self.lambdaRange = np.array([3000.0,11000.0])
 
         if ('lambdaStep' in self.lutConfig):
             self.lambdaStep = self.lutConfig['lambdaStep']
         else:
             self.lambdaStep = 0.5
+
+        if ('lambdaNorm' in self.lutConfig):
+            self.lambdaNorm = self.lutConfig['lambdaNorm']
+        else:
+            self.lambdaNorm = 7750.0
 
     def makeLUT(self,lutFile,clobber=False):
         """
@@ -112,7 +140,7 @@ class FgcmLUT(object):
         self.atmStd = self.modGen(pmb=self.pmbStd,pwv=self.pwvStd,
                                   o3=self.o3Std,tau=self.tauStd,
                                   alpha=self.alphaStd,zenith=self.zenithStd,
-                                  lambdaRange=self.lambdaRange,
+                                  lambdaRange=self.lambdaRange/10.0,
                                   lambdaStep=self.lambdaStep)
         self.atmLambda = self.atmStd['LAMBDA']
         self.atmStdTrans = self.atmStd['COMBINED']
@@ -141,7 +169,7 @@ class FgcmLUT(object):
         self.alphaDelta = self.alpha[1] - self.alpha[0]
         self.secZenith = np.linspace(1./np.cos(self.lutConfig['zenithRange'][0]*np.pi/180.),
                                      1./np.cos(self.lutConfig['zenithRange'][1]*np.pi/180.),
-                                     num=self.zenithSteps)
+                                     num=self.lutConfig['zenithSteps'])
         self.secZenithDelta = self.secZenith[1]-self.secZenith[0]
         self.zenith = np.arccos(1./self.secZenith)*180./np.pi
 
@@ -151,48 +179,63 @@ class FgcmLUT(object):
         # run MODTRAN a bunch of times
         # we need for each airmass, to run the array of pwv and o3 and pull these out
 
+        print("Generating PWV atmospheres...")
 
         pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
 
         for i in xrange(self.pwv.size):
             for j in xrange(self.zenith.size):
                 atm=self.modGen(pwv=self.pwv[i],zenith=self.zenith[j],
-                                lambdaRange=self.lambdaRange,
+                                lambdaRange=self.lambdaRange/10.0,
                                 lambdaStep=self.lambdaStep)
-                pwvAtmTable[i,j,:] = atm['H20']
+                pwvAtmTable[i,j,:] = atm['H2O']
 
+        print("Generating O3 atmospheres...")
         o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
 
         for i in xrange(self.o3.size):
             for j in xrange(self.zenith.size):
                 atm=self.modGen(o3=self.o3[i],zenith=self.zenith[j],
-                                lambdaRange=self.lambdaRange,
+                                lambdaRange=self.lambdaRange/10.0,
                                 lambdaStep=self.lambdaStep)
                 o3AtmTable[i,j,:] = atm['O3']
 
+        print("Generating O2/Rayleigh atmospheres...")
         o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
         rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
 
         for j in xrange(self.zenith.size):
             atm=self.modGen(zenith=self.zenith[j],
-                            lambdaRange=self.lambdaRange,
+                            lambdaRange=self.lambdaRange/10.0,
                             lambdaStep=self.lambdaStep)
             o2AtmTable[j,:] = atm['O2']
             rayleighAtmTable[j,:] = atm['RAYLEIGH']
 
         # get the filters over the same lambda ranges...
+        print("Interpolating filters...")
         self.filters.interpolateFilters(self.atmLambda)
 
         # and now we can get the standard atmosphere and lambda_b
 
+        print("Computing lambdaB")
+        self.lambdaB = np.zeros(self.bands.size)
+        for i in xrange(self.bands.size):
+            num = integrate.simps(self.atmLambda * self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
+            denom = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
+            self.lambdaB[i] = num / denom
+            print("Band: %s, lambdaB = %.3f" % (self.bands[i], self.lambdaB[i]))
+
+        print("Computing lambdaStd")
         self.lambdaStd = np.zeros(self.bands.size)
         for i in xrange(self.bands.size):
             num = integrate.simps(self.atmLambda * self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             self.lambdaStd[i] = num / denom
+            print("Band: %s, lambdaStd = %.3f" % (self.bands[i],self.lambdaStd[i]))
 
 
         # now make the LUT!
+        print("Building look-up table...")
         self.lut = np.zeros((self.bands.size,
                              self.pmb.size,
                              self.pwv.size,
@@ -210,6 +253,7 @@ class FgcmLUT(object):
                                    ('D_SECZENITH','f8')])
 
         for i in xrange(self.bands.size):
+            print("Working on band %s" % (self.bands[i]))
             for j in xrange(self.pmb.size):
                 pmbMolecularScattering = np.exp(-(self.pmb[j] - self.modGen.pmbElevation)/self.modGen.pmbElevation)
                 pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
@@ -228,7 +272,10 @@ class FgcmLUT(object):
         # and now the derivative tables...
         # last boundary is set to zero.
 
+        print("Computing derivatives...")
+
         for i in xrange(self.bands.size-1):
+            print("Working on band %s" % (self.bands[i]))
             for j in xrange(self.pmb.size-1):
                 for k in xrange(self.pwv.size-1):
                     for m in xrange(self.o3.size-1):
@@ -268,7 +315,7 @@ class FgcmLUT(object):
 
         # and now we need the CCD deltas
         # integrate deltaSb for the standard passband, not for each individual passband
-
+        print("Computing CCD deltas...")
         self.ccdDelta = np.zeros((self.bands.size,self.nCCD),
                                  dtype=[('DELTAI0','f8'),
                                         ('DELTAI1','f8')])
@@ -278,19 +325,36 @@ class FgcmLUT(object):
                 deltaSb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,j] - self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG']
                 self.ccdDelta['DELTAI0'][i,j] = integrate.simps(deltaSb * self.atmStdTrans / self.atmLambda, self.atmLambda)
                 self.ccdDelta['DELTAI1'][i,j] = integrate.simps(deltaSb * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+                #self.ccdDelta['DELTAI1'][i,j] = integrate.simps(deltaSb * self.atmStdTrans * (self.atmLambda - self.lambdaB[i]) / self.atmLambda, self.atmLambda)
 
         # and we can write it out.
 
         # start by writing the LUT.  And clobber, though we checked at start
-        hdr=fitsio.FITSHDR()
+        print("Saving LUT to %s" % (lutFile))
 
-        hdr['EXTNAME'] = 'LUT'
-        fitsio.write(lutFile,self.lut,header=hdr,clobber=True)
+        fitsio.write(lutFile,self.lut.flatten(),extname='LUT',clobber=True)
 
-        hdr['EXTNAME'] = 'CCD'
-        fitsio.write(lutFile,self.ccdDelta,header=hdr)
+        indexVals = np.zeros(1,dtype=[('BANDS','a1',self.bands.size),
+                                      ('PMB','f8',self.pmb.size),
+                                      ('PWV','f8',self.pwv.size),
+                                      ('O3','f8',self.o3.size),
+                                      ('TAU','f8',self.tau.size),
+                                      ('ALPHA','f8',self.alpha.size),
+                                      ('ZENITH','f8',self.zenith.size),
+                                      ('NCCD','i4')])
+        indexVals['BANDS'] = self.bands
+        indexVals['PMB'] = self.pmb
+        indexVals['PWV'] = self.pwv
+        indexVals['O3'] = self.o3
+        indexVals['TAU'] = self.tau
+        indexVals['ALPHA'] = self.alpha
+        indexVals['ZENITH'] = self.zenith
+        indexVals['NCCD'] = self.nCCD
 
-        hdr['EXTNAME'] = 'STD'
+        fitsio.write(lutFile,indexVals,extname='INDEX')
+
+        fitsio.write(lutFile,self.ccdDelta.flatten(),extname='CCD')
+
         stdVals = np.zeros(1,dtype=[('PMBSTD','f8'),
                                     ('PWVSTD','f8'),
                                     ('O3STD','f8'),
@@ -300,6 +364,7 @@ class FgcmLUT(object):
                                     ('LAMBDARANGE','f8',2),
                                     ('LAMBDASTEP','f8'),
                                     ('LAMBDASTD','f8',self.bands.size),
+                                    ('LAMBDAB','f8',self.bands.size),
                                     ('ATMLAMBDA','f8',self.atmLambda.size),
                                     ('ATMSTDTRANS','f8',self.atmStd.size)])
         stdVals['PMBSTD'] = self.pmbStd
@@ -311,9 +376,10 @@ class FgcmLUT(object):
         stdVals['LAMBDARANGE'] = self.lambdaRange
         stdVals['LAMBDASTEP'] = self.lambdaStep
         stdVals['LAMBDASTD'][:] = self.lambdaStd
+        stdVals['LAMBDAB'][:] = self.lambdaB
         stdVals['ATMLAMBDA'][:] = self.atmLambda
         stdVals['ATMSTDTRANS'][:] = self.atmStdTrans
 
-        fitsio.write(lutFile,stdVals,header=hdr)
+        fitsio.write(lutFile,stdVals,extname='STD')
 
 
