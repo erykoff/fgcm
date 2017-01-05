@@ -2,6 +2,9 @@
 
 elevation: 2220.0
 
+bands: ['g','r','i','z','Y']
+
+
 pmbRange: [770.0,790.0]
 pmbSteps: 5
 
