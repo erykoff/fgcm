@@ -2,5 +2,5 @@
 .svn*
 build
 dist
-fgcm_y3a1_tools.egg-info
+fgcm.egg-info
 svn*
