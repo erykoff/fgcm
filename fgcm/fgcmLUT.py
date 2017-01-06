@@ -61,6 +61,9 @@ class FgcmLUT(object):
         self.lambdaRange = stdVals['LAMBDARANGE']
         self.lambdaStep = stdVals['LAMBDASTEP']
         self.lambdaStd = stdVals['LAMBDASTD']
+        self.I0Std = stdVals['I0STD']
+        self.I1Std = stdVals['I1STD']
+        self.I10Std = stdVals['I10STD']
         self.lambdaB = stdVals['LAMBDAB']
         self.atmLambda = stdVals['ATMLAMBDA']
         self.atmStdTrans = stdVals['ATMSTDTRANS']
@@ -320,13 +323,19 @@ class FgcmLUT(object):
                                  dtype=[('DELTAI0','f8'),
                                         ('DELTAI1','f8')])
 
+        self.I0Std = np.zeros(self.bands.size)
+        self.I1Std = np.zeros(self.bands.size)
+
         for i in xrange(self.bands.size):
+            self.I0Std[i] = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+            self.I1Std[i] = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
             for j in xrange(self.nCCD):
                 deltaSb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,j] - self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG']
                 self.ccdDelta['DELTAI0'][i,j] = integrate.simps(deltaSb * self.atmStdTrans / self.atmLambda, self.atmLambda)
                 self.ccdDelta['DELTAI1'][i,j] = integrate.simps(deltaSb * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
-                #self.ccdDelta['DELTAI1'][i,j] = integrate.simps(deltaSb * self.atmStdTrans * (self.atmLambda - self.lambdaB[i]) / self.atmLambda, self.atmLambda)
 
+
+        self.I10Std = self.I1Std / self.I0Std
         # and we can write it out.
 
         # start by writing the LUT.  And clobber, though we checked at start
@@ -364,6 +373,9 @@ class FgcmLUT(object):
                                     ('LAMBDARANGE','f8',2),
                                     ('LAMBDASTEP','f8'),
                                     ('LAMBDASTD','f8',self.bands.size),
+                                    ('I0STD','f8',self.bands.size),
+                                    ('I1STD','f8',self.bands.size),
+                                    ('I10STD','f8',self.bands.size),
                                     ('LAMBDAB','f8',self.bands.size),
                                     ('ATMLAMBDA','f8',self.atmLambda.size),
                                     ('ATMSTDTRANS','f8',self.atmStd.size)])
@@ -376,6 +388,9 @@ class FgcmLUT(object):
         stdVals['LAMBDARANGE'] = self.lambdaRange
         stdVals['LAMBDASTEP'] = self.lambdaStep
         stdVals['LAMBDASTD'][:] = self.lambdaStd
+        stdVals['I0STD'][:] = self.I0Std
+        stdVals['I1STD'][:] = self.I1Std
+        stdVals['I10STD'][:] = self.I10Std
         stdVals['LAMBDAB'][:] = self.lambdaB
         stdVals['ATMLAMBDA'][:] = self.atmLambda
         stdVals['ATMSTDTRANS'][:] = self.atmStdTrans
