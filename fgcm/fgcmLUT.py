@@ -7,6 +7,20 @@ import scipy.integrate as integrate
 import fgcm_y3a1_tools
 import os
 import sys
+import multiprocessing
+from multiprocessing import Pool
+import copy_reg
+import types
+
+# this might allow multiprocessing to work
+def _pickle_method(m):
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+
+copy_reg.pickle(types.MethodType, _pickle_method)
+
 
 class FgcmLUT(object):
     """
@@ -136,6 +150,11 @@ class FgcmLUT(object):
         else:
             self.lambdaNorm = 7750.0
 
+        if ('nproc' in self.lutConfig):
+            self.nproc = self.lutConfig['nproc']
+        else:
+            self.nproc = 1
+
     def makeLUT(self,lutFile,clobber=False):
         """
         """
@@ -189,7 +208,7 @@ class FgcmLUT(object):
 
         print("Generating %d*%d=%d PWV atmospheres..." % (self.pwv.size,self.zenith.size,self.pwv.size*self.zenith.size))
 
-        pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
+        self.pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
 
         for i in xrange(self.pwv.size):
             sys.stdout.write('%d' % (i))
@@ -200,10 +219,10 @@ class FgcmLUT(object):
                 atm=self.modGen(pwv=self.pwv[i],zenith=self.zenith[j],
                                 lambdaRange=self.lambdaRange/10.0,
                                 lambdaStep=self.lambdaStep)
-                pwvAtmTable[i,j,:] = atm['H2O']
+                self.pwvAtmTable[i,j,:] = atm['H2O']
 
         print("\nGenerating %d*%d=%d O3 atmospheres..." % (self.o3.size,self.zenith.size,self.o3.size*self.zenith.size))
-        o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
+        self.o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
 
         for i in xrange(self.o3.size):
             sys.stdout.write('%d' % (i))
@@ -214,11 +233,11 @@ class FgcmLUT(object):
                 atm=self.modGen(o3=self.o3[i],zenith=self.zenith[j],
                                 lambdaRange=self.lambdaRange/10.0,
                                 lambdaStep=self.lambdaStep)
-                o3AtmTable[i,j,:] = atm['O3']
+                self.o3AtmTable[i,j,:] = atm['O3']
 
         print("\nGenerating %d O2/Rayleigh atmospheres..." % (self.zenith.size))
-        o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
-        rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
+        self.o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
+        self.rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
 
         for j in xrange(self.zenith.size):
             sys.stdout.write('.')
@@ -226,8 +245,8 @@ class FgcmLUT(object):
             atm=self.modGen(zenith=self.zenith[j],
                             lambdaRange=self.lambdaRange/10.0,
                             lambdaStep=self.lambdaStep)
-            o2AtmTable[j,:] = atm['O2']
-            rayleighAtmTable[j,:] = atm['RAYLEIGH']
+            self.o2AtmTable[j,:] = atm['O2']
+            self.rayleighAtmTable[j,:] = atm['RAYLEIGH']
 
         # get the filters over the same lambda ranges...
         print("\nInterpolating filters...")
@@ -271,29 +290,41 @@ class FgcmLUT(object):
                                    ('D_ALPHA','f8'),
                                    ('D_SECZENITH','f8')])
 
+        #pool = Pool(processes=self.nproc)
+
         for i in xrange(self.bands.size):
             print("Working on band %s" % (self.bands[i]))
             for j in xrange(self.pmb.size):
+                print(" and on pmb #%d" % (j))
                 pmbMolecularScattering = np.exp(-(self.pmb[j] - self.modGen.pmbElevation)/self.modGen.pmbElevation)
                 pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
                 pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
                 for k in xrange(self.pwv.size):
+                    print("  and on pwv #%d" % (k))
                     for m in xrange(self.o3.size):
+                        print("   and on o3 #%d" % (m))
                         for n in xrange(self.tau.size):
+                            #print("    and on tau #%d" % (n))
                             for o in xrange(self.alpha.size):
+
+                                self.dataForPool = (i,j,k,m,n,o,pmbFactor)
+
+                                #retvals=pool.map(self._lutPoolWorker,xrange(self.zenith.size))
                                 for p in xrange(self.zenith.size):
-                                    aerosolTauLambda = np.exp(-1.0*self.tau[n]*self.airmass[p]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[o]))
+                                    retval = self._lutPoolWorker(p)
+                                    self.lut['I0'][i,j,k,m,n,o,p,:] = retval[0,:]
+                                    self.lut['I1'][i,j,k,m,n,o,p,:] = retval[1,:]
 
-                                    for q in xrange(self.nCCDStep):
-                                        # last bin is the average
-                                        if (q == self.nCCD):
-                                            filterThroughput = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG']
-                                        else:
-                                            filterThroughput = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,q]
+                                #for p in xrange(self.zenith.size):
+                                #    self.aerosolTauLambda = np.exp(-1.0*self.tau[n]*self.airmass[p]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[o]))
 
-                                        Sb = filterThroughput * pmbFactor * o2AtmTable[p,:] * rayleighAtmTable[p,:] * pwvAtmTable[k,p,:] * o3AtmTable[m,p,:] * aerosolTauLambda
-                                        self.lut['I0'][i,j,k,m,n,o,p,q] = integrate.simps(Sb / self.atmLambda, self.atmLambda)
-                                        self.lut['I1'][i,j,k,m,n,o,p,q] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+                                #    self.dataForPool = (i,j,k,m,n,o,p,pmbFactor)
+
+                                #    retvals = pool.map(self._lutPoolWorker,xrange(self.nCCDStep))
+                                #    for q in xrange(self.nCCDStep):
+                                #        self.lut['I0'][i,j,k,m,n,o,p,q] = retvals[q][0]
+                                #        self.lut['I1'][i,j,k,m,n,o,p,q] = retvals[q][1]
+
 
         # and now the derivative tables...
         # last boundary is set to zero.
@@ -422,4 +453,53 @@ class FgcmLUT(object):
 
         fitsio.write(lutFile,stdVals,extname='STD')
 
+
+    def _lutPoolWorker(self, zenithIndex):
+        i = self.dataForPool[0]
+        j = self.dataForPool[1]
+        k = self.dataForPool[2]
+        m = self.dataForPool[3]
+        n = self.dataForPool[4]
+        o = self.dataForPool[5]
+        pmbFactor = self.dataForPool[6]
+
+        p=zenithIndex
+
+        aerosolTauLambda = np.exp(-1.0*self.tau[n]*self.airmass[p]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[o]))
+
+        retval = np.zeros((2,self.nCCDStep))
+        for q in xrange(self.nCCDStep):
+            if (q == self.nCCD):
+                Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * aerosolTauLambda
+            else:
+                Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,q] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * aerosolTauLambda
+            retval[0,q] = integrate.simps(Sb / self.atmLambda, self.atmLambda)
+            retval[1,q] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+
+        return retval
+
+    def _lutPoolWorker0(self, ccdIndex):
+        #aerosolTauLambda = np.exp(-1.0*self.tau[indices[4]]*self.airmass[indices[6]]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[indices[5]]))
+
+        i = self.dataForPool[0]
+        j = self.dataForPool[1]
+        k = self.dataForPool[2]
+        m = self.dataForPool[3]
+        n = self.dataForPool[4]
+        o = self.dataForPool[5]
+        p = self.dataForPool[6]
+        pmbFactor = self.dataForPool[7]
+
+        if (ccdIndex == self.nCCD):
+            Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * self.aerosolTauLambda
+        else :
+            Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,ccdIndex] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * self.aerosolTauLambda
+        i0 = integrate.simps(Sb / self.atmLambda, self.atmLambda)
+        i1 = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+        # put in a delay
+        #tot=0
+        #for c in xrange(10000000):
+        #    tot+=1
+
+        return (i0,i1)
 
