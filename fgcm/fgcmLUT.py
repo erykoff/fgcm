@@ -32,16 +32,25 @@ class FgcmLUT(object):
 
         self.bands = indexVals['BANDS'][0]
         self.pmb = indexVals['PMB'][0]
+        self.pmbFactor = indexVals['PMBFACTOR'][0]
+        self.pmbDelta = self.pmb[1] - self.pmb[0]
+        # self.pmbElevation = indexVals['PMBELEVATION'][0]
         self.pwv = indexVals['PWV'][0]
+        self.pwvDelta = self.pwv[1] - self.pwv[0]
         self.o3 = indexVals['O3'][0]
+        self.o3Delta = self.o3[1] - self.o3[0]
         self.tau = indexVals['TAU'][0]
+        self.lnTau = np.log(self.tau)
+        self.lnTauDelta = self.lnTau[1] - self.lnTau[0]
         self.alpha = indexVals['ALPHA'][0]
+        self.alphaDelta = self.alpha[1] - self.alpha[0]
         self.zenith = indexVals['ZENITH'][0]
+        self.secZenith = 1./np.cos(self.zenith*np.pi/180.)
+        self.secZenithDelta = self.secZenith[1] - self.secZenith[0]
         self.nCCD = indexVals['NCCD'][0]
         self.nCCDStep = self.nCCD+1
 
         self.lut = lutFlat.reshape((self.bands.size,
-                                    self.pmb.size,
                                     self.pwv.size,
                                     self.o3.size,
                                     self.tau.size,
@@ -98,6 +107,7 @@ class FgcmLUT(object):
 
         # this will generate an exception if things aren't set up properly
         self.modGen = fgcm_y3a1_tools.ModtranGenerator(self.lutConfig['elevation'])
+        self.pmbElevation = self.modGen.pmbElevation
 
         self.bands = np.array(self.lutConfig['bands'])
 
@@ -260,7 +270,6 @@ class FgcmLUT(object):
         # now make the LUT!
         print("Building look-up table...")
         self.lut = np.zeros((self.bands.size,
-                             self.pmb.size,
                              self.pwv.size,
                              self.o3.size,
                              self.tau.size,
@@ -270,30 +279,28 @@ class FgcmLUT(object):
                             dtype=[('I0','f4'),
                                    ('I1','f4')])
 
+        pmbMolecularScattering = np.exp(-(self.pmb - self.pmbElevation)/self.pmbElevation)
+        pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
+        self.pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
+
         for i in xrange(self.bands.size):
             print("Working on band %s" % (self.bands[i]))
-            for j in xrange(self.pmb.size):
-                print(" and on pmb #%d" % (j))
-                pmbMolecularScattering = np.exp(-(self.pmb[j] - self.modGen.pmbElevation)/self.modGen.pmbElevation)
-                pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
-                pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
-                for k in xrange(self.pwv.size):
-                    print("  and on pwv #%d" % (k))
-                    for m in xrange(self.o3.size):
-                        print("   and on o3 #%d" % (m))
-                        for n in xrange(self.tau.size):
-                            for o in xrange(self.alpha.size):
-                                for p in xrange(self.zenith.size-1):
-                                    aerosolTauLambda = np.exp(-1.0*self.tau[n]*self.airmass[p]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[o]))
+            for j in xrange(self.pwv.size):
+                print("  and on pwv #%d" % (j))
+                for k in xrange(self.o3.size):
+                    print("   and on o3 #%d" % (k))
+                    for m in xrange(self.tau.size):
+                        for n in xrange(self.alpha.size):
+                            for o in xrange(self.zenith.size):
+                                aerosolTauLambda = np.exp(-1.0*self.tau[m]*self.airmass[o]*(self.atmLambda/self.lambdaNorm)**(-self.alpha[n]))
+                                for p in xrange(self.nCCDStep):
+                                    if (p == self.nCCD):
+                                        Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.o2AtmTable[o,:] * self.rayleighAtmTable[o,:] * self.pwvAtmTable[j,o,:] * self.o3AtmTable[k,o,:] * aerosolTauLambda
+                                    else:
+                                        Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,p] * self.o2AtmTable[o,:] * self.rayleighAtmTable[o,:] * self.pwvAtmTable[j,o,:] * self.o3AtmTable[k,o,:] * aerosolTauLambda
 
-                                    for q in xrange(self.nCCDStep):
-                                        if (q == self.nCCD):
-                                            Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * aerosolTauLambda
-                                        else:
-                                            Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,q] * pmbFactor * self.o2AtmTable[p,:] * self.rayleighAtmTable[p,:] * self.pwvAtmTable[k,p,:] * self.o3AtmTable[m,p,:] * aerosolTauLambda
-
-                                        self.lut['I0'][i,j,k,m,n,o,p,q] = integrate.simps(Sb / self.atmLambda, self.atmLambda)
-                                        self.lut['I1'][i,j,k,m,n,o,p,q] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+                                    self.lut['I0'][i,j,k,m,n,o,p] = integrate.simps(Sb / self.atmLambda, self.atmLambda)
+                                    self.lut['I1'][i,j,k,m,n,o,p] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
 
 
         # and now we need the CCD deltas
@@ -326,6 +333,8 @@ class FgcmLUT(object):
 
         indexVals = np.zeros(1,dtype=[('BANDS','a1',self.bands.size),
                                       ('PMB','f8',self.pmb.size),
+                                      ('PMBFACTOR','f8',self.pmb.size),
+                                      ('PMBELEVATION','f8'),
                                       ('PWV','f8',self.pwv.size),
                                       ('O3','f8',self.o3.size),
                                       ('TAU','f8',self.tau.size),
@@ -334,6 +343,8 @@ class FgcmLUT(object):
                                       ('NCCD','i4')])
         indexVals['BANDS'] = self.bands
         indexVals['PMB'] = self.pmb
+        indexVals['PMBFACTOR'] = self.pmbFactor
+        indexVals['PMBELEVATION'] = self.pmbElevation
         indexVals['PWV'] = self.pwv
         indexVals['O3'] = self.o3
         indexVals['TAU'] = self.tau
@@ -381,8 +392,8 @@ class FgcmLUT(object):
     def makeLUTDerivatives(self, lutFile):
 
         # need setup
+        # NOTE: will need to add pmb
         self.lutDeriv = np.zeros((self.bands.size,
-                                  self.pmb.size,
                                   self.pwv.size,
                                   self.o3.size,
                                   self.tau.size,
@@ -400,41 +411,40 @@ class FgcmLUT(object):
 
         for i in xrange(self.bands.size):
             print("Working on band %s" % (self.bands[i]))
-            for j in xrange(self.pmb.size-1):
-                for k in xrange(self.pwv.size-1):
-                    for m in xrange(self.o3.size-1):
-                        for n in xrange(self.tau.size-1):
-                            for o in xrange(self.alpha.size-1):
-                                for p in xrange(self.zenith.size-1):
-                                    for q in xrange(self.nCCDStep):
-                                        self.lut['D_PMB'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j+1,k,m,n,o,p,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
-                                             self.pmbDelta)
-                                            )
-                                        self.lut['D_PWV'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j,k+1,m,n,o,p,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
-                                             self.pwvDelta)
-                                            )
-                                        self.lut['D_O3'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j,k,m+1,n,o,p,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
-                                             self.o3Delta)
-                                            )
-                                        self.lut['D_LNTAU'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j,k,m,n+1,o,p,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
-                                             self.lnTauDelta)
-                                            )
-                                        self.lut['D_ALPHA'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j,k,m,n,o+1,p,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
+            for j in xrange(self.pwv.size-1):
+                for k in xrange(self.o3.size-1):
+                    for m in xrange(self.tau.size-1):
+                        for n in xrange(self.alpha.size-1):
+                            for o in xrange(self.zenith.size-1):
+                                for p in xrange(self.nCCDStep):
+                                    #self.lutDeriv['D_PMB'][i,j,k,m,n,o,p,q] = (
+                                    #        ((self.lutDeriv['I0'][i,j+1,k,m,n,o,p,q] -
+                                    #          self.lutDeriv['I0'][i,j,k,m,n,o,p,q]) /
+                                    #         self.pmbDelta)
+                                    #        )
+                                    self.lutDeriv['D_PWV'][i,j,k,m,n,o,p] = (
+                                        ((self.lut['I0'][i,j+1,k,m,n,o,p] -
+                                          self.lut['I0'][i,j,k,m,n,o,p]) /
+                                         self.pwvDelta)
+                                        )
+                                    self.lutDeriv['D_O3'][i,j,k,m,n,o,p] = (
+                                        ((self.lut['I0'][i,j,k+1,m,n,o,p] -
+                                          self.lut['I0'][i,j,k,m,n,o,p]) /
+                                         self.o3Delta)
+                                        )
+                                    self.lutDeriv['D_LNTAU'][i,j,k,m,n,o,p] = (
+                                        ((self.lut['I0'][i,j,k,m+1,n,o,p] -
+                                          self.lut['I0'][i,j,k,m,n,o,p]) /
+                                         self.lnTauDelta)
+                                        )
+                                    self.lutDeriv['D_ALPHA'][i,j,k,m,n,o,p] = (
+                                            ((self.lut['I0'][i,j,k,m,n+1,o,p] -
+                                              self.lut['I0'][i,j,k,m,n,o,p]) /
                                              self.alphaDelta)
                                             )
-                                        self.lut['D_SECZENITH'][i,j,k,m,n,o,p,q] = (
-                                            ((self.lut['I0'][i,j,k,m,n,o,p+1,q] -
-                                              self.lut['I0'][i,j,k,m,n,o,p,q]) /
+                                    self.lutDeriv['D_SECZENITH'][i,j,k,m,n,o,p] = (
+                                            ((self.lut['I0'][i,j,k,m,n,o+1,p] -
+                                              self.lut['I0'][i,j,k,m,n,o,p]) /
                                              self.secZenithDelta)
                                             )
 
