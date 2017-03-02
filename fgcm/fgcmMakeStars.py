@@ -7,6 +7,7 @@ import sys
 import esutil
 import glob
 import smatch
+import healpy as hp
 
 class FgcmMakeStars(object):
     """
@@ -31,7 +32,7 @@ class FgcmMakeStars(object):
         self.starConfig['observationFile'] = self.starConfig['starfileBase']+'_observations.fits'
         self.starConfig['starPrePositionFile'] = self.starConfig['starfileBase']+'_prepositions.fits'
         self.starConfig['obsIndexFile'] = self.starConfig['starfileBase']+'_obs_index.fits'
-        self.starConfig['starPositionFile'] = self.starConfig['starfileBase']+'_positions.fits'
+        #self.starConfig['starPositionFile'] = self.starConfig['starfileBase']+'_positions.fits'
 
         self.nside=4096
 
@@ -52,14 +53,15 @@ class FgcmMakeStars(object):
                 print("Found %s" % (self.starConfig['observationFile']))
                 return
 
-        fits = fitsio.FITS(self.starConfig['observationFile'],mode='rw',clobber=True)
 
         # read in the exposure file
+        print("Reading in exposure file...")
         expInfo = fitsio.read(self.starConfig['exposureFile'],ext=1)
 
         # read in the blacklist file (if available)
         useBlacklist = False
         if (self.starConfig['blacklistFile'] is not None):
+            print("Reading blacklist file...")
             useBlacklist = True
             blacklist = fitsio.read(self.starConfig['blacklistFile'],ext=1)
             blackHash = (self.starConfig['nCCD'] + 1) * blacklist['EXPNUM'] + blacklist['CCDNUM']
@@ -78,8 +80,14 @@ class FgcmMakeStars(object):
             files = glob.glob(g)
             inputFiles.extend(files)
 
+        print("Found %d files." % (len(inputFiles)))
+
+        fits = fitsio.FITS(self.starConfig['observationFile'],mode='rw',clobber=True)
+        fits.create_table_hdu(dtype=dtype)
+
         for f in inputFiles:
             # read in the file
+            print("Reading %s" % (f))
             inObs = fitsio.read(f,ext=1,upper=True)
 
             # check that these have the right bands...
@@ -93,7 +101,10 @@ class FgcmMakeStars(object):
 
                 # match exp/ccd pairs 
                 _,badObs = esutil.numpy_util.match(blackHash,expHash)
-                mark[ind2] = False
+
+                print("Removing %d observations due to blacklist." % (badObs.size))
+                if (badObs.size > 0) :
+                    mark[badObs] = False
 
             # and check stars in reference band...
             if (self.starConfig['starSelectionMode'] == 0):
@@ -101,7 +112,9 @@ class FgcmMakeStars(object):
                 bad,=np.where((inObs['BAND'] == self.starConfig['referenceBand']) &
                               ((np.abs(inObs['SPREAD_MODEL']) > 0.003) |
                                (inObs['CLASS_STAR'] < 0.75)))
-                mark[bad] = False
+                print("Removing %d observations due to DES star selection." % (bad.size))
+                if (bad.size > 0):
+                    mark[bad] = False
 
             # make sure these are in the exposure list
             expIndex,obsIndex = esutil.numpy_util.match(expInfo['EXPNUM'],inObs['EXPNUM'])
@@ -130,6 +143,7 @@ class FgcmMakeStars(object):
 
             fits[1].append(tempObs)
 
+        print("Done building meta-observation table")
         fits.close()
 
     def makeReferenceStars(self,clobber=False):
@@ -155,6 +169,7 @@ class FgcmMakeStars(object):
                ('RA','f8'),
                ('DEC','f8')]
 
+        print("Matching catalog to neighbors...")
         matches=smatch.match(obsCat['RA'],obsCat['DEC'],self.starConfig['matchRadius']/3600.0,obsCat['RA'],obsCat['DEC'],nside=self.nside,maxmatch=0)
 
         fakeId = np.arange(obsCat.size)
@@ -222,7 +237,7 @@ class FgcmMakeStars(object):
             objCat = np.delete(objCat,neighbored)
 
         # and save the catalog...
-        fitsio.write(objCat,self.starConfig['starPrePositionFile'])
+        fitsio.write(self.starConfig['starPrePositionFile'],objCat)
 
     def makeMatchedStars(self,clobber=False):
         """
@@ -235,43 +250,108 @@ class FgcmMakeStars(object):
 
         # we need the star list...
 
+        print("Reading in reference positions...")
         objCat = fitsio.read(self.starConfig['starPrePositionFile'],ext=1)
+        print("There are %d reference stars." % (objCat.size))
 
         # and the full observation list...
 
+        print("Reading in observation file...")
         obsCat = fitsio.read(self.starConfig['observationFile'],ext=1,columns=['RA','DEC','BAND'])
+        obsBand = np.core.defchararray.strip(obsCat['BAND'])
 
+        print("Matching positions to observations...")
         m=smatch.match(objCat['RA'],objCat['DEC'],self.starConfig['matchRadius']/3600.0,obsCat['RA'],obsCat['DEC'],nside=self.nside,maxmatch=0)
 
-        objInd, obsInd = esutil.stat.histogram(m['i1'], rev=True)
+        print("Collating observations...")
+        nObsPerObj, obsInd = esutil.stat.histogram(m['i1'], rev=True)
 
-        if (objInd.size != objCat.size):
+        if (nObsPerObj.size != objCat.size):
             raise ValueError("Number of reference stars does not match observation file.")
 
         # which stars have at least minPerBand observations in each of the required bands?
-        req, = np.where(self.starConfig['requiredFlag'] == 1)
-        reqBands = self.starConfig['bands'][req]
+        req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
+        reqBands = np.array(self.starConfig['bands'])[req]
 
-        nobs = np.array((reqBands.size, objCat.size),dtype='i4')
+        print("Computing number of observations per band...")
+        nobs = np.zeros((reqBands.size, objCat.size),dtype='i4')
         for i in xrange(reqBands.size):
-            use,=np.where(obsCat['BAND'][m['i2']] == reqBands[i])
+            use,=np.where(obsBand[m['i2']] == reqBands[i])
             # need to make sure it's aligned
-            hist = esutil.stat.histogram(m['i1'][use],min=0,max=blah)
+            hist = esutil.stat.histogram(m['i1'][use],min=0,max=objCat.size-1)
             nobs[i,:] = hist
 
         # cut the star list to those with enough per band
+        minObs = nobs.min(axis=0)
 
-        # cut the density of stars down with sampling
+        # this is our classifier...
+        #   1 is a good star, 0 is bad.
+        objClass = np.zeros(objCat.size,dtype='i2')
+
+        gd,=np.where(minObs >= self.starConfig['minPerBand'])
+        objClass[gd] = 1
+        print("There are %d stars with at least %d observations in each required band." % (gd.size, self.starConfig['minPerBand']))
+
+        # cut the density of stars down with sampling...only the good ones
+
+        theta = (90.0 - objCat['DEC'][gd])*np.pi/180.
+        phi = objCat['RA'][gd]*np.pi/180.
+
+        ipring = hp.ang2pix(self.starConfig['nside'],theta,phi)
+        hist,rev=esutil.stat.histogram(ipring,rev=True)
+
+        high,=np.where(hist > self.starConfig['maxPerPixel'])
+        ok,=np.where(hist > 0)
+        print("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
+        for i in xrange(high.size):
+            i1a=rev[rev[high[i]]:rev[high[i]+1]]
+            cut=np.random.choice(i1a,size=i1a.size-self.starConfig['maxPerPixel'],replace=False)
+            objClass[gd[cut]] = 0
 
         # save the star positions
+        # redo the gd selection
+        gd,=np.where(objClass == 1)
 
-        # spool out the indices -- can we do this without rematching?  Cleanly?
+        print("Writing out %d potential calibration stars." % (gd.size))
+        
+        fits = fitsio.FITS(self.starConfig['obsIndexFile'],mode='rw',clobber=True)
+
+        # note that these are 4-byte integers.
+        #  to handle more than 2 billion observations will require a restructure of the code
+        objCatIndex = np.zeros(gd.size,dtype=[('FGCM_ID','i4'),
+                                              ('RA','f8'),
+                                              ('DEC','f8'),
+                                              ('OBSINDEX','i4'),
+                                              ('NOBS','i4')])
+        objCatIndex['FGCM_ID'][:] = objCat['FGCM_ID'][gd]
+        objCatIndex['RA'][:] = objCat['RA'][gd]
+        objCatIndex['DEC'][:] = objCat['DEC'][gd]
+        # this is definitely the number of observations
+        objCatIndex['NOBS'][:] = nObsPerObj[gd]
+        # and the index is the cumulative sum...
+        objCatIndex['OBSINDEX'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
+
+        # first extension is the positions
+        fits.create_table_hdu(data=objCatIndex,extname='POS')
+        fits[1].write(objCatIndex)
+
+        # next extension is the obsCat indices...
+        dtype=[('OBSINDEX','i4')]
+        fits.create_table_hdu(dtype=dtype,extname='INDEX')
+
+        print("Spooling out %d observation indices." % (np.sum(objCatIndex['NOBS'])))
+        for i in gd:
+            tempIndices = np.zeros(nObsPerObj[i],dtype=dtype)
+            tempIndices['OBSINDEX'][:] = m['i2'][obsInd[obsInd[i]:obsInd[i+1]]]
+            fits[2].append(tempIndices)
+
+        fits.close()
+
+        # note that we're not updating the total observation table, though this
+        # could be done to save some speed on reading it in later on
+        #  (or just grab the rows from the index...need to check on fitsio there.)
 
         # and we're done
 
 
-    #def cutReferenceStars(self):
-    #    pass
-
-    
 
