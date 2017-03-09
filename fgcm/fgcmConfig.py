@@ -24,9 +24,8 @@ class FgcmConfig(object):
             configDict = yaml.load(f)
 
         requiredKeys=['exposureFile','UTBoundary',
-                      'washDates','lutFile','expField',
-                      'ccdField','exptimeField','pmbField','mjdField',
-                      'hourField','telRAField','telDecField','latitude']
+                      'washMJDs','epochMJDs','lutFile','expField',
+                      'ccdField','latitude','seeingField']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -34,27 +33,31 @@ class FgcmConfig(object):
 
         self.exposureFile = configDict['exposureFile']
         self.UTBoundary = configDict['UTBoundary']
-        self.washDates = configDict['washDates']
+        self.washMJDs = np.array(configDict['washMJDs'])
+        self.epochMJDs = np.array(configDict['epochMJDs'])
         self.lutFile = configDict['lutFile']
         self.expField = configDict['expField']
         self.ccdField = configDict['ccdField']
-        self.exptimeField = configDict['exptimeField']
-        self.pmbField = configDict['pmbField']
-        self.mjdField = configDict['mjdField']
-        self.hourField = configDict['hourField']
-        self.telRAField = configDict['telRAField']
-        self.telDecField = configDict['telDecField']
         self.latitude = configDict['latitude']
+        self.seeingField = configDict['seeingField']
         self.cosLatitude = np.cos(np.radians(self.latitude))
         self.sinLatitude = np.sin(np.radians(self.latitude))
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
+            if ('externalPwvDeltaT' not in configDict):
+                raise ValueError("Must include externalPwvDeltaT with pwvFile")
+            self.externalPwvDeltaT = configDict['externalPwvDeltaT']
+
         else:
             self.pwvFile = None
 
         if 'tauFile' in configDict:
             self.tauFile = configDict['tauFile']
+            if ('externalTauDeltaT' not in configDict):
+                raise ValueError("Must include externalTauDeltaT with tauFile")
+            self.externalTauDeltaT = configDict['externalTauDeltaT']
+
         else:
             self.tauFile = None
 
@@ -70,9 +73,36 @@ class FgcmConfig(object):
         self.alphaRange = np.array([np.min(lutStats['ALPHA']),np.max(lutStats['ALPHA'])])
         self.zenithRange = np.array([np.min(lutStats['ZENITH']),np.max(lutStats['ZENITH'])])
 
+        lutStd = fitsio.read(self.lutFile,ext='STD')
+        self.pmbStd = lutStd['PMBSTD']
+        self.pwvStd = lutStd['PWVSTD']
+        self.o3Std = lutStd['O3STD']
+        self.tauStd = lutStd['TAUSTD']
+        self.alphaStd = lutStd['ALPHASTD']
+        self.zenithStd = lutStd['ZENITHSTD']
+
         # and look at the exposure file and grab some stats
         expInfo = fitsio.read(self.exposureFile,ext=1)
-        self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
-        self.mjdRange = np.array([np.min(expInfo[self.mjdField]),np.max(expInfo[self.mjdField])])
+        self.expRange = np.array([np.min(expInfo['EXPNUM']),np.max(expInfo['EXPNUM'])])
+        self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
+
+        # based on mjdRange, look at epochs; also sort.
+        # confirm that we cover all the exposures, and remove excess epochs
+        self.epochMJDs.sort()
+        test=np.searchsorted(epochMJDs,mjdRange)
+
+        if test.min() == 0:
+            raise ValueError("Exposure start MJD is out of epoch range!")
+        if test.max() == epochMJDs.size:
+            raise ValueError("Exposure end MJD is out of epoch range!")
+
+        # crop to valid range
+        self.epochMJDs = self.epochMJDs[test[0]-1:test[1]+1]
+
+        # and look at washMJDs; also sort
+        self.washMJDs.sort()
+        gd,=np.where((self.washMJDs > self.mjdRange[0]) &
+                     (self.washMJDs < self.mjdRange[1]))
+        self.washMJDs = self.washMJDs[gd]
 
