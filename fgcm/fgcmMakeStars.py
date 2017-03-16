@@ -321,7 +321,7 @@ class FgcmMakeStars(object):
         objCatIndex = np.zeros(gd.size,dtype=[('FGCM_ID','i4'),
                                               ('RA','f8'),
                                               ('DEC','f8'),
-                                              ('OBSINDEX','i4'),
+                                              ('OBSARRINDEX','i4'),
                                               ('NOBS','i4')])
         objCatIndex['FGCM_ID'][:] = objCat['FGCM_ID'][gd]
         objCatIndex['RA'][:] = objCat['RA'][gd]
@@ -329,7 +329,7 @@ class FgcmMakeStars(object):
         # this is definitely the number of observations
         objCatIndex['NOBS'][:] = nObsPerObj[gd]
         # and the index is the cumulative sum...
-        objCatIndex['OBSINDEX'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
+        objCatIndex['OBSARRINDEX'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
 
         # first extension is the positions
         fits.create_table_hdu(data=objCatIndex,extname='POS')
