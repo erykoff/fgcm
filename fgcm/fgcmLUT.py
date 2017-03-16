@@ -43,7 +43,15 @@ class FgcmLUT(object):
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]
-        # self.pmbElevation = indexVals['PMBELEVATION'][0]
+        ## temporary hacks
+        try:
+            self.pmbElevation = indexVals['PMBELEVATION'][0]
+        except:
+            self.pmbElevation = 2220.0
+        try:
+            self.lambdaNorm = indexVals['LAMBDANORM'][0]
+        except:
+            self.lambdaNorm = 7750.0
         self.pwv = indexVals['PWV'][0]
         self.pwvDelta = self.pwv[1] - self.pwv[0]
         self.o3 = indexVals['O3'][0]
@@ -69,26 +77,26 @@ class FgcmLUT(object):
 
         ccdDeltaFlat = fitsio.read(lutFile,ext='CCD')
         self.ccdDelta = ccdDeltaFlat.reshape((indexVals['BANDS'].size,
-                                              indexVals['NCCD']))
+                                              indexVals['NCCD'][0]))
 
 
         stdVals = fitsio.read(lutFile,ext='STD')
 
-        self.pmbStd = stdVals['PMBSTD']
-        self.pwvStd = stdVals['PWVSTD']
-        self.o3Std = stdVals['O3STD']
-        self.tauStd = stdVals['TAUSTD']
-        self.alphaStd = stdVals['ALPHASTD']
-        self.zenithStd = stdVals['ZENITHSTD']
-        self.lambdaRange = stdVals['LAMBDARANGE']
-        self.lambdaStep = stdVals['LAMBDASTEP']
-        self.lambdaStd = stdVals['LAMBDASTD']
-        self.I0Std = stdVals['I0STD']
-        self.I1Std = stdVals['I1STD']
-        self.I10Std = stdVals['I10STD']
-        self.lambdaB = stdVals['LAMBDAB']
-        self.atmLambda = stdVals['ATMLAMBDA']
-        self.atmStdTrans = stdVals['ATMSTDTRANS']
+        self.pmbStd = stdVals['PMBSTD'][0]
+        self.pwvStd = stdVals['PWVSTD'][0]
+        self.o3Std = stdVals['O3STD'][0]
+        self.tauStd = stdVals['TAUSTD'][0]
+        self.alphaStd = stdVals['ALPHASTD'][0]
+        self.zenithStd = stdVals['ZENITHSTD'][0]
+        self.lambdaRange = stdVals['LAMBDARANGE'][0]
+        self.lambdaStep = stdVals['LAMBDASTEP'][0]
+        self.lambdaStd = stdVals['LAMBDASTD'][0]
+        self.I0Std = stdVals['I0STD'][0]
+        self.I1Std = stdVals['I1STD'][0]
+        self.I10Std = stdVals['I10STD'][0]
+        self.lambdaB = stdVals['LAMBDAB'][0]
+        self.atmLambda = stdVals['ATMLAMBDA'][0]
+        self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
 
 
     def _checkLUTConfig(self,lutConfig):
@@ -347,6 +355,7 @@ class FgcmLUT(object):
                                       ('PWV','f8',self.pwv.size),
                                       ('O3','f8',self.o3.size),
                                       ('TAU','f8',self.tau.size),
+                                      ('LAMBDANORM','f8'),
                                       ('ALPHA','f8',self.alpha.size),
                                       ('ZENITH','f8',self.zenith.size),
                                       ('NCCD','i4')])
@@ -357,6 +366,7 @@ class FgcmLUT(object):
         indexVals['PWV'] = self.pwv
         indexVals['O3'] = self.o3
         indexVals['TAU'] = self.tau
+        indexVals['LAMBDANORM'] = self.lambdaNorm
         indexVals['ALPHA'] = self.alpha
         indexVals['ZENITH'] = self.zenith
         indexVals['NCCD'] = self.nCCD
@@ -374,6 +384,7 @@ class FgcmLUT(object):
                                     ('LAMBDARANGE','f8',2),
                                     ('LAMBDASTEP','f8'),
                                     ('LAMBDASTD','f8',self.bands.size),
+                                    ('LAMBDANORM','f8'),
                                     ('I0STD','f8',self.bands.size),
                                     ('I1STD','f8',self.bands.size),
                                     ('I10STD','f8',self.bands.size),
@@ -389,6 +400,7 @@ class FgcmLUT(object):
         stdVals['LAMBDARANGE'] = self.lambdaRange
         stdVals['LAMBDASTEP'] = self.lambdaStep
         stdVals['LAMBDASTD'][:] = self.lambdaStd
+        stdVals['LAMBDANORM'][:] = self.lambdaNorm
         stdVals['I0STD'][:] = self.I0Std
         stdVals['I1STD'][:] = self.I1Std
         stdVals['I10STD'][:] = self.I10Std
@@ -473,7 +485,15 @@ class FgcmLUTSHM(object):
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]
-        # self.pmbElevation = indexVals['PMBELEVATION'][0]
+        ## temporary hacks
+        try:
+            self.pmbElevation = indexVals['PMBELEVATION'][0]
+        except:
+            self.pmbElevation = 2220.0
+        try:
+            self.lambdaNorm = indexVals['LAMBDANORM'][0]
+        except:
+            self.lambdaNorm = 7775.0
         self.pwv = indexVals['PWV'][0]
         self.pwvDelta = self.pwv[1] - self.pwv[0]
         self.o3 = indexVals['O3'][0]
@@ -515,6 +535,26 @@ class FgcmLUTSHM(object):
         self.lutDAlphaSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
         self.lutDSecZenithSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH'].reshape(sizeTuple)
 
+        # get the standard values
+        stdVals = fitsio.read(lutFile,ext='STD')
+
+        self.pmbStd = stdVals['PMBSTD'][0]
+        self.pwvStd = stdVals['PWVSTD'][0]
+        self.o3Std = stdVals['O3STD'][0]
+        self.tauStd = stdVals['TAUSTD'][0]
+        self.alphaStd = stdVals['ALPHASTD'][0]
+        self.zenithStd = stdVals['ZENITHSTD'][0]
+        self.lambdaRange = stdVals['LAMBDARANGE'][0]
+        self.lambdaStep = stdVals['LAMBDASTEP'][0]
+        self.lambdaStd = stdVals['LAMBDASTD'][0]
+        self.I0Std = stdVals['I0STD'][0]
+        self.I1Std = stdVals['I1STD'][0]
+        self.I10Std = stdVals['I10STD'][0]
+        self.lambdaB = stdVals['LAMBDAB'][0]
+        self.atmLambda = stdVals['ATMLAMBDA'][0]
+        self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
+
+
     def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         # need to make sure we have the right ccd indices...
         # this will happen externally.
@@ -540,16 +580,16 @@ class FgcmLUTSHM(object):
         dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
         dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
 
-        indicesPlus = indices[:]
-        indicesPlus[5] = indicesPlus[5] + 1
+        indicesPlus = np.array(indices[:-1])
+        indicesPlus[5] += 1
 
         return indices[-1]*(self.lutI0SHM[indices[:-1]] +
                             dPwv * self.lutDPwvSHM[indices[:-1]] +
                             dO3 * self.lutDO3SHM[indices[:-1]] +
-                            dlnTau * self.lutDTauSHM[indices[:-1]] +
+                            dlnTau * self.lutDLnTauSHM[indices[:-1]] +
                             dAlpha * self.lutDAlphaSHM[indices[:-1]] +
                             dSecZenith * self.lutDSecZenithSHM[indices[:-1]] +
-                            dlnTau * dSecZenith * (self.lutDlnTau[indicesPlus[:-1]] - self.lutDlnTau[indices[:-1]])/self.secZenithDelta)
+                            dlnTau * dSecZenith * (self.lutDLnTauSHM[tuple(indicesPlus)] - self.lutDLnTauSHM[indices[:-1]])/self.secZenithDelta)
 
 
     def computeI1(self, indices):
