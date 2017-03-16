@@ -25,7 +25,8 @@ class FgcmConfig(object):
 
         requiredKeys=['exposureFile','UTBoundary',
                       'washMJDs','epochMJDs','lutFile','expField',
-                      'ccdField','latitude','seeingField']
+                      'ccdField','latitude','seeingField','fitBands','extraBands',
+                      'deepFlag']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -40,8 +41,11 @@ class FgcmConfig(object):
         self.ccdField = configDict['ccdField']
         self.latitude = configDict['latitude']
         self.seeingField = configDict['seeingField']
+        self.deepFlag = configDict['deepFlag']
         self.cosLatitude = np.cos(np.radians(self.latitude))
         self.sinLatitude = np.sin(np.radians(self.latitude))
+        self.fitBands = np.array(configDict['fitBands'])
+        self.extraBands = np.array(configDict['extraBands'])
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -61,11 +65,20 @@ class FgcmConfig(object):
         else:
             self.tauFile = None
 
+        if 'stepUnitReference' in configDict:
+            self.stepUnitReference = configDict['stepUnitReference']
+        else:
+            self.stepUnitReference = 0.001
+        if 'stepGrain' in configDict:
+            self.stepGrain = configDict['stepGrain']
+        else:
+            self.stepGrain = 10.0
+
         # and look at the lutFile
         lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
-        self.nCCD = lutStats['NCCD']
-        self.bands = lutStats['BANDS']
+        self.nCCD = lutStats['NCCD'][0]
+        self.bands = lutStats['BANDS'][0]
         self.pmbRange = np.array([np.min(lutStats['PMB']),np.max(lutStats['PMB'])])
         self.pwvRange = np.array([np.min(lutStats['PWV']),np.max(lutStats['PWV'])])
         self.O3Range = np.array([np.min(lutStats['O3']),np.max(lutStats['O3'])])
@@ -74,12 +87,12 @@ class FgcmConfig(object):
         self.zenithRange = np.array([np.min(lutStats['ZENITH']),np.max(lutStats['ZENITH'])])
 
         lutStd = fitsio.read(self.lutFile,ext='STD')
-        self.pmbStd = lutStd['PMBSTD']
-        self.pwvStd = lutStd['PWVSTD']
-        self.o3Std = lutStd['O3STD']
-        self.tauStd = lutStd['TAUSTD']
-        self.alphaStd = lutStd['ALPHASTD']
-        self.zenithStd = lutStd['ZENITHSTD']
+        self.pmbStd = lutStd['PMBSTD'][0]
+        self.pwvStd = lutStd['PWVSTD'][0]
+        self.o3Std = lutStd['O3STD'][0]
+        self.tauStd = lutStd['TAUSTD'][0]
+        self.alphaStd = lutStd['ALPHASTD'][0]
+        self.zenithStd = lutStd['ZENITHSTD'][0]
 
         # and look at the exposure file and grab some stats
         expInfo = fitsio.read(self.exposureFile,ext=1)
@@ -90,11 +103,11 @@ class FgcmConfig(object):
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
         self.epochMJDs.sort()
-        test=np.searchsorted(epochMJDs,mjdRange)
+        test=np.searchsorted(self.epochMJDs,self.mjdRange)
 
         if test.min() == 0:
             raise ValueError("Exposure start MJD is out of epoch range!")
-        if test.max() == epochMJDs.size:
+        if test.max() == self.epochMJDs.size:
             raise ValueError("Exposure end MJD is out of epoch range!")
 
         # crop to valid range
