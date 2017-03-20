@@ -10,7 +10,9 @@ from fgcmUtilities import _pickle_method
 
 import types
 import copy_reg
-import sharedmem as shm
+#import sharedmem as shm
+
+from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 from fgcmLUT import FgcmLUTSHM
 
@@ -97,12 +99,20 @@ class FgcmParameters(object):
         self.parDustSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
 
         if (fgcmConfig.pwvFile is not None):
-            self.loadExternalPWV(fgcmConfig.pwvFile,fgcmConfig.externalPwvDeltaT)
+            self.pwvFile = fgcmConfig.pwvFile
+            self.hasExternalPWV = True
+            self.loadExternalPWV(fgcmConfig.externalPwvDeltaT)
             # need to add two global parameters!
+            self.parExternalPwvScale = 1.0
+            self.parExternalPwvOffset = 0.0
 
         if (fgcmConfig.tauFile is not None):
-            self.loadExternalTau(fgcmConfig.tauFile)
+            self.tauFile = fgcmConfig.tauFile
+            self.hasExternalTau = True
+            self.loadExternalTau()
             # need to add two global parameters!
+            self.parExternalTauScale = 1.0
+            self.parExternalTauOffset = 0.0
 
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
@@ -321,15 +331,25 @@ class FgcmParameters(object):
         self.washStepUnits = parInfo['WASHSTEPUNITS'][0]
         self.washSlopeStepUnits = parInfo['WASHSLOPESTEPUNITS'][0]
 
+        self.hasExternalPWV = parInfo['HASEXTERNALPWV'][0].astype(np.bool)
+        self.hasExternalTau = parInfo['HASEXTERNALTAU'][0].astype(np.bool)
+
         pars=fitsio.read(parFile,ext='PARAMS')
-        self.parAlpha = parInfo['PARALPHA'][0]
-        self.parO3 = parInfo['PARO3'][0]
-        self.parTauIntercept = parInfo['PARTAUINTERCEPT'][0]
-        self.parTauSlope = parInfo['PARTAUSLOPE'][0]
-        self.parPwvIntercept = parInfo['PARPWVINTERCEPT'][0]
-        self.parPwvSlope = parInfo['PARPWVSLOPE'][0]
-        self.parDustIntercept = parInfo['PARDUSTINTERCEPT'][0]
-        self.parDustSlope = parInfo['PARDUSTSLOPE'][0]
+        self.parAlpha = pars['PARALPHA'][0]
+        self.parO3 = pars['PARO3'][0]
+        self.parTauIntercept = pars['PARTAUINTERCEPT'][0]
+        self.parTauSlope = pars['PARTAUSLOPE'][0]
+        self.parPwvIntercept = pars['PARPWVINTERCEPT'][0]
+        self.parPwvSlope = pars['PARPWVSLOPE'][0]
+        self.parDustIntercept = pars['PARDUSTINTERCEPT'][0]
+        self.parDustSlope = pars['PARDUSTSLOPE'][0]
+
+        if self.hasExternalPWV:
+            self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
+            self.parExternalPWVOffset = pars['PAREXTERNALPWVOFFSET'][0]
+        if self.hasExternalTau:
+            self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
+            self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
 
         # should check these are all the right size...
 
@@ -342,12 +362,10 @@ class FgcmParameters(object):
         # save the parameter file...
         # need to decide on a format
 
-        expfilelen = len(self.exposureFile)
-
         dtype=[('NCCD','i4'),
                ('BANDS','a2',self.bands.size),
                ('FITBANDS','a2',self.fitBands.size),
-               ('EXPOSUREFILE','a%d' % (expfilelen+1)),
+               ('EXPOSUREFILE','a%d' % (len(self.exposureFile)+1)),
                ('TAUSTEPUNITS','f8'),
                ('TAUSLOPESTEPUNITS','f8'),
                ('ALPHASTEPUNITS','f8'),
@@ -355,7 +373,14 @@ class FgcmParameters(object):
                ('PWVSLOPESTEPUNITS','f8'),
                ('O3STEPUNITS','f8'),
                ('WASHSTEPUNITS','f8'),
-               ('WASHSLOPESTEPUNITS','f8')]
+               ('WASHSLOPESTEPUNITS','f8'),
+               ('HASEXTERNALPWV','i2'),
+               ('HASEXTERNALTAU','i2')]
+
+        if (self.hasExternalPWV):
+            dtype.extend([('PWVFILE','a%d' % (len(self.pwvFile)+1))])
+        if (self.hasExternalTau):
+            dtype.extend([('TAUFILE','a%d' % (len(self.tauFile)+1))])
 
         parInfo=np.zeros(1,dtype=dtype)
         parInfo['NCCD'] = self.nCCD
@@ -372,6 +397,13 @@ class FgcmParameters(object):
         parInfo['WASHSTEPUNITS'] = self.washStepUnits
         parInfo['WASHSLOPESTEPUNITS'] = self.washSlopeStepUnits
 
+        parInfo['HASEXTERNALPWV'] = self.hasExternalPWV
+        if (self.hasExternalPWV):
+            parInfo['PWVFILE'] = self.pwvFile
+        parInfo['HASEXTERNALTAU'] = self.hasExternalTau
+        if (self.hasExternalTau):
+            parInfo['TAUFILE'] = self.tauFile
+
         # clobber?
         fitsio.write(parfile,parInfo,extname='PARINFO',clobber=True)
 
@@ -383,6 +415,14 @@ class FgcmParameters(object):
                ('PARPWVSLOPE','f8',self.parPwvSlope.size),
                ('PARDUSTINTERCEPT','f8',self.parDustIntercept.size),
                ('PARDUSTSLOPE','f8',self.parDustSlope.size)]
+
+        if (self.hasExternalPWV):
+            dtype.extend([('PAREXTERNALPWVSCALE','f8'),
+                          ('PAREXTERNALPWVOFFSET','f8')])
+        if (self.hasExternalTau):
+            dtype.extend([('PAREXTERNALTAUSCALE','f8'),
+                          ('PAREXTERNALTAUOFFSET','f8')])
+
         pars=np.zeros(1,dtype=dtype)
 
         pars['PARALPHA'] = self.parAlpha
@@ -394,20 +434,27 @@ class FgcmParameters(object):
         pars['PARDUSTINTERCEPT'] = self.parDustIntercept
         pars['PARDUSTSLOPE'] = self.parDustSlope
 
+        if (self.hasExternalPWV):
+            pars['PAREXTERNALPWVSCALE'] = self.parExternalPWVScale
+            pars['PAREXTERNALPWVOFFSET'] = self.parExternalPWVOffset
+        if (self.hasExternalTau):
+            pars['PAREXTERNALTAUSCALE'] = self.parExternalTauScale
+            pars['PAREXTERNALTAUOFFSET'] = self.parExternalTauOffset
+
         fitsio.write(parfile,pars,extname='PARAMS')
 
         # and need to record the superstar flats
 
 
-    def loadExternalPWV(self, pwvFile, externalPwvDeltaT):
+    def loadExternalPWV(self, externalPwvDeltaT):
         """
         """
         # loads a file with PWV, matches to exposures/times
         # flags which ones need the nightly fit
 
-        self.hasExternalPWV = True
+        #self.hasExternalPWV = True
 
-        pwvTable = fitsio.read(pwvFile,ext=1)
+        pwvTable = fitsio.read(self.pwvFile,ext=1)
 
         # make sure it's sorted
         st=np.argsort(pwvTable['MJD'])
@@ -420,20 +467,19 @@ class FgcmParameters(object):
 
         # and new PWV scaling pars!
 
-    def loadExternalTau(self, tauFile, withAlpha=False):
+    def loadExternalTau(self, withAlpha=False):
         """
         """
         # load a file with Tau values
         ## not supported yet
 
-        self.hasExternalTau = True
         if (withAlpha):
             self.hasExternalAlpha = True
 
     def reloadParArray(self, parArray):
         """
         """
-        # takes in a parameter array and loads the local split shm copies
+        # takes in a parameter array and loads the local split shm copies?
 
         pass
 
