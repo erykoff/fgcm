@@ -12,7 +12,9 @@ from fgcmUtilities import _pickle_method
 
 import types
 import copy_reg
-import sharedmem as shm
+#import sharedmem as shm
+
+from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
@@ -472,6 +474,136 @@ class FgcmLUT(object):
         print("Saving DERIV extension to %s" % (lutFile))
         fitsio.write(lutFile,self.lutDeriv.flatten(),extname='DERIV')
 
+#class FgcmLUTSHM(object):
+#    """
+#    """
+#    def __init__(self,lutFile):
+#        self.lutFile = lutFile
+
+#        lutFlat = fitsio.read(self.lutFile,ext='LUT')
+#        indexVals = fitsio.read(self.lutFile,ext='INDEX')
+
+#        self.bands = indexVals['BANDS'][0]
+#        self.pmb = indexVals['PMB'][0]
+#        self.pmbFactor = indexVals['PMBFACTOR'][0]
+#        self.pmbDelta = self.pmb[1] - self.pmb[0]
+        ## temporary hacks
+#        try:
+#            self.pmbElevation = indexVals['PMBELEVATION'][0]
+#        except:
+#            self.pmbElevation = 2220.0
+#        try:
+#            self.lambdaNorm = indexVals['LAMBDANORM'][0]
+#        except:
+#            self.lambdaNorm = 7775.0
+#        self.pwv = indexVals['PWV'][0]
+#        self.pwvDelta = self.pwv[1] - self.pwv[0]
+#        self.o3 = indexVals['O3'][0]
+#        self.o3Delta = self.o3[1] - self.o3[0]
+#        self.tau = indexVals['TAU'][0]
+#        self.lnTau = np.log(self.tau)
+#        self.lnTauDelta = self.lnTau[1] - self.lnTau[0]
+#        self.alpha = indexVals['ALPHA'][0]
+#        self.alphaDelta = self.alpha[1] - self.alpha[0]
+#        self.zenith = indexVals['ZENITH'][0]
+#        self.secZenith = 1./np.cos(self.zenith*np.pi/180.)
+#        self.secZenithDelta = self.secZenith[1] - self.secZenith[0]
+#        self.nCCD = indexVals['NCCD'][0]
+#        self.nCCDStep = self.nCCD+1
+
+#        sizeTuple = (self.bands.size,self.pwv.size,self.o3.size,
+#                     self.tau.size,self.alpha.size,self.zenith.size,self.nCCDStep)
+
+
+#        self.lutI0SHM = shm.zeros(sizeTuple,dtype='f4')
+#        self.lutI1SHM = shm.zeros(sizeTuple,dtype='f4')
+
+#        self.lutI0SHM[:,:,:,:,:,:,:] = lutFlat['I0'].reshape(sizeTuple)
+#        self.lutI1SHM[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
+
+        # clear memory
+#        lutFlat = 0
+
+#        lutDerivFlat = fitsio.read(self.lutFile,ext='DERIV')
+#        self.lutDPwvSHM = shm.zeros(sizeTuple,dtype='f4')
+#        self.lutDO3SHM = shm.zeros(sizeTuple,dtype='f4')
+#        self.lutDLnTauSHM = shm.zeros(sizeTuple,dtype='f4')
+#        self.lutDAlphaSHM = shm.zeros(sizeTuple,dtype='f4')
+#        self.lutDSecZenithSHM = shm.zeros(sizeTuple,dtype='f4')
+
+#        self.lutDPwvSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_PWV'].reshape(sizeTuple)
+#        self.lutDO3SHM[:,:,:,:,:,:,:] = lutDerivFlat['D_O3'].reshape(sizeTuple)
+#        self.lutDLnTauSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU'].reshape(sizeTuple)
+#        self.lutDAlphaSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
+#        self.lutDSecZenithSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH'].reshape(sizeTuple)
+
+        # get the standard values
+#        stdVals = fitsio.read(lutFile,ext='STD')
+
+#        self.pmbStd = stdVals['PMBSTD'][0]
+#        self.pwvStd = stdVals['PWVSTD'][0]
+#        self.o3Std = stdVals['O3STD'][0]
+#        self.tauStd = stdVals['TAUSTD'][0]
+#        self.alphaStd = stdVals['ALPHASTD'][0]
+#        self.zenithStd = stdVals['ZENITHSTD'][0]
+#        self.lambdaRange = stdVals['LAMBDARANGE'][0]
+#        self.lambdaStep = stdVals['LAMBDASTEP'][0]
+#        self.lambdaStd = stdVals['LAMBDASTD'][0]
+#        self.I0Std = stdVals['I0STD'][0]
+#        self.I1Std = stdVals['I1STD'][0]
+#        self.I10Std = stdVals['I10STD'][0]
+#        self.lambdaB = stdVals['LAMBDAB'][0]
+#        self.atmLambda = stdVals['ATMLAMBDA'][0]
+#        self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
+
+
+#    def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
+        # need to make sure we have the right ccd indices...
+        # this will happen externally.
+
+#        return (bandIndex,
+#                np.clip(((pwv - self.pwv[0])/self.pwvDelta).astype(np.int32), 0,
+#                        self.pwv.size-1),
+#                np.clip(((o3 - self.o3[0])/self.o3Delta).astype(np.int32), 0,
+#                        self.o3.size-1),
+#                np.clip(((lnTau - self.lnTau[0])/self.lnTauDelta).astype(np.int32), 0,
+#                        self.lnTau.size-1),
+#                np.clip(((alpha - self.alpha[0])/self.alphaDelta).astype(np.int32), 0,
+#                        self.alpha.size-1),
+#                np.clip(((secZenith - self.secZenith[0])/self.secZenithDelta).astype(np.int32), 0,
+#                        self.secZenith.size-1),
+#                ccdIndex,
+#                (np.exp(-(pmb - self.pmbElevation)/self.pmbElevation)) ** 1.6)
+
+#    def computeI0(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb, indices):
+#        dPwv = pwv - (self.pwv[0] + indices[1] * self.pwvDelta)
+#        dO3 = o3 - (self.o3[0] + indices[2] * self.o3Delta)
+#        dlnTau = lnTau - (self.lnTau[0] + indices[3] * self.lnTauDelta)
+#        dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
+#        dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
+
+#        indicesPlus = np.array(indices[:-1])
+#        indicesPlus[5] += 1
+
+#        return indices[-1]*(self.lutI0SHM[indices[:-1]] +
+#                            dPwv * self.lutDPwvSHM[indices[:-1]] +
+#                            dO3 * self.lutDO3SHM[indices[:-1]] +
+#                            dlnTau * self.lutDLnTauSHM[indices[:-1]] +
+#                            dAlpha * self.lutDAlphaSHM[indices[:-1]] +
+#                            dSecZenith * self.lutDSecZenithSHM[indices[:-1]] +
+#                            dlnTau * dSecZenith * (self.lutDLnTauSHM[tuple(indicesPlus)] - self.lutDLnTauSHM[indices[:-1]])/self.secZenithDelta)
+
+
+#    def computeI1(self, indices):
+#        return indices[-1] * self.lutI1SHM[indices[:-1]]
+
+#    def computeDerivatives(self, indices, I0):
+#        # need to worry about lnTau
+#        return (self.lutDPwvSHM[indices[:-1]] / I0,
+#                self.lutDO3SHM[indices[:-1]] / I0,
+#                self.lutDlnTauSHM[indices[:-1]] / I0,
+#                self.lutDAlphaSHM[indices[:-1]] / I0)
+
 class FgcmLUTSHM(object):
     """
     """
@@ -512,28 +644,38 @@ class FgcmLUTSHM(object):
         sizeTuple = (self.bands.size,self.pwv.size,self.o3.size,
                      self.tau.size,self.alpha.size,self.zenith.size,self.nCCDStep)
 
+        self.lutI0Handle = snmm.createArray(sizeTuple,dtype='f4')
+        snmm.getArray(self.lutI0Handle)[:,:,:,:,:,:,:] = lutFlat['I0'].reshape(sizeTuple)
+        #lutI0 = snmm.getArray(self.lutI0Handle)
+        #lutI0[:,:,:,:,:,:,:] = lutFlat['I0'].reshape(sizeTuple)
+        # clear reference to memory
+        #lutI0 = None
 
-        self.lutI0SHM = shm.zeros(sizeTuple,dtype='f4')
-        self.lutI1SHM = shm.zeros(sizeTuple,dtype='f4')
+        self.lutI1Handle = snmm.createArray(sizeTuple,dtype='f4')
+        snmm.getArray(self.lutI1Handle)[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
+        #lutI1 = snmm.getArray(self.lutI1Handle)
+        #lutI1[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
+        #lutI1 = None
 
-        self.lutI0SHM[:,:,:,:,:,:,:] = lutFlat['I0'].reshape(sizeTuple)
-        self.lutI1SHM[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
+        # clear all memory
+        lutFlag = 0
 
-        # clear memory
-        lutFlat = 0
-
+        # now read in derivative tables...
         lutDerivFlat = fitsio.read(self.lutFile,ext='DERIV')
-        self.lutDPwvSHM = shm.zeros(sizeTuple,dtype='f4')
-        self.lutDO3SHM = shm.zeros(sizeTuple,dtype='f4')
-        self.lutDLnTauSHM = shm.zeros(sizeTuple,dtype='f4')
-        self.lutDAlphaSHM = shm.zeros(sizeTuple,dtype='f4')
-        self.lutDSecZenithSHM = shm.zeros(sizeTuple,dtype='f4')
 
-        self.lutDPwvSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_PWV'].reshape(sizeTuple)
-        self.lutDO3SHM[:,:,:,:,:,:,:] = lutDerivFlat['D_O3'].reshape(sizeTuple)
-        self.lutDLnTauSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU'].reshape(sizeTuple)
-        self.lutDAlphaSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
-        self.lutDSecZenithSHM[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH'].reshape(sizeTuple)
+        self.lutDPwvHandle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDO3Handle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDLnTauHandle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDAlphaHandle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDSecZenithHandle = snmm.createArray(sizeTuple,dtype='f4')
+
+        snmm.getArray(self.lutDPwvHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_PWV'].reshape(sizeTuple)
+        snmm.getArray(self.lutDO3Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_O3'].reshape(sizeTuple)
+        snmm.getArray(self.lutDLnTauHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU'].reshape(sizeTuple)
+        snmm.getArray(self.lutDAlphaHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
+        snmm.getArray(self.lutDSecZenithHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH'].reshape(sizeTuple)
+
+        lutDerivFlat = None
 
         # get the standard values
         stdVals = fitsio.read(lutFile,ext='STD')
@@ -553,7 +695,6 @@ class FgcmLUTSHM(object):
         self.lambdaB = stdVals['LAMBDAB'][0]
         self.atmLambda = stdVals['ATMLAMBDA'][0]
         self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
-
 
     def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         # need to make sure we have the right ccd indices...
@@ -583,21 +724,26 @@ class FgcmLUTSHM(object):
         indicesPlus = np.array(indices[:-1])
         indicesPlus[5] += 1
 
-        return indices[-1]*(self.lutI0SHM[indices[:-1]] +
-                            dPwv * self.lutDPwvSHM[indices[:-1]] +
-                            dO3 * self.lutDO3SHM[indices[:-1]] +
-                            dlnTau * self.lutDLnTauSHM[indices[:-1]] +
-                            dAlpha * self.lutDAlphaSHM[indices[:-1]] +
-                            dSecZenith * self.lutDSecZenithSHM[indices[:-1]] +
-                            dlnTau * dSecZenith * (self.lutDLnTauSHM[tuple(indicesPlus)] - self.lutDLnTauSHM[indices[:-1]])/self.secZenithDelta)
-
+        return indices[-1]*(snmm.getArray(self.lutI0Handle)[indices[:-1]] +
+                            dPwv * snmm.getArray(self.lutDPwvHandle)[indices[:-1]] +
+                            dO3 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] +
+                            dlnTau * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] +
+                            dAlpha * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] +
+                            dSecZenith * snmm.getArray(self.lutDSecZenithHandle)[indices[:-1]] +
+                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauHandle)[tuple(indicesPlus)] -
+                                                   snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta)
 
     def computeI1(self, indices):
-        return indices[-1] * self.lutI1SHM[indices[:-1]]
+        return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
 
     def computeDerivatives(self, indices, I0):
-        # need to worry about lnTau
-        return (self.lutDPwvSHM[indices[:-1]] / I0,
-                self.lutDO3SHM[indices[:-1]] / I0,
-                self.lutDlnTauSHM[indices[:-1]] / I0,
-                self.lutDAlphaSHM[indices[:-1]] / I0)
+        # this needs to be updated, since it's clearly wrong
+        return (snmm.getArray(self.lutDPwvHandle)[indices[:-1]] / I0,
+                snmm.getArray(self.lutDO3Handle)[indices[:-1]] / I0,
+                snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / I0,
+                snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] / I0)
+    
+
+
+
+
