@@ -8,6 +8,8 @@ from fgcmMakeStars import FgcmMakeStars
 import fgcmUtilities
 from fgcmConfig import FgcmConfig
 from fgcmParameters import FgcmParameters
+from fgcmStars import FgcmStars
+from fgcmChisq import FgcmChisq
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
 
