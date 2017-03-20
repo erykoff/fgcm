@@ -23,16 +23,19 @@ class FgcmConfig(object):
         with open(self.configFile) as f:
             configDict = yaml.load(f)
 
-        requiredKeys=['exposureFile','UTBoundary',
+        requiredKeys=['exposureFile','obsFile','indexFile','UTBoundary',
                       'washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField','fitBands','extraBands',
-                      'deepFlag']
+                      'deepFlag','minObsPerBand']
 
         for key in requiredKeys:
             if (key not in configDict):
                 raise ValueError("required %s not in configFile" % (key))
 
         self.exposureFile = configDict['exposureFile']
+        self.minObsPerBand = configDict['minObsPerBand']
+        self.obsFile = configDict['obsFile']
+        self.indexFile = configDict['indexFile']
         self.UTBoundary = configDict['UTBoundary']
         self.washMJDs = np.array(configDict['washMJDs'])
         self.epochMJDs = np.array(configDict['epochMJDs'])
