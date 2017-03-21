@@ -57,8 +57,8 @@ class FgcmStars(object):
         #self.obsBandIndex = shm.zeros(self.nStarObs,dtype='i2')
         #self.obsRA = shm.zeros(self.nStarObs,dtype='f8')
         #self.obsDec = shm.zeros(self.nStarObs,dtype='f8')
-        #self.obsMagObs = shm.zeros(self.nStarObs,dtype='f4')
-        #self.obsMagObsErr = shm.zeros(self.nStarObs,dtype='f4')
+        #self.obsMagADU = shm.zeros(self.nStarObs,dtype='f4')
+        #self.obsMagADUErr = shm.zeros(self.nStarObs,dtype='f4')
         #self.obsMagStd = shm.zeros(self.nStarObs,dtype='f4')
 
         self.obsExpHandle = snmm.createArray(self.nStarObs,dtype='i4')
@@ -66,24 +66,24 @@ class FgcmStars(object):
         self.obsBandIndexHandle = snmm.createArray(self.nStarObs,dtype='i2')
         self.obsRAHandle = snmm.createArray(self.nStarObs,dtype='f8')
         self.obsDecHandle = snmm.createArray(self.nStarObs,dtype='f8')
-        self.obsMagObsHandle = snmm.createArray(self.nStarObs,dtype='f4')
-        self.obsMagObsErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4')
 
         #self.obsExp[:] = obs['EXPNUM'][:]
         #self.obsCCD[:] = obs['CCDNUM'][:]
         #self.obsRA[:] = obs['RA'][:]
         #self.obsDec[:] = obs['DEC'][:]
-        #self.obsMagObs[:] = obs['MAG'][:]
-        #self.obsMagObsErr[:] = obs['MAGERR'][:]
+        #self.obsMagADU[:] = obs['MAG'][:]
+        #self.obsMagADUErr[:] = obs['MAGERR'][:]
         #self.obsMagStd[:] = obs['MAG'][:]  # default
 
         snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
         snmm.getArray(self.obsCCDHandle)[:] = obs['CCDNUM'][:]
         snmm.getArray(self.obsRAHandle)[:] = obs['RA'][:]
         snmm.getArray(self.obsDecHandle)[:] = obs['DEC'][:]
-        snmm.getArray(self.obsMagObsHandle)[:] = obs['MAG'][:]
-        snmm.getArray(self.obsMagObsErrHandle)[:] = obs['MAGERR'][:]
+        snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
+        snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
         snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
 
         # and match bands to indices
@@ -125,8 +125,8 @@ class FgcmStars(object):
         snmm.getArray(self.objNobsHandle)[:] = pos['NOBS'][:]
 
 
-        self.minObjID = np.min(self.objID)
-        self.maxObjID = np.max(self.objID)
+        self.minObjID = np.min(snmm.getArray(self.objIDHandle))
+        self.maxObjID = np.max(snmm.getArray(self.objIDHandle))
 
         # and create reverse look-up ids
         #self.obsObjID = shm.zeros(self.nStarObs,dtype='i4')
@@ -138,7 +138,7 @@ class FgcmStars(object):
         objID = snmm.getArray(self.objIDHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
         objObsIndex = snmm.getArray(self.objObsIndexHandle)
-        objNobs = snmm.getArray(self.objNobs)
+        objNobs = snmm.getArray(self.objNobsHandle)
         for i in xrange(self.nStars):
             obsObjID[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = objID[i]
 
