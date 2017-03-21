@@ -52,9 +52,9 @@ class FgcmConfig(object):
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
-            if ('externalPwvDeltaT' not in configDict):
-                raise ValueError("Must include externalPwvDeltaT with pwvFile")
-            self.externalPwvDeltaT = configDict['externalPwvDeltaT']
+            if ('externalPWVDeltaT' not in configDict):
+                raise ValueError("Must include externalPWVDeltaT with pwvFile")
+            self.externalPWVDeltaT = configDict['externalPWVDeltaT']
 
         else:
             self.pwvFile = None
