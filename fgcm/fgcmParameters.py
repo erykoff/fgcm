@@ -88,23 +88,23 @@ class FgcmParameters(object):
         self.parO3 = np.zeros(self.expNights.size,dtype=np.float32) + fgcmConfig.o3Std
         self.parTauIntercept = np.zeros(self.expNights.size,dtype=np.float32) + fgcmConfig.tauStd
         self.parTauSlope = np.zeros(self.expNights.size,dtype=np.float32)
-        self.parPwvIntercept = np.zeros(self.expNights.size,dtype=np.float32) + fgcmConfig.pwvStd
-        self.parPwvSlope = np.zeros(self.expNights.size,dtype=np.float32)
+        self.parPWVIntercept = np.zeros(self.expNights.size,dtype=np.float32) + fgcmConfig.pwvStd
+        self.parPWVSlope = np.zeros(self.expNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
         self.parSuperflat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
 
         # parameters with per-wash values
-        self.parDustIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
-        self.parDustSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
+        self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
+        self.parQESysSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
 
         if (fgcmConfig.pwvFile is not None):
             self.pwvFile = fgcmConfig.pwvFile
             self.hasExternalPWV = True
-            self.loadExternalPWV(fgcmConfig.externalPwvDeltaT)
+            self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
             # need to add two global parameters!
-            self.parExternalPwvScale = 1.0
-            self.parExternalPwvOffset = 0.0
+            self.parExternalPWVScale = 1.0
+            self.parExternalPWVOffset = 0.0
 
         if (fgcmConfig.tauFile is not None):
             self.tauFile = fgcmConfig.tauFile
@@ -119,6 +119,53 @@ class FgcmParameters(object):
 
         # and need to be able to pack and unpack the parameters and scalings
         #  this part is going to be the hardest
+
+        self._arrangeParArray()
+
+    def _arrangeParArray(self):
+        # make pointers to a fit parameter array...
+        #  pwv, O3, lnTau, alpha
+        self.nFitPars = (self.expNights.size +  # O3
+                         self.expNights.size +  # tauIntercept
+                         self.expNights.size +  # tauSlope
+                         self.expNights.size +  # alpha
+                         self.expNights.size +  # pwv Intercept
+                         self.expNights.size)   # pwv Slope
+        ctr=0
+        self.parO3Loc = ctr
+        ctr+=self.expNights.size
+        self.parTauInterceptLoc = ctr
+        ctr+=self.expNights.size
+        self.parTauSlopeLoc = ctr
+        ctr+=self.expNights.size
+        self.parAlphaLoc = ctr
+        ctr+=self.expNights.size
+        self.parPWVInterceptLoc = ctr
+        ctr+=self.expNights.size
+        self.parPWVSlopeLoc = ctr
+        ctr+=self.expNights.size
+
+        if (self.hasExternalPWV):
+            self.nFitPars += (1+self.expNights.size)
+            self.parExternalPWVScaleLoc = ctr
+            ctr+=1
+            self.parExternalPWVOffsetLoc = ctr
+            ctr+=self.expNights.size
+
+        if (self.hasExternalTau):
+            self.nFitPars += (1+self.expNights.size)
+            self.parExternalTauScaleLoc = ctr
+            ctr+=1
+            self.parExternalTauOffsetLoc = ctr
+            ctr+=self.expNights.size
+
+        self.nFitPars += (self.nWashIntervals + # parQESysIntercept
+                          self.nWashIntervals)  # parQESysSlope
+
+        self.parQESysInterceptLoc = ctr
+        ctr+=self.nWashIntervals
+        self.parQESysSlopeLoc = ctr
+        ctr+=self.nWashIntervals
 
     def _loadExposureInfo(self,fgcmConfig):
         """
@@ -144,6 +191,8 @@ class FgcmParameters(object):
         mjdForNight = np.floor(self.expMJD + fgcmConfig.UTBoundary).astype(np.int32)
         self.expNights = np.unique(mjdForNight)
 
+        self.expDeltaUT = (self.expMJD + fgcmConfig.UTBoundary) - mjdForNight
+
         # and link the exposure numbers to the nights...
         a,b=esutil.numpy_util.match(self.expNights,mjdForNight)
         self.expNightIndex = np.zeros(self.nExp,dtype=np.int32)
@@ -165,10 +214,15 @@ class FgcmParameters(object):
         self.expTelRA = np.radians(expInfo['TELRA'])
         self.expTelDec = np.radians(expInfo['TELDEC'])
 
-        # and rotate?
+        # and rotate?  This may need to be revisited.
         hi,=np.where(self.expTelRA > np.pi)
         if hi.size > 0:
             self.expTelRA[hi] -= 2.0*np.pi
+
+        # and get the secant of the Zenith angle
+        self.sinLatitude = np.sin(np.radians(fgcmConfig.latitude))
+        self.cosLatitude = np.cos(np.radians(fgcmConfig.latitude))
+        
 
         self.expPmb = expInfo['PMB']
 
@@ -207,11 +261,18 @@ class FgcmParameters(object):
             self.expEpochIndex[use] = i
 
         # and set up the wash mjds and link indices
-        self.nWashIntervals = fgcmConfig.washMJDs.size + 1
+        # the first "washMJD" is set to the first exposure date.
+        #self.washMJDs = np.concatenate([[np.min(self.expMJD)-1.0],fgcmConfig.washMJDs])
+        #self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
+        # the number of *intervals* is one less than the dates?
+        #self.nWashIntervals = self.washMJDs.size-1
+
+        self.nWashIntervals = fgcmConfig.washMJDs.size
+        self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
 
         self.expWashIndex = np.zeros(self.nExp,dtype='i4')
-        tempWashMJDs = fgcmConfig.washMJDs
-        tempWashMJDs = np.insert(tempWashMJDs,0,0.0)
+        tempWashMJDs = self.washMJDs
+        #tempWashMJDs = np.insert(tempWashMJDs,0,0.0)
         tempWashMJDs = np.append(tempWashMJDs,1e10)
 
         # record the range in each to get typical length of wash epoch
@@ -339,10 +400,10 @@ class FgcmParameters(object):
         self.parO3 = pars['PARO3'][0]
         self.parTauIntercept = pars['PARTAUINTERCEPT'][0]
         self.parTauSlope = pars['PARTAUSLOPE'][0]
-        self.parPwvIntercept = pars['PARPWVINTERCEPT'][0]
-        self.parPwvSlope = pars['PARPWVSLOPE'][0]
-        self.parDustIntercept = pars['PARDUSTINTERCEPT'][0]
-        self.parDustSlope = pars['PARDUSTSLOPE'][0]
+        self.parPWVIntercept = pars['PARPWVINTERCEPT'][0]
+        self.parPWVSlope = pars['PARPWVSLOPE'][0]
+        self.parQESysIntercept = pars['PARQESYSINTERCEPT'][0]
+        self.parQESysSlope = pars['PARQESYSSLOPE'][0]
 
         if self.hasExternalPWV:
             self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
@@ -351,6 +412,8 @@ class FgcmParameters(object):
             self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
             self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
 
+
+        self._arrangeParArray()
         # should check these are all the right size...
 
         # need to load the superstarflats
@@ -411,42 +474,46 @@ class FgcmParameters(object):
                ('PARO3','f8',self.parO3.size),
                ('PARTAUINTERCEPT','f8',self.parTauIntercept.size),
                ('PARTAUSLOPE','f8',self.parTauSlope.size),
-               ('PARPWVINTERCEPT','f8',self.parPwvIntercept.size),
-               ('PARPWVSLOPE','f8',self.parPwvSlope.size),
-               ('PARDUSTINTERCEPT','f8',self.parDustIntercept.size),
-               ('PARDUSTSLOPE','f8',self.parDustSlope.size)]
+               ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
+               ('PARPWVSLOPE','f8',self.parPWVSlope.size),
+               ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
+               ('PARQESYSSLOPE','f8',self.parQESysSlope.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
-                          ('PAREXTERNALPWVOFFSET','f8')])
+                          ('PAREXTERNALPWVOFFSET','f8',self.parExternalPWVOffset.size),
+                          ('EXTERNALPWV','f8',self.nExp)])
         if (self.hasExternalTau):
             dtype.extend([('PAREXTERNALTAUSCALE','f8'),
-                          ('PAREXTERNALTAUOFFSET','f8')])
+                          ('PAREXTERNALTAUOFFSET','f8',self.parExternalTauOffset.size),
+                          ('EXTERNALTAU','f8',self.nExp)])
 
         pars=np.zeros(1,dtype=dtype)
 
-        pars['PARALPHA'] = self.parAlpha
-        pars['PARO3'] = self.parO3
-        pars['PARTAUINTERCEPT'] = self.parTauIntercept
-        pars['PARTAUSLOPE'] = self.parTauSlope
-        pars['PARPWVINTERCEPT'] = self.parPwvIntercept
-        pars['PARPWVSLOPE'] = self.parPwvSlope
-        pars['PARDUSTINTERCEPT'] = self.parDustIntercept
-        pars['PARDUSTSLOPE'] = self.parDustSlope
+        pars['PARALPHA'][:] = self.parAlpha
+        pars['PARO3'][:] = self.parO3
+        pars['PARTAUINTERCEPT'][:] = self.parTauIntercept
+        pars['PARTAUSLOPE'][:] = self.parTauSlope
+        pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
+        pars['PARPWVSLOPE'][:] = self.parPWVSlope
+        pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
+        pars['PARQESYSSLOPE'][:] = self.parQESysSlope
 
         if (self.hasExternalPWV):
             pars['PAREXTERNALPWVSCALE'] = self.parExternalPWVScale
-            pars['PAREXTERNALPWVOFFSET'] = self.parExternalPWVOffset
+            pars['PAREXTERNALPWVOFFSET'][:] = self.parExternalPWVOffset
+            pars['EXTERNALPWV'][:] = self.externalPWV
         if (self.hasExternalTau):
             pars['PAREXTERNALTAUSCALE'] = self.parExternalTauScale
-            pars['PAREXTERNALTAUOFFSET'] = self.parExternalTauOffset
+            pars['PAREXTERNALTAUOFFSET'][:] = self.parExternalTauOffset
+            pars['EXTERNALTAU'][:] = self.externalTau
 
         fitsio.write(parfile,pars,extname='PARAMS')
 
         # and need to record the superstar flats
 
 
-    def loadExternalPWV(self, externalPwvDeltaT):
+    def loadExternalPWV(self, externalPWVDeltaT):
         """
         """
         # loads a file with PWV, matches to exposures/times
@@ -461,33 +528,169 @@ class FgcmParameters(object):
         pwvTable = pwvTable[st]
 
         pwvIndex = np.clip(np.searchsorted(pwvTable['MJD'],self.expMJD),0,pwvTable.size-1)
-        #gd,=np.where(np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPwvDeltaT)
         # this will be True or False...
-        self.externalPWVFlag = (np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPwvDeltaT)
+        self.externalPWVFlag = (np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPWVDeltaT)
+        self.externalPWV = np.zeros(self.nExp,dtype=np.float32)
+        self.externalPWV[self.externalPWVFlag] = pwvTable['PWV'][pwvIndex[self.externalPWVFlag]]
 
         # and new PWV scaling pars!
+        self.parExternalPWVOffset = np.zeros(self.expNights.size,dtype=np.float32)
+        self.parExternalPWVScale = 1.0
+
 
     def loadExternalTau(self, withAlpha=False):
         """
         """
         # load a file with Tau values
         ## not supported yet
+        raise ValueError("externalTau Not supported yet")
 
         if (withAlpha):
             self.hasExternalAlpha = True
 
-    def reloadParArray(self, parArray):
+    def reloadParArray(self, parArray, fitterUnits=False):
         """
         """
-        # takes in a parameter array and loads the local split shm copies?
+        # takes in a parameter array and loads the local split copies?
 
-        pass
+        if (parArray.size != self.nFitPars):
+            raise ValueError("parArray must have %d elements." % (self.nFitPars))
 
-    def getParArray(self,bounds=False):
+        if (fitterUnits):
+            pwvUnit = self.pwvStepUnits
+            pwvSlopeUnit = self.pwvSlopeStepUnits
+            O3Unit = self.o3StepUnits
+            tauUnit = self.tauStepUnits
+            tauSlopeUnit = self.tauSlopeStepUnits
+            alphaUnit = self.alphaUnits
+            qeSysUnit = self.washStepUnits
+            qeSysSlopeUnit = self.washSlopeStepUnits
+        else:
+            pwvUnit = 1.0
+            pwvSlopeUnit = 1.0
+            O3Unit = 1.0
+            tauUnit = 1.0
+            tauSlopeUnit = 1.0
+            alphaUnit = 1.0
+            qeSysUnit = 1.0
+            qeSysSlopeUnit = 1.0
+
+        self.parPWVIntercept[:] = parArray[self.parPWVInterceptLoc:
+                                               self.parPWVInterceptLoc+self.expNights.size] / pwvUnit
+        self.parPWVSlope[:] = parArray[self.parPWVSlopeLoc:
+                                           self.parPWVSlopeLoc+self.expNights.size] / pwvSlopeUnit
+        self.parO3[:] = parArray[self.parO3Loc:
+                                     self.parO3Loc+self.expNights.size] / O3Unit
+        self.parTauIntercept[:] = parArray[self.parTauInterceptLoc:
+                                               self.parTauInterceptLoc+self.expNights.size] / tauUnit
+        self.parTauSlope[:] = parArray[self.parTauSlopeLoc:
+                                           self.parTauSlopeLoc+self.expNights.size] / tauSlopeUnit
+        self.parAlpha[:] = parArray[self.parAlphaLoc:
+                                        self.parAlphaLoc+self.expNights.size] / alphaUnit
+        if (self.hasExternalPWV):
+            self.parExternalPWVScale = parArray[self.parExternalPWVScaleLoc] / pwvUnit
+            self.parExternalPWVOffset = parArray[self.parExternalPWVOffsetLoc:
+                                                     self.parExternalPWVOffsetLoc+self.expNights.size] / pwvUnit
+
+        if (self.hasExternalTau):
+            self.parExternalTauScale = parArray[self.parExternalTauScaleLoc] / tauUnit
+            self.parExternalTauOffset = parArray[self.parExternalTauOffsetLoc:
+                                                     self.parExternalTauOffsetLoc+self.expNights.size] / tauUnit
+
+        self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
+                                                 self.parQESysInterceptLoc+self.nWashIntervals] / qeSysUnit
+        self.parQESysSlope[:] = parArray[self.parQESysSlopeLoc:
+                                             self.parQESysSlopeLoc+self.nWashIntervals] / qeSysSlopeUnit
+        # done
+
+    def parsToExposures(self):
+        """
+        """
+
+        # I'm guessing that these don't need to be wrapped in shms but I could be wrong
+        #  about the full class, which would suck.
+
+        # first, the nightly parameters without selection...
+        self.expO3 = self.parO3[self.expNightIndex]
+        self.expAlpha = self.parAlpha[self.expNightIndex]
+
+
+        # default to the nightly slope/intercept 
+        self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
+                       self.parPWVSlope[self.expNightIndex] * self.expDeltaUT)
+
+        if (self.hasExternalPWV):
+            # replace where we have these
+            self.expPWV[self.externalPWVFlag] = (self.parExternalPWVOffset[self.expNightIndex[self.externalPWVFlag]] +
+                                                 self.parExternalPWVScale *
+                                                 self.externalPWV[self.externalPWVFlag])
+
+        # default to nightly slope/intercept
+        self.expTau = (self.parTauIntercept[self.expNightIndex] +
+                           self.parTauSlope[self.expNightIndex] * self.expDeltaUT)
+
+        if (self.hasExternalTau):
+            # replace where we have these
+            self.expTau[self.externalTauFlag] = (self.parExternalTauOffset[self.expNightIndex[self.externalTauFlag]] +
+                                                 self.parExternalTauScale *
+                                                 self.externalTau[self.externalTauFlag])
+
+        # and QESys
+        self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
+                         self.parQESysSlope[self.expWashIndex] *
+                         (self.expMJD - self.washMJDs[self.expWashIndex]))
+
+
+    def getParArray(self,bounds=False,fitterUnits=False):
         """
         """
         # extracts parameters into a linearized array
         # also returns bounds if bounds=True
+        parArray = np.zeros(self.nFitPars,dtype=np.float32)
 
-        pass
+        if (fitterUnits):
+            pwvUnit = self.pwvStepUnits
+            pwvSlopeUnit = self.pwvSlopeStepUnits
+            O3Unit = self.o3StepUnits
+            tauUnit = self.tauStepUnits
+            tauSlopeUnit = self.tauSlopeStepUnits
+            alphaUnit = self.alphaUnits
+            qeSysUnit = self.washStepUnits
+            qeSysSlopeUnit = self.washSlopeStepUnits
+        else:
+            pwvUnit = 1.0
+            pwvSlopeUnit = 1.0
+            O3Unit = 1.0
+            tauUnit = 1.0
+            tauSlopeUnit = 1.0
+            alphaUnit = 1.0
+            qeSysUnit = 1.0
+            qeSysSlopeUnit = 1.0
 
+        parArray[self.parPWVInterceptLoc:
+                     self.parPWVInterceptLoc+self.expNights.size] = self.parPWVIntercept[:] * pwvUnit
+        parArray[self.parPWVSlopeLoc:
+                     self.parPWVSlopeLoc+self.expNights.size] = self.parPWVSlope[:] * pwvSlopeUnit
+        parArray[self.parO3Loc:
+                     self.parO3Loc+self.expNights.size] = self.parO3[:] * O3Unit
+        parArray[self.parTauInterceptLoc:
+                     self.parTauInterceptLoc+self.expNights.size] = self.parTauIntercept[:] * tauUnit
+        parArray[self.parTauSlopeLoc:
+                     self.parTauSlopeLoc+self.expNights.size] = self.parTauSlope[:] * tauSlopeUnit
+        parArray[self.parAlphaLoc:
+                     self.parAlphaLoc+self.expNights.size] = self.parAlpha[:] * alphaUnit
+        if (self.hasExternalPWV):
+            parArray[self.parExternalPWVScaleLoc] = self.parExternalPWVScale * pwvUnit
+            parArray[self.parExternalPWVOffsetLoc:
+                         self.parExternalPWVOffsetLoc+self.expNights.size] = self.parExternalPWVOffset * pwvUnit
+        if (self.hasExternalTau):
+            parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * tauUnit
+            parArray[self.parExternalTauOffsetLoc:
+                         self.parExternalTauOffsetLoc+self.expNights.size] = self.parExternalTauOffset * tauUnit
+
+        parArray[self.parQESysInterceptLoc:
+                     self.parQESysInterceptLoc+self.nWashIntervals] = self.parQESysIntercept * qeSysUnit
+        parArray[self.parQESysSlopeLoc:
+                     self.parQESysSlopeLoc+self.nWashIntervals] = self.parQESysSlope *  qeSysSlopeUnit
+
+        return parArray
