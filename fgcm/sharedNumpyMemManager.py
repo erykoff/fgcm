@@ -4,6 +4,9 @@ import multiprocessing
 import ctypes
 
 from fgcmUtilities import _pickle_method
+import types
+import copy_reg
+
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
@@ -32,16 +35,20 @@ class SharedNumpyMemManager:
 
     #def __createArray(self, dimensions, ctype=ctypes.c_double, dtype=None):
     def __createArray(self, dimensions, dtype=np.float64, syncAccess=False):
-        if (np.dtype(dtype) == np.float32):
+        # convert to dtype type (in case short code)
+        dtype = np.dtype(dtype)
+        if (dtype == np.float32):
             ctype = ctypes.c_float
-        elif (np.dtype(dtype) == np.float64):
+        elif (dtype == np.float64):
             ctype = ctypes.c_double
-        elif (np.dtype(dtype) == np.int32):
+        elif (dtype == np.int32):
             ctype = ctypes.c_int32
-        elif (np.dtype(dtype) == np.int64):
+        elif (dtype == np.int64):
             ctype = ctypes.c_int64
-        elif (np.dtype(dtype) == np.int16):
+        elif (dtype == np.int16):
             ctype = ctypes.c_int16
+        elif (dtype == np.bool):
+            ctype = ctypes.c_bool
         else:
             raise ValueError("Unsupported dtype")
 
