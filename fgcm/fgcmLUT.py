@@ -621,7 +621,7 @@ class FgcmLUTSHM(object):
         try:
             self.pmbElevation = indexVals['PMBELEVATION'][0]
         except:
-            self.pmbElevation = 2220.0
+            self.pmbElevation = 773.4763121915056
         try:
             self.lambdaNorm = indexVals['LAMBDANORM'][0]
         except:
