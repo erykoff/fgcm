@@ -31,7 +31,8 @@ class SharedNumpyMemManager:
         self.lock = multiprocessing.Lock()
         self.cur = 0
         self.cnt = 0
-        self.shared_arrays = [None] * SharedNumpyMemManager._initSize
+        self.sharedArrayBases = [None] * SharedNumpyMemManager._initSize
+        self.sharedArrays = [None] * SharedNumpyMemManager._initSize
 
     #def __createArray(self, dimensions, ctype=ctypes.c_double, dtype=None):
     def __createArray(self, dimensions, dtype=np.float64, syncAccess=False):
@@ -55,29 +56,25 @@ class SharedNumpyMemManager:
         self.lock.acquire()
 
         # double size if necessary
-        if (self.cnt >= len(self.shared_arrays)):
-            self.shared_arrays = self.shared_arrays + [None] * len(self.shared_arrays)
+        if (self.cnt >= len(self.sharedArrays)):
+            self.sharedArrays = self.sharedArrays + [None] * len(self.sharedArrays)
+            self.sharedArrayBases = self.sharedArrayBases + [None] * len(self.sharedArrayBases)
 
         # next handle
         self.__getNextFreeHdl()
 
         # create array in shared memory segment
         if (syncAccess):
-            shared_array_base = multiprocessing.Array(ctype, np.prod(dimensions))
+            self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype, np.prod(dimensions))
+            self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur].get_obj(),dtype=dtype)
         else:
-            shared_array_base = multiprocessing.RawArray(ctype, np.prod(dimensions))
-
-        # convert to numpy array vie ctypeslib
-        if (syncAccess):
-            self.shared_arrays[self.cur] = np.frombuffer(shared_array_base.get_obj(),dtype=dtype)
-        else:
-            self.shared_arrays[self.cur] = np.frombuffer(shared_array_base,dtype=dtype)
-
+            self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype, np.prod(dimensions))
+            self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur],dtype=dtype)
 
         # do a reshape for correct dimensions
         # Returns a masked array containing the same data, but with a new shape.
         # The result is a view on the original array
-        self.shared_arrays[self.cur] = self.shared_arrays[self.cnt].reshape(dimensions)
+        self.sharedArrays[self.cur] = self.sharedArrays[self.cur].reshape(dimensions)
 
         # update cnt
         self.cnt += 1
@@ -89,21 +86,25 @@ class SharedNumpyMemManager:
 
     def __getNextFreeHdl(self):
         orgCur = self.cur
-        while self.shared_arrays[self.cur] is not None:
-            self.cur = (self.cur + 1) % len(self.shared_arrays)
+        while self.sharedArrays[self.cur] is not None:
+            self.cur = (self.cur + 1) % len(self.sharedArrays)
             if orgCur == self.cur:
                 raise SharedNumpyMemManagerError('Max Number of Shared Numpy Arrays Exceeded!')
 
     def __freeArray(self, hdl):
         self.lock.acquire()
         # set reference to None
-        if self.shared_arrays[hdl] is not None: # consider multiple calls to free
-            self.shared_arrays[hdl] = None
+        if self.sharedArrays[hdl] is not None: # consider multiple calls to free
+            self.sharedArrays[hdl] = None
+            self.sharedArrayBases[hdl] = None
             self.cnt -= 1
         self.lock.release()
 
     def __getArray(self, i):
-        return self.shared_arrays[i]
+        return self.sharedArrays[i]
+
+    def __getArrayBase(self, i):
+        return self.sharedArrayBases[i]
 
     @staticmethod
     def getInstance():
@@ -118,6 +119,10 @@ class SharedNumpyMemManager:
     @staticmethod
     def getArray(*args, **kwargs):
         return SharedNumpyMemManager.getInstance().__getArray(*args, **kwargs)
+
+    @staticmethod
+    def getArrayBase(*args, **kwargs):
+        return SharedNumpyMemManager.getInstance().__getArrayBase(*args, **kwargs)
 
     @staticmethod
     def freeArray(*args, **kwargs):
