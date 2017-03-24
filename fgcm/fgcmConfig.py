@@ -96,6 +96,7 @@ class FgcmConfig(object):
         self.tauStd = lutStd['TAUSTD'][0]
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
+        self.lambdaStd = lutStd['LAMBDASTD'][0]
 
         # and look at the exposure file and grab some stats
         expInfo = fitsio.read(self.exposureFile,ext=1)
