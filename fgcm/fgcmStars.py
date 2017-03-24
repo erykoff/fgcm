@@ -24,6 +24,8 @@ class FgcmStars(object):
         self.minPerBand = fgcmConfig.minObsPerBand
         self.fitBands = fgcmConfig.fitBands
 
+        self.lambdaStd = fgcmConfig.lambdaStd
+
         self.bandRequired = np.zeros(self.nBands,dtype=np.bool)
         for i in xrange(self.nBands):
             if (self.bands[i] in self.fitBands):
@@ -202,4 +204,33 @@ class FgcmStars(object):
         snmm.getArray(self.starFlagHandle)[bad] = 1
 
         # and further selection?
+
+    def computeObjectSEDSlope(self,objIndex):
+        """
+        """
+
+        thisObjMagStdMean = snmm.getArray(self.objMagStdMeanHandle)[objIndex,:]
+        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+
+        ## FIXME
+        #   work with fit bands and fudge factors
+
+        if (np.max(thisObjMagStdMean) > 90.0):
+            # cannot compute
+            objSEDSlope[objIndex,:] = 0.0
+        else:
+            S=np.zeros(self.nBands-1,dtype='f4')
+            for i in xrange(self.nBands-1):
+                S[i] = -0.921 * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStd[i+1] - self.lambdaStd[i])
+
+            # this is hacked for now
+            objSEDSlope[objIndex,0] = S[0] - 1.0 * ((self.lambdaStd[1] - self.lambdaStd[0])/(self.lambdaStd[2]-self.lambdaStd[0])) * (S[1]-S[0])
+            objSEDSlope[objIndex,1] = (S[0] + S[1])/2.0
+            objSEDSlope[objIndex,2] = (S[1] + S[2])/2.0
+            objSEDSlope[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
+            if ((thisObjMagStdMean[4]) < 90.0):
+                objSEDSlope[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
+
+        
+
 
