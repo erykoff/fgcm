@@ -301,7 +301,7 @@ class FgcmParameters(object):
         # the number of *intervals* is one less than the dates?
         #self.nWashIntervals = self.washMJDs.size-1
 
-        self.nWashIntervals = fgcmConfig.washMJDs.size
+        self.nWashIntervals = fgcmConfig.washMJDs.size+1
         self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
 
         self.expWashIndex = np.zeros(self.nExp,dtype='i4')
