@@ -14,6 +14,10 @@ from fgcmChisq import FgcmChisq
 import types
 import copy_reg
 
+import multiprocessing
+from multiprocessing import Pool
+
+
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
@@ -25,14 +29,21 @@ class FgcmBrightObs(object):
     ## FIXME:
     ##  I don't think this should run fgcmChisq
 
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
+    #def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
+    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+
+        # need fgcmPars because it tracks good exposures
         self.fgcmPars = fgcmPars
-        self.fgcmLUT = fgcmLUT
+        #self.fgcmLUT = fgcmLUT
+        # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
+
+        if (not self.fgcmStars.magStdComputed):
+            raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
 
-        self.fgcmChisq = FgcmChisq(fgcmConfig,fgcmPars,fgcmStars,fgcmLUT)
+        #self.fgcmChisq = FgcmChisq(fgcmConfig,fgcmPars,fgcmStars,fgcmLUT)
 
         self.nCore = fgcmConfig.nCore
 
@@ -40,9 +51,11 @@ class FgcmBrightObs(object):
         """
         """
 
+        self.debug = debug
+
         ## FIXME: require this be previously run?
-        parArray = fgcmPars.getParArray(fitterUnits=False)
-        _ = self.fgcmChisq(parArray,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False)
+        #parArray = fgcmPars.getParArray(fitterUnits=False)
+        #_ = self.fgcmChisq(parArray,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False)
 
 
         # create a link between the exposures and observations
@@ -97,12 +110,12 @@ class FgcmBrightObs(object):
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
         # split out the filters (instead of loop of wheres)...
-        h,rev=esutil.stat.histogram(obsBandIndex[thisObsIndex],rev=True,
+        h,rev=esutil.stat.histogram(thisObsBandIndex,rev=True,
                                     min=0,max=self.fgcmPars.nBands-1)
 
-        for j in xrange(fgcmPars.nBands):
+        for j in xrange(self.fgcmPars.nBands):
             if (h[j] == 0):
-                objNGoodObs[i,j] = 0
+                objNGoodObs[objIndex,j] = 0
                 continue
 
             i1a=rev[rev[j]:rev[j+1]]
@@ -113,9 +126,9 @@ class FgcmBrightObs(object):
             # and all the observations that are comparable
             brightObs,=np.where((obsMagStd[thisObsIndex[i1a]] - minMag) <= self.brightObsGrayMax)
             # number of good observations are these bright ones
-            objNGoodObs[i,j] = brightObs.size
+            objNGoodObs[objIndex,j] = brightObs.size
 
             # and compute straight, unweighted mean of bright Obs
-            objMagStdMean[i,j] = np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]) / brightObs.size
+            objMagStdMean[objIndex,j] = np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]) / brightObs.size
 
         # and we're done
