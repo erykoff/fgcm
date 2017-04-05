@@ -49,22 +49,33 @@ class FgcmStars(object):
         obs=fitsio.read(self.obsFile,ext=1,rows=index['OBSINDEX'][indexSort])
 
         # and fill in new, cut indices
-        #self.obsIndex = shm.zeros(index.size,dtype='i4')
-        #self.obsIndex[:] = np.searchsorted(index['OBSINDEX'][indexSort],index['OBSINDEX'])
+        #  obsIndex: pointer to a particular row in the obs table
+        #            this is used with objObsIndex to get all the observations
+        #            of an individual object
         self.obsIndexHandle = snmm.createArray(index.size,dtype='i4')
         snmm.getArray(self.obsIndexHandle)[:] = np.searchsorted(index['OBSINDEX'][indexSort],index['OBSINDEX'])
 
 
         # need to stuff into shared memory objects.
+        #  nStarObs: total number of observations of all starus
         self.nStarObs = obs.size
 
+        #  obsExp: exposure number of individual observation (pointed by obsIndex)
         self.obsExpHandle = snmm.createArray(self.nStarObs,dtype='i4')
+        #  obsCCD: ccd number of individual observation
         self.obsCCDHandle = snmm.createArray(self.nStarObs,dtype='i2')
+        #  obsBandIndex: band index of individual observation
         self.obsBandIndexHandle = snmm.createArray(self.nStarObs,dtype='i2')
+        #  obsRA: RA of individual observation
         self.obsRAHandle = snmm.createArray(self.nStarObs,dtype='f8')
+        #  obsDec: Declination of individual observation
         self.obsDecHandle = snmm.createArray(self.nStarObs,dtype='f8')
+        #  obsMagADU: log raw ADU counts of individual observation
+        # FIXME: need default zeropoint!
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        #  obsMagADUErr: raw ADU counts error of individual observation
         self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        #  obsMagStd: corrected (to standard passband) mag of individual observation
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4')
 
         snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
@@ -87,13 +98,20 @@ class FgcmStars(object):
 
         pos=fitsio.read(self.indexFile,ext='POS')
 
+        #  nStars: total number of unique stars
         self.nStars = pos.size
 
+        #  objID: unique object ID
         self.objIDHandle = snmm.createArray(self.nStars,dtype='i4')
+        #  objRA: mean RA for object
         self.objRAHandle = snmm.createArray(self.nStars,dtype='f8')
+        #  objDec: mean Declination for object
         self.objDecHandle = snmm.createArray(self.nStars,dtype='f8')
+        #  objObsIndex: for each object, the first 
         self.objObsIndexHandle = snmm.createArray(self.nStars,dtype='i4')
+        #  objNobs: number of observations of this object (all bands)
         self.objNobsHandle = snmm.createArray(self.nStars,dtype='i4')
+        #  objNGoodObsHandle: number of good observations, per band
         self.objNGoodObsHandle = snmm.createArray((self.nStars,self.nBands),dtype='i4')
 
         snmm.getArray(self.objIDHandle)[:] = pos['FGCM_ID'][:]
@@ -103,9 +121,12 @@ class FgcmStars(object):
         snmm.getArray(self.objNobsHandle)[:] = pos['NOBS'][:]
 
 
+        #  minObjID: minimum object ID
         self.minObjID = np.min(snmm.getArray(self.objIDHandle))
+        #  maxObjID: maximum object ID
         self.maxObjID = np.max(snmm.getArray(self.objIDHandle))
 
+        #  obsObjID: object ID of each observation
         self.obsObjIDHandle = snmm.createArray(self.nStarObs,dtype='i4')
         obsObjID = snmm.getArray(self.obsObjIDHandle)
         objID = snmm.getArray(self.objIDHandle)
@@ -131,8 +152,11 @@ class FgcmStars(object):
 
         # And we need to record the mean mag, error, SED slopes...
 
+        #  objMagStdMean: mean standard magnitude of each object, per band
         self.objMagStdMeanHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        #  objMagStdMeanErr: error on the mean standard mag of each object, per band
         self.objMagStdMeanErrHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        #  objSEDSlope: linearized approx. of SED slope of each object, per band
         self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
 
     def selectStarsMinObs(self,goodExps):
