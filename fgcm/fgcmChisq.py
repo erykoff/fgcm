@@ -40,7 +40,7 @@ class FgcmChisq(object):
         self.fgcmStars = fgcmStars
 
         # need to configure
-        self.nCore = 4
+        self.nCore = fgcmConfig.nCore
 
         self.fitChisqs = []
 
@@ -74,7 +74,7 @@ class FgcmChisq(object):
         self.fgcmPars.reloadParArray(fitParams,fitterUnits=self.fitterUnits)
         self.fgcmPars.parsToExposures()
 
-
+        # create a link between the exposures and the observations
         a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
                                     snmm.getArray(self.fgcmStars.obsExpHandle)[:])
         self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
@@ -88,7 +88,7 @@ class FgcmChisq(object):
         goodStars,=np.where(snmm.getArray(self.fgcmStars.starFlagHandle) == 0)
 
         # testing
-        goodStars=goodStars[0:10000]
+        #goodStars=goodStars[0:10000]
 
         # prepare the return arrays...
         # how many do we have?
@@ -118,7 +118,7 @@ class FgcmChisq(object):
 
             # will want to make a pool
 
-            pool = Pool(processes=4)
+            pool = Pool(processes=self.nCore)
             #resourceUsage('premap')
             pool.map(self._worker,goodStars)
             pool.close()
