@@ -33,6 +33,8 @@ class FgcmStars(object):
 
         self._loadStars()
 
+        self.magStdComputed = False
+
         if (computeNobs):
             allExp = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
             self.selectStarsMinObs(allExp)
