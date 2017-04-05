@@ -10,6 +10,7 @@ from fgcmConfig import FgcmConfig
 from fgcmParameters import FgcmParameters
 from fgcmStars import FgcmStars
 from fgcmChisq import FgcmChisq
+from fgcmBrightObs import FgcmBrightObs
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
 
