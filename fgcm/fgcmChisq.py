@@ -151,6 +151,9 @@ class FgcmChisq(object):
 
         print(fitChisq)
 
+        # and flag that we've computed magStd
+        self.fgcmStars.magStdComputed = True
+
         if (self.computeDerivatives):
             return fitChisq, dChisqdP
         else:
