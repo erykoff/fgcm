@@ -77,7 +77,8 @@ class FgcmChisq(object):
         # create a link between the exposures and the observations
         a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
                                     snmm.getArray(self.fgcmStars.obsExpHandle)[:])
-        self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
+        #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
+        self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
         snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # and reset numbers
