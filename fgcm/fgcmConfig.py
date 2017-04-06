@@ -26,7 +26,8 @@ class FgcmConfig(object):
         requiredKeys=['exposureFile','obsFile','indexFile','UTBoundary',
                       'washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField','fitBands','extraBands',
-                      'deepFlag','minObsPerBand','nCore','brightObsGrayMax']
+                      'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
+                      'minStarPerCCD','minCCDPerExp']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -51,6 +52,8 @@ class FgcmConfig(object):
         self.extraBands = np.array(configDict['extraBands'])
         self.nCore = configDict['nCore']
         self.brightObsGrayMax = configDict['brightObsGrayMax']
+        self.minStarPerCCD = configDict['minStarPerCCD']
+        self.minCCDPerExp = configDict['minCCDPerExp']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
