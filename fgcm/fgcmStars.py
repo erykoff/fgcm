@@ -128,18 +128,19 @@ class FgcmStars(object):
         #  maxObjID: maximum object ID
         self.maxObjID = np.max(snmm.getArray(self.objIDHandle))
 
-        #  obsObjID: object ID of each observation
-        self.obsObjIDHandle = snmm.createArray(self.nStarObs,dtype='i4')
-        obsObjID = snmm.getArray(self.obsObjIDHandle)
+        #  obsObjIDIndex: object ID Index of each observation
+        #    (to get objID, then objID[obsObjIDIndex]
+        self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objID = snmm.getArray(self.objIDHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
         objObsIndex = snmm.getArray(self.objObsIndexHandle)
         objNobs = snmm.getArray(self.objNobsHandle)
         for i in xrange(self.nStars):
-            obsObjID[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = objID[i]
+            obsObjIDIndex[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = i
 
         pos=None
-        obsObjID = None
+        obsObjIDIndex = None
         objID = None
         obsIndex = None
         objObsIndex = None
@@ -171,7 +172,7 @@ class FgcmStars(object):
         obsExp = snmm.getArray(self.obsExpHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsObjID = snmm.getArray(self.obsObjIDHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objID = snmm.getArray(self.objIDHandle)
 
@@ -179,20 +180,10 @@ class FgcmStars(object):
 
         req,=np.where(self.bandRequired)
 
-        #nobs = np.zeros((req.size, self.nStars),dtype='i4')
-        #for i in xrange(req.size):
-        #    use,=np.where(obsBandIndex[obsIndex[b]] == req[i])
-        #    hist=esutil.stat.histogram(obsObjID[obsIndex[b[use]]],
-        #                               min=self.minObjID,max=self.maxObjID)
-            #nobs[i,:] = hist[self.objID - self.minObjID]
-        #    objNGoodObs[:,i] = hist[objID - self.minObjID]
-
-        # Better indexed version
-        objNGoodObs[:,:] = 0.0
-        tempObjID = np.arange(self.minObjID,self.maxObjID+1,dtype='i8')
-        tempObjIndex = np.searchsorted(objID,tempObjID)
+        # Even better version
+        objNGoodObs[:,:] = 0
         np.add.at(objNGoodObs,
-                  (tempObjIndex[obsObjID[obsIndex[b]] - self.minObjID],
+                  (obsObjIDIndex[obsIndex[b]],
                    obsBandIndex[obsIndex[b]]),
                   1)
 
