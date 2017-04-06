@@ -26,10 +26,6 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 class FgcmBrightObs(object):
     """
     """
-    ## FIXME:
-    ##  I don't think this should run fgcmChisq
-
-    #def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
         # need fgcmPars because it tracks good exposures
@@ -61,7 +57,8 @@ class FgcmBrightObs(object):
         # create a link between the exposures and observations
         a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
                                     snmm.getArray(self.fgcmStars.obsExpHandle)[:])
-        self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
+        #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
+        self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
         snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # reset numbers
