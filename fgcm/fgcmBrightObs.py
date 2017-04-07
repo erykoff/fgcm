@@ -86,7 +86,7 @@ class FgcmBrightObs(object):
 
         # make local pointers to useful arrays
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        #objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
@@ -105,6 +105,7 @@ class FgcmBrightObs(object):
         thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErr)
 
         # split out the filters (instead of loop of wheres)...
         h,rev=esutil.stat.histogram(thisObsBandIndex,rev=True,
@@ -125,7 +126,13 @@ class FgcmBrightObs(object):
             # number of good observations are these bright ones
             objNGoodObs[objIndex,j] = brightObs.size
 
-            # and compute straight, unweighted mean of bright Obs
-            objMagStdMean[objIndex,j] = np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]) / brightObs.size
+            # and compute straight, unweighted mean of bright Obs  -- no
+            #objMagStdMean[objIndex,j] = np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]) / brightObs.size
+            # compute weighted mean of bright observations, and also compute error
+            wtSum = np.sum(1./obsMagErr[thisObsIndex[i1a[brightObs]]]**2.)
+            objMagStdMean[objIndex,j] = (np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]/
+                                               obsMagErr[thisObsIndex[i1a[brightObs]]]) /
+                                         wtSum)
+            objMagStdMeanErr[objIndex,j] = np.sqrt(1./wtSum)
 
         # and we're done
