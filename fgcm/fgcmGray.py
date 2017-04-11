@@ -25,9 +25,9 @@ class FgcmGray(object):
             raise ValueError("Must run FgcmChisq to compute magStd before FgcmGray")
 
         # and record configuration variables...
-        self.minStarPerCCD = self.fgcmConfig.minStarPerCCD
-        self.minCCDPerExp = self.fgcmConfig.minCCDPerExp
-        self.maxCCDGrayErr = self.fgcmConfig.maxCCDGrayErr
+        self.minStarPerCCD = fgcmConfig.minStarPerCCD
+        self.minCCDPerExp = fgcmConfig.minCCDPerExp
+        self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
 
         self._prepareGrayArrays()
 
@@ -136,7 +136,7 @@ class FgcmGray(object):
         expGray = snmm.getArray(self.expGrayHandle)
         expGrayRMS = snmm.getArray(self.expGrayRMSHandle)
         expGrayErr = snmm.getArray(self.expGrayErrHandle)
-        expGrayNGoodCCDs = snmm.getArray(Self.expGrayNGoodCCDsHandle)
+        expGrayNGoodCCDs = snmm.getArray(self.expGrayNGoodCCDsHandle)
 
         # input numbers
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -209,12 +209,12 @@ class FgcmGray(object):
         np.add.at(ccdGrayRMS,
                   (obsExpIndex[b],obsCCDIndex[b]),
                   EGray[b]**2./EGrayErr2[b])
-        np.add.at(ccdGrayNGoodStars,
+        np.add.at(ccdNGoodStars,
                   (obsExpIndex[b],obsCCDIndex[b]),
                   1)
 
         # need at least 3 or else computation can blow up
-        gd = np.where(ccdGrayNGoodStars > 2)
+        gd = np.where(ccdNGoodStars > 2)
         ccdGray[gd] /= ccdGrayWt[gd]
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
@@ -225,7 +225,7 @@ class FgcmGray(object):
 
         # group CCD by Exposure and Sum
 
-        goodCCD = np.where((ccdGrayNGoodStars >= self.minStarPerCCD) &
+        goodCCD = np.where((ccdNGoodStars >= self.minStarPerCCD) &
                            (ccdGrayErr > 0.0) &
                            (ccdGrayErr < self.maxCCDGrayErr))
 
