@@ -105,7 +105,7 @@ class FgcmBrightObs(object):
         thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErr)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
 
         # split out the filters (instead of loop of wheres)...
         h,rev=esutil.stat.histogram(thisObsBandIndex,rev=True,
