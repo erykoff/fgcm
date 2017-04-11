@@ -59,6 +59,7 @@ class FgcmGray(object):
         # useful numbers
         expGrayForSelection = snmm.getArray(self.expGrayForSelectionHandle)
         expGrayRMSForSelection = snmm.getArray(self.expGrayRMSForSelectionHandle)
+        expGrayNGoodStarForSelection = snmm.getArray(self.expGrayNGoodStarForSelectionHandle)
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
