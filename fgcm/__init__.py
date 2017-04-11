@@ -12,6 +12,7 @@ from fgcmStars import FgcmStars
 from fgcmChisq import FgcmChisq
 from fgcmBrightObs import FgcmBrightObs
 from fgcmGray import FgcmGray
+from fgcmSuperStarFlat import FgcmSuperStarFlat
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
 
