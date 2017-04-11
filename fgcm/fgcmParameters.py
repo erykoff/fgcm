@@ -10,7 +10,6 @@ from fgcmUtilities import _pickle_method
 
 import types
 import copy_reg
-#import sharedmem as shm
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -119,6 +118,12 @@ class FgcmParameters(object):
             # need to add two global parameters!
             self.parExternalTauScale = 1.0
             self.parExternalTauOffset = 0.0
+
+        # and the aperture corrections
+        self.parAperCorrPivot = np.zeros(self.nBands,dtype='f8')
+        self.parAperCorrSlope = np.zeros(self.nBands,dtype='f8')
+        self.parAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
+        self.parAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
 
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
@@ -256,7 +261,6 @@ class FgcmParameters(object):
         # and get the secant of the Zenith angle
         self.sinLatitude = np.sin(np.radians(fgcmConfig.latitude))
         self.cosLatitude = np.cos(np.radians(fgcmConfig.latitude))
-        
 
         self.expPmb = expInfo['PMB']
 
@@ -455,10 +459,16 @@ class FgcmParameters(object):
             # FIXME
             #   need to load external Tau!
 
+        self.parAperCorrPivot = pars['PARAPERCORRPIVOT'][:]
+        self.parAperCorrSlope = pars['PARAPERCORRSLOPE'][:]
+        self.parAperCorrSlopeErr = pars['PARAPERCORRSLOPEERR'][:]
+        self.parAperCorrRange = np.reshape(pars['PARAPERCORRRANGE'][:],(2,self.nBands))
+
         self._arrangeParArray()
         # should check these are all the right size...
 
         # need to load the superstarflats
+        self.parSuperStarFlat = fitsio.read(parfile,ext='SUPER')
 
 
     def saveParFile(self, parFile):
@@ -521,7 +531,11 @@ class FgcmParameters(object):
                ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
                ('PARPWVSLOPE','f8',self.parPWVSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
-               ('PARQESYSSLOPE','f8',self.parQESysSlope.size)]
+               ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
+               ('APERCORRPIVOT','f8',self.parAperCorrPivot.size),
+               ('APERCORRSLOPE','f8',self.parAperCorrSlope.size),
+               ('APERCORRSLOPEERR','f8',self.parAperCorrSlopeErr.size),
+               ('APERCORRRANGE','f8',self.parAperCorrRange.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -552,9 +566,16 @@ class FgcmParameters(object):
             pars['PAREXTERNALTAUOFFSET'][:] = self.parExternalTauOffset
             pars['EXTERNALTAU'][:] = self.externalTau
 
+        pars['PARAPERCORRPIVOT'][:] = self.parAperCorrPivot
+        pars['PARAPERCORRSLOPE'][:] = self.parAperCorrSlope
+        pars['PARAPERCORRSLOPEERR'][:] = self.parAperCorrSlopeErr
+        pars['PARAPERCORRRANGE'][:] = self.parAperCorrRange
+
         fitsio.write(parfile,pars,extname='PARAMS')
 
         # and need to record the superstar flats
+        fitsio.write(parfile,self.parSuperStarFlat,extname='SUPER')
+
 
 
     def loadExternalPWV(self, externalPWVDeltaT):
