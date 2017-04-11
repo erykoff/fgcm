@@ -9,7 +9,7 @@ import time
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class fgcmSuperStarFlat(object):
+class FgcmSuperStarFlat(object):
     """
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
