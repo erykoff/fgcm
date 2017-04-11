@@ -65,7 +65,7 @@ class FgcmBrightObs(object):
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        # This operates on all stars...
+        # This operates on all stars...should it?
 
         if (self.debug) :
             for i in xrange(self.fgcmStars.nStars):
@@ -131,7 +131,7 @@ class FgcmBrightObs(object):
             # compute weighted mean of bright observations, and also compute error
             wtSum = np.sum(1./obsMagErr[thisObsIndex[i1a[brightObs]]]**2.)
             objMagStdMean[objIndex,j] = (np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]/
-                                               obsMagErr[thisObsIndex[i1a[brightObs]]]) /
+                                               obsMagErr[thisObsIndex[i1a[brightObs]]]**2.) /
                                          wtSum)
             objMagStdMeanErr[objIndex,j] = np.sqrt(1./wtSum)
 
