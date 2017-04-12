@@ -15,7 +15,12 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmStars(object):
-    def __init__(self,fgcmConfig,computeNobs=True):
+    """
+    """
+
+    def __init__(self,fgcmConfig,fgcmPars,computeNobs=True):
+        # need fgcmPars for the exposures
+
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
 
@@ -30,6 +35,8 @@ class FgcmStars(object):
         for i in xrange(self.nBands):
             if (self.bands[i] in self.fitBands):
                 self.bandRequired[i] = True
+
+        self.expArray = fgcmPars.expArray
 
         self._loadStars()
 
@@ -64,6 +71,8 @@ class FgcmStars(object):
 
         #  obsExp: exposure number of individual observation (pointed by obsIndex)
         self.obsExpHandle = snmm.createArray(self.nStarObs,dtype='i4')
+        #  obsExpIndex: exposure index
+        self.obsExpIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
         #  obsCCD: ccd number of individual observation
         self.obsCCDHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsBandIndex: band index of individual observation
@@ -73,7 +82,7 @@ class FgcmStars(object):
         #  obsDec: Declination of individual observation
         self.obsDecHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADU: log raw ADU counts of individual observation
-        # FIXME: need default zeropoint!
+        ## FIXME: need to know default zeropoint?
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagADUErr: raw ADU counts error of individual observation
         self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
@@ -87,6 +96,10 @@ class FgcmStars(object):
         snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
         snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
         snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
+
+        a,b=esutil.numpy_util.match(self.expArray,
+                                    snmm.getArray(self.obsExpHandle)[:])
+        snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # and match bands to indices
         bandStrip = np.core.defchararray.strip(obs['BAND'][:])
@@ -215,7 +228,7 @@ class FgcmStars(object):
             objSEDSlope[objIndex,0] = S[0] - 1.0 * ((self.lambdaStd[1] - self.lambdaStd[0])/(self.lambdaStd[2]-self.lambdaStd[0])) * (S[1]-S[0])
             objSEDSlope[objIndex,1] = (S[0] + S[1])/2.0
             objSEDSlope[objIndex,2] = (S[1] + S[2])/2.0
-            objSEDSlope[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
+            objSEDSlope[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
             if ((thisObjMagStdMean[4]) < 90.0):
                 objSEDSlope[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
 
