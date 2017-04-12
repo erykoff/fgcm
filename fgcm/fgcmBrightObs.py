@@ -34,8 +34,6 @@ class FgcmBrightObs(object):
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
 
-        if (not self.fgcmStars.magStdComputed):
-            raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
 
@@ -43,11 +41,16 @@ class FgcmBrightObs(object):
 
         self.nCore = fgcmConfig.nCore
 
-    def selectGoodStars(self,debug=False):
+    def selectGoodStars(self,debug=False,computeSEDSlopes=False):
         """
         """
 
+        if (not self.fgcmStars.magStdComputed):
+            raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
+
+
         self.debug = debug
+        self.computeSEDSlopes = computeSEDSlopes
 
         ## FIXME: require this be previously run?
         #parArray = fgcmPars.getParArray(fitterUnits=False)
@@ -55,11 +58,11 @@ class FgcmBrightObs(object):
 
 
         # create a link between the exposures and observations
-        a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
-                                    snmm.getArray(self.fgcmStars.obsExpHandle)[:])
+        #a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
+        #                            snmm.getArray(self.fgcmStars.obsExpHandle)[:])
         #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
-        self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
-        snmm.getArray(self.obsExpIndexHandle)[b] = a
+        #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
+        #snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # reset numbers
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
@@ -78,7 +81,7 @@ class FgcmBrightObs(object):
             pool.join()
 
         # free shared arrays
-        snmm.freeArray(self.obsExpIndexHandle)
+        #snmm.freeArray(self.obsExpIndexHandle)
 
     def _worker(self,objIndex):
         """
@@ -94,7 +97,8 @@ class FgcmBrightObs(object):
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
 
         thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
-        thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
+        #thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
+        thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
 
         # cut to good exposures
         #  I think this can be done in the parent more efficiently...but not now.
@@ -135,4 +139,7 @@ class FgcmBrightObs(object):
                                          wtSum)
             objMagStdMeanErr[objIndex,j] = np.sqrt(1./wtSum)
 
+        if (self.computeSEDSlopes):
+            self.fgcmStars.computeObjectSEDSlope(objIndex)
+            
         # and we're done
