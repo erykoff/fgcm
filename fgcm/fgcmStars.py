@@ -28,23 +28,34 @@ class FgcmStars(object):
         self.nBands = fgcmConfig.bands.size
         self.minPerBand = fgcmConfig.minObsPerBand
         self.fitBands = fgcmConfig.fitBands
+        self.nFitBands = fgcmConfig.fitBands.size
+        self.extraBands = fgcmConfig.extraBands
+        self.sedFitBandFudgeFactors = fgcmConfig.sedFitBandFudgeFactors
+        self.sedExtraBandFudgeFactors = fgcmConfig.sedExtraBandFudgeFactors
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
-        self.bandRequired = np.zeros(self.nBands,dtype=np.bool)
-        for i in xrange(self.nBands):
-            if (self.bands[i] in self.fitBands):
-                self.bandRequired[i] = True
+        #self.bandRequired = np.zeros(self.nBands,dtype=np.bool)
+        #for i in xrange(self.nBands):
+        #    if (self.bands[i] in self.fitBands):
+        #        self.bandRequired[i] = True
+        self.bandRequired = fgcmConfig.bandRequired
+        self.bandRequiredIndex = np.where(self.bandRequired)[0]
+        self.bandExtra = fgcmConfig.bandExtra
+        self.bandExtraIndex = np.where(self.bandExtra)[0]
 
         self.expArray = fgcmPars.expArray
 
         self._loadStars()
 
         self.magStdComputed = False
+        self.sedSlopeComputed = False
 
         if (computeNobs):
             allExp = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
             self.selectStarsMinObs(allExp)
+
+        self.magConstant = 2.5/np.log(10)
 
     def _loadStars(self):
 
@@ -174,6 +185,7 @@ class FgcmStars(object):
         self.objMagStdMeanErrHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
         #  objSEDSlope: linearized approx. of SED slope of each object, per band
         self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        #self.objSEDSlopeOldHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
 
     def selectStarsMinObs(self,goodExps):
         """
@@ -212,26 +224,73 @@ class FgcmStars(object):
 
         thisObjMagStdMean = snmm.getArray(self.objMagStdMeanHandle)[objIndex,:]
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+        #objSEDSlopeOld = snmm.getArray(self.objSEDSlopeOldHandle)
 
         ## FIXME
         #   work with fit bands and fudge factors
 
-        if (np.max(thisObjMagStdMean) > 90.0):
+        # check that we have valid mags for all the required bands
+        if (np.max(thisObjMagStdMean[self.bandRequired]) > 90.0):
             # cannot compute
             objSEDSlope[objIndex,:] = 0.0
         else:
+            # we can compute S for everything, even if we don't use it.
+            #  makes the indexing simpler
+
+            # this is the flux "color"
             S=np.zeros(self.nBands-1,dtype='f4')
             for i in xrange(self.nBands-1):
-                S[i] = -0.921 * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStd[i+1] - self.lambdaStd[i])
+                S[i] = (-1/self.magConstant) * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStd[i+1] - self.lambdaStd[i])
 
-            # this is hacked for now
-            objSEDSlope[objIndex,0] = S[0] - 1.0 * ((self.lambdaStd[1] - self.lambdaStd[0])/(self.lambdaStd[2]-self.lambdaStd[0])) * (S[1]-S[0])
-            objSEDSlope[objIndex,1] = (S[0] + S[1])/2.0
-            objSEDSlope[objIndex,2] = (S[1] + S[2])/2.0
-            objSEDSlope[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
-            if ((thisObjMagStdMean[4]) < 90.0):
-                objSEDSlope[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
+            # first, handle the required bands.
+            #  edge bands use a second derivative expansion
+            #  central bands use a straight mean
+            #  all have the possibility for a fudge factor
 
-        
+            ## FIXME: will have to handle u band "extra band"
+
+            # handle the first required one...
+            tempIndex=self.bandRequiredIndex[0]
+            objSEDSlope[objIndex,tempIndex] = (
+                S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
+                    (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
+                    (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
+                (S[tempIndex+1]-S[tempIndex]))
+
+            # and the middle ones...
+            #  these are straight averages
+            for tempIndex in self.bandRequiredIndex[1:-1]:
+                objSEDSlope[objIndex,tempIndex] = (S[tempIndex-1] + S[tempIndex]) / 2.0
+
+            # and the last one...
+            tempIndex=self.bandRequiredIndex[-1]
+            objSEDSlope[objIndex,tempIndex] = (
+                S[tempIndex-1] + self.sedFitBandFudgeFactors[-1] * (
+                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
+                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                (S[tempIndex-1] - S[tempIndex-2]))
+
+            # and the extra bands ... only redward now
+            # we stick with the reddest band
+            tempIndex = self.bandRequiredIndex[-1]
+            extra,=np.where(thisObjMagStdMean[self.bandExtraIndex] < 90.0)
+            for i in xrange(extra.size):
+                objSEDSlope[objIndex,self.bandExtraIndex[extra[i]]] = (
+                    S[tempIndex-1] + self.sedExtraBandFudgeFactors[extra[i]] * (
+                        (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
+                        (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                    (S[tempIndex-1] - S[tempIndex-2]))
+
+
+            ## temporary old code to cross-check
+
+            #objSEDSlopeOld[objIndex,0] = S[0] - 1.0 * ((self.lambdaStd[1] - self.lambdaStd[0])/(self.lambdaStd[2]-self.lambdaStd[0])) * (S[1]-S[0])
+            #objSEDSlopeOld[objIndex,1] = (S[0] + S[1])/2.0
+            #objSEDSlopeOld[objIndex,2] = (S[1] + S[2])/2.0
+            #objSEDSlopeOld[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
+            #if ((thisObjMagStdMean[4]) < 90.0):
+            #    objSEDSlopeOld[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
+
+
 
 
