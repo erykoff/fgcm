@@ -28,7 +28,7 @@ class FgcmConfig(object):
                       'ccdField','latitude','seeingField','fitBands','extraBands',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
-                      'illegalValue']
+                      'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -58,6 +58,9 @@ class FgcmConfig(object):
         self.maxCCDGrayErr = configDict['maxCCDGrayErr']
         self.aperCorrFitNBins = configDict['aperCorrFitNBins']
         self.illegalValue = configDict['illegalValue']
+        self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
+        self.sedExtraBandFudgeFactors = np.array(configDict['sedExtraBandFudgeFactors'])
+
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -85,6 +88,12 @@ class FgcmConfig(object):
             self.stepGrain = configDict['stepGrain']
         else:
             self.stepGrain = 10.0
+
+        if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
+            raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
+
+        if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
+            raise ValueError("sedExtraBandFudgeFactors must have same length as extraBands")
 
         # and look at the lutFile
         lutStats=fitsio.read(self.lutFile,ext='INDEX')
@@ -131,4 +140,18 @@ class FgcmConfig(object):
         gd,=np.where((self.washMJDs > self.mjdRange[0]) &
                      (self.washMJDs < self.mjdRange[1]))
         self.washMJDs = self.washMJDs[gd]
+
+        # and deal with fit band indices and extra band indices
+        self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
+        self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
+        for i in xrange(self.bands.size):
+            if (self.bands[i] in self.fitBands):
+                self.bandRequired[i] = True
+            if (self.bands[i] in self.extraBands):
+                self.bandExtra[i] = True
+            if (self.bands[i] in self.fitBands and
+                self.bands[i] in self.extraBands):
+                raise ValueError("Cannot have the same band as fit and extra")
+
+            
 
