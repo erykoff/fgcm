@@ -90,3 +90,5 @@ class FgcmApertureCorrection(object):
 
             self.fgcmPars.parAperCorrSlope[i] = fit[0]
             self.fgcmPars.parAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
+
+            ## FIXME: add plotting
