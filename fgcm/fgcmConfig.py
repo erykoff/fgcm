@@ -27,7 +27,8 @@ class FgcmConfig(object):
                       'washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField','fitBands','extraBands',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
-                      'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins']
+                      'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
+                      'illegalValue']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -56,6 +57,7 @@ class FgcmConfig(object):
         self.minCCDPerExp = configDict['minCCDPerExp']
         self.maxCCDGrayErr = configDict['maxCCDGrayErr']
         self.aperCorrFitNBins = configDict['aperCorrFitNBins']
+        self.illegalValue = configDict['illegalValue']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
