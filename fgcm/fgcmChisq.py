@@ -75,11 +75,12 @@ class FgcmChisq(object):
         self.fgcmPars.parsToExposures()
 
         # create a link between the exposures and the observations
-        a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
-                                    snmm.getArray(self.fgcmStars.obsExpHandle)[:])
+        #a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
+        #                            snmm.getArray(self.fgcmStars.obsExpHandle)[:])
         #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
-        self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
-        snmm.getArray(self.obsExpIndexHandle)[b] = a
+        #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
+        #snmm.getArray(self.obsExpIndexHandle)[b] = a
+        
 
         # and reset numbers
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
@@ -144,7 +145,7 @@ class FgcmChisq(object):
         self.fitChisqs.append(fitChisq)
 
         # free shared arrays
-        snmm.freeArray(self.obsExpIndexHandle)
+        #snmm.freeArray(self.obsExpIndexHandle)
         for key in self.totalHandleDict.keys():
             snmm.freeArray(self.totalHandleDict[key])
 
@@ -177,7 +178,8 @@ class FgcmChisq(object):
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
 
         thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
-        thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
+        #thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
+        thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
 
         # cut to good exposures
         #  I think this can be done in the parent more efficiently...but not now.
