@@ -312,5 +312,5 @@ class FgcmStars(object):
             bad,=np.where((thisColor < cCut[2]) |
                           (thisColor > cCut[3]))
             starFlag[bad] |= 2**starFlagDict['BAD_COLOR']
-            
+
 
