@@ -5,6 +5,7 @@ import fitsio
 import esutil
 
 from fgcmUtilities import _pickle_method
+from fgcmUtilities import starFlagDict
 
 import types
 import copy_reg
@@ -32,6 +33,7 @@ class FgcmStars(object):
         self.extraBands = fgcmConfig.extraBands
         self.sedFitBandFudgeFactors = fgcmConfig.sedFitBandFudgeFactors
         self.sedExtraBandFudgeFactors = fgcmConfig.sedExtraBandFudgeFactors
+        self.starColorCuts = fgcmConfig.starColorCuts
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
@@ -203,7 +205,7 @@ class FgcmStars(object):
 
         a,b=esutil.numpy_util.match(goodExps,obsExp[obsIndex])
 
-        req,=np.where(self.bandRequired)
+        #req,=np.where(self.bandRequired)
 
         # Even better version
         objNGoodObs[:,:] = 0
@@ -212,11 +214,14 @@ class FgcmStars(object):
                    obsBandIndex[obsIndex[b]]),
                   1)
 
-        minObs = objNGoodObs[:,req].min(axis=1)
+        minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
 
-        snmm.getArray(self.starFlagHandle)[:] = 0
+        #snmm.getArray(self.starFlagHandle)[:] = 0
+        #bad,=np.where(minObs < self.minPerBand)
+        #snmm.getArray(self.starFlagHandle)[bad] = 1
+        starFlag = snmm.getArray(self.starFlagHandle)
         bad,=np.where(minObs < self.minPerBand)
-        snmm.getArray(self.starFlagHandle)[bad] = 1
+        starFlag[bad] |= 2**starFlagDict['TOO_FEW_OBS']
 
     def computeObjectSEDSlope(self,objIndex):
         """
@@ -292,5 +297,20 @@ class FgcmStars(object):
             #    objSEDSlopeOld[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
 
 
+    def performColorCuts(self):
+        """
+        """
 
+        if (not self.magStdComputed):
+            raise ValueError("Must compute magStd before performing color cuts")
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        starFlag = snmm.getArray(self.starFlagHandle)
+
+        for cCut in self.starColorCuts:
+            thisColor = objMagStdMean[:,cCut[0]] - objMagStdMean[:,cCut[1]]
+            bad,=np.where((thisColor < cCut[2]) |
+                          (thisColor > cCut[3]))
+            starFlag[bad] |= 2**starFlagDict['BAD_COLOR']
+            
 
