@@ -29,7 +29,7 @@ class FgcmConfig(object):
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
                       'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors',
-                      'starColorCuts']
+                      'starColorCuts','cycleNumber','outfileBase','maxIter']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -62,6 +62,9 @@ class FgcmConfig(object):
         self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
         self.sedExtraBandFudgeFactors = np.array(configDict['sedExtraBandFudgeFactors'])
         self.starColorCuts = configDict['starColorCuts']
+        self.cycleNumber = configDict['cycleNumber']
+        self.outfileBase = configDict['outfileBase']
+        self.maxIter = configDict['maxIter']
 
 
         if 'pwvFile' in configDict:
@@ -90,6 +93,19 @@ class FgcmConfig(object):
             self.stepGrain = configDict['stepGrain']
         else:
             self.stepGrain = 10.0
+
+        if 'outputPath' in configDict:
+            self.outputPath = os.path.abspath(configDict['outputPath'])
+        else:
+            self.outputPath = os.path.abspath('.')
+
+        if (self.cycleNumber < 0):
+            raise ValueError("Illegal cycleNumber: must be >= 0")
+
+        if (self.cycleNumber > 1):
+            if ('inParameterFile' not in configDict):
+                raise ValueError("Must provide inParameterFile for cycleNumber > 0")
+            self.inParameterFile = configDict['inParameterFile']
 
         if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
             raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
