@@ -36,9 +36,9 @@ class FgcmGray(object):
         """
 
         # we have expGray for Selection
-        self.expGrayForSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
-        self.expGrayRMSForSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
-        self.expGrayNGoodStarForSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
+        self.expGrayForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
+        self.expGrayRMSForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
+        self.expGrayNGoodStarForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
 
         # and the exp/ccd gray for the zeropoints
 
@@ -52,14 +52,14 @@ class FgcmGray(object):
         self.expGrayErrHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayNGoodCCDsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i2')
 
-    def computeExpGrayForSelection(self):
+    def computeExpGrayForInitialSelection(self):
         """
         """
 
         # useful numbers
-        expGrayForSelection = snmm.getArray(self.expGrayForSelectionHandle)
-        expGrayRMSForSelection = snmm.getArray(self.expGrayRMSForSelectionHandle)
-        expGrayNGoodStarForSelection = snmm.getArray(self.expGrayNGoodStarForSelectionHandle)
+        expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
+        expGrayRMSForInitialSelection = snmm.getArray(self.expGrayRMSForInitialSelectionHandle)
+        expGrayNGoodStarForInitialSelection = snmm.getArray(self.expGrayNGoodStarForInitialSelectionHandle)
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
@@ -105,24 +105,24 @@ class FgcmGray(object):
 
         # now group per exposure and sum...
 
-        expGrayForSelection[:] = 0.0
-        expGrayRMSForSelection[:] = 0.0
-        expGrayNGoodStarForSelection[:] = 0
+        expGrayForInitialSelection[:] = 0.0
+        expGrayRMSForInitialSelection[:] = 0.0
+        expGrayNGoodStarForInitialSelection[:] = 0
 
-        np.add.at(expGrayForSelection,
+        np.add.at(expGrayForInitialSelection,
                   obsExpIndex[b],
                   EGray[b])
-        np.add.at(expGrayRMSForSelection,
+        np.add.at(expGrayRMSForInitialSelection,
                   obsExpIndex[b],
                   EGray[b]**2.)
-        np.add.at(expGrayNGoodStarForSelection,
+        np.add.at(expGrayNGoodStarForInitialSelection,
                   obsExpIndex[b],
                   1)
 
-        gd,=np.where(expGrayNGoodStarForSelection > 0)
-        expGrayForSelection[gd] /= expGrayNGoodStarForSelection[gd]
-        expGrayRMSForSelection[gd] = np.sqrt((expGrayRMSForSelection[gd]/expGrayNGoodStarForSelection[gd]) -
-                                             (expGrayForSelection[gd])**2.)
+        gd,=np.where(expGrayNGoodStarForInitialSelection > 0)
+        expGrayForInitialSelection[gd] /= expGrayNGoodStarForInitialSelection[gd]
+        expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expGrayNGoodStarForInitialSelection[gd]) -
+                                             (expGrayForInitialSelection[gd])**2.)
 
     def computeCCDAndExpGray(self):
         """
@@ -258,4 +258,4 @@ class FgcmGray(object):
         expGray[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
-        
+
