@@ -15,6 +15,7 @@ from fgcmGray import FgcmGray
 from fgcmSuperStarFlat import FgcmSuperStarFlat
 from fgcmApertureCorrection import FgcmApertureCorrection
 from fgcmExposureSelector import FgcmExposureSelector
+from fgcmFitCycle import FgcmFitCycle
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
 
