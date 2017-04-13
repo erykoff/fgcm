@@ -127,6 +127,7 @@ class FgcmParameters(object):
 
         # one of the "parameters" is expGray
         self.parExpGray = np.zeros(self.nExp,dtype='f8')
+        self.parVarGray = np.zeros(self.nExp,dtype='f8')
 
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
@@ -468,6 +469,7 @@ class FgcmParameters(object):
         self.parAperCorrRange = np.reshape(pars['PARAPERCORRRANGE'][0],(2,self.nBands))
 
         self.parExpGray = pars['PAREXPGRAY'][0]
+        self.parVarGray = pars['PARVARGRAY'][0]
 
         self._arrangeParArray()
         # should check these are all the right size...
@@ -541,7 +543,8 @@ class FgcmParameters(object):
                ('PARAPERCORRSLOPE','f8',self.parAperCorrSlope.size),
                ('PARAPERCORRSLOPEERR','f8',self.parAperCorrSlopeErr.size),
                ('PARAPERCORRRANGE','f8',self.parAperCorrRange.size),
-               ('PAREXPGRAY','f8',self.parExpGray.size)]
+               ('PAREXPGRAY','f8',self.parExpGray.size),
+               ('PARVARGRAY','f8',self.parVarGray.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -578,6 +581,7 @@ class FgcmParameters(object):
         pars['PARAPERCORRRANGE'][:] = self.parAperCorrRange
 
         pars['PAREXPGRAY'][:] = self.parExpGray
+        pars['PARVARGRAY'][:] = self.parVarGray
 
         fitsio.write(parfile,pars,extname='PARAMS')
 
