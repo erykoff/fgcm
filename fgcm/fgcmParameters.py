@@ -120,13 +120,13 @@ class FgcmParameters(object):
             self.parExternalTauOffset = 0.0
 
         # and the aperture corrections
-        self.parAperCorrPivot = np.zeros(self.nBands,dtype='f8')
-        self.parAperCorrSlope = np.zeros(self.nBands,dtype='f8')
-        self.parAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
-        self.parAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
+        self.compAperCorrPivot = np.zeros(self.nBands,dtype='f8')
+        self.compAperCorrSlope = np.zeros(self.nBands,dtype='f8')
+        self.compAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
+        self.compAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
 
         # one of the "parameters" is expGray
-        self.parExpGray = np.zeros(self.nExp,dtype='f8')
+        self.compExpGray = np.zeros(self.nExp,dtype='f8')
         self.parVarGray = np.zeros(self.nExp,dtype='f8')
 
         # and compute the units...
@@ -463,13 +463,14 @@ class FgcmParameters(object):
             # FIXME
             #   need to load external Tau!
 
-        self.parAperCorrPivot = pars['PARAPERCORRPIVOT'][0]
-        self.parAperCorrSlope = pars['PARAPERCORRSLOPE'][0]
-        self.parAperCorrSlopeErr = pars['PARAPERCORRSLOPEERR'][0]
-        self.parAperCorrRange = np.reshape(pars['PARAPERCORRRANGE'][0],(2,self.nBands))
+        self.compAperCorrPivot = pars['COMPAPERCORRPIVOT'][0]
+        self.compAperCorrSlope = pars['COMPAPERCORRSLOPE'][0]
+        self.compAperCorrSlopeErr = pars['COMPAPERCORRSLOPEERR'][0]
+        self.compAperCorrRange = np.reshape(pars['COMPAPERCORRRANGE'][0],(2,self.nBands))
 
-        self.parExpGray = pars['PAREXPGRAY'][0]
-        self.parVarGray = pars['PARVARGRAY'][0]
+        self.compExpGray = pars['COMPEXPGRAY'][0]
+        self.compVarGray = pars['COMPVARGRAY'][0]
+        self.compNGoodStarPerExp = pars['COMPNGOODSTARPEREXP'][0]
 
         self._arrangeParArray()
         # should check these are all the right size...
@@ -539,12 +540,13 @@ class FgcmParameters(object):
                ('PARPWVSLOPE','f8',self.parPWVSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
-               ('PARAPERCORRPIVOT','f8',self.parAperCorrPivot.size),
-               ('PARAPERCORRSLOPE','f8',self.parAperCorrSlope.size),
-               ('PARAPERCORRSLOPEERR','f8',self.parAperCorrSlopeErr.size),
-               ('PARAPERCORRRANGE','f8',self.parAperCorrRange.size),
-               ('PAREXPGRAY','f8',self.parExpGray.size),
-               ('PARVARGRAY','f8',self.parVarGray.size)]
+               ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
+               ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
+               ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
+               ('COMPAPERCORRRANGE','f8',self.compAperCorrRange.size),
+               ('COMPEXPGRAY','f8',self.compExpGray.size),
+               ('COMPVARGRAY','f8',self.compVarGray.size),
+               ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -575,13 +577,14 @@ class FgcmParameters(object):
             pars['PAREXTERNALTAUOFFSET'][:] = self.parExternalTauOffset
             pars['EXTERNALTAU'][:] = self.externalTau
 
-        pars['PARAPERCORRPIVOT'][:] = self.parAperCorrPivot
-        pars['PARAPERCORRSLOPE'][:] = self.parAperCorrSlope
-        pars['PARAPERCORRSLOPEERR'][:] = self.parAperCorrSlopeErr
-        pars['PARAPERCORRRANGE'][:] = self.parAperCorrRange
+        pars['COMPAPERCORRPIVOT'][:] = self.compAperCorrPivot
+        pars['COMPAPERCORRSLOPE'][:] = self.compAperCorrSlope
+        pars['COMPAPERCORRSLOPEERR'][:] = self.compAperCorrSlopeErr
+        pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange
 
-        pars['PAREXPGRAY'][:] = self.parExpGray
-        pars['PARVARGRAY'][:] = self.parVarGray
+        pars['COMPEXPGRAY'][:] = self.compExpGray
+        pars['COMPVARGRAY'][:] = self.compVarGray
+        pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
 
         fitsio.write(parfile,pars,extname='PARAMS')
 
