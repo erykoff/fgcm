@@ -125,6 +125,9 @@ class FgcmParameters(object):
         self.parAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
         self.parAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
 
+        # one of the "parameters" is expGray
+        self.parExpGray = np.zeros(self.nExp,dtype='f8')
+
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
 
@@ -459,10 +462,12 @@ class FgcmParameters(object):
             # FIXME
             #   need to load external Tau!
 
-        self.parAperCorrPivot = pars['PARAPERCORRPIVOT'][:]
-        self.parAperCorrSlope = pars['PARAPERCORRSLOPE'][:]
-        self.parAperCorrSlopeErr = pars['PARAPERCORRSLOPEERR'][:]
-        self.parAperCorrRange = np.reshape(pars['PARAPERCORRRANGE'][:],(2,self.nBands))
+        self.parAperCorrPivot = pars['PARAPERCORRPIVOT'][0]
+        self.parAperCorrSlope = pars['PARAPERCORRSLOPE'][0]
+        self.parAperCorrSlopeErr = pars['PARAPERCORRSLOPEERR'][0]
+        self.parAperCorrRange = np.reshape(pars['PARAPERCORRRANGE'][0],(2,self.nBands))
+
+        self.parExpGray = pars['PAREXPGRAY'][0]
 
         self._arrangeParArray()
         # should check these are all the right size...
@@ -532,10 +537,11 @@ class FgcmParameters(object):
                ('PARPWVSLOPE','f8',self.parPWVSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
-               ('APERCORRPIVOT','f8',self.parAperCorrPivot.size),
-               ('APERCORRSLOPE','f8',self.parAperCorrSlope.size),
-               ('APERCORRSLOPEERR','f8',self.parAperCorrSlopeErr.size),
-               ('APERCORRRANGE','f8',self.parAperCorrRange.size)]
+               ('PARAPERCORRPIVOT','f8',self.parAperCorrPivot.size),
+               ('PARAPERCORRSLOPE','f8',self.parAperCorrSlope.size),
+               ('PARAPERCORRSLOPEERR','f8',self.parAperCorrSlopeErr.size),
+               ('PARAPERCORRRANGE','f8',self.parAperCorrRange.size),
+               ('PAREXPGRAY','f8',self.parExpGray.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -570,6 +576,8 @@ class FgcmParameters(object):
         pars['PARAPERCORRSLOPE'][:] = self.parAperCorrSlope
         pars['PARAPERCORRSLOPEERR'][:] = self.parAperCorrSlopeErr
         pars['PARAPERCORRRANGE'][:] = self.parAperCorrRange
+
+        pars['PAREXPGRAY'][:] = self.parExpGray
 
         fitsio.write(parfile,pars,extname='PARAMS')
 
