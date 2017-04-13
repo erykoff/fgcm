@@ -31,10 +31,13 @@ class FgcmExposureSelector(object):
         # this cuts on expgray,vargray
         # based on those in the parameter file?
 
-        bad,=np.where(self.fgcmPars.expGray < self.expGrayCut)
+        bad,=np.where(self.fgcmPars.compNGoodStarPerExp < self.minStarPerExp)
+        self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
+
+        bad,=np.where(self.fgcmPars.compExpGray < self.expGrayCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
 
-        bad,=np.where(self.fgcmPars.varGray > self.varGrayCut)
+        bad,=np.where(self.fgcmPars.compVarGray > self.varGrayCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
 
         # and what about number of stars?
