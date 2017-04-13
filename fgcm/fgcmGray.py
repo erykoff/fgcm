@@ -56,6 +56,9 @@ class FgcmGray(object):
         """
         """
 
+        ## FIXME: only use good stars
+
+
         # useful numbers
         expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
         expGrayRMSForInitialSelection = snmm.getArray(self.expGrayRMSForInitialSelectionHandle)
@@ -127,6 +130,8 @@ class FgcmGray(object):
     def computeCCDAndExpGray(self):
         """
         """
+
+        ## FIXME: only use good stars
 
         # values to set
         ccdGray = snmm.getArray(self.ccdGrayHandle)
