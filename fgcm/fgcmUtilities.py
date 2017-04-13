@@ -11,7 +11,7 @@ starFlagDict = {'TOO_FEW_OBS':0,
 
 expFlagDict = {'TOO_FEW_STARS':0,
                'EXP_GRAY_TOO_LARGE':1,
-               'EXP_VAR_TOO_LARGE':2,
+               'VAR_GRAY_TOO_LARGE':2,
                'TOO_FEW_EXP_ON_NIGHT':3}
 
 def resourceUsage(where):
