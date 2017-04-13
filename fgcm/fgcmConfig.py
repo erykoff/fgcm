@@ -28,7 +28,8 @@ class FgcmConfig(object):
                       'ccdField','latitude','seeingField','fitBands','extraBands',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
-                      'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors']
+                      'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors',
+                      'starColorCuts']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -60,6 +61,7 @@ class FgcmConfig(object):
         self.illegalValue = configDict['illegalValue']
         self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
         self.sedExtraBandFudgeFactors = np.array(configDict['sedExtraBandFudgeFactors'])
+        self.starColorCuts = configDict['starColorCuts']
 
 
         if 'pwvFile' in configDict:
@@ -153,5 +155,12 @@ class FgcmConfig(object):
                 self.bands[i] in self.extraBands):
                 raise ValueError("Cannot have the same band as fit and extra")
 
-            
+        # and check the star color cuts and replace with indices...
+        for cCut in self.starColorCuts:
+            if (cCut[0] not in self.bands):
+                raise ValueError("starColorCut band %s not in list of bands!" % (cCut[0]))
+            cCut[0] = list(self.bands).index(cCut[0])
+            if (cCut[1] not in self.bands):
+                raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
+            cCut[1] = list(self.bands).index(cCut[1])
 
