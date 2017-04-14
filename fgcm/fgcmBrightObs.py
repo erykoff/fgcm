@@ -68,15 +68,19 @@ class FgcmBrightObs(object):
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        # This operates on all stars...should it?
+        # and select good stars!  This might be all stars at this point, but good to check
+        goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
         if (self.debug) :
-            for i in xrange(self.fgcmStars.nStars):
-                self._worker(i)
+            for goodStar in goodStars:
+                self._worker(goodStar)
+#            for i in xrange(self.fgcmStars.nStars):
+#                self._worker(i)
 
         else:
             pool = Pool(processes=self.nCore)
-            pool.map(self._worker,np.arange(self.fgcmStars.nStars))
+            #pool.map(self._worker,np.arange(self.fgcmStars.nStars))
+            pool.map(self._worker,goodStars)
             pool.close()
             pool.join()
 
@@ -97,11 +101,10 @@ class FgcmBrightObs(object):
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
 
         thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
-        #thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
         thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
 
         # cut to good exposures
-        #  I think this can be done in the parent more efficiently...but not now.
+        ## MAYBE: Check if this can be done more efficiently.
         gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
 
         thisObsIndex=thisObsIndex[gd]
