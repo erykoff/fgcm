@@ -8,6 +8,10 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 
+from fgcmUtilities import _pickle_method
+from fgcmUtilities import resourceUsage
+
+
 import types
 import copy_reg
 
@@ -15,6 +19,7 @@ import multiprocessing
 from multiprocessing import Pool
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
