@@ -80,14 +80,13 @@ class FgcmChisq(object):
         #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
         #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
         #snmm.getArray(self.obsExpIndexHandle)[b] = a
-        
 
         # and reset numbers
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
         # and select good stars!  These are the ones to map.
-        goodStars,=np.where(snmm.getArray(self.fgcmStars.starFlagHandle) == 0)
+        goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
         # testing
         #goodStars=goodStars[0:10000]
@@ -151,7 +150,7 @@ class FgcmChisq(object):
 
         #resourceUsage('end')
 
-        print(fitChisq)
+        #print(fitChisq)
 
         # and flag that we've computed magStd
         self.fgcmStars.magStdComputed = True
@@ -182,7 +181,7 @@ class FgcmChisq(object):
         thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
 
         # cut to good exposures
-        #  I think this can be done in the parent more efficiently...but not now.
+        ## MAYBE: Check if this can be done more efficiently.
         gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
         thisObsIndex=thisObsIndex[gd]
         thisObsExpIndex = thisObsExpIndex[gd]
