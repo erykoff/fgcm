@@ -5,7 +5,7 @@ import fitsio
 import esutil
 
 from fgcmUtilities import _pickle_method
-from fgcmUtilities import starFlagDict
+from fgcmUtilities import objFlagDict
 
 import types
 import copy_reg
@@ -172,12 +172,9 @@ class FgcmStars(object):
         objObsIndex = None
         objNobs = None
 
-        # and create a starFlag which flags bad stars as they fall out...
-        # 0: good
-        # 1: bad...
-        # 2: ???
+        # and create a objFlag which flags bad stars as they fall out...
 
-        self.starFlagHandle = snmm.createArray(self.nStars,dtype='i2')
+        self.objFlagHandle = snmm.createArray(self.nStars,dtype='i2')
 
         # And we need to record the mean mag, error, SED slopes...
 
@@ -189,21 +186,31 @@ class FgcmStars(object):
         self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
         #self.objSEDSlopeOldHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
 
-    def selectStarsMinObs(self,goodExps):
+    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None):
         """
         """
+
+        if (goodExps is None and goodExpsIndex is None):
+            raise ValueError("Must supply *one* of goodExps or goodExpsIndex")
+        if (goodExps is not None and goodExpsIndex is not None):
+            raise ValueError("Must supply one of goodExps *or* goodExpsIndex")
+
 
         # Given a list of good exposures, which stars have at least minObs observations
         #  in each required band?
 
         obsExp = snmm.getArray(self.obsExpHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objID = snmm.getArray(self.objIDHandle)
 
-        a,b=esutil.numpy_util.match(goodExps,obsExp[obsIndex])
+        if (goodExps is not None):
+            a,b=esutil.numpy_util.match(goodExps,obsExp[obsIndex])
+        else:
+            a,b=esutil.numpy_util.match(goodExpsIndex,obsExpIndex[obsIndex])
 
         #req,=np.where(self.bandRequired)
 
@@ -216,12 +223,12 @@ class FgcmStars(object):
 
         minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
 
-        #snmm.getArray(self.starFlagHandle)[:] = 0
+        #snmm.getArray(self.objFlagHandle)[:] = 0
         #bad,=np.where(minObs < self.minPerBand)
-        #snmm.getArray(self.starFlagHandle)[bad] = 1
-        starFlag = snmm.getArray(self.starFlagHandle)
+        #snmm.getArray(self.objFlagHandle)[bad] = 1
+        objFlag = snmm.getArray(self.objFlagHandle)
         bad,=np.where(minObs < self.minPerBand)
-        starFlag[bad] |= 2**starFlagDict['TOO_FEW_OBS']
+        objFlag[bad] |= 2**objFlagDict['TOO_FEW_OBS']
 
     def computeObjectSEDSlope(self,objIndex):
         """
@@ -305,12 +312,12 @@ class FgcmStars(object):
             raise ValueError("Must compute magStd before performing color cuts")
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        starFlag = snmm.getArray(self.starFlagHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
 
         for cCut in self.starColorCuts:
             thisColor = objMagStdMean[:,cCut[0]] - objMagStdMean[:,cCut[1]]
             bad,=np.where((thisColor < cCut[2]) |
                           (thisColor > cCut[3]))
-            starFlag[bad] |= 2**starFlagDict['BAD_COLOR']
+            objFlag[bad] |= 2**objFlagDict['BAD_COLOR']
 
 
