@@ -287,11 +287,8 @@ class FgcmParameters(object):
         # flag those that have extra bands
         self.expExtraBandFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.nExtraBands > 0) :
-            a,b=esutil.numpy_util.match(self.extraBands,self.expBandIndex)
+            a,b=esutil.numpy_util.match(self.extraBandIndex,self.expBandIndex)
             self.expExtraBandFlag[b] = True
-
-        for i in xrange(self.bands.size):
-            use,=np.where(self.exp
 
         # set up the observing epochs and link indices
 
