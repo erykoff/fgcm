@@ -113,6 +113,9 @@ class FgcmConfig(object):
         if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
             raise ValueError("sedExtraBandFudgeFactors must have same length as extraBands")
 
+        self.plotPath = '%s/%s_plots_cycle_%02d' % (self.outputPath,self.outfileBase,
+                                                    self.cycleNumber)
+
         # and look at the lutFile
         lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
