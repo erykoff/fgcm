@@ -65,8 +65,10 @@ class FgcmExposureSelector(object):
 
         # this will use existing flags...
 
-        # select good exposures
-        goodExp,=np.where(self.fgcmPars.expFlag == 0)
+        # select good exposures,
+        #  limit to those that are in the fit bands
+        goodExp,=np.where((self.fgcmPars.expFlag == 0) &
+                          (~self.expExtraBandFlag))
 
         nExpPerNight = np.zeros(self.fgcmPars.nCampaignNights)
 
