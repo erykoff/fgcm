@@ -6,8 +6,8 @@ def _pickle_method(m):
     else:
         return getattr, (m.im_self, m.im_func.func_name)
 
-starFlagDict = {'TOO_FEW_OBS':0,
-                'BAD_COLOR':1}
+objFlagDict = {'TOO_FEW_OBS':0,
+               'BAD_COLOR':1}
 
 expFlagDict = {'TOO_FEW_STARS':0,
                'EXP_GRAY_TOO_LARGE':1,
