@@ -20,13 +20,18 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 class FgcmParameters(object):
     """
     """
-    def __init__(self,parFile=None,
-                 fgcmConfig=None):
+    #def __init__(self,parFile=None,
+    #             fgcmConfig=None):
+    def __init__(self,fgcmConfig,parFile=None):
 
         self.hasExternalPWV = False
         self.hasExternalTau = False
 
-        if (fgcmConfig is not None):
+        #if (fgcmConfig is not None):
+        #    self._initializeParameters(fgcmConfig)
+        if (parFile is not None):
+            self._loadParFile(fgcmConfig,parFile)
+        else:
             self._initializeParameters(fgcmConfig)
 
     def _initializeParameters(self, fgcmConfig):
@@ -279,6 +284,15 @@ class FgcmParameters(object):
             print("Warning: %d exposures with band not in LUT!" % (bad.size))
             self.expFlag[bad] = self.expFlag[bad] & 256
 
+        # flag those that have extra bands
+        self.expExtraBandFlag = np.zeros(self.nExp,dtype=np.bool)
+        if (self.nExtraBands > 0) :
+            a,b=esutil.numpy_util.match(self.extraBands,self.expBandIndex)
+            self.expExtraBandFlag[b] = True
+
+        for i in xrange(self.bands.size):
+            use,=np.where(self.exp
+
         # set up the observing epochs and link indices
 
         # the epochs should contain all the MJDs.
@@ -409,7 +423,7 @@ class FgcmParameters(object):
         self.washSlopeStepUnits = self.washStepUnits / self.meanWashIntervalDuration
 
 
-    def loadParFile(self, fgcmConfig, parFile):
+    def _loadParFile(self, fgcmConfig, parFile):
         """
         """
         # read in the parameter file...
