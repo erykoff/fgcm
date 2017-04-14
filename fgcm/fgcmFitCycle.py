@@ -37,9 +37,10 @@ class FgcmFitCycle(object):
 
         # Generate or Read Parameters
         if (initialCycle):
-            self.fgcmPars = FgcmParameters(fgcmConfig=self.fgcmConfig)
+            self.fgcmPars = FgcmParameters(self.fgcmConfig)
         else:
-            self.fgcmPars = FgcmParameters(parFile=self.fgcmConfig.inParameterFile)
+            self.fgcmPars = FgcmParameters(self.fgcmConfig,
+                                           parFile=self.fgcmConfig.inParameterFile)
 
 
         # Read in Stars
