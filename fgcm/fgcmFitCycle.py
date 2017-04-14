@@ -67,8 +67,8 @@ class FgcmFitCycle(object):
 
 
         # Flag stars with too few exposures
-        goodExps, = np.where(self.fgcmPars.expFlag == 0)
-        self.fgcmStars.selectStarsMinObs(goodExps)
+        goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmStars.selectStarsMinObs(goodExpsIndex)
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = fgcmPars.getParArray(fitterUnits=False)
@@ -99,8 +99,8 @@ class FgcmFitCycle(object):
 
             # reflag bad stars with too few observations
             #  (we don't go back and select exposures at this point)
-            goodExps, = np.where(self.fgcmPars.expFlag == 0)
-            self.fgcmStars.selectStarsMinObs(goodExps)
+            goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
+            self.fgcmStars.selectStarsMinObs(goodExpsIndex)
 
 
         # Select calibratable nights
