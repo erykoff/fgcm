@@ -27,6 +27,9 @@ class FgcmParameters(object):
         self.hasExternalPWV = False
         self.hasExternalTau = False
 
+        self.outfileBase = fgcmConfig.outfileBase
+        self.plotPath = fgcmConfig.plotPath
+
         #if (fgcmConfig is not None):
         #    self._initializeParameters(fgcmConfig)
         if (parFile is not None):
@@ -639,6 +642,7 @@ class FgcmParameters(object):
         if (withAlpha):
             self.hasExternalAlpha = True
 
+    ## FIXME: make this a setter!
     def reloadParArray(self, parArray, fitterUnits=False):
         """
         """
@@ -696,6 +700,11 @@ class FgcmParameters(object):
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
         # done
 
+
+    ## FIXME? should these be properties?
+    ##  The problem is that I think I want these pre-computed, though I don't know
+    ##  if that actually helps the performance.  TEST because properties would be great
+
     def parsToExposures(self):
         """
         """
@@ -733,7 +742,7 @@ class FgcmParameters(object):
                          self.parQESysSlope[self.expWashIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
 
-
+    # cannot be a property because of the keywords
     def getParArray(self,bounds=False,fitterUnits=False):
         """
         """
@@ -771,6 +780,7 @@ class FgcmParameters(object):
 
         return parArray
 
+    # this cannot be a property because it takes units
     def getParBounds(self,fitterUnits=False):
         """
         """
@@ -855,3 +865,87 @@ class FgcmParameters(object):
             unitDict['qeSysSlopeUnit'] = self.washSlopeStepUnits
 
         return unitDict
+
+    ## FIXME: make this a @property
+    #def superStarToExposureCCD(self):
+    #    """
+    #    """
+
+    #    # this should return an array for everything.
+
+    #    pass
+
+    @property
+    def expCCDSuperStar(self):
+        """
+        """
+        expCCDSuperStar = np.zeros((self.nExp,self.nCCD),dtype='f8')
+
+        expCCDSuperStar[:,:] = self.parSuperStarFlat[self.expEpochIndex,
+                                                     self.expBandIndex,
+                                                     :]
+
+        return expCCDSuperStar
+
+    @property
+    def expApertureCorrection(self):
+        """
+        """
+
+        expApertureCorrection = np.zeros(self.nExp,dtype='f8')
+
+        expSeeingVariableClipped = np.clip(self.expSeeingVariable,
+                                           self.compAperCorrRange[0,self.expBandIndex],
+                                           self.compAperCorrRange[1,self.expBandIndex])
+
+        expApertureCorrection[:] = (self.compAperCorrSlope[self.expBandIndex] *
+                                    (expSeeingVariableClipped -
+                                     self.compAperCorrPivot[self.expBandIndex]))
+
+        return expApertureCorrection
+
+    ## FIXME: make this a @property
+    #def apertureToCCD(self,expNums=None,expIndices=None):
+    #    """
+    #    """
+
+        ## FIXME: return an array for everything
+
+    #    if (expNums is None and expIndices is None):
+    #        raise ValueError("Must supply *one* of expNums or expIndices")
+    #    if (expNums is not None and expIndices is not None):
+    #        raise ValueError("Must supply one of expNums *or* expIndices")
+
+        ## FIXME: look for missing ones?
+    #    if (expNums is not None):
+    #        _,expIndices = esutil.numpy_util.match(self.expArray,expNums)
+
+        # need to know the band per exposure
+        # and select the correct slope
+
+        ## FIXME: check indices
+
+    #    corrSlopes = np.zeros(expIndices.size,dtype='f8')
+    #    corrSlopes = self.compAperCorrSlope[self.expBandIndex[expIndices]]
+
+    #    aperCorrs = np.zeros(expIndices.size,dtype='f8')
+
+        ## FIXME: clipping to ranges
+
+    #    aperCorrs[:] = (self.compAperCorrSlope[self.expBandIndex[expIndices]] *
+    #                    (self.expSeeingVariable - self.compAperCorrPivot[self.expBandIndex[expIndices]]))
+
+    #    return aperCorrs
+
+    def plotParameters(self):
+        """
+        """
+
+        # plot the parameters in a reasonably nice format
+        # calls a bunch of sub-plotting routines, why not
+        #   alpha
+        #   tau
+        #   pwv
+        #   gray
+
+        pass
