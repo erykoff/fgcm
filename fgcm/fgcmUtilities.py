@@ -14,6 +14,13 @@ expFlagDict = {'TOO_FEW_STARS':0,
                'VAR_GRAY_TOO_LARGE':2,
                'TOO_FEW_EXP_ON_NIGHT':3}
 
+zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':0,
+              'PHOTOMETRIC_EXTRA_EXPOSURE':1,
+              'NONPHOTOMETRIC_FIT_NIGHT':2,
+              'NOFIT_NIGHT':3,  # FIXME: is this the right terminology?  probably
+              'CANNOT_COMPUTE_ZEROPOINT':4,
+              'TOO_FEW_STARS_ON_CCD':5}
+
 def resourceUsage(where):
     status = None
     result = {'peak':0, 'rss':0}
@@ -79,3 +86,7 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0):
         binStruct['Y'] = binStruct['Y'] - binStruct['Y'][ind]
 
     return binStruct
+
+def gaussFunction(x, *p):
+    A, mu, sigma = p
+    return A*np.exp(-(x-mu)**2./(2.*sigma**2))
