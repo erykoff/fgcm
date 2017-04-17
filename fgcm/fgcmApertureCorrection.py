@@ -41,7 +41,7 @@ class FgcmApertureCorrection(object):
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
 
-            expSeeingVariableClipped = np.clip(expSeeingVariable,
+            expSeeingVariableClipped = np.clip(self.fgcmPars.expSeeingVariable,
                                                self.fgcmPars.compAperCorrRange[0,self.fgcmPars.expBandIndex],
                                                self.fgcmPars.compAperCorrRange[1,self.fgcmPars.expBandIndex])
 
@@ -92,3 +92,5 @@ class FgcmApertureCorrection(object):
             self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
 
             ## FIXME: add plotting
+
+            ## FIXME: modify fgcmGray?
