@@ -29,7 +29,9 @@ class FgcmConfig(object):
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
                       'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors',
-                      'starColorCuts','cycleNumber','outfileBase','maxIter']
+                      'starColorCuts','cycleNumber','outfileBase','maxIter',
+                      'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
+                      'mirrorArea','cameraGain','approxThroughput','ccdStartIndex']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -65,6 +67,10 @@ class FgcmConfig(object):
         self.cycleNumber = configDict['cycleNumber']
         self.outfileBase = configDict['outfileBase']
         self.maxIter = configDict['maxIter']
+        self.mirrorArea = configDict['mirrorArea']
+        self.cameraGain = configDict['cameraGain']
+        self.approxThroughput = configDict['approxThroughput']
+        self.ccdStartIndex = configDict['ccdStartIndex']
 
 
         if 'pwvFile' in configDict:
@@ -116,6 +122,9 @@ class FgcmConfig(object):
         self.plotPath = '%s/%s_plots_cycle_%02d' % (self.outputPath,self.outfileBase,
                                                     self.cycleNumber)
 
+        if (self.illegalValue >= 0.0):
+            raise ValueError("Must set illegalValue to a negative number")
+        
         # and look at the lutFile
         lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
@@ -182,4 +191,11 @@ class FgcmConfig(object):
             if (cCut[1] not in self.bands):
                 raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
             cCut[1] = list(self.bands).index(cCut[1])
+
+        # and AB zeropoint
+        hPlanck = 6.6
+        expPlanck = -27.0
+        self.zptAB = (-48.6 - 2.5*expPlanck +
+                       2.5*np.log10((self.mirrorArea * self.approxThroughput) /
+                                    (hPlanck * self.cameraGain)))
 
