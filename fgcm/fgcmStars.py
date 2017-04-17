@@ -48,9 +48,10 @@ class FgcmStars(object):
 
         self.expArray = fgcmPars.expArray
 
-        self._loadStars()
+        self._loadStars(fgcmPars)
 
         self.magStdComputed = False
+        self.allMagStdComputed = False
         self.sedSlopeComputed = False
 
         if (computeNobs):
@@ -59,7 +60,7 @@ class FgcmStars(object):
 
         self.magConstant = 2.5/np.log(10)
 
-    def _loadStars(self):
+    def _loadStars(self,fgcmPars):
 
         # read in the observational indices
         index=fitsio.read(self.indexFile,ext='INDEX')
@@ -94,6 +95,8 @@ class FgcmStars(object):
         self.obsRAHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsDec: Declination of individual observation
         self.obsDecHandle = snmm.createArray(self.nStarObs,dtype='f8')
+        #  obsSecZenith: secant(zenith) of individual observation
+        self.obsSecZenithHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADU: log raw ADU counts of individual observation
         ## FIXME: need to know default zeropoint?
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
@@ -121,6 +124,8 @@ class FgcmStars(object):
             if (use.size == 0):
                 raise ValueError("No observations in band %s!" % (self.bands[i]))
             snmm.getArray(self.obsBandIndexHandle)[use] = i
+
+
 
         obs=None
 
@@ -184,7 +189,30 @@ class FgcmStars(object):
         self.objMagStdMeanErrHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
         #  objSEDSlope: linearized approx. of SED slope of each object, per band
         self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
-        #self.objSEDSlopeOldHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+
+
+        # note: if this takes too long it can be moved to the star computation,
+        #       but it seems pretty damn fast (which may raise the question of
+        #       why it needs to be precomputed...)
+        # compute secZenith for every observation
+
+        objRARad = np.radians(snmm.getArray(self.objRAHandle))
+        objDecRad = np.radians(snmm.getArray(self.objDecHandle))
+        hi,=np.where(objRARad > np.pi)
+        objRARad[hi] -= 2*np.pi
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsIndex = snmm.getArray(self.obsIndexHandle)
+        objHARad = (fgcmPars.expTelHA[obsExpIndex[obsIndex]] +
+                    fgcmPars.expTelRA[obsExpIndex[obsIndex]] -
+                    objRARad[obsObjIDIndex[obsIndex]])
+        snmm.getArray(self.obsSecZenithHandle)[:] = 1./(np.sin(objDecRad[obsObjIDIndex[obsIndex]]) *
+                                                        fgcmPars.sinLatitude +
+                                                        np.cos(objDecRad[obsObjIDIndex[obsIndex]]) *
+                                                        fgcmPars.cosLatitude *
+                                                        np.cos(objHARad[obsObjIDIndex[obsIndex]]))
+
+
 
     def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None):
         """
