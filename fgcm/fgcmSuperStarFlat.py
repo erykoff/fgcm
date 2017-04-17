@@ -61,4 +61,6 @@ class FgcmSuperStarFlat(object):
         # this accumulates onto the input parameters
         self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
 
+        ## FIXME: change fgcmGray to remove the deltaSuperStarFlat!
+
         # and we're done.
