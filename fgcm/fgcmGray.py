@@ -6,6 +6,9 @@ import os
 import sys
 import esutil
 import time
+import scipy.optimize
+
+from fgcmUtilities import gaussFunction
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -21,13 +24,14 @@ class FgcmGray(object):
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
 
-        if (not self.fgcmStars.magStdComputed):
-            raise ValueError("Must run FgcmChisq to compute magStd before FgcmGray")
-
         # and record configuration variables...
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
+        self.sigFgcmMaxErr = fgcmConfig.sigFgcmMaxErr
+        self.sigFgcmMaxEGray = fgcmConfig.sigFgcmMaxEGray
+        self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
         self._prepareGrayArrays()
 
@@ -55,9 +59,13 @@ class FgcmGray(object):
         self.expNGoodCCDsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i2')
         self.expNGoodTilingsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
 
+        self.sigFgcm = np.zeros(self.fgcmPars.nBands,dtype='f8')
+
     def computeExpGrayForInitialSelection(self):
         """
         """
+        if (not self.fgcmStars.magStdComputed):
+            raise ValueError("Must run FgcmChisq to compute magStd before computeExpGrayForInitialSelection")
 
         # Note this computes ExpGray for all exposures, good and bad
 
@@ -147,6 +155,9 @@ class FgcmGray(object):
         """
         """
 
+        if (not self.fgcmStars.allMagStdComputed):
+            raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
+
         # Note: this computes the gray values for all exposures, good and bad
 
         # values to set
@@ -173,7 +184,7 @@ class FgcmGray(object):
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - 1
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
@@ -182,6 +193,13 @@ class FgcmGray(object):
 
 
         # first, we need to compute E_gray == <mstd> - mstd for each observation
+        ## FIXME: I don't think mstd is computed for every observation of every object
+        #   we need to run a single non-derivative chisq computation where we get mstd
+        #    for all objects.  probably need to record secZenith and that we can
+        #    compute for the mean ... where we have objects.  Otherwise, need to know
+        #    rotation (!) and distance.  Or rather, the central RA/Dec of each
+        #    observation of each ccd image.  Cannot solve this "alone".
+        #    At this moment, substitute exposure average where we don't have it!
 
         EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
         EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
@@ -192,7 +210,7 @@ class FgcmGray(object):
         EGrayErr2[obsIndex] = (objMagStdMeanErr[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]]**2. +
                                obsMagErr[obsIndex]**2.)
 
-        ## FIXME: only use stars that have sufficiently small EGrayErr2
+        goodObs,=np.where(EGrayErr2[obsIndex] < self.ccdGrayMaxStarErr)
 
         # only use good observations of good stars...
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
@@ -201,7 +219,8 @@ class FgcmGray(object):
                               (objFlag == 0))
 
         # select observations of these stars...
-        a,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
+        _,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex[goodObs]])
+        b = goodObs[b]
 
         # first, we only use the required bands
         _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
@@ -282,6 +301,38 @@ class FgcmGray(object):
                                ccdNGoodStars[gd].astype(np.float64))
 
         ## FIXME: add sigmaFGCM computation here, since we have all the numbers computed
+        # use the other code
+
+        for bandIndex in self.fgcmStars.nBands:
+            # if we are an extraBand we need an extra check
+            if (bandIndex in self.fgcmStars.bandRequiredIndex):
+                sigUse,=np.where((np.abs(EGray[b]) < self.sigFgcmMaxEGray) &
+                                 (EGrayErr2[b] > 0.0) &
+                                 (EGrayErr2[b] < self.sigFgcmMaxErr**2.) &
+                                 (EGray[b] != 0.0) &
+                                 (obsBandIndex[b] == bandIndex))
+            else:
+                sigUse,=np.where((np.abs(EGray[b]) < self.sigFgcmMaxEGray) &
+                                 (EGrayErr2[b] > 0.0) &
+                                 (EGrayErr2[b] < self.sigFgcmMaxErr**2.) &
+                                 (EGray[b] != 0.0) &
+                                 (obsBandIndex[b] == bandIndex) &
+                                 (objNGoodObs[obsObjIDIndex[b],bandIndex] >=
+                                  self.fgcmStars.minPerBand))
+
+            hist = esutil.stat.histogram(EGray[b[sigUse]],binsize=0.0002,more=True)
+            hCenter=hist['center']
+            hHist = hist['hist'].astype('f8')
+            hHist = hHist / hHist.max()
+
+            p0=[np.sum(hHist),0.0,0.01]
+
+            coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hCenter, hHist, p0=p0)
+            self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[b[sigUse]]))
+
+            ## FIXME: add plots
+
+
 
         # group CCD by Exposure and Sum
 
@@ -317,6 +368,7 @@ class FgcmGray(object):
                   ccdNGoodTilings[goodCCD])
 
         # need at least 3 or else computation can blow up
+        ## FIXME: put illegal value as filler!
         gd, = np.where(expGrayNGoodCCDs > 2)
         expGray[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
