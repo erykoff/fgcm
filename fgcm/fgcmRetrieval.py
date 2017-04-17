@@ -39,6 +39,7 @@ class FgcmRetrieval(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.nCore = fgcmConfig.nCore
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
         self._prepareRetrievalArrays()
 
@@ -74,7 +75,7 @@ class FgcmRetrieval(object):
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - 1
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
 
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
