@@ -48,7 +48,7 @@ class FgcmChisq(object):
 
         #resourceUsage('End of chisq init')
 
-    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,debug=False):
+    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,debug=False,allExposures=False):
         """
         """
 
@@ -59,6 +59,11 @@ class FgcmChisq(object):
         self.computeDerivatives = computeDerivatives
         self.computeSEDSlopes = computeSEDSlopes
         self.fitterUnits = fitterUnits
+        self.allExposures = allExposures
+
+        if (self.allExposures and (self.computeDerivatives or
+                                   self.computeSEDSlopes)):
+            raise ValueError("Cannot set allExposures and computeDerivatives or computeSEDSlopes")
 
         # for things that need to be changed, we need to create an array *here*
         # I think.  And copy it back out.  Sigh.
@@ -86,6 +91,7 @@ class FgcmChisq(object):
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
         # and select good stars!  These are the ones to map.
+        #  note that these are the only stars we will care about.
         goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
         # testing
@@ -130,21 +136,25 @@ class FgcmChisq(object):
             for thisCore in xrange(self.nCore):
                 partialSums[:] += snmm.getArray(self.totalHandleDict[workerIndex + thisCore])[:]
 
-        # FIXME: dof should be actual number of fit parameters, shouldn't it.
+        # only in regular mode do we actually compute chisq
+        if (not self.allExposures):
+            # FIXME: dof should be actual number of fit parameters, shouldn't it.
 
-        fitDOF = partialSums[-1] - float(self.fgcmPars.nFitPars)
-        if (fitDOF <= 0):
-            raise ValueError("Number of parameters fitted is more than number of constraints! (%d > %d)" % (self.fgcmPars.nFitPars,partialSums[-1]))
+            fitDOF = partialSums[-1] - float(self.fgcmPars.nFitPars)
+            if (fitDOF <= 0):
+                raise ValueError("Number of parameters fitted is more than number of constraints! (%d > %d)" % (self.fgcmPars.nFitPars,partialSums[-1]))
 
-        fitChisq = partialSums[-2] / fitDOF
-        if (self.computeDerivatives):
-            dChisqdP = partialSums[0:self.fgcmPars.nFitPars] / fitDOF
+            fitChisq = partialSums[-2] / fitDOF
+            if (self.computeDerivatives):
+                dChisqdP = partialSums[0:self.fgcmPars.nFitPars] / fitDOF
 
-        # want to append this...
-        self.fitChisqs.append(fitChisq)
+            # want to append this...
+            self.fitChisqs.append(fitChisq)
+        else:
+            # just set it to the last value for reference
+            fitChisq = self.fitChisqs[-1]
 
         # free shared arrays
-        #snmm.freeArray(self.obsExpIndexHandle)
         for key in self.totalHandleDict.keys():
             snmm.freeArray(self.totalHandleDict[key])
 
@@ -154,6 +164,8 @@ class FgcmChisq(object):
 
         # and flag that we've computed magStd
         self.fgcmStars.magStdComputed = True
+        if (self.allExposures):
+            self.fgcmStars.allMagStdComputed = True
 
         if (self.computeDerivatives):
             return fitChisq, dChisqdP
@@ -177,14 +189,14 @@ class FgcmChisq(object):
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
 
         thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
-        #thisObsExpIndex = snmm.getArray(self.obsExpIndexHandle)[thisObsIndex]
         thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
 
-        # cut to good exposures
+        # cut to good exposures, if we desire it...
         ## MAYBE: Check if this can be done more efficiently.
-        gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
-        thisObsIndex=thisObsIndex[gd]
-        thisObsExpIndex = thisObsExpIndex[gd]
+        if (not self.allExposures) :
+            gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
+            thisObsIndex=thisObsIndex[gd]
+            thisObsExpIndex = thisObsExpIndex[gd]
 
         thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
         thisObsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle)[thisObsIndex] - 1
@@ -204,15 +216,19 @@ class FgcmChisq(object):
 
         # need to compute secZenith
         #  is this the right place for it?  I don't know!
-        thisObjRA = np.radians(snmm.getArray(self.fgcmStars.objRAHandle)[objIndex])
-        thisObjDec = np.radians(snmm.getArray(self.fgcmStars.objDecHandle)[objIndex])
-        if (thisObjRA > np.pi) :
-            thisObjRA -= 2*np.pi
-        thisObjHA = (self.fgcmPars.expTelHA[thisObsExpIndex] +
-                     self.fgcmPars.expTelRA[thisObsExpIndex] -
-                     thisObjRA)
-        thisSecZenith = 1./(np.sin(thisObjDec)*self.fgcmPars.sinLatitude +
-                        np.cos(thisObjDec)*self.fgcmPars.cosLatitude*np.cos(thisObjHA))
+        ## FIXME: move to the global computation when stars are read in.
+
+        #thisObjRA = np.radians(snmm.getArray(self.fgcmStars.objRAHandle)[objIndex])
+        #thisObjDec = np.radians(snmm.getArray(self.fgcmStars.objDecHandle)[objIndex])
+        #if (thisObjRA > np.pi) :
+        #    thisObjRA -= 2*np.pi
+        #thisObjHA = (self.fgcmPars.expTelHA[thisObsExpIndex] +
+        #             self.fgcmPars.expTelRA[thisObsExpIndex] -
+        #             thisObjRA)
+        #thisSecZenith = 1./(np.sin(thisObjDec)*self.fgcmPars.sinLatitude +
+        #                    np.cos(thisObjDec)*self.fgcmPars.cosLatitude*np.cos(thisObjHA))
+
+        thisSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)[thisObsIndex]
 
         #print(thisObsBandIndex)
         #print(thisSecZenith)
@@ -302,6 +318,10 @@ class FgcmChisq(object):
 
         obsMagStd[thisObsIndex] = thisMagObs + thisDeltaStd
 
+        if (self.allExposures) :
+            # kick out, don't compute (corrupted) means
+            return None
+
         # compute mean objMagStdMean
         #print("Computing mean mags...")
 
@@ -336,7 +356,7 @@ class FgcmChisq(object):
         if (self.computeDerivatives):
             #print("Computing derivatives!")
 
-            unitDict=self.fgcmPars.getUnitDict(self.fitterUnits)
+            unitDict=self.fgcmPars.getUnitDict(fitterUnits=self.fitterUnits)
             # do I need to loop over all parameters?
 
             # i,i',i": loop over observations (in a given band)
