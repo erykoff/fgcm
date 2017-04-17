@@ -110,6 +110,9 @@ class FgcmFitCycle(object):
         # Perform Fit (subroutine)
         self._doFit()
 
+        # One last run to compute mstd all observations of all exposures
+        _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
+
         # Compute CCD^gray and EXP^gray
         gray.computeCCDAndExpGray()
 
@@ -125,6 +128,8 @@ class FgcmFitCycle(object):
         aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         aperCorr.computeApertureCorrections()
 
+        ## FIXME:
+        # I think we need to apply the superstar flats and aperture corrections to the Grays...automatically?
 
         # Make Zeropoints
         ## FIXME: Write this code
