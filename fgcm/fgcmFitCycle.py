@@ -64,7 +64,10 @@ class FgcmFitCycle(object):
         if (not initialCycle):
             ## FIXME: write code to apply aperture corrections and superstar flats
 
-            pass
+
+            # and flag exposures using quantities computed from previous cycle
+            self.expSelector.selectGoodExposures()
+
 
 
         # Flag stars with too few exposures
@@ -79,6 +82,7 @@ class FgcmFitCycle(object):
 
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
+
         else:
             # need to go through the bright observations
 
@@ -101,11 +105,15 @@ class FgcmFitCycle(object):
             # reflag bad stars with too few observations
             #  (we don't go back and select exposures at this point)
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-            self.fgcmStars.selectStarsMinObs(goodExpsIndex)
+            self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
 
         # Select calibratable nights
         self.expSelector.selectCalibratableNights()
+
+        # We need one last selection to cut last of bad stars
+        goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
         # Perform Fit (subroutine)
         self._doFit()
@@ -114,7 +122,10 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
 
         # Compute CCD^gray and EXP^gray
-        gray.computeCCDAndExpGray()
+        fgcmGray.computeCCDAndExpGray()
+
+        # Re-flag exposures for superstar, aperture, etc.
+        self.expSelector.selectGoodExposures()
 
         # Compute Retrieved chromatic integrals
         retrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,self.fgcmLUT)
@@ -161,8 +172,8 @@ class FgcmFitCycle(object):
                                                    factr=1e2,        # highish accuracy
                                                    pgtol=1e-9,       # gradient tolerance
                                                    maxfun=self.fgcmConfig.maxIter,
-                                                   maxIter=self.fgcmConfig.maxIter,
-                                                   ipring=0,         # only one output
+                                                   maxiter=self.fgcmConfig.maxIter,
+                                                   iprint=0,         # only one output
                                                    callback=None)    # no callback
 
         # FIXME: add plotting of chisq
