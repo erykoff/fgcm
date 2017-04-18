@@ -23,7 +23,7 @@ class FgcmConfig(object):
         with open(self.configFile) as f:
             configDict = yaml.load(f)
 
-        requiredKeys=['exposureFile','obsFile','indexFile','UTBoundary',
+        requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile','UTBoundary',
                       'washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField','fitBands','extraBands',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
@@ -31,7 +31,11 @@ class FgcmConfig(object):
                       'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors',
                       'starColorCuts','cycleNumber','outfileBase','maxIter',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
-                      'mirrorArea','cameraGain','approxThroughput','ccdStartIndex']
+                      'mirrorArea','cameraGain','approxThroughput','ccdStartIndex',
+                      'minExpPerNight','expGrayInitialCut','expVarGrayPhotometricCut',
+                      'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
+                      'expGrayPhotometricCut','expGrayRecoverCut','expGrayErrRecoverCut',
+                      'sigma0Cal']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -47,31 +51,47 @@ class FgcmConfig(object):
         self.lutFile = configDict['lutFile']
         self.expField = configDict['expField']
         self.ccdField = configDict['ccdField']
-        self.latitude = configDict['latitude']
+        self.latitude = float(configDict['latitude'])
         self.seeingField = configDict['seeingField']
         self.deepFlag = configDict['deepFlag']
         self.cosLatitude = np.cos(np.radians(self.latitude))
         self.sinLatitude = np.sin(np.radians(self.latitude))
         self.fitBands = np.array(configDict['fitBands'])
         self.extraBands = np.array(configDict['extraBands'])
-        self.nCore = configDict['nCore']
-        self.brightObsGrayMax = configDict['brightObsGrayMax']
-        self.minStarPerCCD = configDict['minStarPerCCD']
-        self.minCCDPerExp = configDict['minCCDPerExp']
-        self.maxCCDGrayErr = configDict['maxCCDGrayErr']
-        self.aperCorrFitNBins = configDict['aperCorrFitNBins']
-        self.illegalValue = configDict['illegalValue']
+        self.nCore = int(configDict['nCore'])
+        self.brightObsGrayMax = float(configDict['brightObsGrayMax'])
+        self.minStarPerCCD = int(configDict['minStarPerCCD'])
+        self.minStarPerExp = int(configDict['minStarPerExp'])
+        self.minCCDPerExp = int(configDict['minCCDPerExp'])
+        self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
+        #self.maxExpGrayRecoverErr = float(configDict['maxExpGrayRecoverErr'])
+        #self.maxExpGrayRecoverVar = float(configDict['maxExpGrayRecoverVar'])
+        #self.maxExpGrayRecover = float(configDict['maxExpGrayRecover'])
+        self.expGrayPhotometricCut = float(configDict['expGrayPhotometricCut'])
+        self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
+        self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
+        self.expGrayErrRecoverCut = float(configDict['expGrayErrRecoverCut'])
+        self.minExpPerNight = int(configDict['minExpPerNight'])
+        self.expGrayInitialCut = float(configDict['expGrayInitialCut'])
+        #self.expGrayCut = float(configDict['expGrayCut'])
+        #self.varGrayCut = float(configDict['varGrayCut'])
+        self.aperCorrFitNBins = int(configDict['aperCorrFitNBins'])
+        self.illegalValue = float(configDict['illegalValue'])
         self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
         self.sedExtraBandFudgeFactors = np.array(configDict['sedExtraBandFudgeFactors'])
         self.starColorCuts = configDict['starColorCuts']
-        self.cycleNumber = configDict['cycleNumber']
+        self.cycleNumber = int(configDict['cycleNumber'])
         self.outfileBase = configDict['outfileBase']
-        self.maxIter = configDict['maxIter']
-        self.mirrorArea = configDict['mirrorArea']
-        self.cameraGain = configDict['cameraGain']
-        self.approxThroughput = configDict['approxThroughput']
-        self.ccdStartIndex = configDict['ccdStartIndex']
-
+        self.maxIter = int(configDict['maxIter'])
+        self.mirrorArea = float(configDict['mirrorArea'])
+        self.cameraGain = float(configDict['cameraGain'])
+        self.approxThroughput = float(configDict['approxThroughput'])
+        self.ccdStartIndex = int(configDict['ccdStartIndex'])
+        self.ccdOffsetFile = configDict['ccdOffsetFile']
+        self.sigFgcmMaxErr = float(configDict['sigFgcmMaxErr'])
+        self.sigFgcmMaxEGray = float(configDict['sigFgcmMaxEGray'])
+        self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
+        self.sigma0Cal = float(configDict['sigma0Cal'])
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -100,10 +120,21 @@ class FgcmConfig(object):
         else:
             self.stepGrain = 10.0
 
+        if (self.expGrayPhotometricCut >= 0.0) :
+            raise ValueError("expGrayPhotometricCut must be negative.")
+        if (self.expGrayRecoverCut > self.expGrayPhotometricCut) :
+            raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
+        if (self.expVarGrayPhotometricCut <= 0.0):
+            raise ValueError("expVarGrayPhotometricCut must be > 0.0")
+        if (self.expGrayErrRecoverCut <= 0.0):
+            raise ValueError("expGrayErrRecoverCut must be > 0.0")
+
         if 'outputPath' in configDict:
             self.outputPath = os.path.abspath(configDict['outputPath'])
         else:
             self.outputPath = os.path.abspath('.')
+
+        ## FIXME: create outputPath if necessary!
 
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
@@ -119,12 +150,16 @@ class FgcmConfig(object):
         if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
             raise ValueError("sedExtraBandFudgeFactors must have same length as extraBands")
 
+        # check the cut values
+
         self.plotPath = '%s/%s_plots_cycle_%02d' % (self.outputPath,self.outfileBase,
                                                     self.cycleNumber)
 
+        ## FIXME: create plotPath if necessary!
+
         if (self.illegalValue >= 0.0):
             raise ValueError("Must set illegalValue to a negative number")
-        
+
         # and look at the lutFile
         lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
@@ -151,6 +186,9 @@ class FgcmConfig(object):
         self.expRange = np.array([np.min(expInfo['EXPNUM']),np.max(expInfo['EXPNUM'])])
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
+
+        # read in the ccd offset file
+        self.ccdOffsets = fitsio.read(self.ccdOffsetFile,ext=1)
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
@@ -198,4 +236,6 @@ class FgcmConfig(object):
         self.zptAB = (-48.6 - 2.5*expPlanck +
                        2.5*np.log10((self.mirrorArea * self.approxThroughput) /
                                     (hPlanck * self.cameraGain)))
+
+        ## FIXME: add pmb scaling?
 
