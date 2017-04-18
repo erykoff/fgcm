@@ -256,7 +256,7 @@ class FgcmStars(object):
         #snmm.getArray(self.objFlagHandle)[bad] = 1
         objFlag = snmm.getArray(self.objFlagHandle)
         bad,=np.where(minObs < self.minPerBand)
-        objFlag[bad] |= 2**objFlagDict['TOO_FEW_OBS']
+        objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
 
     def computeObjectSEDSlope(self,objIndex):
         """
@@ -346,6 +346,31 @@ class FgcmStars(object):
             thisColor = objMagStdMean[:,cCut[0]] - objMagStdMean[:,cCut[1]]
             bad,=np.where((thisColor < cCut[2]) |
                           (thisColor > cCut[3]))
-            objFlag[bad] |= 2**objFlagDict['BAD_COLOR']
+            objFlag[bad] |= objFlagDict['BAD_COLOR']
 
+    ## The following does not work in a multiprocessing environment.
+    ##  further study is required...
+    #def __del__(self):
+    #    snmm.freeArray(self.obsIndexHandle)
+    #    snmm.freeArray(self.obsExpHandle)
+    #    snmm.freeArray(self.obsExpIndexHandle)
+    #    snmm.freeArray(self.obsCCDHandle)
+    #    snmm.freeArray(self.obsBandIndexHandle)
+    #    snmm.freeArray(self.obsRAHandle)
+    #    snmm.freeArray(self.obsDecHandle)
+    #    snmm.freeArray(self.obsSecZenithHandle)
+    #    snmm.freeArray(self.obsMagADUHandle)
+    #    snmm.freeArray(self.obsMagADUErrHandle)
+    #    snmm.freeArray(self.obsMagStdHandle)
+    #    snmm.freeArray(self.objIDHandle)
+    #    snmm.freeArray(self.objRAHandle)
+    #    snmm.freeArray(self.objDecHandle)
+    #    snmm.freeArray(self.objObsIndexHandle)
+    #    snmm.freeArray(self.objNobsHandle)
+    #    snmm.freeArray(self.objNGoodObsHandle)
+    #    snmm.freeArray(self.obsObjIDIndexHandle)
+    #    snmm.freeArray(self.objFlagHandle)
+    #    snmm.freeArray(self.objMagStdMeanHandle)
+    #    snmm.freeArray(self.objMagStdMeanErrHandle)
+    #    snmm.freeArray(self.objSEDSlopeHandle)
 
