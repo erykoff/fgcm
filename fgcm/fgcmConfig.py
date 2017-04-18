@@ -134,7 +134,11 @@ class FgcmConfig(object):
         else:
             self.outputPath = os.path.abspath('.')
 
-        ## FIXME: create outputPath if necessary!
+        # create output path if necessary
+        try:
+            os.makedirs(self.outputPath)
+        except:
+            raise IOError("Could not create output path: %s" % (self.outputPath))
 
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
@@ -152,10 +156,13 @@ class FgcmConfig(object):
 
         # check the cut values
 
-        self.plotPath = '%s/%s_plots_cycle_%02d' % (self.outputPath,self.outfileBase,
+        self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
                                                     self.cycleNumber)
 
-        ## FIXME: create plotPath if necessary!
+        try:
+            os.makedirs(self.plotPath)
+        except:
+            raise IOError("Could not create plot path: %s" % (self.plotPath))
 
         if (self.illegalValue >= 0.0):
             raise ValueError("Must set illegalValue to a negative number")
