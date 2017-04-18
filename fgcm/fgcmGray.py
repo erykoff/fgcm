@@ -32,6 +32,7 @@ class FgcmGray(object):
         self.sigFgcmMaxEGray = fgcmConfig.sigFgcmMaxEGray
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
+        self.illegalValue = fgcmConfig.illegalValue
 
         self._prepareGrayArrays()
 
@@ -42,7 +43,7 @@ class FgcmGray(object):
         # we have expGray for Selection
         self.expGrayForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayRMSForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
-        self.expGrayNGoodStarForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
+        self.expNGoodStarForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
 
         # and the exp/ccd gray for the zeropoints
 
@@ -56,6 +57,7 @@ class FgcmGray(object):
         self.expGrayHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayRMSHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayErrHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
+        self.expNGoodStarsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
         self.expNGoodCCDsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i2')
         self.expNGoodTilingsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
 
@@ -73,7 +75,7 @@ class FgcmGray(object):
         # useful numbers
         expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
         expGrayRMSForInitialSelection = snmm.getArray(self.expGrayRMSForInitialSelectionHandle)
-        expGrayNGoodStarForInitialSelection = snmm.getArray(self.expGrayNGoodStarForInitialSelectionHandle)
+        expNGoodStarForInitialSelection = snmm.getArray(self.expNGoodStarForInitialSelectionHandle)
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
@@ -116,7 +118,7 @@ class FgcmGray(object):
 
         expGrayForInitialSelection[:] = 0.0
         expGrayRMSForInitialSelection[:] = 0.0
-        expGrayNGoodStarForInitialSelection[:] = 0
+        expNGoodStarForInitialSelection[:] = 0
 
         np.add.at(expGrayForInitialSelection,
                   obsExpIndex[b],
@@ -124,7 +126,7 @@ class FgcmGray(object):
         np.add.at(expGrayRMSForInitialSelection,
                   obsExpIndex[b],
                   EGray[b]**2.)
-        np.add.at(expGrayNGoodStarForInitialSelection,
+        np.add.at(expNGoodStarForInitialSelection,
                   obsExpIndex[b],
                   1)
 
@@ -141,15 +143,17 @@ class FgcmGray(object):
             np.add.at(expGrayRMSForInitialSelection,
                       obsExpIndex[b[extraBandUse]],
                       EGray[b[extraBandUse]]**2.)
-            np.add.at(expGrayNGoodStarForInitialSelection,
+            np.add.at(expNGoodStarForInitialSelection,
                       obsExpIndex[b[extraBandUse]],
                       1)
 
 
-        gd,=np.where(expGrayNGoodStarForInitialSelection > 0)
-        expGrayForInitialSelection[gd] /= expGrayNGoodStarForInitialSelection[gd]
-        expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expGrayNGoodStarForInitialSelection[gd]) -
+        gd,=np.where(expNGoodStarForInitialSelection > 0)
+        expGrayForInitialSelection[gd] /= expNGoodStarForInitialSelection[gd]
+        expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expNGoodStarForInitialSelection[gd]) -
                                              (expGrayForInitialSelection[gd])**2.)
+
+        ## FIXME: add plotting
 
     def computeCCDAndExpGray(self):
         """
@@ -166,12 +170,13 @@ class FgcmGray(object):
         ccdGrayErr = snmm.getArray(self.ccdGrayErrHandle)
         ccdNGoodObs = snmm.getArray(self.ccdNGoodObsHandle)
         ccdNGoodStars = snmm.getArray(self.ccdNGoodStarsHandle)
-        ccdNGoodTilings = snmm.getArray(self.ccdNGoodTilingsHandles)
+        ccdNGoodTilings = snmm.getArray(self.ccdNGoodTilingsHandle)
 
         expGray = snmm.getArray(self.expGrayHandle)
         expGrayRMS = snmm.getArray(self.expGrayRMSHandle)
         expGrayErr = snmm.getArray(self.expGrayErrHandle)
         expNGoodCCDs = snmm.getArray(self.expNGoodCCDsHandle)
+        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
         expNGoodTilings = snmm.getArray(self.expNGoodTilingsHandle)
 
         # input numbers
@@ -193,13 +198,6 @@ class FgcmGray(object):
 
 
         # first, we need to compute E_gray == <mstd> - mstd for each observation
-        ## FIXME: I don't think mstd is computed for every observation of every object
-        #   we need to run a single non-derivative chisq computation where we get mstd
-        #    for all objects.  probably need to record secZenith and that we can
-        #    compute for the mean ... where we have objects.  Otherwise, need to know
-        #    rotation (!) and distance.  Or rather, the central RA/Dec of each
-        #    observation of each ccd image.  Cannot solve this "alone".
-        #    At this moment, substitute exposure average where we don't have it!
 
         EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
         EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
@@ -238,7 +236,7 @@ class FgcmGray(object):
         ccdGrayErr[:,:] = 0.0
         ccdNGoodObs[:,:] = 0
         ccdNGoodStars[:,:] = 0
-        ccdGrayNGoodTilings[:,:] = 0.0
+        ccdNGoodTilings[:,:] = 0.0
 
 
         # temporary variable here
@@ -300,10 +298,9 @@ class FgcmGray(object):
         ccdNGoodTilings[gd] = (ccdNGoodObs[gd].astype(np.float64) /
                                ccdNGoodStars[gd].astype(np.float64))
 
-        ## FIXME: add sigmaFGCM computation here, since we have all the numbers computed
-        # use the other code
+        # and now compute sigFGCM since we have the numbers ready to go
 
-        for bandIndex in self.fgcmStars.nBands:
+        for bandIndex in xrange(self.fgcmStars.nBands):
             # if we are an extraBand we need an extra check
             if (bandIndex in self.fgcmStars.bandRequiredIndex):
                 sigUse,=np.where((np.abs(EGray[b]) < self.sigFgcmMaxEGray) &
@@ -345,6 +342,7 @@ class FgcmGray(object):
         expGray[:] = 0.0
         expGrayRMS[:] = 0.0
         expGrayErr[:] = 0.0
+        expNGoodStars[:] = 0
         expNGoodCCDs[:] = 0
         expNGoodTilings[:] = 0.0
 
@@ -366,11 +364,24 @@ class FgcmGray(object):
         np.add.at(expNGoodTilings,
                   goodCCD[0],
                   ccdNGoodTilings[goodCCD])
+        np.add.at(expNGoodStars,
+                  goodCCD[0],
+                  ccdNGoodStars[goodCCD])
 
         # need at least 3 or else computation can blow up
         ## FIXME: put illegal value as filler!
-        gd, = np.where(expGrayNGoodCCDs > 2)
+
+        gd, = np.where(expNGoodCCDs > 2)
         expGray[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
+
+        ## FIXME: record these values in the parameters!
+        self.fgcmPars.compExpGray[:] = expGray
+        self.fgcmPars.compVarGray[gd] = expGrayRMS[gd]**2.
+        self.fgcmPars.compNGoodStarPerExp = expNGoodStars
+
+        ## FIXME: do plotting
+
+        ##  per band we plot the expGray for photometric exposures...
