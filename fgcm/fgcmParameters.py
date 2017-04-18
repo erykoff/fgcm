@@ -7,6 +7,7 @@ import sys
 import esutil
 
 from fgcmUtilities import _pickle_method
+from fgcmUtilities import expFlagDict
 
 import types
 import copy_reg
@@ -135,7 +136,8 @@ class FgcmParameters(object):
 
         # one of the "parameters" is expGray
         self.compExpGray = np.zeros(self.nExp,dtype='f8')
-        self.parVarGray = np.zeros(self.nExp,dtype='f8')
+        self.compVarGray = np.zeros(self.nExp,dtype='f8')
+        self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
 
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
@@ -285,7 +287,7 @@ class FgcmParameters(object):
         bad,=np.where(self.expBandIndex < 0)
         if (bad.size > 0):
             print("Warning: %d exposures with band not in LUT!" % (bad.size))
-            self.expFlag[bad] = self.expFlag[bad] & 256
+            self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
 
         # flag those that have extra bands
         self.expExtraBandFlag = np.zeros(self.nExp,dtype=np.bool)
