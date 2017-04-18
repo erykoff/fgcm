@@ -135,10 +135,11 @@ class FgcmConfig(object):
             self.outputPath = os.path.abspath('.')
 
         # create output path if necessary
-        try:
-            os.makedirs(self.outputPath)
-        except:
-            raise IOError("Could not create output path: %s" % (self.outputPath))
+        if (not os.path.isdir(self.outputPath)):
+            try:
+                os.makedirs(self.outputPath)
+            except:
+                raise IOError("Could not create output path: %s" % (self.outputPath))
 
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
@@ -159,10 +160,11 @@ class FgcmConfig(object):
         self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
                                                     self.cycleNumber)
 
-        try:
-            os.makedirs(self.plotPath)
-        except:
-            raise IOError("Could not create plot path: %s" % (self.plotPath))
+        if (not os.path.isdir(self.plotPath)):
+            try:
+                os.makedirs(self.plotPath)
+            except:
+                raise IOError("Could not create plot path: %s" % (self.plotPath))
 
         if (self.illegalValue >= 0.0):
             raise ValueError("Must set illegalValue to a negative number")
@@ -199,7 +201,20 @@ class FgcmConfig(object):
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
-        self.epochMJDs.sort()
+
+        try:
+            self.epochNames = np.array(configDict['epochNames'],dtype='a21')
+        except:
+            self.epochNames = np.zeros(self.epochMJDs.size,dtype='a21')
+            for i in xrange(self.epochMJDs.size):
+                self.epochNames[i] = 'epoch%d' % (i)
+
+        if (self.epochNames.size != self.epochMJDs.size):
+            raise ValueError("number of epochNames must be same as epochMJDs")
+
+        st=np.argsort(self.epochMJDs)
+        self.epochMJDs = self.epochMJDs[st]
+        self.epochNames = self.epochNames[st]
         test=np.searchsorted(self.epochMJDs,self.mjdRange)
 
         if test.min() == 0:
@@ -209,6 +224,7 @@ class FgcmConfig(object):
 
         # crop to valid range
         self.epochMJDs = self.epochMJDs[test[0]-1:test[1]+1]
+        self.epochNames = self.epochNames[test[0]-1:test[1]+1]
 
         # and look at washMJDs; also sort
         self.washMJDs.sort()
