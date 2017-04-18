@@ -20,8 +20,11 @@ class FgcmExposureSelector(object):
         # and config variables...
         self.minStarPerExp = fgcmConfig.minStarPerExp
         self.minExpPerNight = fgcmConfig.minExpPerNight
-        self.expGrayCut = fgcmConfig.expGrayCut
-        self.varGrayCut = fgcmConfig.varGrayCut
+        #self.expGrayCut = fgcmConfig.expGrayCut
+        #self.varGrayCut = fgcmConfig.varGrayCut
+        #self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
+        self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
+        self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
 
     def selectGoodExposures(self):
@@ -31,16 +34,22 @@ class FgcmExposureSelector(object):
         # this cuts on expgray,vargray
         # based on those in the parameter file?
 
+        self.fgcmPars.expFlag[:] = 0
+
+        bad,=np.where(self.fgcmPars.compNGoodStarPerExp == 0)
+        self.fgcmPars.expFlag[bad] |= expFlagDict['NO_STARS']
+
         bad,=np.where(self.fgcmPars.compNGoodStarPerExp < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
 
-        bad,=np.where(self.fgcmPars.compExpGray < self.expGrayCut)
+        bad,=np.where(self.fgcmPars.compExpGray < self.expGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
 
-        bad,=np.where(self.fgcmPars.compVarGray > self.varGrayCut)
+        bad,=np.where(self.fgcmPars.compVarGray > self.expVarGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
 
-        # and what about number of stars?
+
+        ## FIXME: do we want to consider minCCDPerExp?
 
     def selectGoodExposuresInitialSelection(self, fgcmGray):
         """
@@ -48,11 +57,12 @@ class FgcmExposureSelector(object):
 
         # this requires fgcmGray
         #  FIXME: ensure that fgcmGray has run initial selection
+        self.fgcmPars.expFlag[:] = 0
 
         expGrayForInitialSelection = snmm.getArray(fgcmGray.expGrayForInitialSelectionHandle)
-        expGrayNGoodStarForInitialSelection = snmm.getArray(fgcmGray.expGrayNGoodStarForInitialSelectionHandle)
+        expNGoodStarForInitialSelection = snmm.getArray(fgcmGray.expNGoodStarForInitialSelectionHandle)
 
-        bad,=np.where(expGrayNGoodStarForInitialSelection < self.minStarPerExp)
+        bad,=np.where(expNGoodStarForInitialSelection < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
 
         bad,=np.where(expGrayForInitialSelection < self.expGrayInitialCut)
@@ -68,13 +78,19 @@ class FgcmExposureSelector(object):
         # select good exposures,
         #  limit to those that are in the fit bands
         goodExp,=np.where((self.fgcmPars.expFlag == 0) &
-                          (~self.expExtraBandFlag))
+                          (~self.fgcmPars.expExtraBandFlag))
 
-        nExpPerNight = np.zeros(self.fgcmPars.nCampaignNights)
+        #nExpPerNight = np.zeros(self.fgcmPars.nCampaignNights)
 
-        h,rev=esutil.stat.histogram(self.fgcmPars.expNightIndex[goodExp],min=0,
-                                    max=self.fgcmPars.nCampaignNights-1,rev=True)
-        badNights,=np.where(h < self.minExpPerNight)
+        # we first need to look for the good nights
+        nExpPerNight=esutil.stat.histogram(self.fgcmPars.expNightIndex[goodExp],min=0,
+                                max=self.fgcmPars.nCampaignNights-1)
+
+        badNights,=np.where(nExpPerNight < self.minExpPerNight)
+
+        # and we need to use *all* the exposures to flag bad nights
+        h,rev = esutil.stat.histogram(self.fgcmPars.expNightIndex,min=0,
+                                      max=self.fgcmPars.nCampaignNights-1,rev=True)
 
         for badNight in badNights:
             i1a=rev[rev[badNight]:rev[badNight+1]]
