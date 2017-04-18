@@ -1,25 +1,30 @@
 from __future__ import print_function
 
+import numpy as np
+
 def _pickle_method(m):
     if m.im_self is None:
         return getattr, (m.im_class, m.im_func.func_name)
     else:
         return getattr, (m.im_self, m.im_func.func_name)
 
-objFlagDict = {'TOO_FEW_OBS':0,
-               'BAD_COLOR':1}
+objFlagDict = {'TOO_FEW_OBS':2**0,
+               'BAD_COLOR':2**1}
 
-expFlagDict = {'TOO_FEW_STARS':0,
-               'EXP_GRAY_TOO_LARGE':1,
-               'VAR_GRAY_TOO_LARGE':2,
-               'TOO_FEW_EXP_ON_NIGHT':3}
+expFlagDict = {'TOO_FEW_STARS':2**0,
+               'EXP_GRAY_TOO_LARGE':2**1,
+               'VAR_GRAY_TOO_LARGE':2**2,
+               'TOO_FEW_EXP_ON_NIGHT':2**3,
+               'NO_STARS':2**4,
+               'BAND_NOT_IN_LUT':2**5}
 
-zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':0,
-              'PHOTOMETRIC_EXTRA_EXPOSURE':1,
-              'NONPHOTOMETRIC_FIT_NIGHT':2,
-              'NOFIT_NIGHT':3,  # FIXME: is this the right terminology?  probably
-              'CANNOT_COMPUTE_ZEROPOINT':4,
-              'TOO_FEW_STARS_ON_CCD':5}
+
+zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
+              'PHOTOMETRIC_EXTRA_EXPOSURE':2**1,
+              'NONPHOTOMETRIC_FIT_NIGHT':2**2,
+              'NOFIT_NIGHT':2**3,  # FIXME: is this the right terminology?  probably
+              'CANNOT_COMPUTE_ZEROPOINT':2**4,
+              'TOO_FEW_STARS_ON_CCD':2**5}
 
 def resourceUsage(where):
     status = None
