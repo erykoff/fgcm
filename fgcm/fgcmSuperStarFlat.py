@@ -24,7 +24,6 @@ class FgcmSuperStarFlat(object):
         """
         """
 
-        ## FIXME: need to know which are the "Good Exposures" to use!
         ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
 
         deltaSuperStarFlat = np.zeros_like(self.fgcmPars.parSuperStarFlat)
@@ -62,5 +61,8 @@ class FgcmSuperStarFlat(object):
         self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
 
         ## FIXME: change fgcmGray to remove the deltaSuperStarFlat!
+
+        ## FIXME: add plotting...
+        
 
         # and we're done.
