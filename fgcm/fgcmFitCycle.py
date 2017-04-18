@@ -143,7 +143,8 @@ class FgcmFitCycle(object):
         # I think we need to apply the superstar flats and aperture corrections to the Grays...automatically?
 
         # Make Zeropoints
-        ## FIXME: Write this code
+        fgcmZpts = FgcmZeropoints(fgcmConfig,fgcmPars,fgcmLUT,fgcmGray,fgcmRetrieval)
+        fgcmZpts.computeZeropoints()
 
         # Save parameters
         outParFile = '%s/%s_cycle%02d_parameters.fits' % (self.fgcmConfig.outputPath,
