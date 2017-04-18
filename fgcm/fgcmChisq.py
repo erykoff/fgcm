@@ -41,6 +41,7 @@ class FgcmChisq(object):
 
         # need to configure
         self.nCore = fgcmConfig.nCore
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
         self.fitChisqs = []
 
@@ -86,13 +87,17 @@ class FgcmChisq(object):
         #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
         #snmm.getArray(self.obsExpIndexHandle)[b] = a
 
-        # and reset numbers
-        snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
-        snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
+        # and reset numbers if necessary
+        if (not self.allExposures):
+            snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
+            snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
         # and select good stars!  These are the ones to map.
         #  note that these are the only stars we will care about.
         goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+
+        if (goodStars.size == 0):
+            raise ValueError("No good stars to fit!")
 
         # testing
         #goodStars=goodStars[0:10000]
@@ -176,8 +181,6 @@ class FgcmChisq(object):
         """
         """
 
-        #print("In worker...")
-
         # make local pointers to useful arrays...
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
@@ -187,6 +190,7 @@ class FgcmChisq(object):
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
+
 
         thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
         thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
@@ -199,7 +203,7 @@ class FgcmChisq(object):
             thisObsExpIndex = thisObsExpIndex[gd]
 
         thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
-        thisObsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle)[thisObsIndex] - 1
+        thisObsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle)[thisObsIndex] - self.ccdStartIndex
 
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
         obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
@@ -229,6 +233,7 @@ class FgcmChisq(object):
         #                    np.cos(thisObjDec)*self.fgcmPars.cosLatitude*np.cos(thisObjHA))
 
         thisSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)[thisObsIndex]
+
 
         #print(thisObsBandIndex)
         #print(thisSecZenith)
