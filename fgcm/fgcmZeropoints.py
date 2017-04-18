@@ -348,4 +348,4 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
                                                    zpStruct['FGCM_ZPTVAR'][zpIndex] +
                                                    self.sigma0Cal**2.)
-        
+
