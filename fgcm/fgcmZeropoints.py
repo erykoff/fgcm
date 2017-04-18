@@ -56,6 +56,9 @@ class FgcmZeropoints(object):
         ccdNGoodStars = snmm.getArray(self.fgcmGray.ccdNGoodStarsHandle)
         ccdNGoodTilings = snmm.getArray(self.fgcmGray.ccdNGoodTilingsHandle)
 
+        r0 = snmm.getArray(self.fgcmRetrieval.r0Handle)
+        r10 = snmm.getArray(self.fgcmRetrieval.r10Handle)
+
 
         # and we need to make sure we have the parameters, and
         #  set these to the exposures
@@ -66,16 +69,16 @@ class FgcmZeropoints(object):
         zpStruct = np.zeros(self.fgcmPars.nExp*self.fgcmPars.nCCD,
                             dtype=[('EXPNUM','i4'), # done
                                    ('CCDNUM','i2'), # done
-                                   ('FGCM_FLAG','i2'),
-                                   ('FGCM_ZPT','f8'),
-                                   ('FGCM_ZPTERR','f8'),
-                                   ('FGCM_I0','f8'),
-                                   ('FGCM_I10','f8'),
+                                   ('FGCM_FLAG','i2'), # done
+                                   ('FGCM_ZPT','f8'), # done
+                                   ('FGCM_ZPTERR','f8'), # done
+                                   ('FGCM_I0','f8'), # done
+                                   ('FGCM_I10','f8'), # done
                                    ('FGCM_R0','f8'),
                                    ('FGCM_R10','f8'),
-                                   ('FGCM_GRY','f8'),
-                                   ('FGCM_ZPTVAR','f8'),
-                                   ('FGCM_TILINGS','f8'),
+                                   ('FGCM_GRY','f8'), # done
+                                   ('FGCM_ZPTVAR','f8'), # done
+                                   ('FGCM_TILINGS','f8'), # done
                                    ('FGCM_FPGRY','f8'), # done
                                    ('FGCM_FPVAR','f8'), # done
                                    ('FGCM_DUST','f8'), # done
@@ -91,7 +94,7 @@ class FgcmZeropoints(object):
                                     ('TAU','f8'),
                                     ('ALPHA','f8'),
                                     ('O3','f8'),
-                                    ('ZD','f8')])
+                                    ('SECZENITH','f8')])
 
         ## start with zpStruct
 
@@ -119,6 +122,10 @@ class FgcmZeropoints(object):
 
         # fill in the aperture correction
         zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
+
+        # fill in the retrieved values
+        zpStruct['FGCM_R0'][:] = r0[zpExpIndex, zpCCDIndex]
+        zpStruct['FGCM_R10'][:] = r10[zpExpIndex, zpCCDIndex]
 
         # and the focal-plane gray and var...
         # these are only filled in for those exposures where we have it computed
@@ -293,7 +300,31 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
-        ## FIXME: plots?  what?
+        ## FIXME: plots?  what plots would be interesting?
+
+        # and save...
+        outFile = '%s/%s_cycle%02d_zpt.fits' % (self.outputPath,self.outfileBase,
+                                                    self.cycleNumber)
+        fitsio.write(outFile,zpStruct,clobber=True,extname='ZPTS')
+
+        #################################
+        # and make the parameter file
+        atmStruct['EXPNUM'] = self.fgcmPars.expArray
+        atmStruct['PMB'] = self.fgcmPars.expPmb
+        atmStruct['PWV'] = self.fgcmPars.expPWV
+        atmStruct['TAU'] = self.fgcmPars.expTau
+        atmStruct['ALPHA'] = self.fgcmPars.expAlpha
+        atmStruct['O3'] = self.fgcmPars.expO3
+        atmStruct['SECZENITH'] = 1./(np.sin(self.fgcmPars.expTelDec) *
+                                     self.fgcmPars.sinLatitude +
+                                     np.cos(self.fgcmPars.expTelDec) *
+                                     self.fgcmPars.cosLatitude *
+                                     np.cos(self.fgcmPars.expTelHA))
+
+        outFile = '%s/%s_cycle%02d_atm.fits' % (self.outputPath,self.outfileBase,
+                                                    self.cycleNumber)
+        fitsio.write(outFile,atmStruct,clobber=True,extname='ATMPARS')
+
 
     def _computeZpt(self,zpStruct,zpIndex):
         """
