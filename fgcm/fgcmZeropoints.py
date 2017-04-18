@@ -6,6 +6,9 @@ import os
 import sys
 import esutil
 
+from fgcmUtilities import zpFlagDict
+from fgcmUtilities import expFlagDict
+
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmZeropoints(object):
@@ -25,6 +28,15 @@ class FgcmZeropoints(object):
         self.outfileBase = fgcmConfig.outfileBase
         self.zptAB = fgcmConfig.zptAB
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
+        self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.bandRequired = fgcmConfig.bandRequired
+        self.bandRequiredIndex = np.where(self.bandRequired)[0]
+        self.bandExtra = fgcmConfig.bandExtra
+        self.bandExtraIndex = np.where(self.bandExtra)[0]
+        self.minCCDPerExp = fgcmConfig.minCCDPerExp
+        self.minStarPerCCD = fgcmConfig.minStarPerCCD
+        self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
+        self.sigma0Cal = fgcmConfig.sigma0Cal
 
     def computeZeropoints(self):
         """
@@ -32,7 +44,18 @@ class FgcmZeropoints(object):
 
         # first, we need to get relevant quantities from shared memory.
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
+        expGrayErr = snmm.getArray(self.fgcmGray.expGrayErrHandle)
         expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
+        expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
+        expNGoodCCDs = snmm.getArray(self.fgcmGray.expNGoodCCDsHandle)
+        expNGoodTilings = snmm.getArray(self.fgcmGray.expNGoodTilingsHandle)
+
+        ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
+        ccdGrayRMS = snmm.getArray(self.fgcmGray.ccdGrayRMSHandle)
+        ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
+        ccdNGoodStars = snmm.getArray(self.fgcmGray.ccdNGoodStarsHandle)
+        ccdNGoodTilings = snmm.getArray(self.fgcmGray.ccdNGoodTilingsHandle)
+
 
         # and we need to make sure we have the parameters, and
         #  set these to the exposures
@@ -76,7 +99,7 @@ class FgcmZeropoints(object):
         zpStruct['EXPNUM'][:] = np.repeat(self.fgcmPars.expArray,
                                           self.fgcmPars.nCCD)
         ## FIXME: make a config for the starting CCD number
-        zpStruct['CCDNUM'][:] = np.tile(np.arange(self.fgcmPars.nCCD)+1,
+        zpStruct['CCDNUM'][:] = np.tile(np.arange(self.fgcmPars.nCCD)+self.ccdStartIndex,
                                         self.fgcmPars.nExp)
 
         # get the exposure indices and CCD indices
@@ -98,50 +121,200 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
 
         # and the focal-plane gray and var...
-        zpStruct['FGCM_FPGRY'][:] = expGray[zpExpIndex]
-        zpStruct['FGCM_FPVAR'][:] = expGrayRMS[zpExpIndex]**2.
-        bad,=np.where(expGrayRMS[zpExpIndex] < 0.0)
-        zpStruct['FGCM_FPVAR'][bad] = self.illegalValue
+        # these are only filled in for those exposures where we have it computed
+        zpStruct['FGCM_FPGRY'][:] = self.illegalValue
+        zpStruct['FGCM_FPVAR'][:] = self.illegalValue
+
+        zpExpOk, = np.where(expNGoodCCDs[zpExpIndex] >= self.minCCDPerExp)
+        zpStruct['FGCM_FPGRY'][zpExpOk] = expGray[zpExpIndex[zpExpOk]]
+        zpStruct['FGCM_FPVAR'][zpExpOk] = expGrayRMS[zpExpIndex[zpExpOk]]**2.
 
         # look up the I0 and I10s.  These are defined for everything
         #  (even if only standard bandpass, it'll grab instrumental)
 
-        ## FIXME: WTH do I do with secZenith?
-        # in fgcmChisq, this is computed for each individual object
-        # so what we need is the mean secZenith of all the objects on a CCD...
-        # or look at the center of the CCD.
-        # look at other code ...
+        ## FIXME: will probably need some sort of rotation information at some point
+
+        ## FIXME: check that the signs are correct!
+        # need secZenith for each exp/ccd pair
+        ccdHA = (self.fgcmPars.expTelHA[zpExpIndex] -
+                 np.radians(self.ccdOffsets['DELTA_RA'][zpCCDIndex]))
+        ccdDec = (self.fgcmPars.expTelDec[zpExpIndex] +
+                  np.radians(self.ccdOffsets['DELTA_DEC'][zpCCDIndex]))
+        ccdSecZenith = 1./(np.sin(ccdDec) * self.fgcmPars.sinLatitude +
+                           np.cos(ccdDec) * self.fgcmPars.cosLatitude * np.cos(ccdHA))
+
+        # and do the LUT lookups
         lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expBandIndex[zpExpIndex],
                                              self.fgcmPars.expPWV[zpExpIndex],
                                              self.fgcmPars.expO3[zpExpIndex],
                                              np.log(self.fgcmPars.expTau[zpExpIndex]),
                                              self.fgcmPars.expAlpha[zpExpIndex],
-                                             secZenith,
+                                             ccdSecZenith,
                                              zpCCDIndex,
                                              self.fgcmPars.expPmb[zpExpIndex])
         zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expBandIndex[zpExpIndex],
                                                         self.fgcmPars.expPWV[zpExpIndex],
                                                         self.fgcmPars.expO3[zpExpIndex],
                                                         np.log(self.fgcmPars.expTau[zpExpIndex]),
-                                                        self.fgcmPars.expAlpha[thisObsExpIndex],
-                                                        secZenith,
+                                                        self.fgcmPars.expAlpha[zpExpIndex],
+                                                        ccdSecZenith,
                                                         zpCCDIndex,
                                                         self.fgcmPars.expPmb[zpExpIndex],
                                                         lutIndices)
         zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(lutIndices) / zpStruct['FGCM_I0'][:]
 
-        # grade the exposures/ccds and compute accordingly
-        # flag 1 or 2 (PHOTOMETRIC_FIT_EXPOSURE, PHOTOMETRIC_EXTRA_EXPOSURE)
+        # Set the tilings, gray values, and zptvar
 
-        goodExpIndex, = np.where(self.fgcmPars.expFlag == 0)
-        goodZpExpIndex = np.searchsorted(self.fgcmPars.expArray[goodExpIndex],
-                                         zpStruct['EXPNUM'])
+        zpStruct['FGCM_TILINGS'][:] = self.illegalValue
+        zpStruct['FGCM_GRY'][:] = self.illegalValue
+        zpStruct['FGCM_ZPTVAR'][:] = self.illegalValue
+
+        goodCCD, = np.where((ccdNGoodStars[zpExpIndex,zpCCDIndex] >=
+                             self.minStarPerCCD) &
+                            (ccdGrayErr[zpExpIndex,zpCCDIndex] <=
+                             self.maxCCDGrayErr))
+        zpStruct['FGCM_TILINGS'][goodCCD] = ccdNGoodTilings[zpExpIndex[goodCCD],
+                                                            zpCCDIndex[goodCCD]]
+        zpStruct['FGCM_GRY'][goodCCD] = ccdGray[zpExpIndex[goodCCD],
+                                                zpCCDIndex[goodCCD]]
+        zpStruct['FGCM_ZPTVAR'][goodCCD] = ccdGrayErr[zpExpIndex[goodCCD],
+                                                      zpCCDIndex[goodCCD]]**2.
+
+        # check: if this has too few stars on the ccd OR the ccd error is too big
+        #        AND the exposure has enough ccds
+        #        AND the exposure gray error is small enough
+        #        AND the exposure gray rms is small enough
+        #        AND the exposure gray is not very large (configurable)
+        #  then we can use the exposure stats to fill the variables
+
+        badCCDGoodExp, = np.where(((ccdNGoodStars[zpExpIndex,zpCCDIndex] <
+                            self.minStarPerCCD) |
+                           (ccdGrayErr[zpExpIndex,zpCCDIndex] >
+                            self.maxCCDGrayErr)) &
+                          (expNGoodCCDs[zpExpIndex] >=
+                           self.minCCDPerExp) &
+                          (expGrayErr[zpExpIndex] <=
+                           self.expGrayErrRecoverCut) &
+                          (expGrayRMS[zpExpIndex] <=
+                           np.sqrt(self.expVarGrayPhotometricCut)) &
+                          (expGray[zpExpIndex] >=
+                           self.expGrayRecoverCut))
+
+        zpStruct['FGCM_TILINGS'][badCCDGoodExp] = expNGoodTilings[zpExpIndex[badCCDGoodExp]]
+        zpStruct['FGCM_GRY'][badCCDGoodExp] = expGray[zpExpIndex[badCCDGoodExp]]
+        zpStruct['FGCM_ZPTVAR'][badCCDGoodExp] = expGrayRMS[zpExpIndex[badCCDGoodExp]]**2.
+
+        # flag the photometric (fit) exposures
+        photZpIndex, = np.where(self.fgcmPars.expFlag[zpExpIndex] == 0)
+
+        photFitBand, = np.where(~self.fgcmPars.expExtraBandFlag[zpExpIndex[photZpIndex]])
+        zpStruct['FGCM_FLAG'][photZpIndex[photFitBand]] |= (
+            zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'])
+
+        photExtraBand, = np.where(self.fgcmPars.expExtraBandFlag[zpExpIndex[photZpIndex]])
+        zpStruct['FGCM_FLAG'][photZpIndex[photExtraBand]] |= (
+            zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
+
+        # flag the non-photometric exposures on calibratable nights
+        rejectMask = (expFlagDict['TOO_FEW_EXP_ON_NIGHT'] |
+                      expFlagDict['BAND_NOT_IN_LUT'] |
+                      expFlagDict['NO_STARS'])
+        acceptMask = (expFlagDict['EXP_GRAY_TOO_LARGE'] |
+                      expFlagDict['VAR_GRAY_TOO_LARGE'] |
+                      expFlagDict['TOO_FEW_STARS'])
+
+        nonPhotZpIndex, = np.where(((self.fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0) &
+                           ((self.fgcmPars.expFlag[zpExpIndex] & rejectMask) == 0))
+        zpStruct['FGCM_FLAG'][nonPhotZpIndex] |= zpFlagDict['NONPHOTOMETRIC_FIT_NIGHT']
+
+        # and the exposures on non-calibratable nights (photometric or not, we don't know)
+        rejectMask = (expFlagDict['NO_STARS'] |
+                      expFlagDict['BAND_NOT_IN_LUT'])
+        acceptMask = (expFlagDict['TOO_FEW_EXP_ON_NIGHT'])
+        badNightZpIndex, = np.where(((self.fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0) &
+                                    ((self.fgcmPars.expFlag[zpExpIndex] & rejectMask) == 0))
+        zpStruct['FGCM_FLAG'][badNightZpIndex] |= zpFlagDict['NOFIT_NIGHT']
+
+        # and finally, the hopeless exposures
+        acceptMask = (expFlagDict['NO_STARS'] |
+                      expFlagDict['BAND_NOT_IN_LUT'])
+        hopelessZpIndex, = np.where(((fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0))
+        zpStruct['FGCM_FLAG'][hopelessZpIndex] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
+
+        # now we can fill the zeropoints
+
+        zpStruct['FGCM_ZPT'][:] = self.illegalValue
+        zpStruct['FGCM_ZPTERR'][:] = self.illegalValue
+
+        # start with the passable flag 1,2,4 exposures
+
+        acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
+              zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'] |
+              zpFlagDict['NONPHOTOMETRIC_FIT_NIGHT'])
+
+        okZpIndex, = np.where((zpStruct['FGCM_FLAG'] & acceptMask) > 0)
+
+        okCCDZpIndexFlag = ((zpStruct['FGCM_I0'][okZpIndex] > 0.0) &
+                    (zpStruct['FGCM_FLAT'][okZpIndex] > self.illegalValue) &
+                    (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
+                    (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
+                    (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
+
+        okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
+
+        _computeZpt(zpStruct,okCCDZpIndex)
+        _computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
+
+        badCCDZpExp = okZpIndex[~okCCDZpIndexFlag]
+        zpStruct['FGCM_FLAG'][badCCDZpExp] |=  zpFlagDict['TOO_FEW_STARS_ON_CCD']
+
+        # and the flag 8 extra exposures
+
+        acceptMask = zpFlagDict['NOFIT_NIGHT']
+
+        mehZpIndex, = np.where((zpStruct['FGCM_FLAG'] & acceptMask) > 0)
+
+        mehCCDZpIndexFlag = ((zpStruct['FGCM_I0'][mehZpIndex] > 0.0) &
+                             (zpStruct['FGCM_FLAT'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_DUST'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_APERCORR'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_GRY'][mehZpIndex] > self.illegalValue) &
+                             (ccdNGoodStars[zpExpIndex[mehZpIndex],zpCCDIndex[mehZpIndex]] >=
+                              self.minStarPerCCD) &
+                             (ccdGrayErr[zpExpIndex[mehZpIndex],zpCCDIndex[mehZpIndex]] <=
+                              self.maxCCDGrayErr))
+
+        mehCCDZpIndex = mehZpIndex[mehCCDZpIndexFlag]
+
+        _computeZpt(zpStruct,mehCCDZpIndex)
+        _computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
+
+        badCCDZpExp = mehZpIndex[~mehCCDZpIndexFlag]
+        zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
+        zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
+
+        ## FIXME: plots?  what?
+
+    def _computeZpt(self,zpStruct,zpIndex):
+        """
+        """
+
+        zpStruct['FGCM_ZPT'][zpIndex] = (2.5*np.log10(zpStruct['FGCM_I0'][zpIndex]) +
+                                         zpStruct['FGCM_FLAT'][zpIndex] +
+                                         zpStruct['FGCM_DUST'][zpIndex] +
+                                         zpStruct['FGCM_APERCORR'][zpIndex] +
+                                         2.5*np.log10(zpStruct['EXPTIME'][zpIndex]) +
+                                         self.zptAB +
+                                         zpStruct['FGCM_GRY'][zpIndex])
+
+    def _computeZptErr(self,zpStruct,zpExpIndex,zpIndex):
+        """
+        """
+
+        sigFgcm = self.fgcmGray.sigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
+        nTilingsM1 = np.clip(zpStruct['FGCM_TILINGS'][zpIndex]-1.0,1.0,1e10)
+
+        zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
+                                                   zpStruct['FGCM_ZPTVAR'][zpIndex] +
+                                                   self.sigma0Cal**2.)
         
-
-        # question: do we have enough information for the flag 8s?
-        # do we use the I0?  It was computed, but see if we want to ignore it.
-
-
-
-
-
