@@ -30,6 +30,8 @@ class FgcmFitCycle(object):
         """
         """
 
+        ## FIXME: add logging, of some sort
+
         # Check if this is the initial cycle
         initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
@@ -147,9 +149,8 @@ class FgcmFitCycle(object):
         fgcmZpts.computeZeropoints()
 
         # Save parameters
-        outParFile = '%s/%s_cycle%02d_parameters.fits' % (self.fgcmConfig.outputPath,
-                                                          self.fgcmConfig.outfileBase,
-                                                          self.fgcmConfig.cycleNumber)
+        outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
+                                                self.fgcmConfig.outfileBaseWithCycle)
         self.fgcmPars.saveParFile(outParFile)
 
         # Save yaml for input to next fit cycle
