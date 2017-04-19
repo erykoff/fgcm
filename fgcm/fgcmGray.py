@@ -8,7 +8,11 @@ import esutil
 import time
 import scipy.optimize
 
+import matplotlib.pyplot as plt
+
+
 from fgcmUtilities import gaussFunction
+from fgcmUtilities import histoGauss
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -26,6 +30,7 @@ class FgcmGray(object):
 
         # and record configuration variables...
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
+        self.minStarPerExp = fgcmConfig.minStarPerExp
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
         self.sigFgcmMaxErr = fgcmConfig.sigFgcmMaxErr
@@ -33,6 +38,10 @@ class FgcmGray(object):
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
+        self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
+        self.plotPath = fgcmConfig.plotPath
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
 
         self._prepareGrayArrays()
 
@@ -63,7 +72,7 @@ class FgcmGray(object):
 
         self.sigFgcm = np.zeros(self.fgcmPars.nBands,dtype='f8')
 
-    def computeExpGrayForInitialSelection(self):
+    def computeExpGrayForInitialSelection(self,noPlots=False):
         """
         """
         if (not self.fgcmStars.magStdComputed):
@@ -153,9 +162,45 @@ class FgcmGray(object):
         expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expNGoodStarForInitialSelection[gd]) -
                                              (expGrayForInitialSelection[gd])**2.)
 
-        ## FIXME: add plotting
 
-    def computeCCDAndExpGray(self):
+        if (noPlots):
+            return
+
+        expUse,=np.where((self.fgcmPars.expFlag == 0) &
+                         (expNGoodStarForInitialSelection > self.minStarPerExp) &
+                         (expGrayForInitialSelection > self.expGrayInitialCut))
+
+        for i in xrange(self.fgcmPars.nBands):
+            inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
+
+            if (inBand.size == 0) :
+                continue
+
+            fig=plt.figure(1)
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            coeff = histoGauss(ax, expGrayForInitialSelection[expUse[inBand]])
+
+            ax.tick_params(axis='both',which='major',labelsize=14)
+            ax.locator_params(axis='x',nbins=5)
+
+            text=r'$(%s)$' % (self.fgcmPars.bands[i]) + '\n' + \
+                r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
+                r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
+                r'$\sigma = %.4f$' % (coeff[2])
+
+            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}} (\mathrm{initial})$',fontsize=16)
+            ax.set_ylabel(r'# of Exposures',fontsize=14)
+
+            fig.savefig('%s/%s_expgray_initial_%s.png' % (self.plotPath,
+                                                          self.outfileBaseWithCycle,
+                                                          self.fgcmPars.bands[i]))
+
+
+    def computeCCDAndExpGray(self,noPlots=False):
         """
         """
 
@@ -317,16 +362,51 @@ class FgcmGray(object):
                                  (objNGoodObs[obsObjIDIndex[b],bandIndex] >=
                                   self.fgcmStars.minPerBand))
 
-            hist = esutil.stat.histogram(EGray[b[sigUse]],binsize=0.0002,more=True)
-            hCenter=hist['center']
-            hHist = hist['hist'].astype('f8')
-            hHist = hHist / hHist.max()
+            #hist = esutil.stat.histogram(EGray[b[sigUse]],binsize=0.0002,more=True)
+            #hCenter=hist['center']
+            #hHist = hist['hist'].astype('f8')
+            #hHist = hHist / hHist.max()
 
-            p0=[np.sum(hHist),0.0,0.01]
+            #p0=[np.sum(hHist),0.0,0.01]
 
-            coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hCenter, hHist, p0=p0)
-            self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[b[sigUse]]))
+            #coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hCenter, hHist, p0=p0)
+            #self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[b[sigUse]]))
 
+            fig = plt.figure(1)
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            coeff = histoGauss(ax, EGray[b[sigUse]])
+
+            self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
+                                              np.median(EGrayErr2[b[sigUse]]))
+
+            if (not np.isfinite(self.sigFgcm[bandIndex])):
+                print("Failed to compute sigFgcm (%s).  Setting to 0.05?" %
+                      (self.fgcmPars.bands[bandIndex]))
+
+            print("sigFgcm (%s) = %.4f" % (self.fgcmPars.bands[bandIndex],
+                                            self.sigFgcm[bandIndex]))
+
+            if (noPlots):
+                continue
+
+            ax.tick_params(axis='both',which='major',labelsize=14)
+            ax.locator_params(axis='x',nbins=5)
+
+            text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n' + \
+                r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
+                r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
+                r'$\sigma_\mathrm{tot} = %.4f$' % (coeff[2]) + '\n' + \
+                r'$\sigma_\mathrm{FGCM} = %.4f$' % (self.sigFgcm[bandIndex])
+
+            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+            ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=16)
+
+            fig.savefig('%s/%s_sigfgcm_%s.png' % (self.plotPath,
+                                                  self.outfileBaseWithCycle,
+                                                  self.fgcmPars.bands[bandIndex]))
             ## FIXME: add plots
 
 
@@ -377,11 +457,43 @@ class FgcmGray(object):
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
 
-        ## FIXME: record these values in the parameters!
         self.fgcmPars.compExpGray[:] = expGray
         self.fgcmPars.compVarGray[gd] = expGrayRMS[gd]**2.
         self.fgcmPars.compNGoodStarPerExp = expNGoodStars
 
-        ## FIXME: do plotting
-
         ##  per band we plot the expGray for photometric exposures...
+
+        if (noPlots):
+            return
+
+        expUse,=np.where((self.fgcmPars.expFlag == 0) &
+                         (expNGoodStars > self.minStarPerExp))
+
+        for i in xrange(self.fgcmPars.nBands):
+            inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
+
+            if (inBand.size == 0) :
+                continue
+
+            fig=plt.figure(1)
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            coeff = histoGauss(ax, expGray[expUse[inBand]])
+
+            ax.tick_params(axis='both',which='major',labelsize=14)
+            ax.locator_params(axis='x',nbins=5)
+
+            text=r'$(%s)$' % (self.fgcmPars.bands[i]) + '\n' + \
+                r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
+                r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
+                r'$\sigma = %.4f$' % (coeff[2])
+
+            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+            ax.set_ylabel(r'# of Exposures',fontsize=14)
+
+            fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
+                                                  self.outfileBaseWithCycle,
+                                                  self.fgcmPars.bands[i]))
