@@ -16,8 +16,6 @@ class FgcmZeropoints(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmLUT,fgcmGray,fgcmRetrieval):
 
-        ## FIXME: I think we need fgcmLUT!        zpStruc
-
         self.fgcmPars = fgcmPars
         self.fgcmLUT = fgcmLUT
         self.fgcmGray = fgcmGray
@@ -25,7 +23,7 @@ class FgcmZeropoints(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.outputPath = fgcmConfig.outputPath
         self.cycleNumber = fgcmConfig.cycleNumber
-        self.outfileBase = fgcmConfig.outfileBase
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.zptAB = fgcmConfig.zptAB
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdOffsets = fgcmConfig.ccdOffsets
@@ -101,7 +99,6 @@ class FgcmZeropoints(object):
         # fill out exposures and ccds
         zpStruct['EXPNUM'][:] = np.repeat(self.fgcmPars.expArray,
                                           self.fgcmPars.nCCD)
-        ## FIXME: make a config for the starting CCD number
         zpStruct['CCDNUM'][:] = np.tile(np.arange(self.fgcmPars.nCCD)+self.ccdStartIndex,
                                         self.fgcmPars.nExp)
 
@@ -303,8 +300,7 @@ class FgcmZeropoints(object):
         ## FIXME: plots?  what plots would be interesting?
 
         # and save...
-        outFile = '%s/%s_cycle%02d_zpt.fits' % (self.outputPath,self.outfileBase,
-                                                    self.cycleNumber)
+        outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
         fitsio.write(outFile,zpStruct,clobber=True,extname='ZPTS')
 
         #################################
@@ -321,8 +317,7 @@ class FgcmZeropoints(object):
                                      self.fgcmPars.cosLatitude *
                                      np.cos(self.fgcmPars.expTelHA))
 
-        outFile = '%s/%s_cycle%02d_atm.fits' % (self.outputPath,self.outfileBase,
-                                                    self.cycleNumber)
+        outFile = '%s/%s_atm.fits' % (self.outputPath,self.outfileBaseWithCycle)
         fitsio.write(outFile,atmStruct,clobber=True,extname='ATMPARS')
 
 
