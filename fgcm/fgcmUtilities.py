@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import numpy as np
 
+
 def _pickle_method(m):
     if m.im_self is None:
         return getattr, (m.im_class, m.im_func.func_name)
@@ -95,3 +96,51 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0):
 def gaussFunction(x, *p):
     A, mu, sigma = p
     return A*np.exp(-(x-mu)**2./(2.*sigma**2))
+
+def histoGauss(ax,array):
+    """
+    """
+    import scipy.optimize
+    import matplotlib.pyplot as plt
+    import esutil
+
+    q13 = np.percentile(array,[25,75])
+    binsize=2*(q13[1] - q13[0])*array.size**(-1./3.)
+
+    hist=esutil.stat.histogram(array,binsize=binsize,more=True)
+
+    p0=[array.size,
+        np.median(array),
+        np.std(array)]
+
+    try:
+        coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
+                                                   hist['hist'], p0=p0)
+    except:
+        # set to starting values...
+        coeff = p0
+
+    hcenter=hist['center']
+    hhist=hist['hist']
+
+    rangeLo = -5*coeff[2]
+    rangeHi = 5*coeff[2]
+
+    lo,=np.where(hcenter < rangeLo)
+    ok,=np.where(hcenter > rangeLo)
+    hhist[ok[0]] += np.sum(hhist[lo])
+
+    hi,=np.where(hcenter > rangeHi)
+    ok,=np.where(hcenter < rangeHi)
+    hhist[ok[-1]] += np.sum(hhist[hi])
+
+    ax.plot(hcenter[ok],hhist[ok],'b-',linewidth=3)
+    ax.set_xlim(rangeLo,rangeHi)
+
+    xvals=np.linspace(rangeLo,rangeHi,1000)
+    yvals=gaussFunction(xvals,*coeff)
+
+    ax.plot(xvals,yvals,'k--',linewidth=3)
+    ax.locator_params(axis='x',nbins=6)  # hmmm
+
+    return coeff
