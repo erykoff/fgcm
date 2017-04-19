@@ -28,7 +28,7 @@ class FgcmSuperStarFlat(object):
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.plotPath = fgcmConfig.plotPath
-        self.outfileBase = fgcmConfig.outfileBase
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.epochNames = fgcmConfig.epochNames
 
     def computeSuperStarFlats(self):
@@ -148,7 +148,7 @@ class FgcmSuperStarFlat(object):
                 cb=None
                 # god damn I hate matplotlib
                 #  probably have to specify tick...and need to find round numbers.  blah
-                cb = plt.colorbar(CS3,ticks=[lo,0.25*(lo+hi),(lo+hi)/2.,0.75*(lo+hi),hi])
+                cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
                 #cb = plt.colorbar(CS3)
 
                 cb.set_label('Superflat Correction (mag)',fontsize=14)
@@ -157,8 +157,14 @@ class FgcmSuperStarFlat(object):
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
 
+                #fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
+                #                                              self.outfileBase,
+                #                                              self.cycleNumber,
+                #                                              name,
+                #                                              self.fgcmPars.bands[j],
+                #                                              self.epochNames[i]))
                 fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
-                                                    self.outfileBase,
+                                                    self.outfileBaseWithCycle,
                                                     name,
                                                     self.fgcmPars.bands[j],
                                                     self.epochNames[i]))
