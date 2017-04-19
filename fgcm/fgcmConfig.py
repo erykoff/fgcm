@@ -157,8 +157,11 @@ class FgcmConfig(object):
 
         # check the cut values
 
-        self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
-                                                    self.cycleNumber)
+        self.outfileBaseWithCycle = '%s_cycle%02d' % (self.outfileBase, self.cycleNumber)
+
+        #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
+        #                                            self.cycleNumber)
+        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
 
         if (not os.path.isdir(self.plotPath)):
             try:
