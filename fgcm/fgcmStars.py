@@ -38,6 +38,8 @@ class FgcmStars(object):
         self.sedFitBandFudgeFactors = fgcmConfig.sedFitBandFudgeFactors
         self.sedExtraBandFudgeFactors = fgcmConfig.sedExtraBandFudgeFactors
         self.starColorCuts = fgcmConfig.starColorCuts
+        self.sigma0Phot = fgcmConfig.sigma0Phot
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
@@ -118,6 +120,15 @@ class FgcmStars(object):
         snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
         snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
         snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
+
+        self.fgcmLog.log('DEBUG','Applying sigma0Phot = %.4f to mag errs' %
+                         (self.sigma0Phot))
+
+        obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
+        obsMagADUErr = np.sqrt(obsMagADUErr**2. + self.sigma0Phot**2.)
+
+        ## Question: do we need to confirm that errors are positive first?
+        ##  eg. how sanitized is the input?
 
         a,b=esutil.numpy_util.match(self.expArray,
                                     snmm.getArray(self.obsExpHandle)[:])
@@ -348,6 +359,34 @@ class FgcmStars(object):
             objFlag[bad] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.log('INFO','Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
+
+    def applySuperStarFlat(self,fgcmPars):
+        """
+        """
+
+        self.fgcmLog.log('INFO','Applying SuperStarFlat to raw magnitudes')
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+
+        obsMagADU += fgcmPars.expCCDSuperStar[obsExpIndex,
+                                              obsCCDIndex]
+
+    def applyApertureCorrections(self,fgcmPars):
+        """
+        """
+
+        self.fgcmLog.log('INFO','Applying ApertureCorrections to raw magnitudes')
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+
+        obsMagADU += fgcmPars.expApertureCorrection[obsExpIndex]
+
+
 
     ## The following does not work in a multiprocessing environment.
     ##  further study is required...
