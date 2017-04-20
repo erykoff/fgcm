@@ -22,7 +22,7 @@ class FgcmStars(object):
     def __init__(self,fgcmConfig,fgcmPars,computeNobs=True):
         # need fgcmPars for the exposures
 
-        self.fgcmLog = self.fgcmConfig.fgcmLog
+        self.fgcmLog = fgcmConfig.fgcmLog
 
         self.fgcmLog.log('INFO','Initializing stars.')
 
@@ -180,6 +180,7 @@ class FgcmStars(object):
 
         #  obsObjIDIndex: object ID Index of each observation
         #    (to get objID, then objID[obsObjIDIndex]
+
         self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objID = snmm.getArray(self.objIDHandle)
