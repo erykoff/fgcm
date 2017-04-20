@@ -15,6 +15,9 @@ class FgcmExposureSelector(object):
     """
     def __init__(self,fgcmConfig,fgcmPars):
 
+        self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing FgcmExposureSelector')
         self.fgcmPars = fgcmPars
 
         # and config variables...
@@ -32,22 +35,29 @@ class FgcmExposureSelector(object):
         """
 
         # this cuts on expgray,vargray
-        # based on those in the parameter file?
+        # based on those in the parameter file if they're available
 
         self.fgcmPars.expFlag[:] = 0
 
         bad,=np.where(self.fgcmPars.compNGoodStarPerExp == 0)
         self.fgcmPars.expFlag[bad] |= expFlagDict['NO_STARS']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with no stars' % (bad.size))
 
         bad,=np.where(self.fgcmPars.compNGoodStarPerExp < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with too few stars.' % (bad.size))
 
         bad,=np.where(self.fgcmPars.compExpGray < self.expGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY too large.' % (bad.size))
 
         bad,=np.where(self.fgcmPars.compVarGray > self.expVarGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with VAR_GRAY too large.' % (bad.size))
 
+        good,=np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmLog.log('INFO','There are now %d of %d exposures that are "photometric"' %
+                         (good.size,self.fgcmPars.nExp))
 
         ## FIXME: do we want to consider minCCDPerExp?
 
@@ -64,9 +74,16 @@ class FgcmExposureSelector(object):
 
         bad,=np.where(expNGoodStarForInitialSelection < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with too few stars' % (bad.size))
 
         bad,=np.where(expGrayForInitialSelection < self.expGrayInitialCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY (initial) too large.' % (bad.size))
+
+        good,=np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmLog.log('INFO','There are now %d of %d exposures that are potentially "photometric"' %
+                         (good.size,self.fgcmPars.nExp))
+
 
 
     def selectCalibratableNights(self):
@@ -88,6 +105,8 @@ class FgcmExposureSelector(object):
 
         badNights,=np.where(nExpPerNight < self.minExpPerNight)
 
+        self.fgcmLog.log('INFO','Flagging exposures on %d bad nights with too few photometric exposures.' % (badNights.size))
+
         # and we need to use *all* the exposures to flag bad nights
         h,rev = esutil.stat.histogram(self.fgcmPars.expNightIndex,min=0,
                                       max=self.fgcmPars.nCampaignNights-1,rev=True)
@@ -97,4 +116,5 @@ class FgcmExposureSelector(object):
 
             self.fgcmPars.expFlag[i1a] |= expFlagDict['TOO_FEW_EXP_ON_NIGHT']
 
-
+        bad,=np.where((self.fgcmPars.expFlag & expFlagDict['TOO_FEW_EXP_ON_NIGHT']) > 0)
+        self.fgcmLog.log('INFO','Flagged %d exposures on bad nights.' % (bad.size))
