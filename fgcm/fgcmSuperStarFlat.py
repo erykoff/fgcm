@@ -79,7 +79,8 @@ class FgcmSuperStarFlat(object):
         # this accumulates onto the input parameters
         self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
 
-        ## FIXME: change fgcmGray to remove the deltaSuperStarFlat!
+        ## MAYBE: change fgcmGray to remove the deltaSuperStarFlat?
+        ##  or we can rely on the iterations.  Try that first.
 
         self.fgcmLog.log('INFO','Computed SuperStarFlats in %.2f seconds.' %
                          (time.time() - startTime))
