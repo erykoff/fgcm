@@ -22,6 +22,10 @@ class FgcmStars(object):
     def __init__(self,fgcmConfig,fgcmPars,computeNobs=True):
         # need fgcmPars for the exposures
 
+        self.fgcmLog = self.fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing stars.')
+
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
 
@@ -70,6 +74,8 @@ class FgcmStars(object):
 
         # and only read these entries from the obs table
         obs=fitsio.read(self.obsFile,ext=1,rows=index['OBSINDEX'][indexSort])
+
+        self.fgcmLog.log('INFO','Loaded %d observations' % (obs.size))
 
         # and fill in new, cut indices
         #  obsIndex: pointer to a particular row in the obs table
@@ -133,6 +139,8 @@ class FgcmStars(object):
 
         #  nStars: total number of unique stars
         self.nStars = pos.size
+
+        self.fgcmLog.log('INFO','Loaded %d unique stars.' % (self.nStars))
 
         #  objID: unique object ID
         self.objIDHandle = snmm.createArray(self.nStars,dtype='i4')
@@ -258,6 +266,8 @@ class FgcmStars(object):
         bad,=np.where(minObs < self.minPerBand)
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
 
+        self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+
     def computeObjectSEDSlope(self,objIndex):
         """
         """
@@ -266,8 +276,6 @@ class FgcmStars(object):
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
         #objSEDSlopeOld = snmm.getArray(self.objSEDSlopeOldHandle)
 
-        ## FIXME
-        #   work with fit bands and fudge factors
 
         # check that we have valid mags for all the required bands
         if (np.max(thisObjMagStdMean[self.bandRequired]) > 90.0):
@@ -322,15 +330,6 @@ class FgcmStars(object):
                     (S[tempIndex-1] - S[tempIndex-2]))
 
 
-            ## temporary old code to cross-check
-
-            #objSEDSlopeOld[objIndex,0] = S[0] - 1.0 * ((self.lambdaStd[1] - self.lambdaStd[0])/(self.lambdaStd[2]-self.lambdaStd[0])) * (S[1]-S[0])
-            #objSEDSlopeOld[objIndex,1] = (S[0] + S[1])/2.0
-            #objSEDSlopeOld[objIndex,2] = (S[1] + S[2])/2.0
-            #objSEDSlopeOld[objIndex,3] = S[2] + 0.5 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2] - S[1])
-            #if ((thisObjMagStdMean[4]) < 90.0):
-            #    objSEDSlopeOld[objIndex,4] = S[2] + 1.0 * ((self.lambdaStd[3]-self.lambdaStd[2])/(self.lambdaStd[3]-self.lambdaStd[1])) * (S[2]-S[1])
-
 
     def performColorCuts(self):
         """
@@ -347,6 +346,8 @@ class FgcmStars(object):
             bad,=np.where((thisColor < cCut[2]) |
                           (thisColor > cCut[3]))
             objFlag[bad] |= objFlagDict['BAD_COLOR']
+
+            self.fgcmLog.log('INFO','Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
     ## The following does not work in a multiprocessing environment.
     ##  further study is required...
