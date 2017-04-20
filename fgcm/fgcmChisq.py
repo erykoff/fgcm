@@ -30,6 +30,10 @@ class FgcmChisq(object):
 
         #resourceUsage('Start of chisq init')
 
+        self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing FgcmChisq')
+
         # does this need to be shm'd?
         self.fgcmPars = fgcmPars
 
@@ -62,6 +66,16 @@ class FgcmChisq(object):
         self.fitterUnits = fitterUnits
         self.allExposures = allExposures
 
+        self.fgcmLog.log('DEBUG','FgcmChisq: computeDerivatives = %d' %
+                         (int(computeDerivatives)))
+        self.fgcmLog.log('DEBUG','FgcmChisq: computeSEDSlopes = %d' %
+                         (int(computeSEDSlopes)))
+        self.fgcmLog.log('DEBUG','FgcmChisq: fitterUnits = %d' %
+                         (int(fitterUnits)))
+        self.fgcmLog.log('DEBUG','FgcmChisq: allExposures = %d' %
+                         (int(allExposures)))
+
+
         if (self.allExposures and (self.computeDerivatives or
                                    self.computeSEDSlopes)):
             raise ValueError("Cannot set allExposures and computeDerivatives or computeSEDSlopes")
@@ -80,12 +94,6 @@ class FgcmChisq(object):
         self.fgcmPars.reloadParArray(fitParams,fitterUnits=self.fitterUnits)
         self.fgcmPars.parsToExposures()
 
-        # create a link between the exposures and the observations
-        #a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
-        #                            snmm.getArray(self.fgcmStars.obsExpHandle)[:])
-        #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
-        #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
-        #snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # and reset numbers if necessary
         if (not self.allExposures):
@@ -95,6 +103,8 @@ class FgcmChisq(object):
         # and select good stars!  These are the ones to map.
         #  note that these are the only stars we will care about.
         goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+
+        self.fgcmLog.log('INFO','Found %d good stars for chisq' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -109,6 +119,8 @@ class FgcmChisq(object):
         if (self.computeDerivatives):
             self.nSums += self.fgcmPars.nFitPars  # one for each parameter
 
+        startTime = time.time()
+        
         self.debug=debug
         if (self.debug):
             self.totalHandleDict = {}
@@ -119,6 +131,8 @@ class FgcmChisq(object):
 
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
+
+            self.fgcmLog.log('INFO','Running chisq on %d cores' % (self.nCore))
             # make a dummy process to discover starting child number
             proc = multiprocessing.Process()
             workerIndex = proc._identity[0]+1
@@ -155,6 +169,8 @@ class FgcmChisq(object):
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
+
+            self.fgcmLog.log('INFO','Chisq/dof = %.2f' % (fitChisq))
         else:
             # just set it to the last value for reference
             fitChisq = self.fitChisqs[-1]
@@ -162,6 +178,9 @@ class FgcmChisq(object):
         # free shared arrays
         for key in self.totalHandleDict.keys():
             snmm.freeArray(self.totalHandleDict[key])
+
+        self.fgcmLog.log('INFO','Chisq computation took %.2f seconds.' %
+                         (time.time() - startTime))
 
         #resourceUsage('end')
 
