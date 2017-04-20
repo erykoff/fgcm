@@ -31,8 +31,6 @@ class FgcmFitCycle(object):
         """
         """
 
-        ## FIXME: add logging, of some sort
-
         # Check if this is the initial cycle
         initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
