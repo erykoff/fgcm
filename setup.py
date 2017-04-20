@@ -4,15 +4,14 @@ import glob
 
 exec(open('fgcm/_version.py').read())
 
-#scripts = ['scripts/combineAtmosphereFiles.py']
-scripts = []
+scripts = ['scripts/runFgcmFitCycle.py']
 
 setup(
     name='fgcm',
     version=__version__,
-    description='Tools for FGCM Y3A1',
+    description='Forward Global Calibration Method (FGCM)',
     author='Eli Rykoff, Dave Burke',
-    author_email='erykoff@slac.stanford.edu',
+    author_email='erykoff@stanford.edu',
     packages=find_packages(),
     data_files=[],
     scripts=scripts
