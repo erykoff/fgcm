@@ -23,9 +23,6 @@ class FgcmExposureSelector(object):
         # and config variables...
         self.minStarPerExp = fgcmConfig.minStarPerExp
         self.minExpPerNight = fgcmConfig.minExpPerNight
-        #self.expGrayCut = fgcmConfig.expGrayCut
-        #self.varGrayCut = fgcmConfig.varGrayCut
-        #self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
         self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -59,18 +56,21 @@ class FgcmExposureSelector(object):
         self.fgcmLog.log('INFO','There are now %d of %d exposures that are "photometric"' %
                          (good.size,self.fgcmPars.nExp))
 
-        ## FIXME: do we want to consider minCCDPerExp?
+        ## MAYBE: do we want to consider minCCDPerExp?
 
     def selectGoodExposuresInitialSelection(self, fgcmGray):
         """
         """
 
-        # this requires fgcmGray
-        #  FIXME: ensure that fgcmGray has run initial selection
-        self.fgcmPars.expFlag[:] = 0
-
         expGrayForInitialSelection = snmm.getArray(fgcmGray.expGrayForInitialSelectionHandle)
         expNGoodStarForInitialSelection = snmm.getArray(fgcmGray.expNGoodStarForInitialSelectionHandle)
+
+        if (np.max(expNGoodStarForInitialSelection) == 0):
+            self.fgcmLog.log('INFO','ERROR: Must run FgcmGray.computeExpGrayForInitialSelection before FgcmExposureSelector')
+            raise ValueError("Must run FgcmGray.computeExpGrayForInitialSelection before FgcmExposureSelector")
+
+        # reset all exposure flags
+        self.fgcmPars.expFlag[:] = 0
 
         bad,=np.where(expNGoodStarForInitialSelection < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
@@ -96,8 +96,6 @@ class FgcmExposureSelector(object):
         #  limit to those that are in the fit bands
         goodExp,=np.where((self.fgcmPars.expFlag == 0) &
                           (~self.fgcmPars.expExtraBandFlag))
-
-        #nExpPerNight = np.zeros(self.fgcmPars.nCampaignNights)
 
         # we first need to look for the good nights
         nExpPerNight=esutil.stat.histogram(self.fgcmPars.expNightIndex[goodExp],min=0,
