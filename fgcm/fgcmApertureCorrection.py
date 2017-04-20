@@ -17,6 +17,9 @@ class FgcmApertureCorrection(object):
     """
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
+        self.fgcmLog = fgcmConfig.fgcmLog
+        self.fgcmLog.log('INFO','Initializing FgcmApertureCorrection')
+
         self.fgcmPars = fgcmPars
 
         self.fgcmGray = fgcmGray
@@ -24,20 +27,23 @@ class FgcmApertureCorrection(object):
         # and record configuration variables
         ## include plot path...
         self.aperCorrFitNBins = fgcmConfig.aperCorrFitNBins
+        self.illegalValue = fgcmConfig.illegalValue
+        self.plotPath = fgcmConfig.plotPath
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
-    def computeApertureCorrections(self):
+    def computeApertureCorrections(self,doPlots=True):
         """
         """
 
-        # we need good exposures...
-        # and then bin and fit...
-        # need to remove any previous!
+        startTime=time.time()
+        self.fgcmLog.log('INFO','Computing aperture corrections')
 
-        # expSeeingVariable
-
+        # need to make a local copy since we're modifying
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
+        expGrayTemp = expGray.copy()
 
         # first, remove any previous correction if necessary...
+        self.fgcmLog.log('DEBUG','Removing old aperture corrections')
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
 
@@ -50,18 +56,17 @@ class FgcmApertureCorrection(object):
                 self.fgcmPars.compAperCorrPivot[self.fgcmPars.expBandIndex])
 
             # Need to check sign here...
-            expGray -= oldAperCorr
+            expGrayTemp -= oldAperCorr
 
         expIndexUse,=np.where(self.fgcmPars.expFlag == 0)
 
         for i in xrange(self.fgcmPars.nBands):
-            ## FIXME: marker for illegal value?
             use,=np.where((self.fgcmPars.expBandIndex[expIndexUse] == i) &
-                          (self.fgcmPars.expSeeingVariable[expIndexUse] > -9999.0) &
+                          (self.fgcmPars.expSeeingVariable[expIndexUse] > self.illegalValue) &
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
 
             # sort to set the range...
-            st=np.argsort(expGray[use])
+            st=np.argsort(expGrayTemp[use])
             use=use[st]
 
             self.fgcmPars.compAperCorrRange[0,i] = expSeeingVariable[expIndexUse[use[int(0.02*use.size)]]]
@@ -74,7 +79,7 @@ class FgcmApertureCorrection(object):
                        self.fgcmPars.compAperCorrRange[0,i]) / self.aperCorrFitNBins
 
             binStruct = dataBinner(self.fgcmPars.expSeeingVariable[use],
-                                   expGray[use],
+                                   expGrayTemp[use],
                                    binSize,
                                    self.fgcmPars.compAperCorrRange[:,i])
 
@@ -91,6 +96,40 @@ class FgcmApertureCorrection(object):
             self.fgcmPars.compAperCorrSlope[i] = fit[0]
             self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
 
-            ## FIXME: add plotting
+            if (doPlots):
+                fig=plt.figure(1)
+                fig.clf()
 
-            ## FIXME: modify fgcmGray?
+                ax=fig.add_subplot(111)
+
+                ax.hexbin(self.fgcmPars.expSeeingVariable[use],
+                          expGrayTemp[use],
+                          rasterized=True)
+                ax.errorbar(binStruct['X_BIN'],binStruct['Y'],
+                            yerr=binStruct['Y_ERR'],fmt='r.',markersize=10)
+                ax.set_xlim(self.fgcmPars.compAperCorrRange[0,i],
+                            self.fgcmPars.compAperCorrRange[1,i])
+                ax.locator_params(axis='x',nbins=6)
+
+                ax.tick_params(axis='both',which='major',labelsize=14)
+
+                ax.set_xlabel(r'$\mathrm{ExpSeeingVariable}$',fontsize=16)
+                ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+
+                text=r'$(%s)$' % (self.fgcmPars.bands[i])
+                ax.annotate(text,(0.9,0.93),xycoords='axes fraction',
+                            ha='right',va='top',color='r',fontsize=16)
+
+                ax.plot(self.fgcmPars.compAperCorrRange[:,i],
+                        self.fgcmPars.compAperCorrSlope[i] *
+                        (self.fgcmPars.compAperCorrRange[:,i] -
+                         self.fgcmPars.compAperCorrPivot[i]),'r--')
+
+                fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle,
+                                                       self.fgcmPars.bands[i]))
+
+        ## FIXME: modify ccd gray and exp gray?
+
+        self.fgcmLog.log('INFO','Computed aperture corrections in %.2f seconds.' %
+                         (time.time() - startTime))
