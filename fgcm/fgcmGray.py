@@ -123,11 +123,17 @@ class FgcmGray(object):
                               (objFlag == 0))
 
         # select observations of these stars...
-        a,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
+        ##
+        #_,goodObs=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
+        #  NOTE: this relies on np.where returning a sorted array
+        _,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+
+        self.fgcmLog.log('INFO','FgcmGray initial exp gray using %d observations from %d good stars.' %
+                         (goodObs.size,goodStars.size))
 
         # and first, we only use the required bands
         _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
-                                               obsBandIndex[b])
+                                               obsBandIndex[goodObs])
 
         # now group per exposure and sum...
 
@@ -136,30 +142,30 @@ class FgcmGray(object):
         expNGoodStarForInitialSelection[:] = 0
 
         np.add.at(expGrayForInitialSelection,
-                  obsExpIndex[b],
-                  EGray[b])
+                  obsExpIndex[goodObs[reqBandUse]],
+                  EGray[goodObs[reqBandUse]])
         np.add.at(expGrayRMSForInitialSelection,
-                  obsExpIndex[b],
-                  EGray[b]**2.)
+                  obsExpIndex[goodObs[reqBandUse]],
+                  EGray[goodObs[reqBandUse]]**2.)
         np.add.at(expNGoodStarForInitialSelection,
-                  obsExpIndex[b],
+                  obsExpIndex[goodObs[reqBandUse]],
                   1)
 
         # loop over the extra bands...
         #  we only want to use previously determined "good" stars
         for extraBandIndex in self.fgcmStars.bandExtraIndex:
-            extraBandUse, = np.where((obsBandIndex[b] == extraBandIndex) &
-                                     (objNGoodObs[obsObjIDIndex[b],extraBandIndex] >=
+            extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
+                                     (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
                                       self.fgcmStars.minPerBand))
 
             np.add.at(expGrayForInitialSelection,
-                      obsExpIndex[b[extraBandUse]],
-                      EGray[b[extraBandUse]])
+                      obsExpIndex[goodObs[extraBandUse]],
+                      EGray[goodObs[extraBandUse]])
             np.add.at(expGrayRMSForInitialSelection,
-                      obsExpIndex[b[extraBandUse]],
-                      EGray[b[extraBandUse]]**2.)
+                      obsExpIndex[goodObs[extraBandUse]],
+                      EGray[goodObs[extraBandUse]]**2.)
             np.add.at(expNGoodStarForInitialSelection,
-                      obsExpIndex[b[extraBandUse]],
+                      obsExpIndex[goodObs[extraBandUse]],
                       1)
 
 
@@ -277,12 +283,18 @@ class FgcmGray(object):
                               (objFlag == 0))
 
         # select observations of these stars...
-        _,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex[goodObs]])
-        b = goodObs[b]
+        #_,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex[goodObs]])
+        # NOTE: this relies on np.where returning a sorted array.
+        _,b=esutil.numpy_util.match(goodStars,obsObjIDIndex[goodObs],presorted=True)
+        #b = goodObs[b]
+        goodObs=goodObs[b]
+
+        self.fgcmLog.log('INFO','FgcmGray using %d observations from %d good stars.' %
+                         (goodObs.size,goodStars.size))
 
         # first, we only use the required bands
         _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
-                                               obsBandIndex[b])
+                                               obsBandIndex[goodObs])
 
         # group by CCD and sum
 
@@ -303,45 +315,45 @@ class FgcmGray(object):
         ccdGrayWt = np.zeros_like(ccdGray)
 
         np.add.at(ccdGrayWt,
-                  (obsExpIndex[b[reqBandUse]],obsCCDIndex[b[reqBandUse]]),
-                  1./EGrayErr2[b[reqBandUse]])
+                  (obsExpIndex[goodObs[reqBandUse]],obsCCDIndex[goodObs[reqBandUse]]),
+                  1./EGrayErr2[goodObs[reqBandUse]])
         np.add.at(ccdGray,
-                  (obsExpIndex[b[reqBandUse]],obsCCDIndex[b[reqBandUse]]),
-                  EGray[b[reqBandUse]]/EGrayErr2[b[reqBandUse]])
+                  (obsExpIndex[goodObs[reqBandUse]],obsCCDIndex[goodObs[reqBandUse]]),
+                  EGray[goodObs[reqBandUse]]/EGrayErr2[goodObs[reqBandUse]])
         np.add.at(ccdGrayRMS,
-                  (obsExpIndex[b[reqBandUse]],obsCCDIndex[b[reqBandUse]]),
-                  EGray[b[reqBandUse]]**2./EGrayErr2[b[reqBandUse]])
+                  (obsExpIndex[goodObs[reqBandUse]],obsCCDIndex[goodObs[reqBandUse]]),
+                  EGray[goodObs[reqBandUse]]**2./EGrayErr2[goodObs[reqBandUse]])
         np.add.at(ccdNGoodStars,
-                  (obsExpIndex[b[reqBandUse]],obsCCDIndex[b[reqBandUse]]),
+                  (obsExpIndex[goodObs[reqBandUse]],obsCCDIndex[goodObs[reqBandUse]]),
                   1)
         np.add.at(ccdNGoodObs,
-                  (obsExpIndex[b[reqBandUse]],obsCCDIndex[b[reqBandUse]]),
-                  objNGoodObs[obsObjIDIndex[b[reqBandUse]],
-                              obsBandIndex[b[reqBandUse]]])
+                  (obsExpIndex[goodObs[reqBandUse]],obsCCDIndex[goodObs[reqBandUse]]),
+                  objNGoodObs[obsObjIDIndex[goodObs[reqBandUse]],
+                              obsBandIndex[goodObs[reqBandUse]]])
 
         # loop over the extra bands
         #  we only want to use previously determined "good" stars
         for extraBandIndex in self.fgcmStars.bandExtraIndex:
-            extraBandUse, = np.where((obsBandIndex[b] == extraBandIndex) &
-                                     (objNGoodObs[obsObjIDIndex[b],extraBandIndex] >=
+            extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
+                                     (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
                                       self.fgcmStars.minPerBand))
 
             np.add.at(ccdGrayWt,
-                      (obsExpIndex[b[extraBandUse]],obsCCDIndex[b[extraBandUse]]),
-                      1./EGrayErr2[b[extraBandUse]])
+                      (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
+                      1./EGrayErr2[goodObs[extraBandUse]])
             np.add.at(ccdGray,
-                      (obsExpIndex[b[extraBandUse]],obsCCDIndex[b[extraBandUse]]),
-                      EGray[b[extraBandUse]]/EGrayErr2[b[extraBandUse]])
+                      (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
+                      EGray[goodObs[extraBandUse]]/EGrayErr2[goodObs[extraBandUse]])
             np.add.at(ccdGrayRMS,
-                      (obsExpIndex[b[extraBandUse]],obsCCDIndex[b[extraBandUse]]),
-                      EGray[b[extraBandUse]]**2./EGrayErr2[b[extraBandUse]])
+                      (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
+                      EGray[goodObs[extraBandUse]]**2./EGrayErr2[goodObs[extraBandUse]])
             np.add.at(ccdNGoodStars,
-                      (obsExpIndex[b[extraBandUse]],obsCCDIndex[b[extraBandUse]]),
+                      (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
                       1)
             np.add.at(ccdNGoodObs,
-                      (obsExpIndex[b[extraBandUse]],obsCCDIndex[b[extraBandUse]]),
-                      objNGoodObs[obsObjIDIndex[b[extraBandUse]],
-                                  obsBandIndex[b[extraBandUse]]])
+                      (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
+                      objNGoodObs[obsObjIDIndex[goodObs[extraBandUse]],
+                                  obsBandIndex[goodObs[extraBandUse]]])
 
 
         # need at least 3 or else computation can blow up
@@ -371,21 +383,21 @@ class FgcmGray(object):
         for bandIndex in xrange(self.fgcmStars.nBands):
             # if we are an extraBand we need an extra check
             if (bandIndex in self.fgcmStars.bandRequiredIndex):
-                sigUse,=np.where((np.abs(EGray[b]) < self.sigFgcmMaxEGray) &
-                                 (EGrayErr2[b] > 0.0) &
-                                 (EGrayErr2[b] < self.sigFgcmMaxErr**2.) &
-                                 (EGray[b] != 0.0) &
-                                 (obsBandIndex[b] == bandIndex))
+                sigUse,=np.where((np.abs(EGray[goodObs]) < self.sigFgcmMaxEGray) &
+                                 (EGrayErr2[goodObs] > 0.0) &
+                                 (EGrayErr2[goodObs] < self.sigFgcmMaxErr**2.) &
+                                 (EGray[goodObs] != 0.0) &
+                                 (obsBandIndex[goodObs] == bandIndex))
             else:
-                sigUse,=np.where((np.abs(EGray[b]) < self.sigFgcmMaxEGray) &
-                                 (EGrayErr2[b] > 0.0) &
-                                 (EGrayErr2[b] < self.sigFgcmMaxErr**2.) &
-                                 (EGray[b] != 0.0) &
-                                 (obsBandIndex[b] == bandIndex) &
-                                 (objNGoodObs[obsObjIDIndex[b],bandIndex] >=
+                sigUse,=np.where((np.abs(EGray[goodObs]) < self.sigFgcmMaxEGray) &
+                                 (EGrayErr2[goodObs] > 0.0) &
+                                 (EGrayErr2[goodObs] < self.sigFgcmMaxErr**2.) &
+                                 (EGray[goodObs] != 0.0) &
+                                 (obsBandIndex[goodObs] == bandIndex) &
+                                 (objNGoodObs[obsObjIDIndex[goodObs],bandIndex] >=
                                   self.fgcmStars.minPerBand))
 
-            #hist = esutil.stat.histogram(EGray[b[sigUse]],binsize=0.0002,more=True)
+            #hist = esutil.stat.histogram(EGray[goodObs[sigUse]],binsize=0.0002,more=True)
             #hCenter=hist['center']
             #hHist = hist['hist'].astype('f8')
             #hHist = hHist / hHist.max()
@@ -393,17 +405,17 @@ class FgcmGray(object):
             #p0=[np.sum(hHist),0.0,0.01]
 
             #coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hCenter, hHist, p0=p0)
-            #self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[b[sigUse]]))
+            #self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[goodObs[sigUse]]))
 
             fig = plt.figure(1)
             fig.clf()
 
             ax=fig.add_subplot(111)
 
-            coeff = histoGauss(ax, EGray[b[sigUse]])
+            coeff = histoGauss(ax, EGray[goodObs[sigUse]])
 
             self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
-                                              np.median(EGrayErr2[b[sigUse]]))
+                                              np.median(EGrayErr2[goodObs[sigUse]]))
 
             if (not np.isfinite(self.sigFgcm[bandIndex])):
                 self.fgcmLog.log('INFO',"Failed to compute sigFgcm (%s).  Setting to 0.05?" %
