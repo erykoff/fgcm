@@ -6,6 +6,8 @@ import os
 import sys
 import esutil
 
+import matplotlib.pyplot as plt
+
 from fgcmUtilities import _pickle_method
 from fgcmUtilities import expFlagDict
 
@@ -28,7 +30,7 @@ class FgcmParameters(object):
         self.hasExternalPWV = False
         self.hasExternalTau = False
 
-        self.outfileBase = fgcmConfig.outfileBase
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.plotPath = fgcmConfig.plotPath
 
         self.fgcmLog = self.fgcmConfig.fgcmLog
@@ -489,11 +491,13 @@ class FgcmParameters(object):
         if self.hasExternalPWV:
             self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
             self.parExternalPWVOffset = pars['PAREXTERNALPWVOFFSET'][0]
-            # FIXME: need to load external PWV!
+            self.hasExternalPWV = True
+            self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
         if self.hasExternalTau:
             self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
             self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
-            # FIXME: need to load external Tau!
+            self.hasExternalTau = True
+            self.loadExternalTau()
 
         self.compAperCorrPivot = pars['COMPAPERCORRPIVOT'][0]
         self.compAperCorrSlope = pars['COMPAPERCORRSLOPE'][0]
@@ -931,6 +935,135 @@ class FgcmParameters(object):
     def plotParameters(self):
         """
         """
+
+        # want nightly averages, on calibratable nights (duh)
+
+        # this is fixed here
+        minExpPerNight = 10
+
+        # make sure we have this...probably redundant
+        self.parsToExposures()
+
+        # only with photometric exposures
+        expUse,=np.where(self.fgcmFlag == 0)
+
+        nExpPerBandPerNight = np.zeros((self.nCampaignNights,self.nBands),dtype='i4')
+        nExpPerNight = np.zeros(self.nCampaignNights,dtype='i4')
+        mjdNight = np.zeros(self.nCampaignNights,dtype='f8')
+        alphaNight = np.zeros(self.nCampaignNights,dtype='f8')
+        O3Night = np.zeros(self.nCampaignNights,dtype='f8')
+        tauNight = np.zeros(self.nCampaignNights,dtype='f8')
+        pwvNight = np.zeros(self.nCampaignNights,dtype='f8')
+
+        np.add.at(nExpPerBandNight,
+                  (self.expNightIndex[expUse],
+                   self.expBandIndex[expUse]),
+                  1)
+        np.add.at(nExpPerNight,
+                  self.expNightIndex[expUse],
+                  1)
+        np.add.at(mjdNight,
+                  self.expNightIndex[expUse],
+                  self.expMJD[expUse])
+        np.add.at(alphaNight,
+                  self.expNightIndex[expUse],
+                  self.expAlpha[expUse])
+        np.add.at(tauNight,
+                  self.expNightIndex[expUse],
+                  self.expTau[expUse])
+        np.add.at(pwvNight,
+                  self.expNightIndex[expUse],
+                  self.expPWV[expUse])
+        np.add.at(O3Night,
+                  self.expNightIndex[expUse],
+                  self.expO3[expUse])
+
+        # hard code this for now
+        gd,=np.where(nExpPerNight > minExpPerNight)
+        mjdNight[gd] /= nExpPerNight[gd].astype(np.float642)
+        alphaNight[gd] /= nExpPerNight[gd].astype(np.float64)
+        tauNight[gd] /= nExpPerNight[gd].astype(np.float64)
+        pwvNight[gd] /= nExpPerNight[gd].astype(np.float64)
+        O3Night[gd] /= nExpPerNight[gd].astype(np.float64)
+
+        firstMJD = np.floor(np.min(mjdNight[gd]))
+
+        # now alpha
+        fig=plt.figure(1)
+        fig.clf()
+        ax=fig.add_subplot(111)
+
+        # alpha is good
+        alphaGd, = np.where(nExpPerNight > minExpPerNight)
+
+        ax.plot(mjdNight[alphaGd] - firstMJD,alphaNight[alphaGd],'r.')
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel(r'$\alpha$',fontsize=16)
+
+        fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
+                                                 self.outfileBaseWithCycle))
+
+        # tau
+        fig=plt.figure(1)
+        fig.clf()
+        ax=fig.add_subplot(111)
+
+        ## FIXME: allow other band names  (bandLike or something)
+        gBandIndex,=np.where(self.bands=='g')
+        rBandIndex,=np.where(self.bands=='r')
+
+        tauGd, = np.where((nExpPerNight > minExpPerNight) &
+                          ((nExpPerBandPerNight[:,gBandIndex] +
+                            nExpPerBandPerNight[:,rBandIndex]) >
+                           minExpPerNight))
+
+        ax.plot(mjdNight[tauGd] - firstMJD, tauNight[tauGd],'r.')
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel(r'$\tau_{7750}$',fontsize=16)
+
+        fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
+                                               self.outfileBaseWithCycle))
+
+        # pwv
+        fig=plt.figure(1)
+        fig.clf()
+        ax=fig.add_subplot(111)
+
+        ## FIXME: allow other band names
+        zBandIndex,=np.where(self.bands=='z')
+
+        pwvGd, = np.where((nExpPerNight > minExpPerNight) &
+                          (nExpPerBandPerNight[:,zBandIndex] > minExpPerNight))
+
+        ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel(r'$\mathrm{PWV}$',fontsize=16)
+
+        fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
+                                               self.outfileBaseWithCycle))
+
+        # O3
+        fig=plt.figure(1)
+        fig.clf()
+        ax=fig.add_subplot(111)
+
+        ## FIXME: allow other band names
+        rBandIndex,=np.where(self.bands=='r')
+        O3Gd, = np.where((nExpPerNight > minExpPerNight) &
+                         (nExpPerBandPerNight[:,rBandIndex] > minExpPerNight))
+
+        ax.plot(mjdNight[O3Gd] - firstMJD, pwvNight[O3Gd],'r.')
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel(r'$O_3$',fontsize=16)
+
+        fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
+                                              self.outfileBaseWithCycle))
+
+
+
+
+
+
 
         ## FIXME: write the plotting routine
 
