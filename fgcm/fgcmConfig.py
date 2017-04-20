@@ -271,5 +271,49 @@ class FgcmConfig(object):
                        2.5*np.log10((self.mirrorArea * self.approxThroughput) /
                                     (hPlanck * self.cameraGain)))
 
+        self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
 
+    def saveConfigForNextCycle(self,fileName,parFile):
+        configDict = self.configDictSaved.copy()
+
+        # save the outputPath
+        configDict['outputPath'] = self.outputPath
+        # update the cycleNumber
+        configDict['cycleNumber'] = self.cycleNumber + 1
+
+        # do we want to increase maxIter?  Hmmm.
+
+        configDict['inParameterFile'] = parFile
+
+        # do we want to guess as to the photometric cut?  not now.
+
+        with open(fileName,'w') as f:
+            yaml.dump(configDict, stream=f)
+            
+
+#        confDict = {'exposureFile':self.exposureFile,
+#                    'ccdOffsetFile':self.ccdOffsetFile,
+#                    'obsFile':self.obsFile,
+#                    'indexFile':self.indexFile,
+#                    'UTBoundary':self.UTBoundary,
+#                    'washMJDs':list(self.washMJDs),
+#                    'epochMJDs':list(self.epochMJDs),
+#                    'lutFile':self.lutFile,
+#                    'expField':self.expField,
+#                    'ccdField':self.ccdField,
+#                    'latitude':self.latitude,
+#                    'seeingField':self.seeingField,
+#                    'fitBands':list(self.fitBands),
+#                    'extraBands':list(self.extraBands),
+#                    'deepFlag':self.deepFlag,
+#                    'minObsPerBand':self.minObsPerBand,
+#                    'nCore':self.nCore,
+#                    'brightObsGrayMax':self.brightObsGrayMax,
+#                    'minStarPerCCD':self.minStarPerCCD,
+#                    'minCCDPerExp':self.minCCDPerExp,
+#                    'maxCCDGrayErr':self.maxCCDGrayErr,
+#                    'aperCorrFitNBins':self.aperCorrFitNBins,
+#                    'illegalValue':self.illegalValue,
+#                    'sedFitBandFudgeFactors':list(self.sedFitBandFudgeFactors),
+#                    '
