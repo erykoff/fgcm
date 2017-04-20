@@ -23,7 +23,7 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
               'PHOTOMETRIC_EXTRA_EXPOSURE':2**1,
               'NONPHOTOMETRIC_FIT_NIGHT':2**2,
-              'NOFIT_NIGHT':2**3,  # FIXME: is this the right terminology?  probably
+              'NOFIT_NIGHT':2**3,
               'CANNOT_COMPUTE_ZEROPOINT':2**4,
               'TOO_FEW_STARS_ON_CCD':2**5}
 
