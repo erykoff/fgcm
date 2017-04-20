@@ -25,6 +25,7 @@ class FgcmFitCycle(object):
     """
     def __init__(self,configFile):
         self.fgcmConfig = FgcmConfig(configFile)
+        self.fgcmLog = self.fgcmConfig.fgcmLog
 
     def run(self):
         """
@@ -39,26 +40,33 @@ class FgcmFitCycle(object):
 
         # Generate or Read Parameters
         if (initialCycle):
+            self.fgcmLog.log('INFO','Fit initial cycle starting...')
             self.fgcmPars = FgcmParameters(self.fgcmConfig)
         else:
+            self.fgcmLog.log('INFO','Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
             self.fgcmPars = FgcmParameters(self.fgcmConfig,
                                            parFile=self.fgcmConfig.inParameterFile)
 
 
         # Read in Stars
+        self.fgcmLog.log('DEBUG','Making FgcmStars')
         self.fgcmStars = FgcmStars(self.fgcmConfig)
 
         # Read in LUT
+        self.fgcmLog.log('DEBUG','Making FgcmLUT')
         self.fgcmLUT = FgcmLUTSHM(self.fgcmConfig.lutFile)
 
         # And prepare the chisq function
+        self.fgcmLog.log('DEBUG','Making FgcmChisq')
         self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
                                    self.fgcmStars,self.fgcmLUT)
 
         # And the exposure selector
+        self.fgcmLog.log('DEBUG','Making FgcmExposureSelector')
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
+        self.fgcmLog.log('DEBUG','Making FgcmGray')
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
         # Apply aperture corrections and SuperStar if available
@@ -68,12 +76,14 @@ class FgcmFitCycle(object):
 
 
             # and flag exposures using quantities computed from previous cycle
+            self.fgcmLog.log('DEBUG','Running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
 
 
 
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmLog.log('DEBUG','Finding good stars from %d good exposures' % (goodExpsIndex.size))
         self.fgcmStars.selectStarsMinObs(goodExpsIndex)
 
         # Get m^std, <m^std>, SED for all the stars.
@@ -159,6 +169,10 @@ class FgcmFitCycle(object):
     def _doFit(self):
         """
         """
+
+        self.fgcmLog.log('INFO','Performing fit with %d iterations.' %
+                         (self.fgcmConfig.maxIter))
+        
         # get the initial parameters
         parInitial = self.fgcmPars.getParArray(fitterUnits=True)
         # and the fit bounds
