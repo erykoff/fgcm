@@ -35,7 +35,7 @@ class FgcmConfig(object):
                       'minExpPerNight','expGrayInitialCut','expVarGrayPhotometricCut',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut','expGrayErrRecoverCut',
-                      'sigma0Cal','logLevel']
+                      'sigma0Cal','logLevel','sigma0Phot']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -93,6 +93,7 @@ class FgcmConfig(object):
         self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
         self.sigma0Cal = float(configDict['sigma0Cal'])
         self.logLevel = configDict['logLevel']
+        self.sigma0Phot = configDict['sigma0Phot']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
