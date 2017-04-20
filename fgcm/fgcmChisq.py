@@ -12,7 +12,6 @@ from fgcmUtilities import resourceUsage
 
 import types
 import copy_reg
-#import sharedmem as shm
 import multiprocessing
 from multiprocessing import Pool
 
@@ -47,11 +46,15 @@ class FgcmChisq(object):
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
-        self.fitChisqs = []
+        #self.fitChisqs = []
+        self.resetFitChisqList()
 
         # not sure what we need the config for
 
         #resourceUsage('End of chisq init')
+
+    def resetFitChisqList(self):
+        self.fitChisqs = []
 
     def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,debug=False,allExposures=False):
         """
@@ -229,36 +232,14 @@ class FgcmChisq(object):
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
         # need to know which are fit bands!
-        #print("matching to fit bands...")
         _,thisObsFitUse = esutil.numpy_util.match(self.fgcmPars.fitBandIndex,thisObsBandIndex)
 
         thisObjGoodBand, = np.where(objNGoodObs[objIndex,:] >= 1)
 
-        # these IDs check out!
-        #print(snmm.getArray(self.fgcmStars.obsObjIDHandle)[thisObsIndex])
-
-        # need to compute secZenith
-        #  is this the right place for it?  I don't know!
-        ## FIXME: move to the global computation when stars are read in.
-
-        #thisObjRA = np.radians(snmm.getArray(self.fgcmStars.objRAHandle)[objIndex])
-        #thisObjDec = np.radians(snmm.getArray(self.fgcmStars.objDecHandle)[objIndex])
-        #if (thisObjRA > np.pi) :
-        #    thisObjRA -= 2*np.pi
-        #thisObjHA = (self.fgcmPars.expTelHA[thisObsExpIndex] +
-        #             self.fgcmPars.expTelRA[thisObsExpIndex] -
-        #             thisObjRA)
-        #thisSecZenith = 1./(np.sin(thisObjDec)*self.fgcmPars.sinLatitude +
-        #                    np.cos(thisObjDec)*self.fgcmPars.cosLatitude*np.cos(thisObjHA))
-
         thisSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)[thisObsIndex]
 
 
-        #print(thisObsBandIndex)
-        #print(thisSecZenith)
-
         # get I0obs values...
-        #print("Going to LUT!")
         lutIndices = self.fgcmLUT.getIndices(thisObsBandIndex,
                                              self.fgcmPars.expPWV[thisObsExpIndex],
                                              self.fgcmPars.expO3[thisObsExpIndex],
@@ -267,14 +248,6 @@ class FgcmChisq(object):
                                              thisSecZenith,
                                              thisObsCCDIndex,
                                              self.fgcmPars.expPmb[thisObsExpIndex])
-
-        #print("exp:",self.fgcmPars.expArray[thisObsExpIndex])
-        #print("pwv:",self.fgcmPars.expPWV[thisObsExpIndex])
-        #print("o3:",self.fgcmPars.expO3[thisObsExpIndex])
-        #print("tau:",self.fgcmPars.expTau[thisObsExpIndex])
-        #print("alpha:",self.fgcmPars.expAlpha[thisObsExpIndex])
-        #print("ccd:",thisObsCCDIndex)
-        #print("pmb:",self.fgcmPars.expPmb[thisObsExpIndex])
 
         # and I10obs values...
         thisI0 = self.fgcmLUT.computeI0(thisObsBandIndex,
@@ -288,9 +261,6 @@ class FgcmChisq(object):
                                         lutIndices)
         thisI10 = self.fgcmLUT.computeI1(lutIndices) / thisI0
 
-        #print("I0:",thisI0)
-        #print("I10:",thisI10)
-
         thisQESys = self.fgcmPars.expQESys[thisObsExpIndex]
 
         # compute thisMagObs
@@ -300,11 +270,8 @@ class FgcmChisq(object):
 
 
         if (self.computeSEDSlopes):
-            #print("Computing SED Slopes")
             # use magObs to compute mean mags...
             # compute in all bands here.
-
-            # how much time is the where taking?
 
             wtSum = np.zeros(self.fgcmStars.nBands)
             np.add.at(wtSum,
@@ -319,24 +286,6 @@ class FgcmChisq(object):
 
             self.fgcmStars.computeObjectSEDSlope(objIndex)
 
-            #if (np.max(objMagStdMean[objIndex,:]) > 90.0) :
-                # cannot compute
-            #    objSEDSlope[objIndex,:] = 0.0
-            #else:
-                # need to do FIT BANDS
-                #   FIXME
-            #    S = np.zeros(self.fgcmPars.nBands-1,dtype='f4')
-            #    for i in xrange(self.fgcmPars.nBands-1):
-            #        S[i] = -0.921 * (objMagStdMean[objIndex,i+1] - objMagStdMean[objIndex,i])/(self.fgcmLUT.lambdaStd[i+1] - self.fgcmLUT.lambdaStd[i])
-
-                # this is hacked for now
-            #    objSEDSlope[objIndex,0] = S[0] - 1.0 * ((self.fgcmLUT.lambdaStd[1] - self.fgcmLUT.lambdaStd[0])/(self.fgcmLUT.lambdaStd[2]-self.fgcmLUT.lambdaStd[0])) * (S[1]-S[0])
-            #    objSEDSlope[objIndex,1] = (S[0] + S[1])/2.0
-            #    objSEDSlope[objIndex,2] = (S[1] + S[2])/2.0
-            #    objSEDSlope[objIndex,3] = S[2] + 0.5 * ((self.fgcmLUT.lambdaStd[3]-self.fgcmLUT.lambdaStd[2])/(self.fgcmLUT.lambdStd[3]-self.fgcmLUT.lambdaStd[1])) * (S[2] - S[1])
-            #    if ((objMagStdMean[objIndex,4]) < 90.0):
-            #        objSEDSlope[objIndex,4] = S[2] + 1.0 * ((self.fgcmLUT.lambdaStd[3]-self.fgcmLUT.lambdaStd[2])/(self.fgcmLUT.lambdaStd[3]-self.fgcmLUT.lambdaStd[1])) * (S[2]-S[1])
-
         # compute magStd (and record)
         thisDeltaStd = 2.5 * np.log10((1.0 + objSEDSlope[objIndex,thisObsBandIndex] * thisI10) / (1.0 + objSEDSlope[objIndex,thisObsBandIndex] * self.fgcmLUT.I10Std[thisObsBandIndex]))
 
@@ -347,7 +296,6 @@ class FgcmChisq(object):
             return None
 
         # compute mean objMagStdMean
-        #print("Computing mean mags...")
 
         # new faster version...
 
@@ -378,7 +326,6 @@ class FgcmChisq(object):
 
         # and compute the derivatives if desired...
         if (self.computeDerivatives):
-            #print("Computing derivatives!")
 
             unitDict=self.fgcmPars.getUnitDict(fitterUnits=self.fitterUnits)
             # do I need to loop over all parameters?
@@ -400,8 +347,6 @@ class FgcmChisq(object):
             #   touch a given parameter
 
             # set up arrays
-            #print("Setting up arrays...")
-
             magdLdPWVIntercept = np.zeros((self.fgcmPars.nCampaignNights,
                                            self.fgcmPars.nFitBands))
             magdLdPWVSlope = np.zeros_like(magdLdPWVIntercept)
@@ -702,213 +647,6 @@ class FgcmChisq(object):
             partialArray[self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] *= (2.0 / unitDict['qeSysSlopeUnit'])
 
-
-
-
-                # and for the washes...
-                #i1a=self.fgcmPars.expWashIndex[thisObsExpIndex[inBand]]
-
-                #np.add.at(magdLdWashIntercept[:,bandIndex],i1a,
-                #          1./thisMagErr2[inBand])
-                #magdLdWashIntercept[:,bandIndex] *= thisObjMagStdMeanErr2[bandIndex]
-                #np.add.at(magdLdWashSlope[:,bandIndex],i1a,
-                #          (self.fgcmPars.expMJD[thisObsExpIndex[inBand]] -
-                #           self.fgcmPars.washMJDs[i1a]) / thisMagErr2[inBand])
-                #magdLdWashSlope[:,bandIndex] *= thisObjMagStdMeanErr2[bandIndex]
-
-
-            ## Fill the partial structures with sums
-            #i1a=self.fgcmPars.expNightIndex[thisObsExpIndex[thisObsFitUse]]
-
-            # O3
-            #np.add.at(partialArray[self.fgcmPars.parO3Loc:
-            #                           (self.fgcmPars.parO3Loc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a,
-            #          deltaMagWeighted[thisObsFitUse] * (
-            #        (dLdO3[thisObsFitUse] -
-            #         magdLdO3[i1a,thisObsBandIndex[thisObsFitUse]])))
-
-            #partialArray[self.fgcmPars.parO3Loc:
-            #                 self.fgcmPars.parO3Loc+self.fgcmPars.nCampaignNights] *= (
-            #    2.0 / unitDict['o3Unit'])
-
-            # Alpha
-            #np.add.at(partialArray[self.fgcmPars.parAlphaLoc:
-            #                           (self.fgcmPars.parAlphaLoc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a,
-            #          deltaMagWeighted[thisObsFitUse] * (
-            #        (dLdAlpha[thisObsFitUse] -
-            #         magdLdAlpha[i1a,thisObsBandIndex[thisObsFitUse]])))
-            #partialArray[self.fgcmPars.parAlphaLoc:
-            #                 self.fgcmPars.parAlphaLoc+self.fgcmPars.nCampaignNights] *= (
-            #    2.0 / unitDict['alphaUnit'])
-
-            # PWV -- external...
-            #if (self.fgcmPars.hasExternalPWV):
-            #    hasExt, = np.where(self.fgcmPars.externalPWVFlag[thisObsExpIndex[thisObsFitUse]])
-            #    np.add.at(partialArray[self.fgcmPars.parExternalPWVOffsetLoc:
-            #                               (self.fgcmPars.parExternalPWVOffsetLoc+
-            #                                self.fgcmPars.nCampaignNights)],
-            #              i1a[hasExt],
-            #              deltaMagWeighted[thisObsFitUse[hasExt]] * (
-            #            (dLdPWV[thisObsFitUse[hasExt]] -
-            #             magdLdPWVOffset[i1a[hasExt],thisObsBandIndex[thisObsFitUse[hasExt]]])))
-                #np.multiply.at(partialArray[self.fgcmPars.parExternalPWVOffsetLoc:
-                #                                (self.fgcmPars.parExternalPWVOffsetLoc+
-                #                                 self.fgcmPars.nCampaignNights)],
-                #               i1a[hasExt],
-                #               2.0 / unitDict['pwvUnit'])
-
-                #partialArray[self.fgcmPars.parExternalPWVOffsetLoc:
-                #                 (self.fgcmPars.parExternalPWVOffsetLoc+
-                #                  self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['pwvUnit'])
-
-                #partialArray[self.fgcmPars.parExternalPWVScaleLoc] = 2.0 * (
-                #    np.sum(deltaMagWeighted[thisObsFitUse[hasExt]] * (
-                #            self.fgcmPars.expPWV[thisObsExpIndex[thisObsFitUse[hasExt]]] *
-                #            dLdPWV[thisObsFitUse[hasExt]] -
-                #            magdLdPWVScale[thisObsBandIndex[thisObsFitUse[hasExt]]])) /
-                #    unitDict['pwvUnit'])
-
-            # PWV -- internal...
-            #noExt, = np.where(~self.fgcmPars.externalPWVFlag[thisObsExpIndex[thisObsFitUse]])
-            #np.add.at(partialArray[self.fgcmPars.parPWVInterceptLoc:
-            #                           (self.fgcmPars.parPWVInterceptLoc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a[noExt],
-            #          deltaMagWeighted[thisObsFitUse[noExt]] * (
-            #        (dLdPWV[thisObsFitUse[noExt]] -
-            #         magdLdPWVIntercept[i1a[noExt],thisObsBandIndex[thisObsFitUse[noExt]]])))
-            #np.multiply.at(partialArray[self.fgcmPars.parPWVInterceptLoc:
-            #                                (self.fgcmPars.parPWVInterceptLoc+
-            #                                 self.fgcmPars.nCampaignNights)],
-            #               i1a[noExt],
-            #               2.0 / unitDict['pwvUnit'])
-
-            #partialArray[self.fgcmPars.parPWVInterceptLoc:
-            #                 (self.fgcmPars.parPWVInterceptLoc+
-            #                  self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['pwvUnit'])
-
-            #np.add.at(partialArray[self.fgcmPars.parPWVSlopeLoc:
-            #                          (self.fgcmPars.parPWVSlopeLoc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a[noExt],
-            #          deltaMagWeighted[thisObsFitUse[noExt]] * (
-            #        (self.fgcmPars.expDeltaUT[thisObsExpIndex[thisObsFitUse[noExt]]]*
-            #         dLdPWV[thisObsFitUse[noExt]] -
-            #         magdLdPWVSlope[i1a[noExt],thisObsBandIndex[thisObsFitUse[noExt]]])))
-            #np.multiply.at(partialArray[self.fgcmPars.parPWVSlopeLoc:
-            #                                (self.fgcmPars.parPWVSlopeLoc+
-            #                                 self.fgcmPars.nCampaignNights)],
-            #               i1a[noExt],
-            #               2.0 / unitDict['pwvSlopeUnit'])
-
-            #partialArray[self.fgcmPars.parPWVSlopeLoc:
-            #                 (self.fgcmPars.parPWVSlopeLoc+
-            #                  self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['pwvSlopeUnit'])
-
-            # Tau -- external
-            #if (self.fgcmPars.hasExternalTau):
-            #    hasExt, = np.where(self.fgcmPars.externalTauFlag[thisObsExpIndex[thisObsFitUse]])
-            #    np.add.at(partialArray[self.fgcmPars.parExternalTauOffsetLoc:
-            #                               (self.fgcmPars.parExternalTauOffsetLoc+
-            #                                self.fgcmPars.nCampaignNights)],
-            #              i1a[hasExt],
-            #              deltaMagWeighted[thisObsFitUse[hasExt]] * (
-            #            (dLdTau[thisObsFitUse[hasExt]] -
-            #             magdLdTauOffset[i1a[hasExt],thisObsBandIndex[thisObsFitUse[hasExt]]])))
-                #np.multiply.at(partialArray[self.fgcmPars.parExternalTauOffsetLoc:
-                #                                (self.fgcmPars.parExternalTauOffsetLoc+
-                #                                 self.fgcmPars.nCampaignNights)],
-                #               i1a[hasExt],
-                #               2.0 / unitDict['tauUnit'])
-                #partialArray[self.fgcmPars.parExternalTauOffsetLoc:
-                #                 (self.fgcmPars.parExternalTauOffsetLoc+
-                #                  self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['tauUnit'])
-                #partialArray[self.fgcmPars.parExternalTauScaleLoc] = 2.0 * (
-                #    np.sum(deltaMagWeighted[thisObsFitUse[hasExt]] * (
-                #            self.fgcmPars.expTau[thisObsExpIndex[thisObsFitUse[hasExt]]] *
-                #            dLdTau[thisObsFitUse[hasExt]] -
-                #            magdLdTauScale[thisObsBandIndex[thisObsFitUse[hasExt]]])) /
-                #    unitDict['tauUnit'])
-
-            # Tau -- internal...
-            #noExt, = np.where(~self.fgcmPars.externalTauFlag[thisObsExpIndex[thisObsFitUse]])
-            #np.add.at(partialArray[self.fgcmPars.parTauInterceptLoc:
-            #                           (self.fgcmPars.parTauInterceptLoc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a[noExt],
-            #          deltaMagWeighted[thisObsFitUse[noExt]] * (
-            #        (dLdTau[thisObsFitUse[noExt]] -
-            #         magdLdTauIntercept[i1a[noExt],thisObsBandIndex[thisObsFitUse[noExt]]])))
-            #np.multiply.at(partialArray[self.fgcmPars.parTauInterceptLoc:
-            #                                (self.fgcmPars.parTauInterceptLoc+
-            #                                 self.fgcmPars.nCampaignNights)],
-            #               i1a[noExt],
-            #               2.0 / unitDict['tauUnit'])
-            #partialArray[self.fgcmPars.parTauInterceptLoc:
-            #                           (self.fgcmPars.parTauInterceptLoc+
-            #                            self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['tauUnit']#)
-
-            #np.add.at(partialArray[self.fgcmPars.parTauSlopeLoc:
-            #                           (self.fgcmPars.parTauSlopeLoc+
-            #                            self.fgcmPars.nCampaignNights)],
-            #          i1a[noExt],
-            #          deltaMagWeighted[thisObsFitUse[noExt]] * (
-            #        (self.fgcmPars.expDeltaUT[thisObsExpIndex[thisObsFitUse[noExt]]]*
-            #         dLdTau[thisObsFitUse[noExt]] -
-            #         magdLdTauSlope[i1a[noExt],thisObsBandIndex[thisObsFitUse[noExt]]])))
-            #np.multiply.at(partialArray[self.fgcmPars.parTauSlopeLoc:
-            #                                (self.fgcmPars.parTauSlopeLoc+
-            #                                 self.fgcmPars.nCampaignNights)],
-            #               i1a[noExt],
-            #               2.0 / unitDict['pwvSlopeUnit'])
-
-            #partialArray[self.fgcmPars.parTauSlopeLoc:
-            #                           (self.fgcmPars.parTauSlopeLoc+
-            #                            self.fgcmPars.nCampaignNights)] *= (2.0 / unitDict['pwvSlopeUnit'])
-
-            # and the washes
-            #i1a=self.fgcmPars.expWashIndex[thisObsExpIndex[thisObsFitUse]]
-
-            #np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
-            #                           (self.fgcmPars.parQESysInterceptLoc +
-            #                            self.fgcmPars.nWashIntervals)],
-            #          i1a,
-            #          deltaMagWeighted[thisObsFitUse] * (
-            #        (1.0 - magdLdWashIntercept[i1a,thisObsBandIndex[thisObsFitUse]])))
-            #np.multiply.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
-            #                                (self.fgcmPars.parQESysInterceptLoc +
-            #                                 self.fgcmPars.nWashIntervals)],
-            #               i1a,
-            #               2.0 / unitDict['qeSysUnit'])
-            #partialArray[self.fgcmPars.parQESysInterceptLoc:
-            #                 (self.fgcmPars.parQESysInterceptLoc +
-            #                  self.fgcmPars.nWashIntervals)] *= 2.0 / unitDict['qeSysUnit']
-
-            #partialArray[self.fgcmPars.parQESysInterceptLoc:
-            #                 (self.fgcmPars.parQESysInterceptLoc +
-            #                  self.fgcmPars.nWashIntervals)] *= (2.0 / unitDict['qeSysUnit'])
-            #np.add.at(partialArray[self.fgcmPars.parQESysSlopeLoc:
-            #                           (self.fgcmPars.parQESysSlopeLoc +
-            #                            self.fgcmPars.nWashIntervals)],
-            #          i1a,
-            #          deltaMagWeighted[thisObsFitUse] * (
-            #        (self.fgcmPars.expMJD[thisObsExpIndex[thisObsFitUse]] -
-            #         self.fgcmPars.washMJDs[i1a]) -
-            #        magdLdWashSlope[i1a,thisObsBandIndex[thisObsFitUse]]))
-            #np.multiply.at(partialArray[self.fgcmPars.parQESysSlopeLoc:
-            #                                (self.fgcmPars.parQESysSlopeLoc +
-            #                                 self.fgcmPars.nWashIntervals)],
-            #               i1a,
-            #               2.0 / unitDict['qeSysSlopeUnit'])
-            #partialArray[self.fgcmPars.parQESysSlopeLoc:
-            #                 (self.fgcmPars.parQESysSlopeLoc +
-            #                  self.fgcmPars.nWashIntervals)] *= (2.0 / unitDict['qeSysSlopeUnit'])
-
-
         # note that this doesn't need locking because we are only accessing
         #   a single array from a single process
         if self.debug:
@@ -918,6 +656,5 @@ class FgcmChisq(object):
         totalArr = snmm.getArray(self.totalHandleDict[thisCore])
         totalArr[:] = totalArr[:] + partialArray
 
-        #print("done")
-        # no return
+        # Nothing to return
         return None
