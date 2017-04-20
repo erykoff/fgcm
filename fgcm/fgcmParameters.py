@@ -18,8 +18,6 @@ from fgcmLUT import FgcmLUTSHM
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
-##FIXME: add logging
-
 class FgcmParameters(object):
     """
     """
@@ -491,13 +489,11 @@ class FgcmParameters(object):
         if self.hasExternalPWV:
             self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
             self.parExternalPWVOffset = pars['PAREXTERNALPWVOFFSET'][0]
-            # FIXME
-            #   need to load external PWV!
+            # FIXME: need to load external PWV!
         if self.hasExternalTau:
             self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
             self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
-            # FIXME
-            #   need to load external Tau!
+            # FIXME: need to load external Tau!
 
         self.compAperCorrPivot = pars['COMPAPERCORRPIVOT'][0]
         self.compAperCorrSlope = pars['COMPAPERCORRSLOPE'][0]
@@ -709,9 +705,10 @@ class FgcmParameters(object):
         # done
 
 
-    ## FIXME? should these be properties?
+    ## MAYBE? should these be properties?
     ##  The problem is that I think I want these pre-computed, though I don't know
-    ##  if that actually helps the performance.  TEST because properties would be great
+    ##  if that actually helps the performance.  TEST because properties would be
+    ##  very convenient
 
     def parsToExposures(self):
         """
@@ -798,62 +795,82 @@ class FgcmParameters(object):
         """
 
         self.fgcmLog.log('DEBUG','Retrieving parameter bounds')
-        
+
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
-        ## FIXME
-        #  want to configure slope ranges
+        ## MAYBE: configure slope ranges?
 
         parLow[self.parPWVInterceptLoc:
-                   self.parPWVInterceptLoc+self.nCampaignNights] = (self.pwvRange[0] + 10.0*0.2) * unitDict['pwvUnit']
+                   self.parPWVInterceptLoc+self.nCampaignNights] = (
+            (self.pwvRange[0] + 10.0*0.2) * unitDict['pwvUnit'])
         parHigh[self.parPWVInterceptLoc:
-                    self.parPWVInterceptLoc+self.nCampaignNights] = (self.pwvRange[1] - 10.0*0.2) * unitDict['pwvUnit']
+                    self.parPWVInterceptLoc+self.nCampaignNights] = (
+            (self.pwvRange[1] - 10.0*0.2) * unitDict['pwvUnit'])
         parLow[self.parPWVSlopeLoc:
-                   self.parPWVSlopeLoc+self.nCampaignNights] = -0.2 * unitDict['pwvSlopeUnit']
+                   self.parPWVSlopeLoc+self.nCampaignNights] = (
+            -0.2 * unitDict['pwvSlopeUnit'])
         parHigh[self.parPWVSlopeLoc:
-                    self.parPWVSlopeLoc+self.nCampaignNights] = 0.2 * unitDict['pwvSlopeUnit']
+                    self.parPWVSlopeLoc+self.nCampaignNights] = (
+            0.2 * unitDict['pwvSlopeUnit'])
         parLow[self.parO3Loc:
-                   self.parO3Loc+self.nCampaignNights] = self.O3Range[0] * unitDict['o3Unit']
+                   self.parO3Loc+self.nCampaignNights] = (
+            self.O3Range[0] * unitDict['o3Unit'])
         parHigh[self.parO3Loc:
-                    self.parO3Loc+self.nCampaignNights] = self.O3Range[1] * unitDict['o3Unit']
+                    self.parO3Loc+self.nCampaignNights] = (
+            self.O3Range[1] * unitDict['o3Unit'])
+
         parLow[self.parTauInterceptLoc:
-                   self.parTauInterceptLoc+self.nCampaignNights] = (self.tauRange[0] + 10.0*0.0025) * unitDict['tauUnit']
+                   self.parTauInterceptLoc+self.nCampaignNights] = (
+            (self.tauRange[0] + 10.0*0.0025) * unitDict['tauUnit'])
         parHigh[self.parTauInterceptLoc:
-                    self.parTauInterceptLoc+self.nCampaignNights] = (self.tauRange[1] - 10.0*0.0025) * unitDict['tauUnit']
+                    self.parTauInterceptLoc+self.nCampaignNights] = (
+            (self.tauRange[1] - 10.0*0.0025) * unitDict['tauUnit'])
         parLow[self.parTauSlopeLoc:
-                   self.parTauSlopeLoc+self.nCampaignNights] = -0.0025 * unitDict['tauSlopeUnit']
+                   self.parTauSlopeLoc+self.nCampaignNights] = (
+            -0.0025 * unitDict['tauSlopeUnit'])
         parHigh[self.parTauSlopeLoc:
-                    self.parTauSlopeLoc+self.nCampaignNights] = 0.0025 * unitDict['tauSlopeUnit']
+                    self.parTauSlopeLoc+self.nCampaignNights] = (
+            0.0025 * unitDict['tauSlopeUnit'])
         parLow[self.parAlphaLoc:
-                   self.parAlphaLoc+self.nCampaignNights] = 0.25 * unitDict['alphaUnit']
+                   self.parAlphaLoc+self.nCampaignNights] = (
+            0.25 * unitDict['alphaUnit'])
         parHigh[self.parAlphaLoc:
-                    self.parAlphaLoc+self.nCampaignNights] = 1.75 * unitDict['alphaUnit']
+                    self.parAlphaLoc+self.nCampaignNights] = (
+            1.75 * unitDict['alphaUnit'])
         if (self.hasExternalPWV):
             parLow[self.parExternalPWVScaleLoc] = 0.5 * unitDict['pwvUnit']
             parHigh[self.parExternalPWVScaleLoc] = 1.5 * unitDict['pwvUnit']
             parLow[self.parExternalPWVOffsetLoc:
-                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = -1.5 * unitDict['pwvUnit']
+                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = (
+                -1.5 * unitDict['pwvUnit'])
             parHigh[self.parExternalPWVOffsetLoc:
-                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = 3.0 * unitDict['pwvUnit']
+                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = (
+                3.0 * unitDict['pwvUnit'])
         if (self.hasExternalTau):
             parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
             parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
             parLow[self.parExternalTauOffsetLoc:
-                       self.parExternalTauOffsetLoc+self.nCampaignNights] = 0.0 * unitDict['tauUnit']
+                       self.parExternalTauOffsetLoc+self.nCampaignNights] = (
+                0.0 * unitDict['tauUnit'])
             parHigh[self.parExternalTauOffsetLoc:
-                        self.parExternalTauOffsetLoc+self.nCampaignNights] = 0.03 * unitDict['tauUnit']
+                        self.parExternalTauOffsetLoc+self.nCampaignNights] = (
+                0.03 * unitDict['tauUnit'])
 
         parLow[self.parQESysInterceptLoc:
-                   self.parQESysInterceptLoc+self.nWashIntervals] = -0.2 * unitDict['qeSysUnit']
+                   self.parQESysInterceptLoc+self.nWashIntervals] = (
+            -0.2 * unitDict['qeSysUnit'])
         parHigh[self.parQESysInterceptLoc:
-                    self.parQESysInterceptLoc+self.nWashIntervals] = 0.05 * unitDict['qeSysUnit']
+                    self.parQESysInterceptLoc+self.nWashIntervals] = (
+            0.05 * unitDict['qeSysUnit'])
         parLow[self.parQESysSlopeLoc:
-                   self.parQESysSlopeLoc+self.nWashIntervals] = -0.001 * unitDict['qeSysSlopeUnit']
+                   self.parQESysSlopeLoc+self.nWashIntervals] = (
+            -0.001 * unitDict['qeSysSlopeUnit'])
         parHigh[self.parQESysSlopeLoc:
-                    self.parQESysSlopeLoc+self.nWashIntervals] = 0.001 * unitDict['qeSysSlopeUnit']
+                    self.parQESysSlopeLoc+self.nWashIntervals] = (
+            0.001 * unitDict['qeSysSlopeUnit'])
 
         # zip these into a list of tuples
         parBounds = zip(parLow,parHigh)
@@ -880,15 +897,6 @@ class FgcmParameters(object):
             unitDict['qeSysSlopeUnit'] = self.washSlopeStepUnits
 
         return unitDict
-
-    ## FIXME: make this a @property
-    #def superStarToExposureCCD(self):
-    #    """
-    #    """
-
-    #    # this should return an array for everything.
-
-    #    pass
 
     @property
     def expCCDSuperStar(self):
@@ -919,38 +927,6 @@ class FgcmParameters(object):
 
         return expApertureCorrection
 
-    ## FIXME: make this a @property
-    #def apertureToCCD(self,expNums=None,expIndices=None):
-    #    """
-    #    """
-
-        ## FIXME: return an array for everything
-
-    #    if (expNums is None and expIndices is None):
-    #        raise ValueError("Must supply *one* of expNums or expIndices")
-    #    if (expNums is not None and expIndices is not None):
-    #        raise ValueError("Must supply one of expNums *or* expIndices")
-
-        ## FIXME: look for missing ones?
-    #    if (expNums is not None):
-    #        _,expIndices = esutil.numpy_util.match(self.expArray,expNums)
-
-        # need to know the band per exposure
-        # and select the correct slope
-
-        ## FIXME: check indices
-
-    #    corrSlopes = np.zeros(expIndices.size,dtype='f8')
-    #    corrSlopes = self.compAperCorrSlope[self.expBandIndex[expIndices]]
-
-    #    aperCorrs = np.zeros(expIndices.size,dtype='f8')
-
-        ## FIXME: clipping to ranges
-
-    #    aperCorrs[:] = (self.compAperCorrSlope[self.expBandIndex[expIndices]] *
-    #                    (self.expSeeingVariable - self.compAperCorrPivot[self.expBandIndex[expIndices]]))
-
-    #    return aperCorrs
 
     def plotParameters(self):
         """
