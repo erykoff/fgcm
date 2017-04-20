@@ -27,7 +27,8 @@ zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
               'CANNOT_COMPUTE_ZEROPOINT':2**4,
               'TOO_FEW_STARS_ON_CCD':2**5}
 
-logDict = {'INFO':1,
+logDict = {'NONE':0,
+           'INFO':1,
            'DEBUG':2}
 
 def resourceUsage(where):
