@@ -352,9 +352,15 @@ class FgcmGray(object):
 
         self.fgcmLog.log('INFO','Computed CCDGray for %d CCDs' % (gd.size))
 
+        # set illegalValue for totally bad CCDs
+        bad = np.where(ccdNGoodStars < 2)
+        ccdGray[bad] = self.illegalValue
+        ccdGrayRMS[bad] = self.illegalValue
+        ccdGrayErr[bad] = self.illegalValue
+
         # check for infinities
         bad=np.where(~np.isfinite(ccdGrayRMS))
-        ccdGrayRMS[bad] = 0.0
+        ccdGrayRMS[bad] = self.illegalValue
 
         # and the ccdNGoodTilings...
         ccdNGoodTilings[gd] = (ccdNGoodObs[gd].astype(np.float64) /
@@ -467,13 +473,19 @@ class FgcmGray(object):
                   ccdNGoodStars[goodCCD])
 
         # need at least 3 or else computation can blow up
-        ## FIXME: put illegal value as filler!
-
         gd, = np.where(expNGoodCCDs > 2)
         expGray[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
+
+        # set illegal value for non-measurements
+        bad, = np.where(expNGoodCCDs < 2)
+        expGray[bad] = self.illegalValue
+        expGrayRMS[bad] = self.illegalValue
+        expGrayErr[bad] = self.illegalValue
+        expNGoodTilings[bad] = self.illegalValue
+
 
         self.fgcmPars.compExpGray[:] = expGray
         self.fgcmPars.compVarGray[gd] = expGrayRMS[gd]**2.
