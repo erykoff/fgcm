@@ -21,6 +21,10 @@ class FgcmGray(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
+        self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing fgcmGray')
+
         # need fgcmPars because it tracks good exposures
         #  also this is where the gray info is stored
         self.fgcmPars = fgcmPars
@@ -72,7 +76,7 @@ class FgcmGray(object):
 
         self.sigFgcm = np.zeros(self.fgcmPars.nBands,dtype='f8')
 
-    def computeExpGrayForInitialSelection(self,noPlots=False):
+    def computeExpGrayForInitialSelection(self,doPlots=True):
         """
         """
         if (not self.fgcmStars.magStdComputed):
@@ -80,6 +84,8 @@ class FgcmGray(object):
 
         # Note this computes ExpGray for all exposures, good and bad
 
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Computing ExpGray for initial selection')
 
         # useful numbers
         expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
@@ -162,8 +168,12 @@ class FgcmGray(object):
         expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expNGoodStarForInitialSelection[gd]) -
                                              (expGrayForInitialSelection[gd])**2.)
 
+        self.fgcmLog.log('INFO','ExpGray for initial selection computed for %d exposures.' %
+                         (gd.size))
+        self.fgcmLog.log('INFO','Computed ExpGray for initial selection in %.2f seconds.' %
+                         (time.time() - startTime))
 
-        if (noPlots):
+        if (not doPlots):
             return
 
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
@@ -171,6 +181,8 @@ class FgcmGray(object):
                          (expGrayForInitialSelection > self.expGrayInitialCut))
 
         for i in xrange(self.fgcmPars.nBands):
+            self.fgcmLog.log('DEBUG','Making EXP_GRAY (initial) histogram for %s band' %
+                             (self.fgcmPars.bands[i]))
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
 
             if (inBand.size == 0) :
@@ -200,12 +212,15 @@ class FgcmGray(object):
                                                           self.fgcmPars.bands[i]))
 
 
-    def computeCCDAndExpGray(self,noPlots=False):
+    def computeCCDAndExpGray(self,doPlots=True):
         """
         """
 
         if (not self.fgcmStars.allMagStdComputed):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
+
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Computing CCDGray and ExpGray.')
 
         # Note: this computes the gray values for all exposures, good and bad
 
@@ -335,6 +350,8 @@ class FgcmGray(object):
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
+        self.fgcmLog.log('INFO','Computed CCDGray for %d CCDs' % (gd.size))
+
         # check for infinities
         bad=np.where(~np.isfinite(ccdGrayRMS))
         ccdGrayRMS[bad] = 0.0
@@ -383,13 +400,13 @@ class FgcmGray(object):
                                               np.median(EGrayErr2[b[sigUse]]))
 
             if (not np.isfinite(self.sigFgcm[bandIndex])):
-                print("Failed to compute sigFgcm (%s).  Setting to 0.05?" %
-                      (self.fgcmPars.bands[bandIndex]))
+                self.fgcmLog.log('INFO',"Failed to compute sigFgcm (%s).  Setting to 0.05?" %
+                                 (self.fgcmPars.bands[bandIndex]))
 
-            print("sigFgcm (%s) = %.4f" % (self.fgcmPars.bands[bandIndex],
-                                            self.sigFgcm[bandIndex]))
+            self.fgcmLog.log('INFO',"sigFgcm (%s) = %.4f" % (self.fgcmPars.bands[bandIndex],
+                                                             self.sigFgcm[bandIndex]))
 
-            if (noPlots):
+            if (not doPlots):
                 continue
 
             ax.tick_params(axis='both',which='major',labelsize=14)
@@ -407,8 +424,6 @@ class FgcmGray(object):
             fig.savefig('%s/%s_sigfgcm_%s.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle,
                                                   self.fgcmPars.bands[bandIndex]))
-            ## FIXME: add plots
-
 
 
         # group CCD by Exposure and Sum
@@ -416,6 +431,9 @@ class FgcmGray(object):
         goodCCD = np.where((ccdNGoodStars >= self.minStarPerCCD) &
                            (ccdGrayErr > 0.0) &
                            (ccdGrayErr < self.maxCCDGrayErr))
+
+        self.fgcmLog.log('INFO','For ExpGray, found %d good CCDs' %
+                         (goodCCD[0].size))
 
         # note: goodCCD[0] refers to the expIndex, goodCCD[1] to the CCDIndex
 
@@ -463,7 +481,11 @@ class FgcmGray(object):
 
         ##  per band we plot the expGray for photometric exposures...
 
-        if (noPlots):
+        self.fgcmLog.log('INFO','ExpGray computed for %d exposures.' % (gd.size))
+        self.fgcmLog.log('INFO','Computed CCDGray and ExpGray in %.2f seconds.' %
+                         (time.time() - startTime))
+
+        if (not doPlots):
             return
 
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
