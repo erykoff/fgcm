@@ -17,6 +17,7 @@ from fgcmApertureCorrection import FgcmApertureCorrection
 from fgcmExposureSelector import FgcmExposureSelector
 from fgcmFitCycle import FgcmFitCycle
 from fgcmZeropoints import FgcmZeropoints
+from fgcmLogger import FgcmLogger
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
 from desCCDFormat import DESCCDFormatter
