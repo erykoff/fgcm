@@ -28,6 +28,11 @@ class FgcmRetrieval(object):
     """
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
+
+        self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing FgcmRetrieval')
+
         self.fgcmPars = fgcmPars
 
         self.fgcmStars = fgcmStars
@@ -61,6 +66,9 @@ class FgcmRetrieval(object):
 
         if (not self.fgcmStars.magStdComputed):
             raise ValueError("Must run fgcmChisq before fgcmRetrieval.")
+
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Computing retrieved integrals')
 
         # reset arrays
         r0 = snmm.getArray(self.r0Handle)
@@ -158,6 +166,9 @@ class FgcmRetrieval(object):
         # which ones can we compute?
         expIndexUse,ccdIndexUse=np.where(nStar >= self.minStarPerCCD)
 
+        self.fgcmLog.log('INFO','Found %d CCDs to compute retrieved integrals.' %
+                         (ccdIndexUse.size))
+
         # and loop, to do the linear algebra solution
         for i in xrange(expIndexUse.size):
             try:
@@ -165,6 +176,9 @@ class FgcmRetrieval(object):
                                                               ccdIndexUse[i]]),
                                     RHS[:,expIndexUse[i],ccdIndexUse[i]])
             except:
+                # FIXME: write exposure number, ccd number not index
+                self.fgcmLog.log('DEBUG','Failed to compute R0, R1 for %d/%d'
+                                 % (expIndexUse[i],ccdIndexUse[i]))
                 continue
 
             r0[expIndexUse[i],ccdIndexUse[i]] = IRetrived[0]
@@ -172,6 +186,8 @@ class FgcmRetrieval(object):
 
 
         # and we're done
+        self.fgcmLog.log('INFO','Computed retrieved integrals in %.2f seconds.' %
+                         (time.time() - startTime))
 
         ## Will look into whether we want to parallelize the matrix ops.
         #if (self.debug) :
