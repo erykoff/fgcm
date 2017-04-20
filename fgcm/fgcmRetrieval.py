@@ -80,12 +80,14 @@ class FgcmRetrieval(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
 
+        objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
         objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
@@ -95,7 +97,18 @@ class FgcmRetrieval(object):
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
 
-        ## FIXME: select good observations of good stars!
+
+        # limit to good observations of calibration stars
+        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
+        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+                              (objFlag == 0))
+
+        #_,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
+        # NOTE: this relies on np.where returning a sorted array.
+        _,goodObs=esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+
+        self.fgcmLog.log('INFO','FgcmRetrieval using %d observations from %d good stars.' %
+                         (goodObs.size,goodStars.size))
 
         IMatrix = np.zeros((2,2,self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
         RHS = np.zeros((2,self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
@@ -108,15 +121,16 @@ class FgcmRetrieval(object):
         # compute deltaMag and error
         deltaMag = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
         deltaMagErr2 = np.zeros_like(deltaMag)
-        deltaMag[obsIndex] = (obsMagADU[obsIndex] -
-                              objMagStdMean[obsObjIDIndex[obsIndex],
-                                            obsBandIndex[obsIndex]] +
-                              self.fgcmPars.expQESys[obsExpIndex])
-        deltaMagErr2[obsIndex] = (obsMagErr[obsIndex]**2. +
-                                  objMagStdMeanErr[obsObjIDIndex[obsIndex],
-                                                   obsBandIndex[obsIndex]]**2.)
+        deltaMag[obsIndex[goodObs]] = (obsMagADU[obsIndex[goodObs]] -
+                                 objMagStdMean[obsObjIDIndex[obsIndex[goodObs]],
+                                               obsBandIndex[obsIndex[goodObs]]] +
+                                 self.fgcmPars.expQESys[obsExpIndex[goodObs]])
+        deltaMagErr2[obsIndex[goodObs]] = (obsMagErr[obsIndex[goodObs]]**2. +
+                                     objMagStdMeanErr[obsObjIDIndex[obsIndex[goodObs]],
+                                                      obsBandIndex[obsIndex[goodObs]]]**2.)
 
         # and put in flux units
+        # these can work on the full array, even if they're bad.
         fObs = 10.**(-0.4*deltaMag)
         fObsErr2 = deltaMagErr2 * ((2.5/np.log(10.)) * fObs)**2.
         deltaStd = (1.0 + objSEDSlope[obsObjIDIndex[obsIndex],
@@ -136,32 +150,38 @@ class FgcmRetrieval(object):
         # RHS[1] = sum ((F'_nu * f^obs / (sigma_f^2 * deltaStd))
 
         np.add.at(IMatrix,
-                  (0,0,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  1./deltaStdWeight[obsIndex])
+                  (0,0,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  1./deltaStdWeight[obsIndex[goodObs]])
         np.add.at(IMatrix,
-                  (0,1,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  objSEDSlope[obsObjIDIndex[obsIndex],
-                              obsBandIndex[obsIndex]] / deltaStdWeight[obsIndex])
+                  (0,1,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  objSEDSlope[obsObjIDIndex[obsIndex[goodObs]],
+                              obsBandIndex[obsIndex[goodObs]]] /
+                  deltaStdWeight[obsIndex[goodObs]])
         np.add.at(IMatrix,
-                  (1,0,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  objSEDSlope[obsObjIDIndex[obsIndex],
-                              obsBandIndex[obsIndex]] / deltaStdWeight[obsIndex])
+                  (1,0,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  objSEDSlope[obsObjIDIndex[obsIndex[goodObs]],
+                              obsBandIndex[obsIndex[goodObs]]] /
+                  deltaStdWeight[obsIndex[goodObs]])
         np.add.at(IMatrix,
-                  (1,1,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  objSEDSlope[obsObjIDIndex[obsIndex],
-                              obsBandIndex[obsIndex]]**2. / deltaStdWeight[obsIndex])
+                  (1,1,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  objSEDSlope[obsObjIDIndex[obsIndex[goodObs]],
+                              obsBandIndex[obsIndex[goodObs]]]**2. /
+                  deltaStdWeight[obsIndex[goodObs]])
         np.add.at(nStar,
-                  (obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
+                  (obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
                   1)
 
         np.add.at(RHS,
-                  (0,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  fObs[obsIndex] / (fObsErr2[obsIndex] * deltaStd[obsIndex]))
+                  (0,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  fObs[obsIndex[goodObs]] / (fObsErr2[obsIndex[goodObs]] *
+                                             deltaStd[obsIndex[goodObs]]))
         np.add.at(RHS,
-                  (1,obsExpIndex[obsIndex],obsCCDIndex[obsIndex]),
-                  objSEDSlope[obsObjIDIndex[obsIndex],
-                              obsBandIndex[obsIndex]] * fObs[obsIndex] /
-                  (fObsErr2[obsIndex] * deltaStd[obsIndex]))
+                  (1,obsExpIndex[obsIndex[goodObs]],obsCCDIndex[obsIndex[goodObs]]),
+                  objSEDSlope[obsObjIDIndex[obsIndex[goodObs]],
+                              obsBandIndex[obsIndex[goodObs]]] *
+                  fObs[obsIndex[goodObs]] /
+                  (fObsErr2[obsIndex[goodObs]] *
+                   deltaStd[obsIndex[goodObs]]))
 
         # which ones can we compute?
         expIndexUse,ccdIndexUse=np.where(nStar >= self.minStarPerCCD)
