@@ -164,7 +164,10 @@ class FgcmFitCycle(object):
         self.fgcmPars.saveParFile(outParFile)
 
         # Save yaml for input to next fit cycle
-        ## FIXME: Write this code
+        outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
+                                                      self.fgcmConfig.outfileBase,
+                                                      self.fgcmConfig.cycleNumber+1)
+        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile)
 
     def _doFit(self,doPlots=True):
         """
