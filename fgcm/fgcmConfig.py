@@ -290,7 +290,7 @@ class FgcmConfig(object):
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)
-            
+
 
 #        confDict = {'exposureFile':self.exposureFile,
 #                    'ccdOffsetFile':self.ccdOffsetFile,
