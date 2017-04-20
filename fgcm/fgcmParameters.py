@@ -33,7 +33,7 @@ class FgcmParameters(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.plotPath = fgcmConfig.plotPath
 
-        self.fgcmLog = self.fgcmConfig.fgcmLog
+        self.fgcmLog = fgcmConfig.fgcmLog
 
         self.fgcmLog.log('INFO','Initializing FgcmParameters...')
 
