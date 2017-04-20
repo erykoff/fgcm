@@ -20,6 +20,9 @@ class FgcmSuperStarFlat(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
 
+        self.fgcmLog = fgcmConfig.fgcmLog
+        self.fgcmLog.log('INFO','Initializing FgcmSuperStarFlat')
+
         self.fgcmPars = fgcmPars
 
         self.fgcmGray = fgcmGray
@@ -31,9 +34,12 @@ class FgcmSuperStarFlat(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.epochNames = fgcmConfig.epochNames
 
-    def computeSuperStarFlats(self):
+    def computeSuperStarFlats(self,doPlots=True):
         """
         """
+
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Computing superstarflats')
 
         ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
 
@@ -51,6 +57,8 @@ class FgcmSuperStarFlat(object):
         gd,=np.where(self.fgcmPars.expFlag[expIndexUse] == 0)
         expIndexUse=expIndexUse[gd]
         ccdIndexUse=ccdIndexUse[gd]
+
+        self.fgcmLog.log('INFO','SuperStarFlats based on %d exposures' % (gd.size))
 
         # sum up ccdGray values
         np.add.at(deltaSuperStarFlat,
@@ -73,12 +81,16 @@ class FgcmSuperStarFlat(object):
 
         ## FIXME: change fgcmGray to remove the deltaSuperStarFlat!
 
-        self.plotSuperStarFlats(deltaSuperStarFlat,
-                                nCCDArray=deltaSuperStarFlatNCCD,
-                                name='deltasuperstar')
-        self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat,
-                                nCCDArray=deltaSuperStarFlatNCCD,
-                                name='superstar')
+        self.fgcmLog.log('INFO','Computed SuperStarFlats in %.2f seconds.' %
+                         (time.time() - startTime))
+
+        if (doPlots):
+            self.plotSuperStarFlats(deltaSuperStarFlat,
+                                    nCCDArray=deltaSuperStarFlatNCCD,
+                                    name='deltasuperstar')
+            self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat,
+                                    nCCDArray=deltaSuperStarFlatNCCD,
+                                    name='superstar')
 
         # and we're done.
 
@@ -157,12 +169,7 @@ class FgcmSuperStarFlat(object):
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
 
-                #fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
-                #                                              self.outfileBase,
-                #                                              self.cycleNumber,
-                #                                              name,
-                #                                              self.fgcmPars.bands[j],
-                #                                              self.epochNames[i]))
+
                 fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
                                                     self.outfileBaseWithCycle,
                                                     name,
