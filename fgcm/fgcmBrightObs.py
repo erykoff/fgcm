@@ -28,17 +28,17 @@ class FgcmBrightObs(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
+        self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing FgcmBrightObs')
+
         # need fgcmPars because it tracks good exposures
         self.fgcmPars = fgcmPars
-        #self.fgcmLUT = fgcmLUT
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
 
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
-
-        #self.fgcmChisq = FgcmChisq(fgcmConfig,fgcmPars,fgcmStars,fgcmLUT)
-
         self.nCore = fgcmConfig.nCore
 
     def selectGoodStars(self,debug=False,computeSEDSlopes=False):
@@ -48,21 +48,12 @@ class FgcmBrightObs(object):
         if (not self.fgcmStars.magStdComputed):
             raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
 
+        startTime=time.time()
+        self.fgcmLog.log('INFO','Selecting good stars from Bright Observations')
 
         self.debug = debug
         self.computeSEDSlopes = computeSEDSlopes
 
-        ## FIXME: require this be previously run?
-        #parArray = fgcmPars.getParArray(fitterUnits=False)
-        #_ = self.fgcmChisq(parArray,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False)
-
-
-        # create a link between the exposures and observations
-        #a,b=esutil.numpy_util.match(self.fgcmPars.expArray,
-        #                            snmm.getArray(self.fgcmStars.obsExpHandle)[:])
-        #self.obsExpIndexHandle = snmm.createArray(a.size,dtype='i4')
-        #self.obsExpIndexHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='i4')
-        #snmm.getArray(self.obsExpIndexHandle)[b] = a
 
         # reset numbers
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
@@ -74,18 +65,16 @@ class FgcmBrightObs(object):
         if (self.debug) :
             for goodStar in goodStars:
                 self._worker(goodStar)
-#            for i in xrange(self.fgcmStars.nStars):
-#                self._worker(i)
-
         else:
+            self.fgcmLog.log('INFO','Running BrightObs on %d cores' % (self.nCore))
             pool = Pool(processes=self.nCore)
-            #pool.map(self._worker,np.arange(self.fgcmStars.nStars))
             pool.map(self._worker,goodStars)
             pool.close()
             pool.join()
 
-        # free shared arrays
-        #snmm.freeArray(self.obsExpIndexHandle)
+        self.fgcmLog.log('INFO','Finished BrightObs in %.2f seconds.' %
+                         (time.time() - startTime))
+
 
     def _worker(self,objIndex):
         """
@@ -108,7 +97,6 @@ class FgcmBrightObs(object):
         gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
 
         thisObsIndex=thisObsIndex[gd]
-        #thisObsExpIndex = thisObsExpIndex[gd]
         thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
@@ -144,5 +132,5 @@ class FgcmBrightObs(object):
 
         if (self.computeSEDSlopes):
             self.fgcmStars.computeObjectSEDSlope(objIndex)
-            
+
         # and we're done
