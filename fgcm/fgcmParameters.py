@@ -18,6 +18,8 @@ from fgcmLUT import FgcmLUTSHM
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
+##FIXME: add logging
+
 class FgcmParameters(object):
     """
     """
@@ -31,12 +33,17 @@ class FgcmParameters(object):
         self.outfileBase = fgcmConfig.outfileBase
         self.plotPath = fgcmConfig.plotPath
 
+        self.fgcmLog = self.fgcmConfig.fgcmLog
+
+        self.fgcmLog.log('INFO','Initializing FgcmParameters...')
+
         #if (fgcmConfig is not None):
         #    self._initializeParameters(fgcmConfig)
         if (parFile is not None):
             self._loadParFile(fgcmConfig,parFile)
         else:
             self._initializeParameters(fgcmConfig)
+
 
     def _initializeParameters(self, fgcmConfig):
         """
@@ -112,6 +119,7 @@ class FgcmParameters(object):
 
         self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
         if (fgcmConfig.pwvFile is not None):
+            self.fgcmLog.log('INFO','Found external PWV file.')
             self.pwvFile = fgcmConfig.pwvFile
             self.hasExternalPWV = True
             self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
@@ -121,6 +129,7 @@ class FgcmParameters(object):
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if (fgcmConfig.tauFile is not None):
+            self.fgcmLog.log('INFO','Found external tau file.')
             self.tauFile = fgcmConfig.tauFile
             self.hasExternalTau = True
             self.loadExternalTau()
@@ -231,6 +240,8 @@ class FgcmParameters(object):
 
         self.nExp = fgcmConfig.nExp
 
+        self.fgcmLog.log('INFO','Loading info on %d exposures.' % (self.nExp))
+
         self.expArray = expInfo['EXPNUM']
         self.expFlag = np.zeros(self.nExp,dtype=np.int8)
         self.expExptime = expInfo['EXPTIME']
@@ -243,6 +254,8 @@ class FgcmParameters(object):
         mjdForNight = np.floor(self.expMJD + fgcmConfig.UTBoundary).astype(np.int32)
         self.campaignNights = np.unique(mjdForNight)
         self.nCampaignNights = self.campaignNights.size
+
+        self.fgcmLog.log('INFO','Exposures taken on %d nights.' % (self.nCampaignNights))
 
         self.expDeltaUT = (self.expMJD + fgcmConfig.UTBoundary) - mjdForNight
 
@@ -286,7 +299,7 @@ class FgcmParameters(object):
 
         bad,=np.where(self.expBandIndex < 0)
         if (bad.size > 0):
-            print("Warning: %d exposures with band not in LUT!" % (bad.size))
+            self.fgcmLog.log('INFO','***Warning: %d exposures with band not in LUT!' % (bad.size))
             self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
 
         # flag those that have extra bands
@@ -320,17 +333,13 @@ class FgcmParameters(object):
 
         # and set up the wash mjds and link indices
         # the first "washMJD" is set to the first exposure date.
-        #self.washMJDs = np.concatenate([[np.min(self.expMJD)-1.0],fgcmConfig.washMJDs])
-        #self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
         # the number of *intervals* is one less than the dates?
-        #self.nWashIntervals = self.washMJDs.size-1
 
         self.nWashIntervals = fgcmConfig.washMJDs.size+1
         self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
 
         self.expWashIndex = np.zeros(self.nExp,dtype='i4')
         tempWashMJDs = self.washMJDs
-        #tempWashMJDs = np.insert(tempWashMJDs,0,0.0)
         tempWashMJDs = np.append(tempWashMJDs,1e10)
 
         # record the range in each to get typical length of wash epoch
@@ -363,11 +372,14 @@ class FgcmParameters(object):
         deltaMagTau = (2.5*np.log10(np.exp(-secZenithStd*LUT.tauStd)) -
                        2.5*np.log10(np.exp(-secZenithStd*(LUT.tauStd+1.0))))
         self.tauStepUnits = np.abs(deltaMagTau) / self.stepUnitReference / self.stepGrain
+        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
 
         # and the tau slope units
         self.tauSlopeStepUnits = self.tauStepUnits * self.meanNightDuration
+        self.fgcmLog.log('INFO','tau slope step unit set to %f' % (self.tauSlopeStepUnits))
 
         # alpha units -- reference to g, or r if not available
+        ## FIXME: will need to allow band names other than g, r
         bandIndex,=np.where(self.bands == 'g')
         if bandIndex.size == 0:
             bandIndex,=np.where(self.bands == 'r')
@@ -383,6 +395,7 @@ class FgcmParameters(object):
                       (self.fitBands == 'g') |
                       (self.fitBands == 'r'))
         self.alphaStepUnits *= float(use.size) / float(self.nFitBands)
+        self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.alphaStepUnits))
 
         # pwv units -- reference to z
         bandIndex,=np.where(self.bands == 'z')
@@ -400,9 +413,11 @@ class FgcmParameters(object):
         use,=np.where((self.fitBands == 'z') |
                       (self.fitBands == 'Y'))
         self.pwvStepUnits *= float(use.size) / float(self.nFitBands)
+        self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
 
         # PWV slope units
         self.pwvSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration
+        self.fgcmLog.log('INFO','pwv slope step unit set to %f' % (self.pwvSlopeStepUnits))
 
         # O3 units -- reference to r
         bandIndex,=np.where(self.bands == 'r')
@@ -419,10 +434,13 @@ class FgcmParameters(object):
         # scale by fraction of bands that are affected
         use,=np.where((self.fitBands == 'r'))
         self.o3StepUnits *= float(use.size) / float(self.nFitBands)
+        self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.o3StepUnits))
 
         # wash parameters units...
         self.washStepUnits = 1.0/self.stepUnitReference / self.stepGrain
         self.washSlopeStepUnits = self.washStepUnits / self.meanWashIntervalDuration
+        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
+        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washSlopeStepUnits))
 
 
     def _loadParFile(self, fgcmConfig, parFile):
@@ -430,6 +448,8 @@ class FgcmParameters(object):
         """
         # read in the parameter file...
         # need to decide on a format
+
+        self.fgcmLog.log('INFO','Loading parameters from %s' % (parFile))
 
         parInfo=fitsio.read(parFile,ext='PARINFO')
         self.nCCD = parInfo['NCCD'][0]
@@ -500,6 +520,8 @@ class FgcmParameters(object):
         """
         # save the parameter file...
         # need to decide on a format
+
+        self.fgcmLog.log('INFO','Saving parameters to %s' % (parFile))
 
         dtype=[('NCCD','i4'),
                ('BANDS','a2',self.bands.size),
@@ -633,6 +655,9 @@ class FgcmParameters(object):
         self.parExternalPWVOffset = np.zeros(self.nCampaignNights,dtype=np.float32)
         self.parExternalPWVScale = 1.0
 
+        match, = np.where(self.externalPWVFlag)
+        self.fgcmLog.log('INFO','%d exposures of %d have external pwv values' % (match.size,self.nExp))
+
 
     def loadExternalTau(self, withAlpha=False):
         """
@@ -644,33 +669,14 @@ class FgcmParameters(object):
         if (withAlpha):
             self.hasExternalAlpha = True
 
-    ## FIXME: make this a setter!
     def reloadParArray(self, parArray, fitterUnits=False):
         """
         """
         # takes in a parameter array and loads the local split copies?
+        self.fgcmLog.log('DEBUG','Reloading parameter array')
 
         if (parArray.size != self.nFitPars):
             raise ValueError("parArray must have %d elements." % (self.nFitPars))
-
-        #if (fitterUnits):
-        #    pwvUnit = self.pwvStepUnits
-        #    pwvSlopeUnit = self.pwvSlopeStepUnits
-        #    o3Unit = self.o3StepUnits
-        #    tauUnit = self.tauStepUnits
-        #    tauSlopeUnit = self.tauSlopeStepUnits
-        #    alphaUnit = self.alphaUnits
-        #    qeSysUnit = self.washStepUnits
-        #    qeSysSlopeUnit = self.washSlopeStepUnits
-        #else:
-        #    pwvUnit = 1.0
-        #    pwvSlopeUnit = 1.0
-        #    o3Unit = 1.0
-        #    tauUnit = 1.0
-        #    tauSlopeUnit = 1.0
-        #    alphaUnit = 1.0
-        #    qeSysUnit = 1.0
-        #    qeSysSlopeUnit = 1.0
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
@@ -711,6 +717,8 @@ class FgcmParameters(object):
         """
         """
 
+        self.fgcmLog.log('DEBUG','Computing exposure values from parameters')
+
         # I'm guessing that these don't need to be wrapped in shms but I could be wrong
         #  about the full class, which would suck.
 
@@ -745,12 +753,14 @@ class FgcmParameters(object):
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
 
     # cannot be a property because of the keywords
-    def getParArray(self,bounds=False,fitterUnits=False):
+    def getParArray(self,fitterUnits=False):
         """
         """
+
+        self.fgcmLog.log('DEBUG','Retrieving parameter array')
+
         # extracts parameters into a linearized array
-        # also returns bounds if bounds=True
-        parArray = np.zeros(self.nFitPars,dtype=np.float32)
+        parArray = np.zeros(self.nFitPars,dtype=np.float64)
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
@@ -786,6 +796,9 @@ class FgcmParameters(object):
     def getParBounds(self,fitterUnits=False):
         """
         """
+
+        self.fgcmLog.log('DEBUG','Retrieving parameter bounds')
+        
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
@@ -942,6 +955,8 @@ class FgcmParameters(object):
     def plotParameters(self):
         """
         """
+
+        ## FIXME: write the plotting routine
 
         # plot the parameters in a reasonably nice format
         # calls a bunch of sub-plotting routines, why not
