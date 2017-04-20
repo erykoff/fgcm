@@ -24,7 +24,8 @@ class FgcmLogger(object):
     def log(self,logType,logString):
 
         if (logDict[logType] <= logDict[self.logLevel]):
-            f.write(logString)
+            self.logF.write(logString)
+            self.logF.flush()
             print(logString)
 
     def stopLogging(self):
