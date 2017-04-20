@@ -129,7 +129,8 @@ class FgcmApertureCorrection(object):
                                                        self.outfileBaseWithCycle,
                                                        self.fgcmPars.bands[i]))
 
-        ## FIXME: modify ccd gray and exp gray?
+        ## MAYBE: modify ccd gray and exp gray?
+        ##  could rely on the iterations taking care of this.
 
         self.fgcmLog.log('INFO','Computed aperture corrections in %.2f seconds.' %
                          (time.time() - startTime))
