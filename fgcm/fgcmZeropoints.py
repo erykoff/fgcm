@@ -297,7 +297,7 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
-        ## FIXME: plots?  what plots would be interesting?
+        ## MAYBE: plots?  what plots would be interesting?
 
         # and save...
         outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
