@@ -7,6 +7,7 @@ import sys
 import yaml
 
 from fgcmUtilities import _pickle_method
+from fgcmLogger import FgcmLogger
 
 import types
 import copy_reg
