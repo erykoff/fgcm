@@ -70,8 +70,8 @@ class FgcmFitCycle(object):
         # Apply aperture corrections and SuperStar if available
         # select exposures...
         if (not initialCycle):
-            ## FIXME: write code to apply aperture corrections and superstar flats
-
+            self.fgcmStars.applySuperStarFlat(self.fgcmPars)
+            self.fgcmStars.applyApertureCorrection(self.fgcmPars)
 
             # and flag exposures using quantities computed from previous cycle
             self.fgcmLog.log('DEBUG','Running selectGoodExposures()')
