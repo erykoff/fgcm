@@ -35,7 +35,7 @@ class FgcmConfig(object):
                       'minExpPerNight','expGrayInitialCut','expVarGrayPhotometricCut',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut','expGrayErrRecoverCut',
-                      'sigma0Cal']
+                      'sigma0Cal','logLevel']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -92,6 +92,7 @@ class FgcmConfig(object):
         self.sigFgcmMaxEGray = float(configDict['sigFgcmMaxEGray'])
         self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
         self.sigma0Cal = float(configDict['sigma0Cal'])
+        self.logLevel = configDict['logLevel']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -158,6 +159,11 @@ class FgcmConfig(object):
         # check the cut values
 
         self.outfileBaseWithCycle = '%s_cycle%02d' % (self.outfileBase, self.cycleNumber)
+
+        # set up logger are we get the name...
+        self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
+                                                 self.outfileBaseWithCycle),
+                                  self.logLevel)
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
         #                                            self.cycleNumber)
