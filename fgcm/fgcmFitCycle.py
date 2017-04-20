@@ -7,6 +7,8 @@ import sys
 import esutil
 import scipy.optimize as optimize
 
+import matplotlib.pyplot as plt
+
 from fgcmConfig import FgcmConfig
 from fgcmParameters import FgcmParameters
 from fgcmChisq import FgcmChisq
@@ -164,17 +166,20 @@ class FgcmFitCycle(object):
         # Save yaml for input to next fit cycle
         ## FIXME: Write this code
 
-    def _doFit(self):
+    def _doFit(self,doPlots=True):
         """
         """
 
         self.fgcmLog.log('INFO','Performing fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
-        
+
         # get the initial parameters
         parInitial = self.fgcmPars.getParArray(fitterUnits=True)
         # and the fit bounds
         parBounds = self.fgcmPars.getParBounds(fitterUnits=True)
+
+        # reset the chisq list (for plotting)
+        self.fgcmChisq.resetFitChisqList()
 
         pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                    parInitial,       # initial guess
@@ -190,7 +195,19 @@ class FgcmFitCycle(object):
                                                    iprint=0,         # only one output
                                                    callback=None)    # no callback
 
-        # FIXME: add plotting of chisq
+        if (doPlots):
+            fig=plt.figure(1)
+            ax=fig.add_subplot(111)
+
+            chisqValues = np.array(self.fgcmChisq.fitChisqs)
+
+            ax.plot(np.arange(chisqValues.size),chisqValues,'r.')
+
+            ax.set_xlabel(r'$\mathrm{Iteration}$',fontsize=16)
+            ax.set_ylabel(r'$\chisq/\mathrm{DOF}$',fontsize=16)
+
+            fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
+                                                 self.fgcmConfig.outfileBaseWithCycle))
 
         # save new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
