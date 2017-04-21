@@ -14,6 +14,8 @@ from fgcmParameters import FgcmParameters
 from fgcmChisq import FgcmChisq
 from fgcmStars import FgcmStars
 from fgcmLUT import FgcmLUTSHM
+from fgcmGray import FgcmGray
+from fgcmZeropoints import FgcmZeropoints
 from fgcmSuperStarFlat import FgcmSuperStarFlat
 from fgcmRetrieval import FgcmRetrieval
 from fgcmApertureCorrection import FgcmApertureCorrection
@@ -49,45 +51,47 @@ class FgcmFitCycle(object):
 
 
         # Read in Stars
-        self.fgcmLog.log('DEBUG','Making FgcmStars')
-        self.fgcmStars = FgcmStars(self.fgcmConfig)
+        self.fgcmLog.log('DEBUG','FitCycle is making FgcmStars')
+        self.fgcmStars = FgcmStars(self.fgcmConfig,self.fgcmPars)
 
         # Read in LUT
-        self.fgcmLog.log('DEBUG','Making FgcmLUT')
+        self.fgcmLog.log('DEBUG','FitCycle is making FgcmLUT')
         self.fgcmLUT = FgcmLUTSHM(self.fgcmConfig.lutFile)
 
         # And prepare the chisq function
-        self.fgcmLog.log('DEBUG','Making FgcmChisq')
+        self.fgcmLog.log('DEBUG','FitCycle is making FgcmChisq')
         self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
                                    self.fgcmStars,self.fgcmLUT)
 
         # And the exposure selector
-        self.fgcmLog.log('DEBUG','Making FgcmExposureSelector')
+        self.fgcmLog.log('DEBUG','FitCycle is making FgcmExposureSelector')
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
-        self.fgcmLog.log('DEBUG','Making FgcmGray')
+        self.fgcmLog.log('DEBUG','FitCycle is making FgcmGray')
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
         # Apply aperture corrections and SuperStar if available
         # select exposures...
         if (not initialCycle):
+            self.fgcmLog.log('DEBUG','FitCycle is applying SuperStarFlat')
             self.fgcmStars.applySuperStarFlat(self.fgcmPars)
+            self.fgcmLog.log('DEBUG','FitCycle is applying ApertureCorrection')
             self.fgcmStars.applyApertureCorrection(self.fgcmPars)
 
             # and flag exposures using quantities computed from previous cycle
-            self.fgcmLog.log('DEBUG','Running selectGoodExposures()')
+            self.fgcmLog.log('DEBUG','FitCycle is running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
 
 
 
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-        self.fgcmLog.log('DEBUG','Finding good stars from %d good exposures' % (goodExpsIndex.size))
-        self.fgcmStars.selectStarsMinObs(goodExpsIndex)
+        self.fgcmLog.log('DEBUG','FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
+        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
         # Get m^std, <m^std>, SED for all the stars.
-        parArray = fgcmPars.getParArray(fitterUnits=False)
+        parArray = self.fgcmPars.getParArray(fitterUnits=False)
         if (not initialCycle):
             # get the SED from the chisq function
             self.fgcmChisq(parArray,computeSEDSlopes=True)
@@ -131,31 +135,42 @@ class FgcmFitCycle(object):
         self._doFit()
 
         # One last run to compute mstd all observations of all exposures
+        self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
 
         # Compute CCD^gray and EXP^gray
-        fgcmGray.computeCCDAndExpGray()
+        self.fgcmLog.log('DEBUG','FitCycle computing Exp and CCD Gray')
+        self.fgcmGray.computeCCDAndExpGray()
 
         # Re-flag exposures for superstar, aperture, etc.
+        self.fgcmLog.log('DEBUG','FitCycle re-selecting good exposures')
         self.expSelector.selectGoodExposures()
 
         # Compute Retrieved chromatic integrals
-        retrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,self.fgcmLUT)
-        retrieval.computeRetrievedIntegrals()
+        self.fgcmLog.log('DEBUG','FitCycle computing retrieved R0/R1')
+        self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,
+                                           self.fgcmStars,self.fgcmLUT)
+        self.fgcmRetrieval.computeRetrievedIntegrals()
 
         # Compute SuperStar Flats
+        self.fgcmLog.log('DEBUG','FitCycle computing SuperStarFlats')
         superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         superStarFlat.computeSuperStarFlats()
 
         # Compute Aperture Corrections
+        self.fgcmLog.log('DEBUG','FitCycle computing ApertureCorrections')
         aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         aperCorr.computeApertureCorrections()
 
-        ## FIXME:
-        # I think we need to apply the superstar flats and aperture corrections to the Grays...automatically?
+        ## MAYBE:
+        #   apply superstar and aperture corrections to grays
+        #   if we don't the zeropoints before convergence will be wrong.
 
-        # Make Zeropoints
-        fgcmZpts = FgcmZeropoints(fgcmConfig,fgcmPars,fgcmLUT,fgcmGray,fgcmRetrieval)
+        # Make Zeropoints -- save also
+        self.fgcmLog.log('DEBUG','FitCycle computing zeropoints.')
+        fgcmZpts = FgcmZeropoints(self.fgcmConfig,self.fgcmPars,
+                                  self.fgcmLUT,self.fgcmGray,
+                                  self.fgcmRetrieval)
         fgcmZpts.computeZeropoints()
 
         # Save parameters
@@ -198,16 +213,21 @@ class FgcmFitCycle(object):
                                                    iprint=0,         # only one output
                                                    callback=None)    # no callback
 
+        self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+
         if (doPlots):
             fig=plt.figure(1)
+            fig.clf()
             ax=fig.add_subplot(111)
 
             chisqValues = np.array(self.fgcmChisq.fitChisqs)
 
-            ax.plot(np.arange(chisqValues.size),chisqValues,'r.')
+            ax.plot(np.arange(chisqValues.size),chisqValues,'k.')
 
             ax.set_xlabel(r'$\mathrm{Iteration}$',fontsize=16)
-            ax.set_ylabel(r'$\chisq/\mathrm{DOF}$',fontsize=16)
+            ax.set_ylabel(r'$\chi^2/\mathrm{DOF}$',fontsize=16)
+
+            ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
 
             fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
                                                  self.fgcmConfig.outfileBaseWithCycle))
