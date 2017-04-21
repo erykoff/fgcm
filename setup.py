@@ -4,7 +4,8 @@ import glob
 
 exec(open('fgcm/_version.py').read())
 
-scripts = ['scripts/runFgcmFitCycle.py']
+scripts = ['scripts/runFgcmFitCycle.py',
+           'scripts/makeFgcmLUT.py']
 
 setup(
     name='fgcm',
