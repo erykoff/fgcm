@@ -32,12 +32,16 @@ class FgcmMakeStars(object):
         self.starConfig['observationFile'] = self.starConfig['starfileBase']+'_observations.fits'
         self.starConfig['starPrePositionFile'] = self.starConfig['starfileBase']+'_prepositions.fits'
         self.starConfig['obsIndexFile'] = self.starConfig['starfileBase']+'_obs_index.fits'
-        #self.starConfig['starPositionFile'] = self.starConfig['starfileBase']+'_positions.fits'
 
         self.nside=4096
 
-    def run(self):
-        pass
+    def run(self,clobber=False):
+        """
+        """
+
+        self.makeObservationFile(clobber=clobber)
+        self.makeReferenceStars(clobber=clobber)
+        self.makeMatchedStars(clobber=clobber)
 
     def makeObservationFile(self,clobber=False):
         """
@@ -56,6 +60,9 @@ class FgcmMakeStars(object):
 
         # read in the exposure file
         print("Reading in exposure file...")
+
+        ## FIXME: change to new exposure file format!
+
         expInfo = fitsio.read(self.starConfig['exposureFile'],ext=1)
 
         # read in the blacklist file (if available)
@@ -79,6 +86,8 @@ class FgcmMakeStars(object):
         for g in self.starConfig['fileGlobs']:
             files = glob.glob(g)
             inputFiles.extend(files)
+
+        inputFiles.sort()
 
         print("Found %d files." % (len(inputFiles)))
 
@@ -169,7 +178,7 @@ class FgcmMakeStars(object):
                ('RA','f8'),
                ('DEC','f8')]
 
-        print("Matching catalog to neighbors...")
+        print("Matching referenceBand catalog to itself...")
         matches=smatch.match(obsCat['RA'],obsCat['DEC'],self.starConfig['matchRadius']/3600.0,obsCat['RA'],obsCat['DEC'],nside=self.nside,maxmatch=0)
 
         fakeId = np.arange(obsCat.size)
@@ -313,7 +322,7 @@ class FgcmMakeStars(object):
         gd,=np.where(objClass == 1)
 
         print("Writing out %d potential calibration stars." % (gd.size))
-        
+
         fits = fitsio.FITS(self.starConfig['obsIndexFile'],mode='rw',clobber=True)
 
         # note that these are 4-byte integers.
