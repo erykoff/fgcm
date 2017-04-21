@@ -46,14 +46,14 @@ def resourceUsage(where):
         print('Could not find self status.')
     return
 
-def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0):
+def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
     """
     """
 
 
     import esutil
 
-    hist,rev=esutil.stat.histogram(x,binsize=binsize,min=xRange[0],max=xRange[1]-0.0001,rev=True)
+    hist,rev=esutil.stat.histogram(x,binsize=binSize,min=xRange[0],max=xRange[1]-0.0001,rev=True)
     binStruct=np.zeros(hist.size,dtype=[('X_BIN','f4'),
                                         ('X','f4'),
                                         ('X_ERR_MEAN','f4'),
@@ -65,15 +65,15 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0):
     binStruct['X_BIN'] = np.linspace(xRange[0],xRange[1],hist.size)
 
     for i in xrange(hist.size):
-        if (hist[i] >= 10):
+        if (hist[i] >= minPerBin):
             i1a=rev[rev[i]:rev[i+1]]
 
             binStruct['N'][i] = i1a.size
 
-            medYs=np.zeros(ntrial,dtype='f8')
-            medYWidths=np.zeros(ntrial,dtype='f8')
-            medXs=np.zeros(ntrial,dtype='f8')
-            medXWidths=np.zeros(ntrial,dtype='f8')
+            medYs=np.zeros(nTrial,dtype='f8')
+            medYWidths=np.zeros(nTrial,dtype='f8')
+            medXs=np.zeros(nTrial,dtype='f8')
+            medXWidths=np.zeros(nTrial,dtype='f8')
 
             for t in xrange(nTrial):
                 r=(np.random.random(i1a.size)*i1a.size).astype('i4')
