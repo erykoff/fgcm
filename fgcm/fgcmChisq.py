@@ -27,8 +27,6 @@ class FgcmChisq(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
-        #resourceUsage('Start of chisq init')
-
         self.fgcmLog = fgcmConfig.fgcmLog
 
         self.fgcmLog.log('INFO','Initializing FgcmChisq')
@@ -123,7 +121,7 @@ class FgcmChisq(object):
             self.nSums += self.fgcmPars.nFitPars  # one for each parameter
 
         startTime = time.time()
-        
+
         self.debug=debug
         if (self.debug):
             self.totalHandleDict = {}
@@ -287,7 +285,11 @@ class FgcmChisq(object):
             self.fgcmStars.computeObjectSEDSlope(objIndex)
 
         # compute magStd (and record)
-        thisDeltaStd = 2.5 * np.log10((1.0 + objSEDSlope[objIndex,thisObsBandIndex] * thisI10) / (1.0 + objSEDSlope[objIndex,thisObsBandIndex] * self.fgcmLUT.I10Std[thisObsBandIndex]))
+        thisDeltaStd = 2.5 * np.log10((1.0 +
+                                       objSEDSlope[objIndex,thisObsBandIndex] *
+                                       thisI10) /
+                                      (1.0 + objSEDSlope[objIndex,thisObsBandIndex] *
+                                       self.fgcmLUT.I10Std[thisObsBandIndex]))
 
         obsMagStd[thisObsIndex] = thisMagObs + thisDeltaStd
 
