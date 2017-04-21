@@ -132,7 +132,11 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
         # Perform Fit (subroutine)
-        self._doFit()
+        if (self.fgcmConfig.maxIter > 0):
+            self._doFit()
+            self.fgcmPars.plotParameters()
+        else:
+            self.fgcmLog.log('INFO','FitCycle skipping fit because maxIter == 0')
 
         # One last run to compute mstd all observations of all exposures
         self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
@@ -228,9 +232,10 @@ class FgcmFitCycle(object):
             ax.set_ylabel(r'$\chi^2/\mathrm{DOF}$',fontsize=16)
 
             ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
+            ax.set_ylim(chisqValues[-1]-0.5,chisqValues[0]+0.5)
 
             fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
                                                  self.fgcmConfig.outfileBaseWithCycle))
 
-        # save new parameters
+        # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
