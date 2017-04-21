@@ -36,7 +36,8 @@ class FgcmApertureCorrection(object):
         """
 
         startTime=time.time()
-        self.fgcmLog.log('INFO','Computing aperture corrections')
+        self.fgcmLog.log('INFO','Computing aperture corrections with %d bins' %
+                         (self.aperCorrFitNBins))
 
         # need to make a local copy since we're modifying
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
@@ -66,26 +67,36 @@ class FgcmApertureCorrection(object):
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
 
             # sort to set the range...
-            st=np.argsort(expGrayTemp[use])
+            #st=np.argsort(expGrayTemp[use])
+            st=np.argsort(self.fgcmPars.expSeeingVariable[expIndexUse[use]])
             use=use[st]
 
-            self.fgcmPars.compAperCorrRange[0,i] = expSeeingVariable[expIndexUse[use[int(0.02*use.size)]]]
-            self.fgcmPars.compAperCorrRange[1,i] = expSeeingVariable[expIndexUse[use[int(0.98*use.size)]]]
+            self.fgcmPars.compAperCorrRange[0,i] = self.fgcmPars.expSeeingVariable[expIndexUse[use[int(0.02*use.size)]]]
+            self.fgcmPars.compAperCorrRange[1,i] = self.fgcmPars.expSeeingVariable[expIndexUse[use[int(0.98*use.size)]]]
 
             # this will make a rounder number
-            self.fgcmPars.compAperCorrPivot[i] = np.floor(np.median(expSeeingVariable[expIndexUse[use]])*1000)/1000.
+            self.fgcmPars.compAperCorrPivot[i] = np.floor(np.median(self.fgcmPars.expSeeingVariable[expIndexUse[use]])*1000)/1000.
 
             binSize = (self.fgcmPars.compAperCorrRange[1,i] -
                        self.fgcmPars.compAperCorrRange[0,i]) / self.aperCorrFitNBins
 
-            binStruct = dataBinner(self.fgcmPars.expSeeingVariable[use],
-                                   expGrayTemp[use],
+            binStruct = dataBinner(self.fgcmPars.expSeeingVariable[expIndexUse[use]],
+                                   expGrayTemp[expIndexUse[use]],
                                    binSize,
                                    self.fgcmPars.compAperCorrRange[:,i])
-
             # remove any empty bins...
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
+            if (gd.size < 3):
+                self.fgcmLog.log('INFO','Warning: could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
+                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
+
+                continue
+
             binStruct=binStruct[gd]
+
+            # this helps in debugging?
+            binStruct['Y_ERR'] = np.sqrt(binStruct['Y_ERR']**2. + 0.001**2.)
 
             fit,cov = np.polyfit(binStruct['X_BIN'] - self.fgcmPars.compAperCorrPivot[i],
                                  binStruct['Y'],
@@ -93,8 +104,21 @@ class FgcmApertureCorrection(object):
                                  w=(1./binStruct['Y_ERR'])**2.,
                                  cov=True)
 
-            self.fgcmPars.compAperCorrSlope[i] = fit[0]
-            self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
+            if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0])) :
+                self.fgcmLog.log('INFO','Warning: Aperture correction computation failed for band %s' %
+                                 (self.fgcmPars.bands[i]))
+                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
+
+                continue
+            else :
+                self.fgcmPars.compAperCorrSlope[i] = fit[0]
+                self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
+
+                self.fgcmLog.log('INFO','Aperture correction slope in band %s is %.4f +/- %.4f' %
+                                 (self.fgcmPars.bands[i],
+                                  self.fgcmPars.compAperCorrSlope[i],
+                                  self.fgcmPars.compAperCorrSlopeErr[i]))
 
             if (doPlots):
                 fig=plt.figure(1)
@@ -102,9 +126,10 @@ class FgcmApertureCorrection(object):
 
                 ax=fig.add_subplot(111)
 
-                ax.hexbin(self.fgcmPars.expSeeingVariable[use],
-                          expGrayTemp[use],
+                ax.hexbin(self.fgcmPars.expSeeingVariable[expIndexUse[use]],
+                          expGrayTemp[expIndexUse[use]],
                           rasterized=True)
+
                 ax.errorbar(binStruct['X_BIN'],binStruct['Y'],
                             yerr=binStruct['Y_ERR'],fmt='r.',markersize=10)
                 ax.set_xlim(self.fgcmPars.compAperCorrRange[0,i],
@@ -128,6 +153,7 @@ class FgcmApertureCorrection(object):
                 fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle,
                                                        self.fgcmPars.bands[i]))
+
 
         ## MAYBE: modify ccd gray and exp gray?
         ##  could rely on the iterations taking care of this.
