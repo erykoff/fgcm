@@ -415,7 +415,7 @@ class FgcmLUT(object):
         fitsio.write(lutFile,stdVals,extname='STD')
 
     def makeLUTDerivatives(self, lutFile):
-        
+
         # need setup
         # NOTE: will need to add pmb
         self.lutDeriv = np.zeros((self.bands.size,
@@ -433,7 +433,7 @@ class FgcmLUT(object):
                                         ('D_SECZENITH','f4')])
 
         print("Computing derivatives...")
-        
+
         for i in xrange(self.bands.size):
             print("Working on band %s" % (self.bands[i]))
             for j in xrange(self.pwv.size-1):
