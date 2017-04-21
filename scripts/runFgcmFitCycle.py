@@ -8,9 +8,9 @@ import argparse
 import fgcm
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(decription='Code to run FGCM fit cycle')
+    parser = argparse.ArgumentParser(description='Code to run FGCM fit cycle')
 
-    parser.add_argument('-c','--config', action='store', type='str', required=True,
+    parser.add_argument('-c','--config', action='store', type=str, required=True,
                         help='YAML config file')
 
     args = parser.parse_args()
