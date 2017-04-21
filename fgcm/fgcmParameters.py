@@ -37,6 +37,9 @@ class FgcmParameters(object):
 
         self.fgcmLog.log('INFO','Initializing FgcmParameters...')
 
+        # for plotting
+        self.minExpPerNight = fgcmConfig.minExpPerNight
+
         #if (fgcmConfig is not None):
         #    self._initializeParameters(fgcmConfig)
         if (parFile is not None):
@@ -155,13 +158,8 @@ class FgcmParameters(object):
         #  this part is going to be the hardest
 
         self._arrangeParArray()
+        self._setParRanges(fgcmConfig)
 
-        self.pmbRange = fgcmConfig.pmbRange
-        self.pwvRange = fgcmConfig.pwvRange
-        self.O3Range = fgcmConfig.O3Range
-        self.tauRange = fgcmConfig.tauRange
-        self.alphaRange = fgcmConfig.alphaRange
-        self.zenithRange = fgcmConfig.zenithRange
 
     def _arrangeParArray(self):
         # make pointers to a fit parameter array...
@@ -208,6 +206,18 @@ class FgcmParameters(object):
         self.parQESysSlopeLoc = ctr
         ctr+=self.nWashIntervals
 
+    def _setParRanges(self,fgcmConfig):
+        """
+        """
+
+        self.pmbRange = fgcmConfig.pmbRange
+        self.pwvRange = fgcmConfig.pwvRange
+        self.O3Range = fgcmConfig.O3Range
+        self.tauRange = fgcmConfig.tauRange
+        self.alphaRange = fgcmConfig.alphaRange
+        self.zenithRange = fgcmConfig.zenithRange
+
+
     def _makeBandIndices(self):
         """
         """
@@ -216,6 +226,7 @@ class FgcmParameters(object):
         self.fitBandIndex = np.zeros(self.nFitBands,dtype='i2')
         self.extraBandIndex = np.zeros(self.nExtraBands,dtype='i2')
 
+        bandStrip = np.core.defchararray.strip(self.bands[:])
         for i in xrange(self.nFitBands):
             u,=np.where(self.fitBands[i] == self.bands)
             if (u.size == 0):
@@ -452,14 +463,27 @@ class FgcmParameters(object):
         self.fgcmLog.log('INFO','Loading parameters from %s' % (parFile))
 
         parInfo=fitsio.read(parFile,ext='PARINFO')
-        self.nCCD = parInfo['NCCD'][0]
-        self.bands = parInfo['BANDS'][0]
+        #self.nCCD = parInfo['NCCD'][0]
+        #self.bands = parInfo['BANDS'][0]
+        #self.nBands = self.bands.size
+        #self.fitBands = parInfo['FITBANDS'][0]
+        #self.nFitBands = self.fitBands.size
+        #self.extraBands = parInfo['EXTRABANDS'][0]
+        #self.nExtraBands = self.extraBands.size
+        #self.exposureFile = parInfo['EXPOSUREFILE'][0]
+
+        #self.bands = np.core.defchararray.strip(self.bands[:])
+        #self.fitBands = np.core.defchararray.strip(self.fitBands[:])
+        #self.extraBands = np.core.defchararray.strip(self.extraBands[:])
+
+        self.nCCD = fgcmConfig.nCCD
+        self.bands = fgcmConfig.bands
         self.nBands = self.bands.size
-        self.fitBands = parInfo['FITBANDS'][0]
-        self.nFitBands = self.fitBands.size
-        self.extraBands = parInfo['EXTRABANDS'][0]
-        self.nExtraBands = self.extraBands.size
-        self.exposureFile = parInfo['EXPOSUREFILE'][0]
+        self.fitBands = fgcmConfig.fitBands
+        self.nFitBands = fgcmConfig.fitBands.size
+        self.extraBands = fgcmConfig.extraBands
+        self.nExtraBands = fgcmConfig.extraBands.size
+        self.exposureFile = fgcmConfig.exposureFile
 
         self._makeBandIndices()
         self._loadExposureInfo(fgcmConfig)
@@ -488,12 +512,17 @@ class FgcmParameters(object):
         self.parQESysIntercept = pars['PARQESYSINTERCEPT'][0]
         self.parQESysSlope = pars['PARQESYSSLOPE'][0]
 
+        self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPWV:
+            self.pwvFile = str(parInfo['PWVFILE'][0]).rstrip()
             self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
             self.parExternalPWVOffset = pars['PAREXTERNALPWVOFFSET'][0]
             self.hasExternalPWV = True
             self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
+
+        self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalTau:
+            self.tauFile = str(parInfo['TAUFILE'][0]).rstrip()
             self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
             self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
             self.hasExternalTau = True
@@ -509,6 +538,8 @@ class FgcmParameters(object):
         self.compNGoodStarPerExp = pars['COMPNGOODSTARPEREXP'][0]
 
         self._arrangeParArray()
+        self._setParRanges(fgcmConfig)
+
         # should check these are all the right size...
 
         # need to load the superstarflats
@@ -939,13 +970,13 @@ class FgcmParameters(object):
         # want nightly averages, on calibratable nights (duh)
 
         # this is fixed here
-        minExpPerNight = 10
+        #minExpPerNight = 
 
         # make sure we have this...probably redundant
         self.parsToExposures()
 
         # only with photometric exposures
-        expUse,=np.where(self.fgcmFlag == 0)
+        expUse,=np.where(self.expFlag == 0)
 
         nExpPerBandPerNight = np.zeros((self.nCampaignNights,self.nBands),dtype='i4')
         nExpPerNight = np.zeros(self.nCampaignNights,dtype='i4')
@@ -955,7 +986,7 @@ class FgcmParameters(object):
         tauNight = np.zeros(self.nCampaignNights,dtype='f8')
         pwvNight = np.zeros(self.nCampaignNights,dtype='f8')
 
-        np.add.at(nExpPerBandNight,
+        np.add.at(nExpPerBandPerNight,
                   (self.expNightIndex[expUse],
                    self.expBandIndex[expUse]),
                   1)
@@ -979,8 +1010,8 @@ class FgcmParameters(object):
                   self.expO3[expUse])
 
         # hard code this for now
-        gd,=np.where(nExpPerNight > minExpPerNight)
-        mjdNight[gd] /= nExpPerNight[gd].astype(np.float642)
+        gd,=np.where(nExpPerNight > self.minExpPerNight)
+        mjdNight[gd] /= nExpPerNight[gd].astype(np.float64)
         alphaNight[gd] /= nExpPerNight[gd].astype(np.float64)
         tauNight[gd] /= nExpPerNight[gd].astype(np.float64)
         pwvNight[gd] /= nExpPerNight[gd].astype(np.float64)
@@ -994,7 +1025,7 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         # alpha is good
-        alphaGd, = np.where(nExpPerNight > minExpPerNight)
+        alphaGd, = np.where(nExpPerNight > self.minExpPerNight)
 
         ax.plot(mjdNight[alphaGd] - firstMJD,alphaNight[alphaGd],'r.')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
@@ -1009,13 +1040,13 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names  (bandLike or something)
-        gBandIndex,=np.where(self.bands=='g')
-        rBandIndex,=np.where(self.bands=='r')
+        gBandIndex,=np.where(self.bands=='g')[0]
+        rBandIndex,=np.where(self.bands=='r')[0]
 
-        tauGd, = np.where((nExpPerNight > minExpPerNight) &
+        tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
                           ((nExpPerBandPerNight[:,gBandIndex] +
                             nExpPerBandPerNight[:,rBandIndex]) >
-                           minExpPerNight))
+                           self.minExpPerNight))
 
         ax.plot(mjdNight[tauGd] - firstMJD, tauNight[tauGd],'r.')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
@@ -1030,10 +1061,10 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names
-        zBandIndex,=np.where(self.bands=='z')
+        zBandIndex,=np.where(self.bands=='z')[0]
 
-        pwvGd, = np.where((nExpPerNight > minExpPerNight) &
-                          (nExpPerBandPerNight[:,zBandIndex] > minExpPerNight))
+        pwvGd, = np.where((nExpPerNight > self.minExpPerNight) &
+                          (nExpPerBandPerNight[:,zBandIndex] > self.minExpPerNight))
 
         ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
@@ -1048,9 +1079,9 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names
-        rBandIndex,=np.where(self.bands=='r')
-        O3Gd, = np.where((nExpPerNight > minExpPerNight) &
-                         (nExpPerBandPerNight[:,rBandIndex] > minExpPerNight))
+        rBandIndex,=np.where(self.bands=='r')[0]
+        O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
+                         (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
 
         ax.plot(mjdNight[O3Gd] - firstMJD, pwvNight[O3Gd],'r.')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
@@ -1060,4 +1091,6 @@ class FgcmParameters(object):
                                               self.outfileBaseWithCycle))
 
 
-        ## FIXME: write mirror gray plottting routine
+        ## FIXME: write mirror gray plotting routine
+        ## FIXME: add pwv offset plotting routine (if external)
+        ## FIXME: add tau offset plotting routing (if external)
