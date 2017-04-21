@@ -53,11 +53,11 @@ class FgcmRetrieval(object):
         """
 
         self.r0Handle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
-        self.r10Handle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtyep='f8')
+        self.r10Handle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
 
         r0 = snmm.getArray(self.r0Handle)
         r0[:] = self.illegalValue
-        r10 = snmm.getArray(self.r10Handles)
+        r10 = snmm.getArray(self.r10Handle)
         r10[:] = self.illegalValue
 
     def computeRetrievedIntegrals(self,debug=False):
@@ -201,7 +201,7 @@ class FgcmRetrieval(object):
                                  % (expIndexUse[i],ccdIndexUse[i]))
                 continue
 
-            r0[expIndexUse[i],ccdIndexUse[i]] = IRetrived[0]
+            r0[expIndexUse[i],ccdIndexUse[i]] = IRetrieved[0]
             r10[expIndexUse[i],ccdIndexUse[i]] = IRetrieved[1]/IRetrieved[0]
 
 
