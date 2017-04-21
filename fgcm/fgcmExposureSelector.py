@@ -44,7 +44,8 @@ class FgcmExposureSelector(object):
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
         self.fgcmLog.log('INFO','Flagged %d bad exposures with too few stars.' % (bad.size))
 
-        bad,=np.where(self.fgcmPars.compExpGray < self.expGrayPhotometricCut)
+        bad,=np.where((self.fgcmPars.compExpGray < self.expGrayPhotometricCut) &
+                      (self.fgcmPars.compNGoodStarPerExp > 0))
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
         self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY too large.' % (bad.size))
 
