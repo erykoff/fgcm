@@ -375,7 +375,7 @@ class FgcmStars(object):
         obsMagADU += fgcmPars.expCCDSuperStar[obsExpIndex,
                                               obsCCDIndex]
 
-    def applyApertureCorrections(self,fgcmPars):
+    def applyApertureCorrection(self,fgcmPars):
         """
         """
 
