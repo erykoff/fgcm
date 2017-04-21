@@ -19,6 +19,7 @@ class FgcmZeropoints(object):
         self.fgcmPars = fgcmPars
         self.fgcmLUT = fgcmLUT
         self.fgcmGray = fgcmGray
+        self.fgcmRetrieval = fgcmRetrieval
 
         self.illegalValue = fgcmConfig.illegalValue
         self.outputPath = fgcmConfig.outputPath
@@ -35,6 +36,12 @@ class FgcmZeropoints(object):
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
         self.sigma0Cal = fgcmConfig.sigma0Cal
+        self.expField = fgcmConfig.expField
+        self.ccdField = fgcmConfig.ccdField
+        self.expGrayRecoverCut = fgcmConfig.expGrayRecoverCut
+        self.expGrayErrRecoverCut = fgcmConfig.expGrayErrRecoverCut
+        self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
+
 
     def computeZeropoints(self):
         """
@@ -64,9 +71,10 @@ class FgcmZeropoints(object):
         self.fgcmPars.parsToExposures()
 
         # set up output structures
+
         zpStruct = np.zeros(self.fgcmPars.nExp*self.fgcmPars.nCCD,
-                            dtype=[('EXPNUM','i4'), # done
-                                   ('CCDNUM','i2'), # done
+                            dtype=[(self.expField,'i4'), # done
+                                   (self.ccdField,'i2'), # done
                                    ('FGCM_FLAG','i2'), # done
                                    ('FGCM_ZPT','f8'), # done
                                    ('FGCM_ZPTERR','f8'), # done
@@ -86,7 +94,7 @@ class FgcmZeropoints(object):
                                    ('BAND','a2')]) # done
 
         atmStruct = np.zeros(self.fgcmPars.nExp,
-                             dtype=[('EXPNUM','i4'),
+                             dtype=[(self.expField,'i4'),
                                     ('PMB','f8'),
                                     ('PWV','f8'),
                                     ('TAU','f8'),
@@ -97,14 +105,14 @@ class FgcmZeropoints(object):
         ## start with zpStruct
 
         # fill out exposures and ccds
-        zpStruct['EXPNUM'][:] = np.repeat(self.fgcmPars.expArray,
+        zpStruct[self.expField][:] = np.repeat(self.fgcmPars.expArray,
                                           self.fgcmPars.nCCD)
-        zpStruct['CCDNUM'][:] = np.tile(np.arange(self.fgcmPars.nCCD)+self.ccdStartIndex,
+        zpStruct[self.ccdField][:] = np.tile(np.arange(self.fgcmPars.nCCD)+self.ccdStartIndex,
                                         self.fgcmPars.nExp)
 
         # get the exposure indices and CCD indices
-        zpExpIndex = np.searchsorted(self.fgcmPars.expArray,zpStruct['EXPNUM'])
-        zpCCDIndex = zpStruct['CCDNUM'] - self.ccdStartIndex
+        zpExpIndex = np.searchsorted(self.fgcmPars.expArray,zpStruct[self.expField])
+        zpCCDIndex = zpStruct[self.ccdField] - self.ccdStartIndex
 
         # fill exposure quantities
         zpStruct['BAND'][:] = self.fgcmPars.bands[self.fgcmPars.expBandIndex[zpExpIndex]]
@@ -242,7 +250,7 @@ class FgcmZeropoints(object):
         # and finally, the hopeless exposures
         acceptMask = (expFlagDict['NO_STARS'] |
                       expFlagDict['BAND_NOT_IN_LUT'])
-        hopelessZpIndex, = np.where(((fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0))
+        hopelessZpIndex, = np.where(((self.fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0))
         zpStruct['FGCM_FLAG'][hopelessZpIndex] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
         # now we can fill the zeropoints
@@ -266,8 +274,8 @@ class FgcmZeropoints(object):
 
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
 
-        _computeZpt(zpStruct,okCCDZpIndex)
-        _computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
+        self._computeZpt(zpStruct,okCCDZpIndex)
+        self._computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
 
         badCCDZpExp = okZpIndex[~okCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |=  zpFlagDict['TOO_FEW_STARS_ON_CCD']
@@ -290,14 +298,18 @@ class FgcmZeropoints(object):
 
         mehCCDZpIndex = mehZpIndex[mehCCDZpIndexFlag]
 
-        _computeZpt(zpStruct,mehCCDZpIndex)
-        _computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
+        self._computeZpt(zpStruct,mehCCDZpIndex)
+        self._computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
 
         badCCDZpExp = mehZpIndex[~mehCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
-        ## MAYBE: plots?  what plots would be interesting?
+        ## FIXME: plots?  what plots would be interesting?
+        ##  zeropoint as a function of MJD
+        ##  colors per band
+        ##  focal plane average
+        ##  plot symbols for flag
 
         # and save...
         outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
@@ -305,7 +317,7 @@ class FgcmZeropoints(object):
 
         #################################
         # and make the parameter file
-        atmStruct['EXPNUM'] = self.fgcmPars.expArray
+        atmStruct[self.expField] = self.fgcmPars.expArray
         atmStruct['PMB'] = self.fgcmPars.expPmb
         atmStruct['PWV'] = self.fgcmPars.expPWV
         atmStruct['TAU'] = self.fgcmPars.expTau
