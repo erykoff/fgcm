@@ -512,7 +512,7 @@ class FgcmParameters(object):
         # should check these are all the right size...
 
         # need to load the superstarflats
-        self.parSuperStarFlat = fitsio.read(parfile,ext='SUPER')
+        self.parSuperStarFlat = fitsio.read(parFile,ext='SUPER')
 
 
     def saveParFile(self, parFile):
@@ -568,7 +568,7 @@ class FgcmParameters(object):
             parInfo['TAUFILE'] = self.tauFile
 
         # clobber?
-        fitsio.write(parfile,parInfo,extname='PARINFO',clobber=True)
+        fitsio.write(parFile,parInfo,extname='PARINFO',clobber=True)
 
         dtype=[('PARALPHA','f8',self.parAlpha.size),
                ('PARO3','f8',self.parO3.size),
@@ -618,16 +618,16 @@ class FgcmParameters(object):
         pars['COMPAPERCORRPIVOT'][:] = self.compAperCorrPivot
         pars['COMPAPERCORRSLOPE'][:] = self.compAperCorrSlope
         pars['COMPAPERCORRSLOPEERR'][:] = self.compAperCorrSlopeErr
-        pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange
+        pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange.flatten()
 
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
 
-        fitsio.write(parfile,pars,extname='PARAMS')
+        fitsio.write(parFile,pars,extname='PARAMS')
 
         # and need to record the superstar flats
-        fitsio.write(parfile,self.parSuperStarFlat,extname='SUPER')
+        fitsio.write(parFile,self.parSuperStarFlat,extname='SUPER')
 
 
 
@@ -1060,18 +1060,4 @@ class FgcmParameters(object):
                                               self.outfileBaseWithCycle))
 
 
-
-
-
-
-
-        ## FIXME: write the plotting routine
-
-        # plot the parameters in a reasonably nice format
-        # calls a bunch of sub-plotting routines, why not
-        #   alpha
-        #   tau
-        #   pwv
-        #   gray
-
-        pass
+        ## FIXME: write mirror gray plottting routine
