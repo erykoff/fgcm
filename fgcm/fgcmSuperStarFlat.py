@@ -86,6 +86,7 @@ class FgcmSuperStarFlat(object):
                          (time.time() - startTime))
 
         if (doPlots):
+            self.fgcmLog.log('INFO','Making SuperStarFlat plots')
             self.plotSuperStarFlats(deltaSuperStarFlat,
                                     nCCDArray=deltaSuperStarFlatNCCD,
                                     name='deltasuperstar')
