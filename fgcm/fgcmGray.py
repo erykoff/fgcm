@@ -362,7 +362,7 @@ class FgcmGray(object):
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
-        self.fgcmLog.log('INFO','Computed CCDGray for %d CCDs' % (gd.size))
+        self.fgcmLog.log('INFO','Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
         bad = np.where(ccdNGoodStars < 2)
