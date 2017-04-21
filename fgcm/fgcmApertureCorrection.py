@@ -104,7 +104,7 @@ class FgcmApertureCorrection(object):
                                  w=(1./binStruct['Y_ERR'])**2.,
                                  cov=True)
 
-            if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0])) :
+            if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
                 self.fgcmLog.log('INFO','Warning: Aperture correction computation failed for band %s' %
                                  (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
