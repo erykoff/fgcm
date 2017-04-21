@@ -61,8 +61,8 @@ class FgcmStars(object):
         self.sedSlopeComputed = False
 
         if (computeNobs):
-            allExp = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
-            self.selectStarsMinObs(allExp)
+            allExps = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
+            self.selectStarsMinObs(goodExps=allExps)
 
         self.magConstant = 2.5/np.log(10)
 
