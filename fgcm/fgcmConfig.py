@@ -147,7 +147,7 @@ class FgcmConfig(object):
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
 
-        if (self.cycleNumber > 1):
+        if (self.cycleNumber >= 1):
             if ('inParameterFile' not in configDict):
                 raise ValueError("Must provide inParameterFile for cycleNumber > 0")
             self.inParameterFile = configDict['inParameterFile']
@@ -191,6 +191,16 @@ class FgcmConfig(object):
         self.tauRange = np.array([np.min(lutStats['TAU']),np.max(lutStats['TAU'])])
         self.alphaRange = np.array([np.min(lutStats['ALPHA']),np.max(lutStats['ALPHA'])])
         self.zenithRange = np.array([np.min(lutStats['ZENITH']),np.max(lutStats['ZENITH'])])
+
+        # make sure we drop trailing spaces
+        self.bands = np.core.defchararray.strip(self.bands[:])
+        self.fitBands = np.core.defchararray.strip(self.fitBands[:])
+        self.extraBands = np.core.defchararray.strip(self.extraBands[:])
+
+        bandString = ''
+        for b in self.bands: bandString += b + ' '
+        self.fgcmLog.log('INFO','Found %d CCDs and %d bands (%s)' %
+                         (self.nCCD,self.bands.size,bandString))
 
         lutStd = fitsio.read(self.lutFile,ext='STD')
         self.pmbStd = lutStd['PMBSTD'][0]
@@ -256,6 +266,9 @@ class FgcmConfig(object):
                 raise ValueError("Cannot have the same band as fit and extra")
 
         # and check the star color cuts and replace with indices...
+        #  note that self.starColorCuts is a copy so that we don't overwrite.
+        ## FIXME: allow index or name here
+
         for cCut in self.starColorCuts:
             if (cCut[0] not in self.bands):
                 raise ValueError("starColorCut band %s not in list of bands!" % (cCut[0]))
