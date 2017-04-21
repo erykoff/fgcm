@@ -82,21 +82,52 @@ class FgcmSuperStarFlat(object):
         ## MAYBE: change fgcmGray to remove the deltaSuperStarFlat?
         ##  or we can rely on the iterations.  Try that first.
 
+        self.deltaSuperStarFlatMean = np.zeros((self.fgcmPars.nEpochs,
+                                                self.fgcmPars.nBands),dtype='f8')
+        self.deltaSuperStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
+        self.superStarFlatMean = np.zeros_like(self.deltaSuperStarFlatMean)
+        self.superStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
+
+        for i in xrange(self.fgcmPars.nEpochs):
+            for j in xrange(self.fgcmPars.nBands):
+                use,=np.where(deltaSuperStarFlatNCCD[i,j,:] > 0)
+
+                if use.size < 3:
+                    continue
+
+                self.deltaSuperStarFlatMean[i,j] = np.mean(deltaSuperStarFlat[i,j,use])
+                self.deltaSuperStarFlatSigma[i,j] = np.std(deltaSuperStarFlat[i,j,use])
+                self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use])
+                self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use])
+                self.fgcmLog.log('INFO','Superstar epoch %d band %s: %.4f +/- %.4f' %
+                                 (i,self.fgcmPars.bands[j],
+                                  self.superStarFlatMean[i,j],
+                                  self.superStarFlatSigma[i,j]))
+                self.fgcmLog.log('INFO','DeltaSuperStar epoch %d band %s: %.4f +/- %.4f' %
+                                 (i,self.fgcmPars.bands[j],
+                                  self.deltaSuperStarFlatMean[i,i],
+                                  self.deltaSuperStarFlatSigma[i,j]))
+
         self.fgcmLog.log('INFO','Computed SuperStarFlats in %.2f seconds.' %
                          (time.time() - startTime))
 
         if (doPlots):
             self.fgcmLog.log('INFO','Making SuperStarFlat plots')
             self.plotSuperStarFlats(deltaSuperStarFlat,
+                                    self.deltaSuperStarFlatMean,
+                                    self.deltaSuperStarFlatSigma,
                                     nCCDArray=deltaSuperStarFlatNCCD,
                                     name='deltasuperstar')
             self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat,
+                                    self.superStarFlatMean,
+                                    self.superStarFlatSigma,
                                     nCCDArray=deltaSuperStarFlatNCCD,
                                     name='superstar')
 
         # and we're done.
 
-    def plotSuperStarFlats(self, superStarArray, nCCDArray=None, name='superstar'):
+    def plotSuperStarFlats(self, superStarArray, superStarMean, superStarSigma,
+                           nCCDArray=None, name='superstar'):
         """
         """
 
@@ -167,7 +198,13 @@ class FgcmSuperStarFlat(object):
 
                 cb.set_label('Superflat Correction (mag)',fontsize=14)
 
-                ax.annotate(r'$(%s)$' % (self.fgcmPars.bands[j]),
+                text = r'$(%s)$' % (self.fgcmPars.bands[j]) + '\n' + \
+                    r'%.4f +/- %.4f' % (superStarMean[i,j],superStarSigma[i,j])
+
+                #ax.annotate(r'$(%s)$' % (self.fgcmPars.bands[j]),
+                #            (0.1,0.93),xycoords='axes fraction',
+                #            ha='left',va='top',fontsize=18)
+                ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
 
