@@ -311,6 +311,8 @@ class FgcmZeropoints(object):
         ##  focal plane average
         ##  plot symbols for flag
 
+        ## compare I0 and R0, I1 and R1
+
         # and save...
         outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
         fitsio.write(outFile,zpStruct,clobber=True,extname='ZPTS')
