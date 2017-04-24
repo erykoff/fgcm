@@ -40,6 +40,11 @@ class FgcmStars(object):
         self.starColorCuts = fgcmConfig.starColorCuts
         self.sigma0Phot = fgcmConfig.sigma0Phot
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
+        self.plotPath = fgcmConfig.plotPath
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+
+        self.mapLongitudeRef = fgcmConfig.mapLongitudeRef
+        self.mapNside = fgcmConfig.mapNside
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
@@ -62,7 +67,7 @@ class FgcmStars(object):
 
         if (computeNobs):
             allExps = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
-            self.selectStarsMinObs(goodExps=allExps)
+            self.selectStarsMinObs(goodExps=allExps,doPlots=False)
 
         self.magConstant = 2.5/np.log(10)
 
@@ -234,7 +239,7 @@ class FgcmStars(object):
 
 
 
-    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None):
+    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None,doPlots=False):
         """
         """
 
@@ -279,6 +284,43 @@ class FgcmStars(object):
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
 
         self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+
+        if (doPlots):
+            self.plotStarMap()
+
+    def plotStarMap(self):
+        """
+        """
+        import healpy as hp
+        from fgcmPlotmaps import plot_hpxmap
+
+        goodStars,=np.where(snmm.getArray(self.objFlagHandle)[:] == 0.0)
+
+        theta = (90.0-snmm.getArray(self.objDecHandle)[goodStars])*np.pi/180.
+        phi = snmm.getArray(self.objRAHandle)[goodStars]*np.pi/180.
+
+        ipring = hp.ang2pix(self.mapNside,theta,phi)
+
+        densMap = esutil.stat.histogram(ipring,min=0,max=12*self.mapNside*self.mapNside-1)
+        densMap = densMap.astype(np.float32)
+
+        bad,=np.where(densMap == 0)
+        densMap[bad] = hp.UNSEEN
+
+        raStarRot = snmm.getArray(self.objRAHandle)[goodStars]
+        hi,=np.where(raStarRot > 180.0)
+        raStarRot[hi] -= 360.0
+
+        decStar = snmm.getArray(self.objDecHandle)[goodStars]
+
+        fig,ax = plot_hpxmap(densMap,
+                             raRange=[np.min(raStarRot),np.max(raStarRot)],
+                             decRange=[np.min(decStar),np.max(decStar)],
+                             lonRef = self.mapLongitudeRef)
+
+        fig.savefig('%s/%s_initialGoodStars.png' % (self.plotPath,
+                                                    self.outfileBaseWithCycle))
+
 
     def computeObjectSEDSlope(self,objIndex):
         """
