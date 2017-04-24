@@ -86,15 +86,13 @@ class FgcmBasemap(Basemap):
 
         vmin,vmax = np.percentile(hpxmap.compressed(),[0.1,99.9])
 
-        print(vmin,vmax)
-
         defaults = dict(latlon=True, rasterized=True, vmin=vmin, vmax=vmax)
         self.set_defaults(kwargs,defaults)
 
         ax = plt.gca()
 
-        lon = np.linspace(0, 360., xsize) 
-        lat = np.linspace(-90., 90., xsize) 
+        lon = np.linspace(0, 360., xsize)
+        lat = np.linspace(-90., 90., xsize)
         lon, lat = np.meshgrid(lon, lat)
 
         nside = healpy.get_nside(hpxmap.data)
