@@ -9,7 +9,6 @@ import time
 import matplotlib.pyplot as plt
 
 from fgcmUtilities import _pickle_method
-from fgcmUtilities import resourceUsage
 
 
 import types
