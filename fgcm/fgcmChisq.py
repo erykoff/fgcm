@@ -8,7 +8,6 @@ import esutil
 import time
 
 from fgcmUtilities import _pickle_method
-from fgcmUtilities import resourceUsage
 
 import types
 import copy_reg
@@ -103,18 +102,49 @@ class FgcmChisq(object):
         if (self.computeDerivatives):
             self.nSums += self.fgcmPars.nFitPars
 
-        self.totalHandleDict = {}
-        self.totalHandleDict[0] = snmm.createArray(self.nSums,dtype='f8')
+        self.debug = debug
+        if (self.debug):
+            # debug mode: single core
+            self.totalHandleDict = {}
+            self.totalHandleDict[0] = snmm.createArray(self.nSums,dtype='f8')
 
-        self._worker(goodStars)
+            self._worker(goodStars)
 
+            partialSums = snmm.getArray(self.totalHandleDict[0])[:]
+        else:
+            # regular multi-core
 
-        partialSums = snmm.getArray(self.totalHandleDict[0])[:]
+            self.fgcmLog.log('INFO','Running chisq on %d cores' % (self.nCore))
+
+            # make a dummy process to discover starting child number
+            proc = multiprocessing.Process()
+            workerIndex = proc._identity[0]+1
+            proc = None
+
+            self.totalHandleDict = {}
+            for thisCore in xrange(self.nCore):
+                self.totalHandleDict[workerIndex + thisCore] = (
+                    snmm.createArray(self.nSums,dtype='f8'))
+
+            # split goodStars into a list of arrays of roughly equal size
+            goodStarsList = np.array_split(goodStars,self.nCore)
+
+            # make a pool
+            pool = Pool(processes=self.nCore)
+            pool.map(self._worker,goodStarsList)
+            pool.close()
+            pool.join()
+
+            # sum up the partial sums from the different jobs
+            partialSums = np.zeros(self.nSums,dtype='f8')
+            for thisCore in xrange(self.nCore):
+                partialSums[:] += snmm.getArray(
+                    self.totalHandleDict[workerIndex + thisCore])[:]
 
 
         if (not self.allExposures):
             ## FIXME: dof should be actual number of fit parameters
-            
+
             fitDOF = partialSums[-1] - float(self.fgcmPars.nFitPars)
             if (fitDOF <= 0):
                 raise ValueError("Number of parameters fitted is more than number of constraints! (%d > %d)" % (self.fgcmPars.nFitPars,partialSums[-1]))
@@ -149,8 +179,6 @@ class FgcmChisq(object):
     def _worker(self,goodStars):
         """
         """
-
-        # test for all exposures ... single thread...
 
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
@@ -622,8 +650,14 @@ class FgcmChisq(object):
                          uWashIndex] *= (2.0 / unitDict['qeSysSlopeUnit'])
 
 
-        # stuff in the totalArr for return
-        totalArr = snmm.getArray(self.totalHandleDict[0])
+        # note that this store doesn't need locking because we only access
+        #  a given array from a singel process
+        if self.debug:
+            thisCore = 0
+        else:
+            thisCore = multiprocessing.current_process()._identity[0]
+
+        totalArr = snmm.getArray(self.totalHandleDict[thisCore])
         totalArr[:] = totalArr[:] + partialArray
 
 
