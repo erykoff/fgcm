@@ -165,7 +165,7 @@ class FgcmSuperStarFlat(object):
                 levels=np.linspace(lo,hi,num=150)
                 CS3=plt.contourf(Z,levels,cmap=cm)
 
-                fig=plt.figure(1)
+                fig=plt.figure(1,figsize=(8,6))
                 fig.clf()
 
                 ax=fig.add_subplot(111)
