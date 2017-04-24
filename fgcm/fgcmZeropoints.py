@@ -6,6 +6,8 @@ import os
 import sys
 import esutil
 
+import matplotlib.pyplot as plt
+
 from fgcmUtilities import zpFlagDict
 from fgcmUtilities import expFlagDict
 
