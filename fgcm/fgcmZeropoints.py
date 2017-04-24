@@ -305,13 +305,6 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
-        ## FIXME: plots?  what plots would be interesting?
-        ##  zeropoint as a function of MJD
-        ##  colors per band
-        ##  focal plane average
-        ##  plot symbols for flag
-
-        ## compare I0 and R0, I1 and R1
 
         # and save...
         outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
@@ -334,6 +327,88 @@ class FgcmZeropoints(object):
         outFile = '%s/%s_atm.fits' % (self.outputPath,self.outfileBaseWithCycle)
         fitsio.write(outFile,atmStruct,clobber=True,extname='ATMPARS')
 
+
+        ############
+        ## plots
+        ############
+
+
+        ## compare I0 and R0, I1 and R1
+        for i in xrange(self.fgcmPars.nBands):
+            use,=np.where((zpStruct['BAND'] == self.fgcmPars.bands[i]) &
+                          (zpStruct['FGCM_FLAG'] == 1) &
+                          (np.abs(zpStruct['FGCM_R10']) < 1000.0))
+
+            i1 = zpStruct['FGCM_I10'][use]*zpStruct['FGCM_I0'][use]
+            r1 = zpStruct['FGCM_R10'][use]*zpStruct['FGCM_R10'][use]
+
+            fig = plt.figure(1,figsize=(8,6))
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            ax.hexbin(i1,r1,cmap=plt.get_cmap('gray_r'),rasterized=True)
+            ax.plot(ax.get_xlim(),ax.get_ylim(),'b--',linewidth=2)
+
+            ax.set_xlabel(r'$I_1$ from FGCM Fit',fontsize=16)
+            ax.set_ylabel(r'$R_1$ from Retrieval',fontsize=16)
+
+            text=r'$(%s)$' % (bands[i])
+            ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
+                        ha='left',va='top',fontsize=16)
+
+            fig.savefig('%s/%s_i1r1_%s.png' % (self.fgcmConfig.plotPath,
+                                               self.outfileBaseWithCycle,
+                                               self.fgcmPars.bands[i]))
+
+        ## FIXME: plots?  what plots would be interesting?
+        ##  zeropoint as a function of MJD
+        ##  colors per band
+        ##  focal plane average
+        ##  plot symbols for flag
+
+        # need to know the mean zeropoint per exposure
+        expZpMean = np.zeros(self.fgcmPars.nExp,dtype='f4')
+        expZpNCCD = np.zeros(self.fgcmPars.nExp,dtype='i4')
+
+        rejectMask = (zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
+                      zpFlagDict['TOO_FEW_STARS_ON_CCD'])
+
+        okCCD,=np.where((zpStruct['FGCM_FLAG'] & rejectMask) == 0)
+
+        np.add.at(expZpMean,
+                  zpExpIndex[okCCD],
+                  zpStruct['FGCM_ZPT'][okCCD])
+        np.add.at(expZpNCCD,
+                  zpExpIndex[okCCD],
+                  1)
+
+        gd,=np.where(expZpNCCD > 0)
+        expZpMean[gd] /= expZpNCCD[gd]
+
+        fig=plt.figure(1,figsize(8,6))
+        fig.clf()
+
+        ax=fig.add_subplot(111)
+
+        firstMJD = np.floor(np.min(self.fgcmPars.mjdNight))
+
+        # FIXME: make configurable
+        cols = ['g','r','b','m','y']
+        syms = ['.','+','o','*','x']
+
+        for i in xrange(self.fgcmPars.nBands):
+            use,=np.where((self.fgcmPars.expBandIndex == i) &
+                          (expZpMean > 0.0))
+
+            plt.plot(self.fgcmPars.expMJD[use] - firstMJD,
+                     expZpMean[use],cols[i]+syms[j],
+                     label=r'$(%s)$' % (self.fgcmPars.bands[i]))
+
+        ax.legend(3)
+
+        fig.savefig('%s/%s_zeropoints.png' % (self.fgcmConfig.plotPath,
+                                              self.outfileBaseWithCycle))
 
     def _computeZpt(self,zpStruct,zpIndex):
         """
