@@ -1017,10 +1017,11 @@ class FgcmParameters(object):
         pwvNight[gd] /= nExpPerNight[gd].astype(np.float64)
         O3Night[gd] /= nExpPerNight[gd].astype(np.float64)
 
-        firstMJD = np.floor(np.min(mjdNight[gd]))
+        #firstMJD = np.floor(np.min(mjdNight[gd]))
+        firstMJD = np.floor(np.min(self.expMJD))
 
         # now alpha
-        fig=plt.figure(1)
+        fig=plt.figure(1,figsize=(8,6))
         fig.clf()
         ax=fig.add_subplot(111)
 
@@ -1035,7 +1036,7 @@ class FgcmParameters(object):
                                                  self.outfileBaseWithCycle))
 
         # tau
-        fig=plt.figure(1)
+        fig=plt.figure(1,figsize=(8,6))
         fig.clf()
         ax=fig.add_subplot(111)
 
@@ -1056,7 +1057,7 @@ class FgcmParameters(object):
                                                self.outfileBaseWithCycle))
 
         # pwv
-        fig=plt.figure(1)
+        fig=plt.figure(1,figsize=(8,6))
         fig.clf()
         ax=fig.add_subplot(111)
 
@@ -1074,7 +1075,7 @@ class FgcmParameters(object):
                                                self.outfileBaseWithCycle))
 
         # O3
-        fig=plt.figure(1)
+        fig=plt.figure(1,figsize=(8,6))
         fig.clf()
         ax=fig.add_subplot(111)
 
@@ -1083,7 +1084,7 @@ class FgcmParameters(object):
         O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
                          (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
 
-        ax.plot(mjdNight[O3Gd] - firstMJD, pwvNight[O3Gd],'r.')
+        ax.plot(mjdNight[O3Gd] - firstMJD, O3Night[O3Gd],'r.')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
         ax.set_ylabel(r'$O_3$',fontsize=16)
 
@@ -1091,6 +1092,29 @@ class FgcmParameters(object):
                                               self.outfileBaseWithCycle))
 
 
-        ## FIXME: write mirror gray plotting routine
+        # mirror gray
+        fig=plt.figure(1,figsize=(8,6))
+        fig.clf()
+        ax=fig.add_subplot(111)
+
+        for i in xrange(self.nWashIntervals):
+            use,=np.where(self.expWashIndex == i)
+            washMJDRange = [np.min(self.expMJD[use]),np.max(self.expMJD[use])]
+
+            ax.plot(washMJDRange - firstMJD,
+                    (washMJDRange - self.washMJDs[i])*self.parQESysSlope[i] +
+                    self.parQESysIntercept[i],'r--',linewidth=3)
+
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})$',fontsize=16)
+        ax.tick_params(axis='both',which='major',labelsize=14)
+
+        for i in xrange(self.nWashIntervals):
+            ax.plot([self.washMJDs[i]-firstMJD,self.washMJDs[i]-firstMJD],
+                    ax.get_ylim(),'k--')
+
+        fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
+                                                self.outfileBaseWithCycle))
+
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)
