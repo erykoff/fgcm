@@ -36,7 +36,7 @@ class FgcmConfig(object):
                       'minExpPerNight','expGrayInitialCut','expVarGrayPhotometricCut',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut','expGrayErrRecoverCut',
-                      'sigma0Cal','logLevel','sigma0Phot']
+                      'sigma0Cal','logLevel','sigma0Phot','mapLongitudeRef','mapNside']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -95,6 +95,8 @@ class FgcmConfig(object):
         self.sigma0Cal = float(configDict['sigma0Cal'])
         self.logLevel = configDict['logLevel']
         self.sigma0Phot = configDict['sigma0Phot']
+        self.mapLongitudeRef = configDict['mapLongitudeRef']
+        self.mapNside = configDict['mapNside']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -270,12 +272,14 @@ class FgcmConfig(object):
         ## FIXME: allow index or name here
 
         for cCut in self.starColorCuts:
-            if (cCut[0] not in self.bands):
-                raise ValueError("starColorCut band %s not in list of bands!" % (cCut[0]))
-            cCut[0] = list(self.bands).index(cCut[0])
-            if (cCut[1] not in self.bands):
-                raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
-            cCut[1] = list(self.bands).index(cCut[1])
+            if (not isinstance(cCut[0],int)) :
+                if (cCut[0] not in self.bands):
+                    raise ValueError("starColorCut band %s not in list of bands!" % (cCut[0]))
+                cCut[0] = list(self.bands).index(cCut[0])
+            if (not isinstance(cCut[1],int)) :
+                if (cCut[1] not in self.bands):
+                    raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
+                cCut[1] = list(self.bands).index(cCut[1])
 
         # and AB zeropoint
         hPlanck = 6.6
