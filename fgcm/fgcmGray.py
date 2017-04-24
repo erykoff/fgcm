@@ -194,7 +194,7 @@ class FgcmGray(object):
             if (inBand.size == 0) :
                 continue
 
-            fig=plt.figure(1)
+            fig=plt.figure(1,figsize=(8,6))
             fig.clf()
 
             ax=fig.add_subplot(111)
@@ -407,7 +407,7 @@ class FgcmGray(object):
             #coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hCenter, hHist, p0=p0)
             #self.sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. - np.median(EGrayErr2[goodObs[sigUse]]))
 
-            fig = plt.figure(1)
+            fig = plt.figure(1,figsize=(8,6))
             fig.clf()
 
             ax=fig.add_subplot(111)
@@ -521,7 +521,7 @@ class FgcmGray(object):
             if (inBand.size == 0) :
                 continue
 
-            fig=plt.figure(1)
+            fig=plt.figure(1,figsize=(8,6))
             fig.clf()
 
             ax=fig.add_subplot(111)
