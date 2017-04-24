@@ -35,6 +35,16 @@ class SharedNumpyMemManager:
         self.sharedArrays = [None] * SharedNumpyMemManager._initSize
 
     #def __createArray(self, dimensions, ctype=ctypes.c_double, dtype=None):
+
+    def __createArrayLike(self, inArray, syncAccess=False, dtype=None):
+        # like zeros_like
+
+        dimensions = inArray.shape
+        if dtype is None:
+            dtype = inArray.dtype
+
+        return self.__createArray(dimensions, dtype=dtype, syncAccess=syncAccess)
+
     def __createArray(self, dimensions, dtype=np.float64, syncAccess=False):
         # convert to dtype type (in case short code)
         dtype = np.dtype(dtype)
@@ -115,6 +125,10 @@ class SharedNumpyMemManager:
     @staticmethod
     def createArray(*args, **kwargs):
         return SharedNumpyMemManager.getInstance().__createArray(*args, **kwargs)
+
+    @staticmethod
+    def createArrayLike(*args, **kwargs):
+        return SharedNumpyMemManager.getInstance().__createArrayLike(*args, **kwargs)
 
     @staticmethod
     def getArray(*args, **kwargs):
