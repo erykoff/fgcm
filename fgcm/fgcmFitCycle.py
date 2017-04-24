@@ -91,7 +91,7 @@ class FgcmFitCycle(object):
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.log('DEBUG','FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
-        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
@@ -233,7 +233,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
 
         if (doPlots):
-            fig=plt.figure(1)
+            fig=plt.figure(1,figsize=(8,6))
             fig.clf()
             ax=fig.add_subplot(111)
 
