@@ -8,7 +8,6 @@ import esutil
 import time
 
 from fgcmUtilities import _pickle_method
-from fgcmUtilities import resourceUsage
 from fgcmChisq import FgcmChisq
 
 import types
@@ -23,7 +22,7 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 copy_reg.pickle(types.MethodType, _pickle_method)
 
 
-class FgcmBrightObs(object):
+class FgcmBrightObsAlt(object):
     """
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
@@ -41,7 +40,7 @@ class FgcmBrightObs(object):
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
 
-    def selectGoodStars(self,debug=False,computeSEDSlopes=False):
+    def brightestObsMeanMag(self,debug=False,computeSEDSlopes=False):
         """
         """
 
@@ -62,75 +61,146 @@ class FgcmBrightObs(object):
         # and select good stars!  This might be all stars at this point, but good to check
         goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
-        if (self.debug) :
-            for goodStar in goodStars:
-                self._worker(goodStar)
+        self.fgcmLog.log('INFO','Found %d good stars for bright obs' % (goodStars.size))
+
+        if (goodStars.size == 0):
+            raise ValueError("No good stars to fit!")
+
+        if (self.debug):
+            self._worker(goodStars)
         else:
             self.fgcmLog.log('INFO','Running BrightObs on %d cores' % (self.nCore))
+
+            goodStarsList = np.array_split(goodStars,self.nCore)
+
+            # make a pool
             pool = Pool(processes=self.nCore)
-            pool.map(self._worker,goodStars)
+            pool.map(self._worker,goodStarsList)
             pool.close()
             pool.join()
 
-        self.fgcmLog.log('INFO','Finished BrightObs in %.2f seconds.' %
+
+        self.fgcmLog.log('INFO','Finished BrightObs (Alt) in %.2f seconds.' %
                          (time.time() - startTime))
 
 
-    def _worker(self,objIndex):
+    def _worker(self,goodStars):
         """
         """
 
-        # make local pointers to useful arrays
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        objNobs = snmm.getArray(self.fgcmStars.objNobsHandle)
-
-        thisObsIndex = obsIndex[objObsIndex[objIndex]:objObsIndex[objIndex]+objNobs[objIndex]]
-        thisObsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)[thisObsIndex]
-
-        # cut to good exposures
-        ## MAYBE: Check if this can be done more efficiently.
-        gd,=np.where(self.fgcmPars.expFlag[thisObsExpIndex] == 0)
-
-        thisObsIndex=thisObsIndex[gd]
-        thisObsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[thisObsIndex]
-
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
 
-        # split out the filters (instead of loop of wheres)...
-        h,rev=esutil.stat.histogram(thisObsBandIndex,rev=True,
-                                    min=0,max=self.fgcmPars.nBands-1)
+        # select the good observations that go into these stars
+        _,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
 
-        for j in xrange(self.fgcmPars.nBands):
-            if (h[j] == 0):
-                objNGoodObs[objIndex,j] = 0
-                continue
+        # and cut to those exposures that are not flagged
+        gd,=np.where(self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0)
+        goodObs = goodObs[gd]
 
-            i1a=rev[rev[j]:rev[j+1]]
+        obsMagErr2GO = obsMagADUErr[goodObs]**2.
 
-            # find the brightest observation
-            minMag = np.amin(obsMagStd[thisObsIndex[i1a]])
+        # start by saying that they're all good
+        subGood = np.arange(goodObs.size)
 
-            # and all the observations that are comparable
-            brightObs,=np.where((obsMagStd[thisObsIndex[i1a]] - minMag) <= self.brightObsGrayMax)
-            # number of good observations are these bright ones
-            objNGoodObs[objIndex,j] = brightObs.size
+        # we can only have the number of iterations of the max number of stars
+        maxIter = objNGoodObs[goodStars,:].max()
 
-            # and compute straight, unweighted mean of bright Obs  -- no
-            #objMagStdMean[objIndex,j] = np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]) / brightObs.size
-            # compute weighted mean of bright observations, and also compute error
-            wtSum = np.sum(1./obsMagErr[thisObsIndex[i1a[brightObs]]]**2.)
-            objMagStdMean[objIndex,j] = (np.sum(obsMagStd[thisObsIndex[i1a[brightObs]]]/
-                                               obsMagErr[thisObsIndex[i1a[brightObs]]]**2.) /
-                                         wtSum)
-            objMagStdMeanErr[objIndex,j] = np.sqrt(1./wtSum)
+        ctr = 0
 
+        lastGoodSize = subGood.size+1
+
+        # create temporary variables.  Are they too big in memory?
+        nSum = np.zeros_like(objMagStdMean,dtype='i4')
+        tempObjMagStdMean = np.zeros_like(objMagStdMean)
+
+        # loop over cutting iteratively
+        #  this is essentially a binary search to find the brightest mag
+        #  for each object/band
+        #  right now it just keeps searching until they're all done, even
+        #  if that isn't the most efficient.
+        while ((lastGoodSize > subGood.size) and (ctr < maxIter)) :
+            # first, save lastGoodSize
+            lastGoodSize = subGood.size
+
+            # clear temp vars
+            nSum[:,:] = 0
+            tempObjMagStdMean[:,:] = 0
+
+            # compute mean mags, with total and number
+            np.add.at(tempObjMagStdMean,
+                      (obsObjIDIndex[goodObs[subGood]],
+                       obsBandIndex[goodObs[subGood]]),
+                      obsMagStd[goodObs[subGood]])
+            np.add.at(nSum,
+                      (obsObjIDIndex[goodObs[subGood]],
+                       obsBandIndex[goodObs[subGood]]),
+                      1)
+
+            # which have measurements?
+            #  (note this might be redundant in the iterations)
+
+            gd=np.where(nSum > 0)
+
+            tempObjMagStdMean[gd] /= nSum[gd]
+
+            # and get new subGood
+            #   note that this refers to the original goodObs...not a sub of a sub
+            subGood,=np.where(obsMagStd[goodObs] <=
+                              tempObjMagStdMean[obsObjIDIndex[goodObs],
+                                                obsBandIndex[goodObs]])
+
+            # and increment counter
+            ctr+=1
+
+
+        if (ctr == maxIter):
+            # this is a big problem, and shouldn't be possible.
+            raise ValueError("Bright observation search failed to converge!")
+
+        # now which observations are bright *enough* to consider?
+        brightEnoughGO, = np.where((obsMagStd[goodObs] -
+                                    tempObjMagStdMean[obsObjIDIndex[goodObs],
+                                                      obsBandIndex[goodObs]]) <=
+                                   self.brightObsGrayMax)
+
+        # need to take the weighted mean, so a temp array here
+        #  (memory issues?)
+        wtSum = np.zeros_like(objMagStdMean,dtype='f8')
+        obsMagErr2GOBE = obsMagADUErr[goodObs[brightEnoughGO]]**2.
+
+        np.add.at(wtSum,
+                  (obsObjIDIndex[goodObs[brightEnoughGO]],
+                   obsBandIndex[goodObs[brightEnoughGO]]),
+                  1./obsMagErr2GOBE)
+
+        gd=np.where(wtSum > 0.0)
+        # important: only zero accumulator for our stars
+        objMagStdMean[gd] = 0.0
+        objNGoodObs[gd] = 0
+
+        # note that obsMag is already cut to goodObs
+        np.add.at(objMagStdMean,
+                  (obsObjIDIndex[goodObs[brightEnoughGO]],
+                   obsBandIndex[goodObs[brightEnoughGO]]),
+                  obsMagStd[goodObs[brightEnoughGO]]/obsMagErr2GOBE)
+        np.add.at(objNGoodObs,
+                  (obsObjIDIndex[goodObs[brightEnoughGO]],
+                   obsBandIndex[goodObs[brightEnoughGO]]),
+                  1)
+
+        objMagStdMean[gd] /= wtSum[gd]
+        objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
+
+        # finally, compute SED slopes if desired
         if (self.computeSEDSlopes):
-            self.fgcmStars.computeObjectSEDSlope(objIndex)
+            self.fgcmStars.computeObjectSEDSlopes(goodStars)
 
         # and we're done
