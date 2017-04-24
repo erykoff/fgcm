@@ -35,6 +35,9 @@ class FgcmFitCycle(object):
         """
         """
 
+        # unsure whether memory usage should be start or not
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Start')
+
         # Check if this is the initial cycle
         initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
@@ -71,6 +74,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.log('DEBUG','FitCycle is making FgcmGray')
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Prepared')
+
         # Apply aperture corrections and SuperStar if available
         # select exposures...
         if (not initialCycle):
@@ -82,8 +87,6 @@ class FgcmFitCycle(object):
             # and flag exposures using quantities computed from previous cycle
             self.fgcmLog.log('DEBUG','FitCycle is running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
-
-
 
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
@@ -107,7 +110,9 @@ class FgcmFitCycle(object):
 
             # run the bright observation algorithm, computing SEDs
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
-            brightObs.selectGoodStars(computeSEDSlopes=True)
+            brightObs.brightestObsMeanMag(computeSEDSlopes=True)
+
+            self.fgcmLog.logMemoryUsage('INFO','FitCycle Post Bright-Obs')
 
             # flag stars that are outside our color cuts
             self.fgcmStars.performColorCuts()
@@ -131,6 +136,8 @@ class FgcmFitCycle(object):
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Pre-Fit')
+
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
             self._doFit()
@@ -138,9 +145,12 @@ class FgcmFitCycle(object):
         else:
             self.fgcmLog.log('INFO','FitCycle skipping fit because maxIter == 0')
 
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Post-Fit')
+
         # One last run to compute mstd all observations of all exposures
         self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
+
 
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.log('DEBUG','FitCycle computing Exp and CCD Gray')
@@ -187,6 +197,9 @@ class FgcmFitCycle(object):
                                                       self.fgcmConfig.outfileBase,
                                                       self.fgcmConfig.cycleNumber+1)
         self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile)
+
+
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Completed')
 
     def _doFit(self,doPlots=True):
         """
