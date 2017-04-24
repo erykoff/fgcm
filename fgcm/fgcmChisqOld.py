@@ -8,7 +8,6 @@ import esutil
 import time
 
 from fgcmUtilities import _pickle_method
-from fgcmUtilities import resourceUsage
 
 import types
 import copy_reg
