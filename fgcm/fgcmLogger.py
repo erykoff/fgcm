@@ -22,13 +22,39 @@ class FgcmLogger(object):
 
 
     def log(self,logType,logString):
+        """
+        """
 
         if (logDict[logType] <= logDict[self.logLevel]):
             self.logF.write(logString+'\n')
             self.logF.flush()
             print(logString)
 
+    def logMemoryUsage(self,logType,location):
+        """
+        """
+        status = None
+        result = {'peak':0, 'rss':0}
+        try:
+            status = open('/proc/self/status')
+            for line in status:
+                parts = line.split()
+                key = parts[0][2:-1].lower()
+                if key in result:
+                    result[key] = int(parts[1])/1000
+
+            logString = 'Memory usage at %s: %d MB current; %d MB peak.' % (
+                location, result['rss'], result['peak'])
+
+            self.log(logType,logString)
+        except:
+            self.log(logType,'Could not get process status for resource usage!')
+
+        return
+
     def stopLogging(self):
+        """
+        """
         self.logF.close()
 
         self.logLevel == 0
