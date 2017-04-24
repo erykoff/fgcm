@@ -22,7 +22,7 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 copy_reg.pickle(types.MethodType, _pickle_method)
 
 
-class FgcmBrightObsAlt(object):
+class FgcmBrightObs(object):
     """
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
