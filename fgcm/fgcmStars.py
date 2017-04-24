@@ -290,7 +290,7 @@ class FgcmStars(object):
 
 
         # check that we have valid mags for all the required bands
-        if (np.max(thisObjMagStdMean[self.bandRequired]) > 90.0):
+        if (np.max(thisObjMagStdMean[self.bandRequiredIndex]) > 90.0):
             # cannot compute
             objSEDSlope[objIndex,:] = 0.0
         else:
@@ -341,6 +341,70 @@ class FgcmStars(object):
                         (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
                     (S[tempIndex-1] - S[tempIndex-2]))
 
+    def computeObjectSEDSlopes(self,objIndicesIn):
+        """
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+
+        # select out good ones
+        # NOTE: assumes that the required bands are sequential.
+        #  in fact, this whole thing does.
+        ## FIXME: require required bands to be explicitly sequential
+
+        ## NOTE: this check is probably redundant, since we already have
+        #   a list of good stars in most cases.
+        maxMag = np.max(objMagStdMean[objIndicesIn,
+                                      self.bandRequiredIndex.min():
+                                          self.bandRequiredIndex.max()+1],axis=1)
+        bdFlag = (maxMag > 90.0)
+        bd,=np.where(bdFlag)
+        objSEDSlope[objIndicesIn[bd],:] = 0.0
+        gd,=np.where(~bdFlag)
+
+        objIndices = objIndicesIn[gd]
+
+        # can this be non-looped?
+        S=np.zeros((objIndices.size,self.nBands-1),dtype='f8')
+        for i in xrange(self.nBands-1):
+            S[:,i] = (-1/self.magConstant) * (objMagStdMean[objIndices,i+1] -
+                                              objMagStdMean[objIndices,i]) / (
+                (self.lambdaStd[i+1] - self.lambdaStd[i]))
+
+        ## FIXME: will have to handle u band "extra"
+
+        tempIndex=self.bandRequiredIndex[0]
+        objSEDSlope[objIndices,tempIndex] = (
+            S[:,tempIndex] + self.sedFitBandFudgeFactors[0] * (
+                (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
+                (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
+            (S[:,tempIndex+1] - S[:,tempIndex]))
+
+        # and the middle ones...
+        #  these are straight averages
+        for tempIndex in self.bandRequiredIndex[1:-1]:
+            objSEDSlope[objIndices,tempIndex] = self.sedFitBandFudgeFactors[tempIndex] * (
+                S[:,tempIndex-1] + S[:,tempIndex]) / 2.0
+
+        # and the last one
+        tempIndex = self.bandRequiredIndex[-1]
+        objSEDSlope[objIndices,tempIndex] = (
+            S[:,tempIndex-1] + self.sedFitBandFudgeFactors[-1] * (
+                (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
+                (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+            (S[:,tempIndex-1] - S[:,tempIndex-2]))
+
+        # and the extra bands, only redward now
+        tempIndex = self.bandRequiredIndex[-1]
+        for i in xrange(len(self.bandExtraIndex)):
+            extraIndex=self.bandExtraIndex[i]
+            use,=np.where(objMagStdMean[objIndices,extraIndex] < 90.0)
+            objSEDSlope[objIndices[use],extraIndex] = (
+                S[use,tempIndex-1] + self.sedExtraBandFudgeFactors[i] * (
+                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
+                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                (S[use,tempIndex-1] - S[use,tempIndex-2]))
 
 
     def performColorCuts(self):
