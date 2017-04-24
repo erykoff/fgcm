@@ -121,7 +121,7 @@ class FgcmApertureCorrection(object):
                                   self.fgcmPars.compAperCorrSlopeErr[i]))
 
             if (doPlots):
-                fig=plt.figure(1)
+                fig=plt.figure(1,figsize=(8,6))
                 fig.clf()
 
                 ax=fig.add_subplot(111)
