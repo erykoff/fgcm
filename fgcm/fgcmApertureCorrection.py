@@ -66,6 +66,10 @@ class FgcmApertureCorrection(object):
                           (self.fgcmPars.expSeeingVariable[expIndexUse] > self.illegalValue) &
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
 
+            if (use.size == 0):
+                self.fgcmLog.log('INFO','ApertureCorrection: No good observations in %s band.' % (self.fgcmPars.bands[i]))
+                continue
+
             # sort to set the range...
             #st=np.argsort(expGrayTemp[use])
             st=np.argsort(self.fgcmPars.expSeeingVariable[expIndexUse[use]])
