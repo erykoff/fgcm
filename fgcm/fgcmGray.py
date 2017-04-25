@@ -402,6 +402,11 @@ class FgcmGray(object):
                                  (objNGoodObs[obsObjIDIndex[goodObs],bandIndex] >=
                                   self.fgcmStars.minPerBand))
 
+            if (sigUse.size == 0):
+                self.fgcmLog.log('INFO','sigFGCM: No good observations in %s band.' %
+                                 (self.fgcmPars.bands[bandIndex]))
+                continue
+
             #hist = esutil.stat.histogram(EGray[goodObs[sigUse]],binsize=0.0002,more=True)
             #hCenter=hist['center']
             #hHist = hist['hist'].astype('f8')
