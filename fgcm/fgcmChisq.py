@@ -225,6 +225,7 @@ class FgcmChisq(object):
 
         # now refer to obsBandIndex[goodObs]
         # add GO to index names that are cut to goodObs
+        # add GOF to index names that are cut to goodObs[obsFitUseGO]
 
         lutIndicesGO = self.fgcmLUT.getIndices(obsBandIndex[goodObs],
                                                self.fgcmPars.expPWV[obsExpIndex[goodObs]],
