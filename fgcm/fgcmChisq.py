@@ -40,12 +40,12 @@ class FgcmChisq(object):
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
 
-        #self.fitChisqs = []
         self.resetFitChisqList()
 
-        # not sure what we need the config for
+        # this is the default number of parameters
+        self.nActualFitPars = self.fgcmPars.nFitPars
+        self.fgcmLog.log('INFO','Default: fit %d parameters.' % (self.nActualFitPars))
 
-        #resourceUsage('End of chisq init')
 
     def resetFitChisqList(self):
         self.fitChisqs = []
@@ -100,7 +100,9 @@ class FgcmChisq(object):
 
         self.nSums = 2  # chisq, nobs
         if (self.computeDerivatives):
-            self.nSums += self.fgcmPars.nFitPars
+            # we have one for each of the derivatives
+            # and a duplicate set to track which parameters were "touched"
+            self.nSums += 2*self.fgcmPars.nFitPars
 
         self.debug = debug
         if (self.debug):
@@ -143,9 +145,17 @@ class FgcmChisq(object):
 
 
         if (not self.allExposures):
-            ## FIXME: dof should be actual number of fit parameters
+            # we get the number of fit parameters by counting which of the parameters
+            #  have been touched by the data (number of touches is irrelevant)
 
-            fitDOF = partialSums[-1] - float(self.fgcmPars.nFitPars)
+            if (self.computeDerivatives):
+                nonZero, = np.where(partialSums[self.fgcmPars.nFitPars:
+                                                    2*self.fgcmPars.nFitPars] > 0)
+                self.nActualFitPars = nonZero.size
+                self.fgcmLog.log('INFO','Actually fit %d parameters.' % (self.nActualFitPars))
+
+            fitDOF = partialSums[-1] - float(self.nActualFitPars)
+
             if (fitDOF <= 0):
                 raise ValueError("Number of parameters fitted is more than number of constraints! (%d > %d)" % (self.fgcmPars.nFitPars,partialSums[-1]))
 
@@ -374,6 +384,9 @@ class FgcmChisq(object):
 
             partialArray[self.fgcmPars.parO3Loc +
                          uNightIndex] *= (2.0 / unitDict['o3Unit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parO3Loc +
+                         uNightIndex] += 1
 
             ###########
             ## Alpha
@@ -396,6 +409,9 @@ class FgcmChisq(object):
 
             partialArray[self.fgcmPars.parAlphaLoc +
                          uNightIndex] *= (2.0 / unitDict['alphaUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parAlphaLoc +
+                         uNightIndex] += 1
 
 
             ###########
@@ -404,6 +420,7 @@ class FgcmChisq(object):
 
             if (self.fgcmPars.hasExternalPWV):
                 hasExtGOF,=np.where(self.fgcmPars.externalPWVFlag[obsExpIndex[goodObs[obsFitUseGO]]])
+                uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
 
                 # PWV Nightly Offset
                 np.add.at(magdLdPWVOffset,
@@ -425,7 +442,10 @@ class FgcmChisq(object):
                          magdLdPWVOffset[expNightIndexGOF[hasExtGOF],
                                          obsBandIndex[goodObs[obsFitUseGO[hasExtGOF]]]])))
                 partialArray[self.fgcmPars.parExternalPWVOffsetLoc +
-                             uNightIndex] *= (2.0 / unitDict['pwvUnit'])
+                             uNightIndexHasExt] *= (2.0 / unitDict['pwvUnit'])
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parExternalPWVOffsetLoc +
+                             uNightIndexHasExt] += 1
 
 
                 # PWV Global Scale
@@ -444,12 +464,16 @@ class FgcmChisq(object):
                             dLdPWVGO[obsFitUseGO[hasExtGOF]] -
                             magdLdPWVScale[obsBandIndex[goodObs[obsFitUseGO[hasExtGOF]]]])) /
                     unitDict['pwvUnit'])
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parExternalPWVScaleLoc] += 1
 
             ###########
             ## PWV No External
             ###########
 
             noExtGOF, = np.where(~self.fgcmPars.externalPWVFlag[obsExpIndex[goodObs[obsFitUseGO]]])
+            uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
+
             # PWV Nightly Intercept
 
             np.add.at(magdLdPWVIntercept,
@@ -472,7 +496,10 @@ class FgcmChisq(object):
                                      obsBandIndex[goodObs[obsFitUseGO[noExtGOF]]]])))
 
             partialArray[self.fgcmPars.parPWVInterceptLoc +
-                         uNightIndex] *= (2.0 / unitDict['pwvUnit'])
+                         uNightIndexNoExt] *= (2.0 / unitDict['pwvUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parPWVInterceptLoc +
+                         uNightIndexNoExt] += 1
 
             # PWV Nightly Slope
             np.add.at(magdLdPWVSlope,
@@ -498,6 +525,8 @@ class FgcmChisq(object):
 
             partialArray[self.fgcmPars.parPWVSlopeLoc +
                          uNightIndex] *= (2.0 / unitDict['pwvSlopeUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parPWVSlopeLoc] += 1
 
             #############
             ## Tau External
@@ -505,6 +534,7 @@ class FgcmChisq(object):
 
             if (self.fgcmPars.hasExternalTau):
                 hasExtGOF,=np.where(self.fgcmPars.externalTauFlag[obsExpIndex[goodObs[obsFitUseGO]]])
+                uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
 
                 # Tau Nightly Offset
                 np.add.at(magdLdTauOffset,
@@ -527,7 +557,10 @@ class FgcmChisq(object):
                                          obsBandIndex[goodObs[obsFitUseGO[hasExtGOF]]]])))
 
                 partialArray[self.fgcmPars.parExternalTauOffsetLoc +
-                             uNightIndex] *= (2.0 / unitDict['tauUnit'])
+                             uNightIndexHasExt] *= (2.0 / unitDict['tauUnit'])
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parExternalTauOffsetLoc +
+                             uNightIndexHasExt] += 1
 
                 # Tau Global Scale
                 ## MAYBE: is this correct with the logs?
@@ -546,12 +579,15 @@ class FgcmChisq(object):
                             dLdTauGO[obsFitUseGO[hasExtGOF]] -
                             magdLdPWVScale[obsBandIndex[goodObs[obsFitUseGO[hasExtGOF]]]])) /
                     unitDict['tauUnit'])
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parExternalTauScaleLoc] += 1
 
             ###########
             ## Tau No External
             ###########
 
             noExtGOF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndex[goodObs[obsFitUseGO]]])
+            uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
 
             # Tau Nightly Intercept
             np.add.at(magdLdTauIntercept,
@@ -574,7 +610,10 @@ class FgcmChisq(object):
                                      obsBandIndex[goodObs[obsFitUseGO[noExtGOF]]]])))
 
             partialArray[self.fgcmPars.parTauInterceptLoc +
-                         uNightIndex] *= (2.0 / unitDict['tauUnit'])
+                         uNightIndexNoExt] *= (2.0 / unitDict['tauUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parTauInterceptLoc +
+                         uNightIndexNoExt] += 1
 
             # Tau Nightly Slope
             np.add.at(magdLdTauSlope,
@@ -599,7 +638,10 @@ class FgcmChisq(object):
                                     obsBandIndex[goodObs[obsFitUseGO[noExtGOF]]]])))
 
             partialArray[self.fgcmPars.parTauSlopeLoc +
-                         uNightIndex] *= (2.0 / unitDict['tauSlopeUnit'])
+                         uNightIndexNoExt] *= (2.0 / unitDict['tauSlopeUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parTauSlopeLoc +
+                         uNightIndexNoExt] += 1
 
             #############
             ## Washes (QE Sys)
@@ -626,6 +668,9 @@ class FgcmChisq(object):
 
             partialArray[self.fgcmPars.parQESysInterceptLoc +
                          uWashIndex] *= (2.0 / unitDict['qeSysUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parQESysInterceptLoc +
+                         uWashIndex] += 1
 
             # Wash Slope
             np.add.at(magdLdWashSlope,
@@ -648,6 +693,9 @@ class FgcmChisq(object):
                                     obsBandIndex[goodObs[obsFitUseGO]]]))
             partialArray[self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] *= (2.0 / unitDict['qeSysSlopeUnit'])
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parQESysSlopeLoc +
+                         uWashIndex] += 1
 
 
         # note that this store doesn't need locking because we only access
