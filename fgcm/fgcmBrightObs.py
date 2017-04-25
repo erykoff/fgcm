@@ -97,12 +97,14 @@ class FgcmBrightObs(object):
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # select the good observations that go into these stars
         _,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
 
         # and cut to those exposures that are not flagged
-        gd,=np.where(self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0)
+        gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
+                     (obsFlag[goodObs] == 0))
         goodObs = goodObs[gd]
 
         obsMagErr2GO = obsMagADUErr[goodObs]**2.
