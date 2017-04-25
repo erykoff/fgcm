@@ -452,9 +452,9 @@ class FgcmZeropoints(object):
                      expZpMean[use],cols[i]+syms[i],
                      label=r'$(%s)$' % (self.fgcmPars.bands[i]))
 
-        ax.legend(3)
+        ax.legend(loc=3)
 
-        fig.savefig('%s/%s_zeropoints.png' % (self.fgcmConfig.plotPath,
+        fig.savefig('%s/%s_zeropoints.png' % (self.plotPath,
                                               self.outfileBaseWithCycle))
 
     def _computeZpt(self,zpStruct,zpIndex):
