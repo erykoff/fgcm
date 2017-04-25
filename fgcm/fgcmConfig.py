@@ -197,7 +197,8 @@ class FgcmConfig(object):
         # make sure we drop trailing spaces
         self.bands = np.core.defchararray.strip(self.bands[:])
         self.fitBands = np.core.defchararray.strip(self.fitBands[:])
-        self.extraBands = np.core.defchararray.strip(self.extraBands[:])
+        if (self.extraBands.size > 0):
+            self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
         bandString = ''
         for b in self.bands: bandString += b + ' '
@@ -261,11 +262,12 @@ class FgcmConfig(object):
         for i in xrange(self.bands.size):
             if (self.bands[i] in self.fitBands):
                 self.bandRequired[i] = True
-            if (self.bands[i] in self.extraBands):
-                self.bandExtra[i] = True
-            if (self.bands[i] in self.fitBands and
-                self.bands[i] in self.extraBands):
-                raise ValueError("Cannot have the same band as fit and extra")
+            if (self.extraBands.size > 0):
+                if (self.bands[i] in self.extraBands):
+                    self.bandExtra[i] = True
+                if (self.bands[i] in self.fitBands and
+                    self.bands[i] in self.extraBands):
+                    raise ValueError("Cannot have the same band as fit and extra")
 
         # and check the star color cuts and replace with indices...
         #  note that self.starColorCuts is a copy so that we don't overwrite.
