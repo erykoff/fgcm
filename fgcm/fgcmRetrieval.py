@@ -85,6 +85,7 @@ class FgcmRetrieval(object):
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
@@ -105,6 +106,9 @@ class FgcmRetrieval(object):
         #_,b=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
         # NOTE: this relies on np.where returning a sorted array.
         _,goodObs=esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+
+        gd,=np.where(obsFlag[goodObs] == 0)
+        goodObs=goodObs[gd]
 
         self.fgcmLog.log('INFO','FgcmRetrieval using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
