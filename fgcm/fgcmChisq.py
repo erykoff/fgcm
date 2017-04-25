@@ -201,6 +201,7 @@ class FgcmChisq(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
         obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
         obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
@@ -209,7 +210,13 @@ class FgcmChisq(object):
         _,goodObs=esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
 
         if (not self.allExposures):
-            gd,=np.where(self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0)
+            # if we aren't doing all exposures, cut to expFlag == 0 exposures
+            gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
+                         (obsFlag[goodObs] == 0))
+            goodObs = goodObs[gd]
+        else:
+            # we are doing all exposures, still cut out bad observations
+            gd,=np.where(obsFlag[goodObs] == 0)
             goodObs = goodObs[gd]
 
         # which observations are used in the fit?
