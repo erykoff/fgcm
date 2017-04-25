@@ -380,8 +380,8 @@ class FgcmZeropoints(object):
                           (np.abs(zpStruct['FGCM_R10']) < 1000.0) &
                           (np.abs(zpStruct['FGCM_R0']) < 1000.0))
 
-            #if (use.size == 0) :
-            #    self.fgcmLog
+            if (use.size == 0):
+                continue
 
             i1 = zpStruct['FGCM_I10'][use]*zpStruct['FGCM_I0'][use]
             r1 = zpStruct['FGCM_R10'][use]*zpStruct['FGCM_R0'][use]
@@ -447,6 +447,9 @@ class FgcmZeropoints(object):
         for i in xrange(self.fgcmPars.nBands):
             use,=np.where((self.fgcmPars.expBandIndex == i) &
                           (expZpMean > 0.0))
+
+            if (use.size == 0) :
+                continue
 
             plt.plot(self.fgcmPars.expMJD[use] - firstMJD,
                      expZpMean[use],cols[i]+syms[i],
