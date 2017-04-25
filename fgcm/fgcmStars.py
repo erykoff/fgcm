@@ -259,15 +259,6 @@ class FgcmStars(object):
         tempSecZenith[bad] = 1.0  # filler here, but these stars aren't used
         snmm.getArray(self.obsSecZenithHandle)[:] = tempSecZenith
 
-        #objHARad = (fgcmPars.expTelHA[obsExpIndex[obsIndex]] +
-        #            fgcmPars.expTelRA[obsExpIndex[obsIndex]] -
-        #            objRARad[obsObjIDIndex[obsIndex]])
-        #snmm.getArray(self.obsSecZenithHandle)[:] = 1./(np.sin(objDecRad[obsObjIDIndex[obsIndex]]) *
-        #                                                fgcmPars.sinLatitude +
-        #                                                np.cos(objDecRad[obsObjIDIndex[obsIndex]]) *
-        #                                                fgcmPars.cosLatitude *
-        #                                                np.cos(objHARad[obsObjIDIndex[obsIndex]]))
-
 
 
     def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None,doPlots=False):
@@ -285,30 +276,26 @@ class FgcmStars(object):
 
         obsExp = snmm.getArray(self.obsExpHandle)
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsIndex = snmm.getArray(self.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objID = snmm.getArray(self.objIDHandle)
         obsFlag = snmm.getArray(self.obsFlagHandle)
 
-        goodObs, = np.where(obsFlag == 0)
-
-        ## CHECK: is this necessary??
-
+        # new simpler version
+        #  want to think if there's an even faster version.
         if (goodExps is not None):
-            a,b=esutil.numpy_util.match(goodExps,obsExp[obsIndex])
+            _,goodObs=esutil.numpy_util.match(goodExps,obsExp)
         else:
-            a,b=esutil.numpy_util.match(goodExpsIndex,obsExpIndex[obsIndex])
+            _,goodObs=esutil.numpy_util.match(goodExpsIndex,obsExpIndex)
 
-        goodObs, = np.where(obsFlag[obsIndex[b]] == 0)
-        b = b[goodObs]
+        gd, = np.where(obsFlag[goodObs] == 0)
+        goodObs = goodObs[gd]
 
-        # Even better version
         objNGoodObs[:,:] = 0
         np.add.at(objNGoodObs,
-                  (obsObjIDIndex[obsIndex[b]],
-                   obsBandIndex[obsIndex[b]]),
+                  (obsObjIDIndex[goodObs],
+                   obsBandIndex[goodObs]),
                   1)
 
         minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
