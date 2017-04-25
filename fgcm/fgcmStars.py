@@ -6,6 +6,7 @@ import esutil
 
 from fgcmUtilities import _pickle_method
 from fgcmUtilities import objFlagDict
+from fgcmUtilities import obsFlagDict
 
 import types
 import copy_reg
@@ -104,6 +105,8 @@ class FgcmStars(object):
         self.obsCCDHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsBandIndex: band index of individual observation
         self.obsBandIndexHandle = snmm.createArray(self.nStarObs,dtype='i2')
+        #  obsFlag: individual bad observation
+        self.obsFlagHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsRA: RA of individual observation
         self.obsRAHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsDec: Declination of individual observation
@@ -118,6 +121,7 @@ class FgcmStars(object):
         #  obsMagStd: corrected (to standard passband) mag of individual observation
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4')
 
+
         snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
         snmm.getArray(self.obsCCDHandle)[:] = obs['CCDNUM'][:]
         snmm.getArray(self.obsRAHandle)[:] = obs['RA'][:]
@@ -130,14 +134,28 @@ class FgcmStars(object):
                          (self.sigma0Phot))
 
         obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
+
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+        bad,=np.where(obsMagADUErr <= 0.0)
+        obsFlag[bad] |= obsFlagDict['BAD_ERROR']
+        if (bad.size > 0):
+            self.fgcmLog.log('INFO','Flagging %d observations with bad errors.' %
+                             (bad.size))
+
         obsMagADUErr = np.sqrt(obsMagADUErr**2. + self.sigma0Phot**2.)
 
-        ## Question: do we need to confirm that errors are positive first?
-        ##  eg. how sanitized is the input?
-
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsExpIndex[:] = -1
         a,b=esutil.numpy_util.match(self.expArray,
                                     snmm.getArray(self.obsExpHandle)[:])
-        snmm.getArray(self.obsExpIndexHandle)[b] = a
+        obsExpIndex[b] = a
+
+        bad,=np.where(obsExpIndex < 0)
+        obsFlag[bad] |= obsFlagDict['NO_EXPOSURE']
+
+        if (bad.size > 0):
+            self.fgcmLog.log('INFO','Flagging %d observations with no associated exposure.' %
+                             (bad.size))
 
         # and match bands to indices
         bandStrip = np.core.defchararray.strip(obs['BAND'][:])
@@ -223,19 +241,32 @@ class FgcmStars(object):
 
         objRARad = np.radians(snmm.getArray(self.objRAHandle))
         objDecRad = np.radians(snmm.getArray(self.objDecHandle))
+        ## FIXME: deal with this at some point...
         hi,=np.where(objRARad > np.pi)
         objRARad[hi] -= 2*np.pi
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
-        objHARad = (fgcmPars.expTelHA[obsExpIndex[obsIndex]] +
-                    fgcmPars.expTelRA[obsExpIndex[obsIndex]] -
-                    objRARad[obsObjIDIndex[obsIndex]])
-        snmm.getArray(self.obsSecZenithHandle)[:] = 1./(np.sin(objDecRad[obsObjIDIndex[obsIndex]]) *
-                                                        fgcmPars.sinLatitude +
-                                                        np.cos(objDecRad[obsObjIDIndex[obsIndex]]) *
-                                                        fgcmPars.cosLatitude *
-                                                        np.cos(objHARad[obsObjIDIndex[obsIndex]]))
+
+        obsHARad = (fgcmPars.expTelHA[obsExpIndex] +
+                    fgcmPars.expTelRA[obsExpIndex] -
+                    objRARad[obsObjIDIndex])
+        tempSecZenith = 1./(np.sin(objDecRad[obsObjIDIndex]) * fgcmPars.sinLatitude +
+                            np.cos(objDecRad[obsObjIDIndex]) * fgcmPars.cosLatitude *
+                            np.cos(obsHARad))
+
+        bad,=np.where(obsFlag != 0)
+        tempSecZenith[bad] = 1.0  # filler here, but these stars aren't used
+        snmm.getArray(self.obsSecZenithHandle)[:] = tempSecZenith
+
+        #objHARad = (fgcmPars.expTelHA[obsExpIndex[obsIndex]] +
+        #            fgcmPars.expTelRA[obsExpIndex[obsIndex]] -
+        #            objRARad[obsObjIDIndex[obsIndex]])
+        #snmm.getArray(self.obsSecZenithHandle)[:] = 1./(np.sin(objDecRad[obsObjIDIndex[obsIndex]]) *
+        #                                                fgcmPars.sinLatitude +
+        #                                                np.cos(objDecRad[obsObjIDIndex[obsIndex]]) *
+        #                                                fgcmPars.cosLatitude *
+        #                                                np.cos(objHARad[obsObjIDIndex[obsIndex]]))
 
 
 
@@ -259,13 +290,19 @@ class FgcmStars(object):
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objID = snmm.getArray(self.objIDHandle)
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+
+        goodObs, = np.where(obsFlag == 0)
+
+        ## CHECK: is this necessary??
 
         if (goodExps is not None):
             a,b=esutil.numpy_util.match(goodExps,obsExp[obsIndex])
         else:
             a,b=esutil.numpy_util.match(goodExpsIndex,obsExpIndex[obsIndex])
 
-        #req,=np.where(self.bandRequired)
+        goodObs, = np.where(obsFlag[obsIndex[b]] == 0)
+        b = b[goodObs]
 
         # Even better version
         objNGoodObs[:,:] = 0
@@ -276,9 +313,6 @@ class FgcmStars(object):
 
         minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
 
-        #snmm.getArray(self.objFlagHandle)[:] = 0
-        #bad,=np.where(minObs < self.minPerBand)
-        #snmm.getArray(self.objFlagHandle)[bad] = 1
         objFlag = snmm.getArray(self.objFlagHandle)
         bad,=np.where(minObs < self.minPerBand)
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
@@ -472,6 +506,9 @@ class FgcmStars(object):
         """
 
         self.fgcmLog.log('INFO','Applying SuperStarFlat to raw magnitudes')
+
+        # note: in the case of bad observations, these will still get something
+        #  applied, but we need to make sure we filter it out before using it
 
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
