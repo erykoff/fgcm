@@ -1017,7 +1017,6 @@ class FgcmParameters(object):
         pwvNight[gd] /= nExpPerNight[gd].astype(np.float64)
         O3Night[gd] /= nExpPerNight[gd].astype(np.float64)
 
-        #firstMJD = np.floor(np.min(mjdNight[gd]))
         firstMJD = np.floor(np.min(self.expMJD))
 
         # now alpha
