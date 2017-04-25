@@ -105,6 +105,7 @@ class FgcmGray(object):
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # first, we need to compute E_gray == <mstd> - mstd for each observation
 
@@ -127,6 +128,10 @@ class FgcmGray(object):
         #_,goodObs=esutil.numpy_util.match(objID[goodStars],objID[obsObjIDIndex])
         #  NOTE: this relies on np.where returning a sorted array
         _,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+
+        # and cut out bad observations
+        gd,=np.where(obsFlag[goodObs] == 0)
+        goodObs = goodObs[gd]
 
         self.fgcmLog.log('INFO','FgcmGray initial exp gray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
