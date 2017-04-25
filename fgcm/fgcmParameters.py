@@ -451,7 +451,7 @@ class FgcmParameters(object):
         self.washStepUnits = 1.0/self.stepUnitReference / self.stepGrain
         self.washSlopeStepUnits = self.washStepUnits / self.meanWashIntervalDuration
         self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
-        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washSlopeStepUnits))
+        self.fgcmLog.log('INFO','wash slope step unit set to %f' % (self.washSlopeStepUnits))
 
 
     def _loadParFile(self, fgcmConfig, parFile):
