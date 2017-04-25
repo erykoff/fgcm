@@ -438,7 +438,7 @@ class FgcmGray(object):
                 continue
 
             ax.tick_params(axis='both',which='major',labelsize=14)
-            ax.locator_params(axis='x',nbins=5)
+            #ax.locator_params(axis='x',nbins=6)
 
             text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n' + \
                 r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
