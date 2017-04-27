@@ -120,7 +120,7 @@ class FgcmBrightObs(object):
 
             # make a pool
             pool = Pool(processes=self.nCore)
-            pool.map(self._worker,workerList)
+            pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
 
@@ -146,6 +146,9 @@ class FgcmBrightObs(object):
         obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+
+        # and the arrays for locking access
+        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
 
         # select the good observations that go into these stars
         #if (self.debug) :
@@ -193,7 +196,7 @@ class FgcmBrightObs(object):
 
         # create temporary variables.  Are they too big in memory?
         nSum = np.zeros_like(objMagStdMean,dtype='i4')
-        tempObjMagStdMean = np.zeros_like(objMagStdMean)
+        objMagStdMeanTemp = np.zeros_like(objMagStdMean)
 
         # loop over cutting iteratively
         #  this is essentially a binary search to find the brightest mag
@@ -209,10 +212,10 @@ class FgcmBrightObs(object):
 
             # clear temp vars
             nSum[:,:] = 0
-            tempObjMagStdMean[:,:] = 0
+            objMagStdMeanTemp[:,:] = 0
 
             # compute mean mags, with total and number
-            np.add.at(tempObjMagStdMean,
+            np.add.at(objMagStdMeanTemp,
                       (obsObjIDIndexGO[subGood],
                        obsBandIndexGO[subGood]),
                       obsMagStdGO[subGood])
@@ -226,12 +229,12 @@ class FgcmBrightObs(object):
 
             gd=np.where(nSum > 0)
 
-            tempObjMagStdMean[gd] /= nSum[gd]
+            objMagStdMeanTemp[gd] /= nSum[gd]
 
             # and get new subGood
             #   note that this refers to the original goodObs...not a sub of a sub
             subGood,=np.where(obsMagStdGO <=
-                              tempObjMagStdMean[obsObjIDIndexGO,
+                              objMagStdMeanTemp[obsObjIDIndexGO,
                                                 obsBandIndexGO])
 
             if (self.debug):
@@ -248,38 +251,43 @@ class FgcmBrightObs(object):
 
         # now which observations are bright *enough* to consider?
         brightEnoughGO, = np.where((obsMagStdGO -
-                                    tempObjMagStdMean[obsObjIDIndexGO,
+                                    objMagStdMeanTemp[obsObjIDIndexGO,
                                                       obsBandIndexGO]) <=
                                    self.brightObsGrayMax)
 
         # need to take the weighted mean, so a temp array here
         #  (memory issues?)
         wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        #obsMagErr2GOBE = obsMagADUErr[goodObs[brightEnoughGO]]**2.
+        objNGoodObsTemp = np.zeros_like(objNGoodObs)
+        objMagStdMeanTemp[:,:] = 0
+
         obsMagErr2GOBE = obsMagErr2GO[brightEnoughGO]
 
         np.add.at(wtSum,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
                   1./obsMagErr2GOBE)
-
-        gd=np.where(wtSum > 0.0)
-        # important: only zero accumulator for our stars
-        objMagStdMean[gd] = 0.0
-        objNGoodObs[gd] = 0
-
-        # note that obsMag is already cut to goodObs
-        np.add.at(objMagStdMean,
+        np.add.at(objMagStdMeanTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
                   obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE)
-        np.add.at(objNGoodObs,
+        np.add.at(objNGoodObsTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
                   1)
 
-        objMagStdMean[gd] /= wtSum[gd]
+        # these are good object/bands that were observed
+        gd=np.where(wtSum > 0.0)
+
+        # acquire lock to save values
+        objMagStdMeanLock.acquire()
+
+        objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
         objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
+        objNGoodObs[gd] = objNGoodObsTemp[gd]
+
+        # and release
+        objMagStdMeanLock.release()
 
         # finally, compute SED slopes if desired
         if (self.computeSEDSlopes):
