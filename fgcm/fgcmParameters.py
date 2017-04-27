@@ -735,6 +735,8 @@ class FgcmParameters(object):
 
         self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
                                                  self.parQESysInterceptLoc+self.nWashIntervals] / unitDict['qeSysUnit']
+
+        
         self.parQESysSlope[:] = parArray[self.parQESysSlopeLoc:
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
         # done
@@ -828,7 +830,6 @@ class FgcmParameters(object):
     def getParBounds(self,fitterUnits=False):
         """
         """
-
         self.fgcmLog.log('DEBUG','Retrieving parameter bounds')
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
@@ -837,74 +838,101 @@ class FgcmParameters(object):
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
         ## MAYBE: configure slope ranges?
-
-        parLow[self.parPWVInterceptLoc:
-                   self.parPWVInterceptLoc+self.nCampaignNights] = (
-            (self.pwvRange[0] + 10.0*0.2) * unitDict['pwvUnit'])
-        parHigh[self.parPWVInterceptLoc:
-                    self.parPWVInterceptLoc+self.nCampaignNights] = (
-            (self.pwvRange[1] - 10.0*0.2) * unitDict['pwvUnit'])
-        parLow[self.parPWVSlopeLoc:
-                   self.parPWVSlopeLoc+self.nCampaignNights] = (
-            -0.2 * unitDict['pwvSlopeUnit'])
-        parHigh[self.parPWVSlopeLoc:
-                    self.parPWVSlopeLoc+self.nCampaignNights] = (
+        parLow[self.parPWVInterceptLoc: \
+                   self.parPWVInterceptLoc + \
+               self.nCampaignNights] = ( \
+            (self.pwvRange[0] + 10.0*0.2) * \
+                unitDict['pwvUnit'])
+        parHigh[self.parPWVInterceptLoc: \
+                    self.parPWVInterceptLoc + \
+                    self.nCampaignNights] = ( \
+            (self.pwvRange[1] - 10.0*0.2) * \
+                unitDict['pwvUnit'])
+        parLow[self.parPWVSlopeLoc: \
+                   self.parPWVSlopeLoc + \
+                   self.nCampaignNights] = ( \
+                       -0.2 * unitDict['pwvSlopeUnit'])
+        parHigh[self.parPWVSlopeLoc: \
+                    self.parPWVSlopeLoc + \
+                    self.nCampaignNights] = ( \
             0.2 * unitDict['pwvSlopeUnit'])
-        parLow[self.parO3Loc:
-                   self.parO3Loc+self.nCampaignNights] = (
+        parLow[self.parO3Loc: \
+                   self.parO3Loc + \
+                   self.nCampaignNights] = ( \
             self.O3Range[0] * unitDict['o3Unit'])
-        parHigh[self.parO3Loc:
-                    self.parO3Loc+self.nCampaignNights] = (
+        parHigh[self.parO3Loc: \
+                    self.parO3Loc + \
+                    self.nCampaignNights] = ( \
             self.O3Range[1] * unitDict['o3Unit'])
-
-        parLow[self.parTauInterceptLoc:
-                   self.parTauInterceptLoc+self.nCampaignNights] = (
-            (self.tauRange[0] + 10.0*0.0025) * unitDict['tauUnit'])
-        parHigh[self.parTauInterceptLoc:
-                    self.parTauInterceptLoc+self.nCampaignNights] = (
-            (self.tauRange[1] - 10.0*0.0025) * unitDict['tauUnit'])
-        parLow[self.parTauSlopeLoc:
-                   self.parTauSlopeLoc+self.nCampaignNights] = (
+        parLow[self.parTauInterceptLoc: \
+                   self.parTauInterceptLoc + \
+                   self.nCampaignNights] = ( \
+            (self.tauRange[0] + 10.0*0.0025) * \
+                unitDict['tauUnit'])
+        parHigh[self.parTauInterceptLoc: \
+                    self.parTauInterceptLoc +
+                self.nCampaignNights] = ( \
+            (self.tauRange[1] - 10.0*0.0025) * \
+                unitDict['tauUnit'])
+        parLow[self.parTauSlopeLoc: \
+                   self.parTauSlopeLoc + \
+                   self.nCampaignNights] = ( \
             -0.0025 * unitDict['tauSlopeUnit'])
-        parHigh[self.parTauSlopeLoc:
-                    self.parTauSlopeLoc+self.nCampaignNights] = (
+        parHigh[self.parTauSlopeLoc: \
+                    self.parTauSlopeLoc + \
+                    self.nCampaignNights] = ( \
             0.0025 * unitDict['tauSlopeUnit'])
-        parLow[self.parAlphaLoc:
-                   self.parAlphaLoc+self.nCampaignNights] = (
+        parLow[self.parAlphaLoc: \
+                   self.parAlphaLoc + \
+                   self.nCampaignNights] = ( \
             0.25 * unitDict['alphaUnit'])
-        parHigh[self.parAlphaLoc:
-                    self.parAlphaLoc+self.nCampaignNights] = (
+        parHigh[self.parAlphaLoc: \
+                    self.parAlphaLoc + \
+                    self.nCampaignNights] = ( \
             1.75 * unitDict['alphaUnit'])
         if (self.hasExternalPWV):
             parLow[self.parExternalPWVScaleLoc] = 0.5 * unitDict['pwvUnit']
             parHigh[self.parExternalPWVScaleLoc] = 1.5 * unitDict['pwvUnit']
-            parLow[self.parExternalPWVOffsetLoc:
-                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = (
+            parLow[self.parExternalPWVOffsetLoc: \
+                       self.parExternalPWVOffsetLoc + \
+                       self.nCampaignNights] = ( \
                 -1.5 * unitDict['pwvUnit'])
-            parHigh[self.parExternalPWVOffsetLoc:
-                       self.parExternalPWVOffsetLoc+self.nCampaignNights] = (
+            parHigh[self.parExternalPWVOffsetLoc: \
+                       self.parExternalPWVOffsetLoc + \
+                        self.nCampaignNights] = ( \
                 3.0 * unitDict['pwvUnit'])
         if (self.hasExternalTau):
             parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
             parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
-            parLow[self.parExternalTauOffsetLoc:
-                       self.parExternalTauOffsetLoc+self.nCampaignNights] = (
+            parLow[self.parExternalTauOffsetLoc: \
+                       self.parExternalTauOffsetLoc + \
+                   self.nCampaignNights] = ( \
                 0.0 * unitDict['tauUnit'])
-            parHigh[self.parExternalTauOffsetLoc:
-                        self.parExternalTauOffsetLoc+self.nCampaignNights] = (
+            parHigh[self.parExternalTauOffsetLoc: \
+                        self.parExternalTauOffsetLoc + \
+                        self.nCampaignNights] = ( \
                 0.03 * unitDict['tauUnit'])
 
-        parLow[self.parQESysInterceptLoc:
-                   self.parQESysInterceptLoc+self.nWashIntervals] = (
+        parLow[self.parQESysInterceptLoc: \
+                   self.parQESysInterceptLoc + \
+                   self.nWashIntervals] = ( \
             -0.2 * unitDict['qeSysUnit'])
-        parHigh[self.parQESysInterceptLoc:
-                    self.parQESysInterceptLoc+self.nWashIntervals] = (
+        parHigh[self.parQESysInterceptLoc: \
+                    self.parQESysInterceptLoc + \
+                    self.nWashIntervals] = ( \
             0.05 * unitDict['qeSysUnit'])
-        parLow[self.parQESysSlopeLoc:
-                   self.parQESysSlopeLoc+self.nWashIntervals] = (
+
+        # and for the first interval, the intercept will set to zero
+        parLow[self.parQESysInterceptLoc] = 0.0
+        parHigh[self.parQESysInterceptLoc] = 0.0
+
+        parLow[self.parQESysSlopeLoc: \
+                   self.parQESysSlopeLoc + \
+                   self.nWashIntervals] = ( \
             -0.001 * unitDict['qeSysSlopeUnit'])
-        parHigh[self.parQESysSlopeLoc:
-                    self.parQESysSlopeLoc+self.nWashIntervals] = (
+        parHigh[self.parQESysSlopeLoc: \
+                    self.parQESysSlopeLoc + \
+                    self.nWashIntervals] = ( \
             0.001 * unitDict['qeSysSlopeUnit'])
 
         # zip these into a list of tuples
