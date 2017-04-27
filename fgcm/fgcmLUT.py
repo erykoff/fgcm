@@ -702,6 +702,9 @@ class FgcmLUTSHM(object):
 
 
     def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
+        """
+        """
+        
         # need to make sure we have the right ccd indices...
         # this will happen externally.
 
@@ -720,6 +723,9 @@ class FgcmLUTSHM(object):
                 (np.exp(-(pmb - self.pmbElevation)/self.pmbElevation)) ** 1.6)
 
     def computeI0(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb, indices):
+        """
+        """
+        
         dPWV = pwv - (self.pwv[0] + indices[1] * self.pwvDelta)
         dO3 = o3 - (self.o3[0] + indices[2] * self.o3Delta)
         dlnTau = lnTau - (self.lnTau[0] + indices[3] * self.lnTauDelta)
@@ -739,6 +745,9 @@ class FgcmLUTSHM(object):
                                                    snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta)
 
     def computeI1(self, indices):
+        """
+        """
+        
         return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
 
     def computeLogDerivatives(self, indices, I0, tau):
