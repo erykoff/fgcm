@@ -39,6 +39,7 @@ class FgcmBrightObs(object):
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
+        self.nStarPerRun = fgcmConfig.nStarPerRun
 
     def brightestObsMeanMag(self,debug=False,computeSEDSlopes=False):
         """
@@ -66,27 +67,74 @@ class FgcmBrightObs(object):
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
 
+        # do global pre-matching before giving to workers, because
+        #  it is faster this way
+
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+
+        preStartTime=time.time()
+        self.fgcmLog.log('INFO','Pre-matching stars and observations...')
+        goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
+                                                       obsObjIDIndex,
+                                                       presorted=True)
+
+        if (goodStarsSub[0] != 0.0):
+            raise ValueError("Very strange that the goodStarsSub first element is non-zero.")
+
+        self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
+                         (time.time() - preStartTime))
+
         if (self.debug):
-            self._worker(goodStars)
+            self._worker((goodStars,goodObs))
         else:
             self.fgcmLog.log('INFO','Running BrightObs on %d cores' % (self.nCore))
 
-            goodStarsList = np.array_split(goodStars,self.nCore)
+            # split goodStars into a list of arrays of roughly equal size
+
+            prepStartTime = time.time()
+            nSections = goodStars.size // self.nStarPerRun + 1
+            goodStarsList = np.array_split(goodStars,nSections)
+
+            # is there a better way of getting all the first elements from the list?
+            #  note that we need to skip the first which should be zero (checked above)
+            #  see also fgcmChisq.py
+            splitValues = np.zeros(nSections-1,dtype='i4')
+            for i in xrange(1,nSections):
+                splitValues[i-1] = goodStarsList[i][0]
+
+            # get the indices from the goodStarsSub matched list
+            splitIndices = np.searchsorted(goodStarsSub, splitValues)
+
+            # and split along these indices
+            goodObsList = np.split(goodObs,splitIndices)
+
+            workerList = zip(goodStarsList,goodObsList)
+
+            # reverse sort so the longest running go first
+            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
+
+            self.fgcmLog.log('INFO','Using %d sections (%.1f seconds)' %
+                             (nSections,time.time() - prepStartTime))
 
             # make a pool
             pool = Pool(processes=self.nCore)
-            pool.map(self._worker,goodStarsList)
+            pool.map(self._worker,workerList)
             pool.close()
             pool.join()
 
 
-        self.fgcmLog.log('INFO','Finished BrightObs (Alt) in %.2f seconds.' %
+        self.fgcmLog.log('INFO','Finished BrightObs in %.2f seconds.' %
                          (time.time() - startTime))
 
 
-    def _worker(self,goodStars):
+    def _worker(self,goodStarsAndObs):
         """
         """
+
+        goodStars = goodStarsAndObs[0]
+        goodObs = goodStarsAndObs[1]
 
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
@@ -100,12 +148,36 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # select the good observations that go into these stars
-        _,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+        #if (self.debug) :
+        #    startTime = time.time()
+        #    self.fgcmLog.log('DEBUG','Matching goodStars and obsObjIDIndex')
+
+        #_,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
+
+        #if (self.debug):
+        #    self.fgcmLog.log('DEBUG','Matching done in %.1f seconds.' %
+        #                     (time.time() - startTime))
 
         # and cut to those exposures that are not flagged
+        if (self.debug):
+            startTime = time.time()
+            self.fgcmLog.log('DEBUG','Cutting to good exposures')
+
         gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
                      (obsFlag[goodObs] == 0))
         goodObs = goodObs[gd]
+
+        if (self.debug):
+            startTime=time.time()
+            self.fgcmLog.log('DEBUG','Cutting to sub-indices.')
+
+        obsObjIDIndexGO = obsObjIDIndex[goodObs]
+        obsBandIndexGO = obsBandIndex[goodObs]
+        obsMagStdGO = obsMagStd[goodObs]
+
+        if (self.debug):
+            self.fgcmLog.log('DEBUG','Cut to sub-indices in %.1f seconds.' %
+                             (time.time() - startTime))
 
         obsMagErr2GO = obsMagADUErr[goodObs]**2.
 
@@ -129,6 +201,9 @@ class FgcmBrightObs(object):
         #  right now it just keeps searching until they're all done, even
         #  if that isn't the most efficient.
         while ((lastGoodSize > subGood.size) and (ctr < maxIter)) :
+            if (self.debug):
+                startTime = time.time()
+
             # first, save lastGoodSize
             lastGoodSize = subGood.size
 
@@ -138,12 +213,12 @@ class FgcmBrightObs(object):
 
             # compute mean mags, with total and number
             np.add.at(tempObjMagStdMean,
-                      (obsObjIDIndex[goodObs[subGood]],
-                       obsBandIndex[goodObs[subGood]]),
-                      obsMagStd[goodObs[subGood]])
+                      (obsObjIDIndexGO[subGood],
+                       obsBandIndexGO[subGood]),
+                      obsMagStdGO[subGood])
             np.add.at(nSum,
-                      (obsObjIDIndex[goodObs[subGood]],
-                       obsBandIndex[goodObs[subGood]]),
+                      (obsObjIDIndexGO[subGood],
+                       obsBandIndexGO[subGood]),
                       1)
 
             # which have measurements?
@@ -155,9 +230,13 @@ class FgcmBrightObs(object):
 
             # and get new subGood
             #   note that this refers to the original goodObs...not a sub of a sub
-            subGood,=np.where(obsMagStd[goodObs] <=
-                              tempObjMagStdMean[obsObjIDIndex[goodObs],
-                                                obsBandIndex[goodObs]])
+            subGood,=np.where(obsMagStdGO <=
+                              tempObjMagStdMean[obsObjIDIndexGO,
+                                                obsBandIndexGO])
+
+            if (self.debug):
+                self.fgcmLog.log('DEBUG','Iteration %d done in %.1f' %
+                                 (ctr, time.time() - startTime))
 
             # and increment counter
             ctr+=1
@@ -168,19 +247,20 @@ class FgcmBrightObs(object):
             raise ValueError("Bright observation search failed to converge!")
 
         # now which observations are bright *enough* to consider?
-        brightEnoughGO, = np.where((obsMagStd[goodObs] -
-                                    tempObjMagStdMean[obsObjIDIndex[goodObs],
-                                                      obsBandIndex[goodObs]]) <=
+        brightEnoughGO, = np.where((obsMagStdGO -
+                                    tempObjMagStdMean[obsObjIDIndexGO,
+                                                      obsBandIndexGO]) <=
                                    self.brightObsGrayMax)
 
         # need to take the weighted mean, so a temp array here
         #  (memory issues?)
         wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        obsMagErr2GOBE = obsMagADUErr[goodObs[brightEnoughGO]]**2.
+        #obsMagErr2GOBE = obsMagADUErr[goodObs[brightEnoughGO]]**2.
+        obsMagErr2GOBE = obsMagErr2GO[brightEnoughGO]
 
         np.add.at(wtSum,
-                  (obsObjIDIndex[goodObs[brightEnoughGO]],
-                   obsBandIndex[goodObs[brightEnoughGO]]),
+                  (obsObjIDIndexGO[brightEnoughGO],
+                   obsBandIndexGO[brightEnoughGO]),
                   1./obsMagErr2GOBE)
 
         gd=np.where(wtSum > 0.0)
@@ -190,12 +270,12 @@ class FgcmBrightObs(object):
 
         # note that obsMag is already cut to goodObs
         np.add.at(objMagStdMean,
-                  (obsObjIDIndex[goodObs[brightEnoughGO]],
-                   obsBandIndex[goodObs[brightEnoughGO]]),
-                  obsMagStd[goodObs[brightEnoughGO]]/obsMagErr2GOBE)
+                  (obsObjIDIndexGO[brightEnoughGO],
+                   obsBandIndexGO[brightEnoughGO]),
+                  obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE)
         np.add.at(objNGoodObs,
-                  (obsObjIDIndex[goodObs[brightEnoughGO]],
-                   obsBandIndex[goodObs[brightEnoughGO]]),
+                  (obsObjIDIndexGO[brightEnoughGO],
+                   obsBandIndexGO[brightEnoughGO]),
                   1)
 
         objMagStdMean[gd] /= wtSum[gd]
