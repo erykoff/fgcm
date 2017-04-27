@@ -118,7 +118,9 @@ class FgcmChisq(object):
             # just cut out bad observations
             gd,=np.where(obsFlag[goodObs] == 0)
 
+        # crop out both goodObs and goodStarsSub
         goodObs=goodObs[gd]
+        goodStarsSub=goodStarsSub[gd]
 
         self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
@@ -157,20 +159,19 @@ class FgcmChisq(object):
 
             prepStartTime = time.time()
             nSections = goodStars.size // self.nStarPerRun + 1
-            #if (nSections < 2):
-            #    nSections = 2
             goodStarsList = np.array_split(goodStars,nSections)
 
 
             # is there a better way of getting all the first elements from the list?
             #  note that we need to skip the first which should be zero (checked above)
             #  see also fgcmBrightObs.py
+            # splitValues is the first of the goodStars in each list
             splitValues = np.zeros(nSections-1,dtype='i4')
             for i in xrange(1,nSections):
                 splitValues[i-1] = goodStarsList[i][0]
 
-            # get the indices from the goodStarsSub matched list
-            splitIndices = np.searchsorted(goodStarsSub, splitValues)
+            # get the indices from the goodStarsSub matched list (matched to goodStars)
+            splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
 
             # and split along the indices
             goodObsList = np.split(goodObs,splitIndices)
@@ -183,13 +184,10 @@ class FgcmChisq(object):
             self.fgcmLog.log('INFO','Using %d sections (%.1f seconds)' %
                              (nSections,time.time()-prepStartTime))
 
-            useNCore = self.nCore
-            #if (useNCore > nSections):
-            #    useNCore = nSections
-            self.fgcmLog.log('INFO','Running chisq on %d cores' % (useNCore))
+            self.fgcmLog.log('INFO','Running chisq on %d cores' % (self.nCore))
 
             # make a pool
-            pool = Pool(processes=useNCore)
+            pool = Pool(processes=self.nCore)
             #pool.map(self._worker,goodStarsList)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
@@ -227,7 +225,10 @@ class FgcmChisq(object):
             self.fgcmLog.log('INFO','Chisq/dof = %.2f' % (fitChisq))
 
         else:
-            fitChisq = self.fitChisqs[-1]
+            try:
+                fitChisq = self.fitChisqs[-1]
+            except:
+                fitChisq = 0.0
 
         # free shared arrays
         for key in self.totalHandleDict.keys():
@@ -269,7 +270,7 @@ class FgcmChisq(object):
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
+        #obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
 
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
@@ -292,15 +293,15 @@ class FgcmChisq(object):
         #                 (thisCore, time.time() - startTime),printOnly=True)
 
         #startTime = time.time()
-        if (not self.allExposures):
+        #if (not self.allExposures):
             # if we aren't doing all exposures, cut to expFlag == 0 exposures
-            gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
-                         (obsFlag[goodObs] == 0))
-            goodObs = goodObs[gd]
-        else:
+        #    gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
+        #                 (obsFlag[goodObs] == 0))
+        #    goodObs = goodObs[gd]
+        #else:
             # we are doing all exposures, still cut out bad observations
-            gd,=np.where(obsFlag[goodObs] == 0)
-            goodObs = goodObs[gd]
+        #    gd,=np.where(obsFlag[goodObs] == 0)
+        #    goodObs = goodObs[gd]
 
         #self.fgcmLog.log('DEBUG','chisq %d: cut to good exps in %.1f sec.' %
         #                 (thisCore, time.time() - startTime),printOnly=True)
