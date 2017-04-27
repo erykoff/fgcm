@@ -106,7 +106,8 @@ class FgcmFitCycle(object):
             # need to go through the bright observations
 
             # first, use fgcmChisq to compute m^std for every observation
-            self.fgcmChisq(parArray)
+            ## FIXME: check that this should be allExposures = True
+            self.fgcmChisq(parArray,allExposures=True)
 
             # run the bright observation algorithm, computing SEDs
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
