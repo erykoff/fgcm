@@ -100,12 +100,13 @@ class FgcmBrightObs(object):
             # is there a better way of getting all the first elements from the list?
             #  note that we need to skip the first which should be zero (checked above)
             #  see also fgcmChisq.py
+            # splitValues is the first of the goodStars in each list
             splitValues = np.zeros(nSections-1,dtype='i4')
             for i in xrange(1,nSections):
                 splitValues[i-1] = goodStarsList[i][0]
 
             # get the indices from the goodStarsSub matched list
-            splitIndices = np.searchsorted(goodStarsSub, splitValues)
+            splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
 
             # and split along these indices
             goodObsList = np.split(goodObs,splitIndices)
