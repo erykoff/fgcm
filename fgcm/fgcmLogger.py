@@ -21,13 +21,15 @@ class FgcmLogger(object):
             raise ValueError("Illegal logLevel: %s" % (logLevel))
 
 
-    def log(self,logType,logString):
+    def log(self,logType,logString,printOnly=False):
         """
         """
 
         if (logDict[logType] <= logDict[self.logLevel]):
-            self.logF.write(logString+'\n')
-            self.logF.flush()
+            if (not printOnly):
+                self.logF.write(logString+'\n')
+                self.logF.flush()
+
             try:
                 print(logString)
             except:
