@@ -10,20 +10,49 @@ import esutil
 class DESExposureFormatter(object):
     """
     """
-    def __init__(self,exposureFile,pmbFile,deltaAperFile):
-        self.exposureFile = exposureFile
-        self.pmbFile = pmbFile
-        self.deltaAperFile = deltaAperFile
+    def __init__(self,configFile):
+        self.configFile = configFile
 
-        if (not os.path.isfile(self.exposureFile)):
-            raise ValueError("Could not find exposureFile: %s" % (self.exposureFile))
+        with open(self.configFile) as f:
+            configDict = yaml.load(f)
+
+        requiredKeys = ['rawExposureFile','pmbFile','deltaAperFile','outFile',
+                        'raRange','decRange','raWrap']
+
+        for key in requiredKeys:
+            if (key not in configDict):
+                raise ValueError("required key %s not in configFile" % (key))
+
+        self.rawExposureFile = configDict['rawExposureFile']
+        self.pmbFile = configDict['pmbFile']
+        self.deltaAperFile = configDict['deltaAperFile']
+        self.outFile = configDict['outFile']
+        self.raRange = np.array(configDict['raRange'])
+        self.decRange = np.array(configDict['decRange'])
+        self.raWrap = float(configDict['raWrap'])
+
+        if (not os.path.isfile(self.rawExposureFile)):
+            raise ValueError("Could not find rawExposureFile %s" % (self.rawExposureFile))
         if (not os.path.isfile(self.pmbFile)):
-            raise ValueError("Could not find pmbFile: %s" % (self.pmbFile))
+            raise ValueError("Could not find pmbFile %s" % (self.pmbFile))
         if (not os.path.isfile(self.deltaAperFile)):
-            raise ValueError("Could not find deltaAperFile: %s" % (self.deltaAperFile))
+            raise ValueError("Could not find deltaAperFile %s" % (self.deltaAperFile))
 
-    def __call__(self,outFile,clobber=False):
-        expInfoIn = fitsio.read(self.exposureFile,ext=1)
+        if (self.raRange.size != 2) :
+            raise ValueError("raRange must have 2 elements")
+        if (self.decRange.size != 2):
+            raise ValueError("decRange must have 2 elements")
+
+
+    def run(self,clobber=False):
+        """
+        """
+
+        if (os.path.isfile(self.outFile) and not clobber):
+            print("Output file %s found and clobber == False." % (self.outFile))
+            return
+
+        expInfoIn = fitsio.read(self.rawExposureFile,ext=1)
 
         expInfo = np.zeros(expInfoIn.size,dtype=[('EXPNUM','i8'),
                                                  ('BAND','a2'),
@@ -57,6 +86,12 @@ class DESExposureFormatter(object):
                                                  float(parts[1])/60. +
                                                  float(parts[2])/3600.0)
 
+        # Cut to ra/dec range
+        telRAWrap = np.zeros_like(expInfo['TELRA'])
+        telRAWrap[:] = expInfo['TELRA']
+        hi,=np.where(telRAWrap > self.raWrap)
+        telRAWrap[hi] -= 360.0
+
         # and read the pmb file...where did it come from?
 
         pmbExp = []
@@ -89,4 +124,12 @@ class DESExposureFormatter(object):
         a,b=esutil.numpy_util.match(deltaAper['EXPNUM'],expInfo['EXPNUM'])
         expInfo['DELTA_APER'][b] = deltaAper['APER7M9'][a]
 
-        fitsio.write(outFile,expInfo,clobber=clobber)
+
+        inFootprint, = np.where((telRAWrap >= self.raRange[0]) &
+                                (telRAWrap <= self.raRange[1]) &
+                                (expInfo['TELDEC'] >= self.decRange[0]) &
+                                (expInfo['TELDEC'] <= self.decRange[1]))
+
+        expInfo = expInfo[inFootprint]
+
+        fitsio.write(self.outFile,expInfo)
