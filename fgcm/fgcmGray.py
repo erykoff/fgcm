@@ -218,7 +218,7 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}} (\mathrm{initial})$',fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
-            fig.savefig('%s/%s_expgray_initial_%s.png' % (self.plotPath,
+            fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
                                                           self.outfileBaseWithCycle,
                                                           self.fgcmPars.bands[i]))
 
