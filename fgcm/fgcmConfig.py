@@ -24,19 +24,21 @@ class FgcmConfig(object):
         with open(self.configFile) as f:
             configDict = yaml.load(f)
 
-        requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile','UTBoundary',
-                      'washMJDs','epochMJDs','lutFile','expField',
+        requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile',
+                      'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField','fitBands','extraBands',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
-                      'minStarPerCCD','minCCDPerExp','maxCCDGrayErr','aperCorrFitNBins',
-                      'illegalValue','sedFitBandFudgeFactors','sedExtraBandFudgeFactors',
-                      'starColorCuts','cycleNumber','outfileBase','maxIter',
+                      'minStarPerCCD','minCCDPerExp','maxCCDGrayErr',
+                      'aperCorrFitNBins','illegalValue','sedFitBandFudgeFactors',
+                      'sedExtraBandFudgeFactors','starColorCuts','cycleNumber',
+                      'outfileBase','maxIter','sigFgcmMaxErr','sigFgcmMaxEGray',
+                      'ccdGrayMaxStarErr','mirrorArea','cameraGain',
+                      'approxThroughput','ccdStartIndex','minExpPerNight',
+                      'expGrayInitialCut','expVarGrayPhotometricCut',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
-                      'mirrorArea','cameraGain','approxThroughput','ccdStartIndex',
-                      'minExpPerNight','expGrayInitialCut','expVarGrayPhotometricCut',
-                      'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
-                      'expGrayPhotometricCut','expGrayRecoverCut','expGrayErrRecoverCut',
-                      'sigma0Cal','logLevel','sigma0Phot','mapLongitudeRef','mapNside']
+                      'expGrayPhotometricCut','expGrayRecoverCut',
+                      'expGrayErrRecoverCut','sigma0Cal','logLevel',
+                      'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -47,8 +49,8 @@ class FgcmConfig(object):
         self.obsFile = configDict['obsFile']
         self.indexFile = configDict['indexFile']
         self.UTBoundary = configDict['UTBoundary']
-        self.washMJDs = np.array(configDict['washMJDs'])
-        self.epochMJDs = np.array(configDict['epochMJDs'])
+        self.washMJDs = np.array(configDict['washMJDs'],dtype='f8')
+        self.epochMJDs = np.array(configDict['epochMJDs'],dtype='f8')
         self.lutFile = configDict['lutFile']
         self.expField = configDict['expField']
         self.ccdField = configDict['ccdField']
@@ -65,17 +67,12 @@ class FgcmConfig(object):
         self.minStarPerExp = int(configDict['minStarPerExp'])
         self.minCCDPerExp = int(configDict['minCCDPerExp'])
         self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
-        #self.maxExpGrayRecoverErr = float(configDict['maxExpGrayRecoverErr'])
-        #self.maxExpGrayRecoverVar = float(configDict['maxExpGrayRecoverVar'])
-        #self.maxExpGrayRecover = float(configDict['maxExpGrayRecover'])
         self.expGrayPhotometricCut = float(configDict['expGrayPhotometricCut'])
         self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
         self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
         self.expGrayErrRecoverCut = float(configDict['expGrayErrRecoverCut'])
         self.minExpPerNight = int(configDict['minExpPerNight'])
         self.expGrayInitialCut = float(configDict['expGrayInitialCut'])
-        #self.expGrayCut = float(configDict['expGrayCut'])
-        #self.varGrayCut = float(configDict['varGrayCut'])
         self.aperCorrFitNBins = int(configDict['aperCorrFitNBins'])
         self.illegalValue = float(configDict['illegalValue'])
         self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
@@ -97,6 +94,7 @@ class FgcmConfig(object):
         self.sigma0Phot = configDict['sigma0Phot']
         self.mapLongitudeRef = configDict['mapLongitudeRef']
         self.mapNside = configDict['mapNside']
+        self.nStarPerRun = configDict['nStarPerRun']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -168,6 +166,9 @@ class FgcmConfig(object):
         self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
                                                  self.outfileBaseWithCycle),
                                   self.logLevel)
+
+        self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
+        self.fgcmLog.log('INFO','Configuration read from %s' % (self.configFile))
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
         #                                            self.cycleNumber)
@@ -251,7 +252,10 @@ class FgcmConfig(object):
         self.epochNames = self.epochNames[test[0]-1:test[1]+1]
 
         # and look at washMJDs; also sort
-        self.washMJDs.sort()
+        st=np.argsort(self.washMJDs)
+        if (not np.array_equal(st,np.arange(self.washMJDs.size))):
+            raise ValueError("Input washMJDs must be in sort order.")
+
         gd,=np.where((self.washMJDs > self.mjdRange[0]) &
                      (self.washMJDs < self.mjdRange[1]))
         self.washMJDs = self.washMJDs[gd]
