@@ -122,6 +122,10 @@ class FgcmConfig(object):
             self.stepGrain = configDict['stepGrain']
         else:
             self.stepGrain = 10.0
+        if 'experimentalMode' in configDict:
+            self.experimentalMode = bool(configDict['experimentalMode'])
+        else:
+            self.experimentalMode = False
 
         if (self.expGrayPhotometricCut >= 0.0) :
             raise ValueError("expGrayPhotometricCut must be negative.")
@@ -169,6 +173,10 @@ class FgcmConfig(object):
 
         self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
         self.fgcmLog.log('INFO','Configuration read from %s' % (self.configFile))
+
+        if (self.experimentalMode) :
+            self.fgcmLog.log('INFO','ExperimentalMode set to True')
+
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
         #                                            self.cycleNumber)
