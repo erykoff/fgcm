@@ -129,6 +129,16 @@ class FgcmFitCycle(object):
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
             self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
+            ## EXPERIMENTAL
+            if (self.fgcmConfig.experimentalMode) :
+                self._doSOpticsFit(doPlots=True)
+                outParFileTemp =  '%s/%s_parameters_soptics.fits' % (
+                    self.fgcmConfig.outputPath,
+                    self.fgcmConfig.outfileBaseWithCycle)
+                self.fgcmPars.saveParFile(outParFileTemp)
+
+                # do we need to compute EXP^gray here? yes, probably.  In the _doSOpticsFit
+
 
         # Select calibratable nights
         self.expSelector.selectCalibratableNights()
@@ -253,3 +263,126 @@ class FgcmFitCycle(object):
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
+
+    def _doSOpticsFit(self,doPlots=True):
+        """
+        """
+
+        from fgcmUtilities import expFlagDict
+        from fgcmUtilities import objFlagDict
+
+        self.fgcmLog.log('INFO','Performing SOptics fit with %d iterations.' %
+                         (self.fgcmConfig.maxIter))
+
+        # get the initial parameters
+        parInitial = self.fgcmPars.getParArray(fitterUnits=True)
+
+        # and the fit bounds
+        parBounds = self.fgcmPars.getParBounds(fitterUnits=True)
+        #unitDict = self.fgcmPars.getUnitDict(fitterUnits=True)
+
+
+        # flag everything that isn't "deep"
+        notDeep, = np.where(self.fgcmPars.expDeepFlag == 0)
+        self.fgcmPars.expFlag[notDeep] |= expFlagDict['TEMPORARY_BAD_EXPOSURE']
+
+        goodExpsIndex,=np.where(self.fgcmPars.expFlag == 0)
+
+        # don't know how to reverse this...make a "temporary" thing"
+        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+
+        # and bound everything but SOptics ... replace with input numbers
+        # and store backups to refill
+        parArr = np.array(parBounds)
+        parLow = parArr[:,0]
+        parHigh = parArr[:,1]
+
+        parLowStore = parLow.copy()
+        parHighStore = parHigh.copy()
+
+        parLow[:] = parInitial[:]
+        parHigh[:] = parInitial[:]
+
+        parLow[self.fgcmPars.parQESysInterceptLoc: \
+                   self.fgcmPars.parQESysInterceptLoc + \
+                   self.fgcmPars.nWashIntervals] = \
+                   parLowStore[self.fgcmPars.parQESysInterceptLoc: \
+                                   self.fgcmPars.parQESysInterceptLoc + \
+                                   self.fgcmPars.nWashIntervals]
+        parHigh[self.fgcmPars.parQESysInterceptLoc: \
+                    self.fgcmPars.parQESysInterceptLoc + \
+                    self.fgcmPars.nWashIntervals] = \
+                    parHighStore[self.fgcmPars.parQESysInterceptLoc: \
+                                     self.fgcmPars.parQESysInterceptLoc + \
+                                     self.fgcmPars.nWashIntervals]
+        parLow[self.fgcmPars.parQESysSlopeLoc: \
+                   self.fgcmPars.parQESysSlopeLoc + \
+                   self.fgcmPars.nWashIntervals] = \
+                   parLowStore[self.fgcmPars.parQESysSlopeLoc: \
+                                   self.fgcmPars.parQESysSlopeLoc + \
+                                   self.fgcmPars.nWashIntervals]
+        parHigh[self.fgcmPars.parQESysSlopeLoc: \
+                    self.fgcmPars.parQESysSlopeLoc + \
+                    self.fgcmPars.nWashIntervals] = \
+                    parHighStore[self.fgcmPars.parQESysSlopeLoc: \
+                                     self.fgcmPars.parQESysSlopeLoc + \
+                                     self.fgcmPars.nWashIntervals]
+
+        # zip together for new parameter bounds
+        parBounds = zip(parLow, parHigh)
+
+
+        # reset chisq list
+        self.fgcmChisq.resetFitChisqList()
+
+        pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
+                                                   parInitial,       # initial guess
+                                                   fprime=None,      # in fgcmChisq()
+                                                   args=(True,True), # fitterUnits, deriv
+                                                   approx_grad=False,# don't approx grad
+                                                   bounds=parBounds, # boundaries
+                                                   m=10,             # "variable metric conditions"
+                                                   factr=1e2,        # highish accuracy
+                                                   pgtol=1e-9,       # gradient tolerance
+                                                   maxfun=self.fgcmConfig.maxIter,
+                                                   maxiter=self.fgcmConfig.maxIter,
+                                                   iprint=0,         # only one output
+                                                   callback=None)    # no callback
+
+
+        self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+
+        if (doPlots):
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+            ax=fig.add_subplot(111)
+
+            chisqValues = np.array(self.fgcmChisq.fitChisqs)
+
+            ax.plot(np.arange(chisqValues.size),chisqValues,'k.')
+
+            ax.set_xlabel(r'$\mathrm{Iteration}$',fontsize=16)
+            ax.set_ylabel(r'$\chi^2/\mathrm{DOF}$',fontsize=16)
+
+            ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
+            ax.set_ylim(chisqValues[-1]-0.5,chisqValues[0]+0.5)
+
+            fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
+                                                 self.fgcmConfig.outfileBaseWithCycle))
+
+        # record new parameters
+        self.fgcmPars.reloadParArray(pars, fitterUnits=True)
+
+        # compute EXP^gray, and do plots
+        self.fgcmLog.log('INFO','Computing CCD and EXP gray for deep exposures')
+        self.fgcmGray.computeCCDAndExpGray()
+
+        # reset the exposure flag
+        self.fgcmPars.expFlag &= ~expFlagDict['TEMPORARY_BAD_EXPOSURE']
+
+        # and the star flag
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objFlag[:] &= ~objFlagDict['TEMPORARY_BAD_STAR']
+
+
+        self.fgcmPars.plotParameters()
