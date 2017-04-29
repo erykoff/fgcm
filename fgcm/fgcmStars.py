@@ -305,7 +305,7 @@ class FgcmStars(object):
         self.fgcmLog.log('INFO','Computed secZenith in %.1f seconds.' %
                          (time.time() - startTime))
 
-    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None,doPlots=False):
+    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None,doPlots=False,temporary=False):
         """
         """
 
@@ -350,9 +350,16 @@ class FgcmStars(object):
 
         objFlag = snmm.getArray(self.objFlagHandle)
         bad,=np.where(minObs < self.minPerBand)
-        objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
 
-        self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+        if (not temporary) :
+            objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
+
+            self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+        else:
+            objFlag[bad] |= objFlagDict['TEMPORARY_BAD_STAR']
+
+            self.fgcmLog.log('INFO','Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
+
 
         if (doPlots):
             self.plotStarMap()
@@ -602,7 +609,10 @@ class FgcmStars(object):
 
         obsMagADU = snmm.getArray(self.obsMagADUHandle)
 
-        obsMagADU += fgcmPars.expCCDSuperStar[obsExpIndex,
+        # The superstarflat is the mean ccd offset in an epoch
+        # so we want to add this to the magnitudes
+
+        obsMagADU[:] += fgcmPars.expCCDSuperStar[obsExpIndex,
                                               obsCCDIndex]
 
     def applyApertureCorrection(self,fgcmPars):
@@ -615,7 +625,13 @@ class FgcmStars(object):
 
         obsMagADU = snmm.getArray(self.obsMagADUHandle)
 
-        obsMagADU += fgcmPars.expApertureCorrection[obsExpIndex]
+        # Note that EXP^gray = < <mstd>_j - mstd_ij >
+        #  when we have seeing loss, that makes mstd_ij larger and EXP^gray smaller
+        #  So the slope of aperCorr is negative.
+        #  If we add aperCorr to each of mstd_ij, then we get a smaller (brighter)
+        #  magnitude.  And this will bring mstd_ij closer to <mstd>_j
+
+        obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
 
 
