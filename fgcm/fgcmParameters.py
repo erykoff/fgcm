@@ -449,7 +449,7 @@ class FgcmParameters(object):
 
         # wash parameters units...
         self.washStepUnits = 1.0/self.stepUnitReference / self.stepGrain
-        self.washSlopeStepUnits = self.washStepUnits / self.meanWashIntervalDuration
+        self.washSlopeStepUnits = self.washStepUnits * self.meanWashIntervalDuration
         self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
         self.fgcmLog.log('INFO','wash slope step unit set to %f' % (self.washSlopeStepUnits))
 
@@ -498,6 +498,19 @@ class FgcmParameters(object):
         self.o3StepUnits = parInfo['O3STEPUNITS'][0]
         self.washStepUnits = parInfo['WASHSTEPUNITS'][0]
         self.washSlopeStepUnits = parInfo['WASHSLOPESTEPUNITS'][0]
+
+        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
+        self.fgcmLog.log('INFO','tau slope step unit set to %f' %
+                         (self.tauSlopeStepUnits))
+        self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.alphaStepUnits))
+        self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
+        self.fgcmLog.log('INFO','pwv slope step unit set to %f' %
+                         (self.pwvSlopeStepUnits))
+        self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.o3StepUnits))
+        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
+        self.fgcmLog.log('INFO','wash slope step unit set to %f' %
+                         (self.washSlopeStepUnits))
+
 
         self.hasExternalPWV = parInfo['HASEXTERNALPWV'][0].astype(np.bool)
         self.hasExternalTau = parInfo['HASEXTERNALTAU'][0].astype(np.bool)
@@ -936,7 +949,7 @@ class FgcmParameters(object):
             0.001 * unitDict['qeSysSlopeUnit'])
 
         # zip these into a list of tuples
-        parBounds = zip(parLow,parHigh)
+        parBounds = zip(parLow, parHigh)
 
         return parBounds
 
@@ -1136,9 +1149,10 @@ class FgcmParameters(object):
         ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})$',fontsize=16)
         ax.tick_params(axis='both',which='major',labelsize=14)
 
+        ylim = ax.get_ylim()
         for i in xrange(self.nWashIntervals):
             ax.plot([self.washMJDs[i]-firstMJD,self.washMJDs[i]-firstMJD],
-                    ax.get_ylim(),'k--')
+                    ylim,'k--')
 
         fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
                                                 self.outfileBaseWithCycle))
