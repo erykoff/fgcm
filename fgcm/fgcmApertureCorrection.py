@@ -44,9 +44,9 @@ class FgcmApertureCorrection(object):
         expGrayTemp = expGray.copy()
 
         # first, remove any previous correction if necessary...
-        self.fgcmLog.log('DEBUG','Removing old aperture corrections')
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
+            self.fgcmLog.log('INFO','Removing old aperture corrections')
 
             expSeeingVariableClipped = np.clip(self.fgcmPars.expSeeingVariable,
                                                self.fgcmPars.compAperCorrRange[0,self.fgcmPars.expBandIndex],
@@ -56,8 +56,12 @@ class FgcmApertureCorrection(object):
                 expSeeingVariableClipped -
                 self.fgcmPars.compAperCorrPivot[self.fgcmPars.expBandIndex])
 
-            # Need to check sign here...
-            expGrayTemp -= oldAperCorr
+            # Note that EXP^gray = < <mstd>_j - mstd_ij >
+            #  the aperture correction is applied to mstd_ij
+            #  so do de-apply the aperture correction, we need the same sign as in
+            #  FgcmStars.applyApertureCorrection
+
+            expGrayTemp += oldAperCorr
 
         expIndexUse,=np.where(self.fgcmPars.expFlag == 0)
 
