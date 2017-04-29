@@ -373,7 +373,7 @@ class FgcmChisq(object):
                       1./obsMagErr2GO)
             np.add.at(objMagStdMeanTemp,
                   (obsObjIDIndexGO,obsBandIndexGO),
-                  obsMagStdGO/obsMagErr2GO)
+                  obsMagGO/obsMagErr2GO)
 
             # these are good object/bands that were observed
             gd=np.where(wtSum > 0.0)
