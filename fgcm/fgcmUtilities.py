@@ -10,7 +10,8 @@ def _pickle_method(m):
         return getattr, (m.im_self, m.im_func.func_name)
 
 objFlagDict = {'TOO_FEW_OBS':2**0,
-               'BAD_COLOR':2**1}
+               'BAD_COLOR':2**1,
+               'TEMPORARY_BAD_STAR':2**2}
 
 obsFlagDict = {'NO_EXPOSURE':2**0,
                'BAD_ERROR':2**1}
@@ -20,7 +21,8 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
                'VAR_GRAY_TOO_LARGE':2**2,
                'TOO_FEW_EXP_ON_NIGHT':2**3,
                'NO_STARS':2**4,
-               'BAND_NOT_IN_LUT':2**5}
+               'BAND_NOT_IN_LUT':2**5,
+               'TEMPORARY_BAD_EXPOSURE':2**6}
 
 
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
