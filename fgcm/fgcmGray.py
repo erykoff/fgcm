@@ -519,8 +519,19 @@ class FgcmGray(object):
         self.fgcmLog.log('INFO','Computed CCDGray and ExpGray in %.2f seconds.' %
                          (time.time() - startTime))
 
-        if (not doPlots):
-            return
+        #if (not doPlots):
+        #    return
+        if (doPlots):
+            self.makeExpGrayPlots()
+
+
+    def makeExpGrayPlots(self):
+        """
+        """
+
+        # arrays we need
+        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
+        expGray = snmm.getArray(self.expGrayHandle)
 
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
                          (expNGoodStars > self.minStarPerExp))
@@ -530,6 +541,8 @@ class FgcmGray(object):
 
             if (inBand.size == 0) :
                 continue
+
+            # plot histograms of EXP^gray
 
             fig=plt.figure(1,figsize=(8,6))
             fig.clf()
@@ -553,3 +566,70 @@ class FgcmGray(object):
             fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle,
                                                   self.fgcmPars.bands[i]))
+
+            # plot EXP^gray as a function of secZenith (airmass)
+            secZenith = 1./(np.sin(self.fgcmPars.expTelDec[expUse[inBand]]) *
+                            self.fgcmPars.sinLatitude +
+                            np.cos(self.fgcmPars.expTelDec[expUse[inBand]]) *
+                            self.fgcmPars.cosLatitude *
+                            np.cos(self.fgcmPars.expTelHA[expUse[inBand]]))
+
+            # zoom in on 1<secZenith<1.5 for plotting
+            ok,=np.where(secZenith < 1.5)
+
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            ax.hexbin(secZenith[ok],expGray[expUse[inBand[ok]]],rasterized=True)
+
+            text = r'$(%s)$' % (self.fgcmPars.bands[i])
+            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+
+            ax.set_xlabel(r'$\mathrm{sec}(\mathrm{zd})$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+
+            fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
+                                                          self.outfileBaseWithCycle,
+                                                          self.fgcmPars.bands[i]))
+
+            # plot EXP^gray as a function of UT
+
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            ax.hexbin(self.fgcmPars.expDeltaUT[expUse[inBand]],
+                      expGray[expUse[inBand]],
+                      rasterized=True)
+            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+
+            ax.set_xlabel(r'$\Delta \mathrm{UT}$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+
+            fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle,
+                                                     self.fgcmPars.bands[i]))
+
+        # and plot EXP^gray vs MJD for all bands for deep fields
+        fig = plt.figure(1,figsize=(8,6))
+        fig.clf()
+
+        ax=fig.add_subplot(111)
+
+        firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
+
+        deepUse,=np.where(self.fgcmPars.expDeepFlag[expUse] == 1)
+
+        ax.plot(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
+                expGray[expUse[deepUse]],'k.')
+        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+        ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+
+        ax.set_title(r'$\mathrm{Deep Fields}$')
+
+        fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle))
+
