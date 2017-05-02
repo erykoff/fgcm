@@ -21,6 +21,8 @@ from fgcmRetrieval import FgcmRetrieval
 from fgcmApertureCorrection import FgcmApertureCorrection
 from fgcmBrightObs import FgcmBrightObs
 from fgcmExposureSelector import FgcmExposureSelector
+from fgcmSigFgcm import FgcmSigFgcm
+from fgcmFlagVariables import FgcmFlagVariables
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -130,6 +132,7 @@ class FgcmFitCycle(object):
             self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
 
             ## EXPERIMENTAL
+            ## not needed as far as I can tell
             if (self.fgcmConfig.experimentalMode) :
                 self._doSOpticsFit(doPlots=True)
                 outParFileTemp =  '%s/%s_parameters_soptics.fits' % (
@@ -166,6 +169,18 @@ class FgcmFitCycle(object):
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.log('DEBUG','FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
+
+        # Compute sigFgcm
+        self.fgcmLog.log('DEBUG','FitCycle computing sigFgcm')
+        self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
+                                       self.fgcmStars)
+        self.fgcmSigFgcm.computeSigFgcm()
+
+        # Flag variables for next cycle
+        self.fgcmLog.log('DEBUG','FitCycle flagging variables')
+        self.fgcmFlagVars = FgcmFlagVariables(self.fgcmConfig,self.fgcmPars,
+                                              self.fgcmStars)
+        self.fgcmFlagVars.flagVariables()
 
         # Re-flag exposures for superstar, aperture, etc.
         self.fgcmLog.log('DEBUG','FitCycle re-selecting good exposures')
