@@ -870,12 +870,12 @@ class FgcmParameters(object):
         parLow[self.parPWVInterceptLoc: \
                    self.parPWVInterceptLoc + \
                self.nCampaignNights] = ( \
-            (self.pwvRange[0] + 10.0*0.2) * \
+            (self.pwvRange[0] + 5.0*0.2) * \
                 unitDict['pwvUnit'])
         parHigh[self.parPWVInterceptLoc: \
                     self.parPWVInterceptLoc + \
                     self.nCampaignNights] = ( \
-            (self.pwvRange[1] - 10.0*0.2) * \
+            (self.pwvRange[1] - 5.0*0.2) * \
                 unitDict['pwvUnit'])
         parLow[self.parPWVSlopeLoc: \
                    self.parPWVSlopeLoc + \
@@ -896,12 +896,12 @@ class FgcmParameters(object):
         parLow[self.parTauInterceptLoc: \
                    self.parTauInterceptLoc + \
                    self.nCampaignNights] = ( \
-            (self.tauRange[0] + 10.0*0.0025) * \
+            (self.tauRange[0] + 5.0*0.0025) * \
                 unitDict['tauUnit'])
         parHigh[self.parTauInterceptLoc: \
                     self.parTauInterceptLoc +
                 self.nCampaignNights] = ( \
-            (self.tauRange[1] - 10.0*0.0025) * \
+            (self.tauRange[1] - 5.0*0.0025) * \
                 unitDict['tauUnit'])
         parLow[self.parTauSlopeLoc: \
                    self.parTauSlopeLoc + \
