@@ -68,7 +68,8 @@ class FgcmConfig(object):
         self.minStarPerExp = int(configDict['minStarPerExp'])
         self.minCCDPerExp = int(configDict['minCCDPerExp'])
         self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
-        self.expGrayPhotometricCut = float(configDict['expGrayPhotometricCut'])
+        #self.expGrayPhotometricCut = float(configDict['expGrayPhotometricCut'])
+        self.expGrayPhotometricCut = np.array(configDict['expGrayPhotometricCut'])
         self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
         self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
         self.expGrayErrRecoverCut = float(configDict['expGrayErrRecoverCut'])
@@ -134,8 +135,6 @@ class FgcmConfig(object):
         else:
             self.resetParameters = True
 
-        if (self.expGrayPhotometricCut >= 0.0) :
-            raise ValueError("expGrayPhotometricCut must be negative.")
         if (self.expGrayRecoverCut > self.expGrayPhotometricCut) :
             raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
         if (self.expVarGrayPhotometricCut <= 0.0):
@@ -237,6 +236,11 @@ class FgcmConfig(object):
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
         self.lambdaStd = lutStd['LAMBDASTD'][0]
+
+        if (self.expGrayPhotometricCut.size != self.bands.size):
+            raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
+        if (self.expGrayPhotometricCut.max() >= 0.0):
+            raise ValueError("expGrayPhotometricCut must all be negative")
 
         # and look at the exposure file and grab some stats
         expInfo = fitsio.read(self.exposureFile,ext=1)
