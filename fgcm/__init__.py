@@ -18,6 +18,8 @@ from fgcmExposureSelector import FgcmExposureSelector
 from fgcmFitCycle import FgcmFitCycle
 from fgcmZeropoints import FgcmZeropoints
 from fgcmLogger import FgcmLogger
+from fgcmSigFgcm import FgcmSigFgcm
+from fgcmFlagVariables import FgcmFlagVariables
 import fgcmPlotmaps
 from desGPSFormat import DESGPSFormatter
 from desExposureFormat import DESExposureFormatter
