@@ -151,17 +151,6 @@ class FgcmBrightObs(object):
         # and the arrays for locking access
         objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
 
-        # select the good observations that go into these stars
-        #if (self.debug) :
-        #    startTime = time.time()
-        #    self.fgcmLog.log('DEBUG','Matching goodStars and obsObjIDIndex')
-
-        #_,goodObs = esutil.numpy_util.match(goodStars,obsObjIDIndex,presorted=True)
-
-        #if (self.debug):
-        #    self.fgcmLog.log('DEBUG','Matching done in %.1f seconds.' %
-        #                     (time.time() - startTime))
-
         # and cut to those exposures that are not flagged
         if (self.debug):
             startTime = time.time()
@@ -185,70 +174,16 @@ class FgcmBrightObs(object):
 
         obsMagErr2GO = obsMagADUErr[goodObs]**2.
 
-        # start by saying that they're all good
-        subGood = np.arange(goodObs.size)
+        # new version using fmin.at()
 
-        # we can only have the number of iterations of the max number of stars
-        maxIter = objNGoodObs[goodStars,:].max()
-
-        ctr = 0
-
-        lastGoodSize = subGood.size+1
-
-        # create temporary variables.  Are they too big in memory?
-        nSum = np.zeros_like(objMagStdMean,dtype='i4')
+        # start with the mean temp var, set to 99s.
         objMagStdMeanTemp = np.zeros_like(objMagStdMean)
+        objMagStdMeanTemp[:,:] = 99.0
 
-        # loop over cutting iteratively
-        #  this is essentially a binary search to find the brightest mag
-        #  for each object/band
-        #  right now it just keeps searching until they're all done, even
-        #  if that isn't the most efficient.
-        while ((lastGoodSize > subGood.size) and (ctr < maxIter)) :
-            if (self.debug):
-                startTime = time.time()
-
-            # first, save lastGoodSize
-            lastGoodSize = subGood.size
-
-            # clear temp vars
-            nSum[:,:] = 0
-            objMagStdMeanTemp[:,:] = 0
-
-            # compute mean mags, with total and number
-            np.add.at(objMagStdMeanTemp,
-                      (obsObjIDIndexGO[subGood],
-                       obsBandIndexGO[subGood]),
-                      obsMagStdGO[subGood])
-            np.add.at(nSum,
-                      (obsObjIDIndexGO[subGood],
-                       obsBandIndexGO[subGood]),
-                      1)
-
-            # which have measurements?
-            #  (note this might be redundant in the iterations)
-
-            gd=np.where(nSum > 0)
-
-            objMagStdMeanTemp[gd] /= nSum[gd]
-
-            # and get new subGood
-            #   note that this refers to the original goodObs...not a sub of a sub
-            subGood,=np.where(obsMagStdGO <=
-                              objMagStdMeanTemp[obsObjIDIndexGO,
-                                                obsBandIndexGO])
-
-            if (self.debug):
-                self.fgcmLog.log('DEBUG','Iteration %d done in %.1f' %
-                                 (ctr, time.time() - startTime))
-
-            # and increment counter
-            ctr+=1
-
-
-        if (ctr == maxIter):
-            # this is a big problem, and shouldn't be possible.
-            raise ValueError("Bright observation search failed to converge!")
+        # find the brightest (minmag) object at each index
+        np.fmin.at(objMagStdMeanTemp,
+                   (obsObjIDIndexGO, obsBandIndexGO),
+                   obsMagStdGO)
 
         # now which observations are bright *enough* to consider?
         brightEnoughGO, = np.where((obsMagStdGO -
