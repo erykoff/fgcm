@@ -127,8 +127,8 @@ class FgcmParameters(object):
             self.hasExternalPWV = True
             self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
             # need to add two global parameters!
-            self.parExternalPWVScale = 1.0
-            self.parExternalPWVOffset = 0.0
+            #self.parExternalPWVScale = 1.0
+            #self.parExternalPWVOffset = 0.0
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if (fgcmConfig.tauFile is not None):
@@ -137,8 +137,8 @@ class FgcmParameters(object):
             self.hasExternalTau = True
             self.loadExternalTau()
             # need to add two global parameters!
-            self.parExternalTauScale = 1.0
-            self.parExternalTauOffset = 0.0
+            #self.parExternalTauScale = 1.0
+            #self.parExternalTauOffset = 0.0
 
         # and the aperture corrections
         self.compAperCorrPivot = np.zeros(self.nBands,dtype='f8')
@@ -150,6 +150,9 @@ class FgcmParameters(object):
         self.compExpGray = np.zeros(self.nExp,dtype='f8')
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
         self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
+
+        # and sigFgcm
+        self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
 
         # and compute the units...
         self._computeStepUnits(fgcmConfig)
@@ -463,18 +466,6 @@ class FgcmParameters(object):
         self.fgcmLog.log('INFO','Loading parameters from %s' % (parFile))
 
         parInfo=fitsio.read(parFile,ext='PARINFO')
-        #self.nCCD = parInfo['NCCD'][0]
-        #self.bands = parInfo['BANDS'][0]
-        #self.nBands = self.bands.size
-        #self.fitBands = parInfo['FITBANDS'][0]
-        #self.nFitBands = self.fitBands.size
-        #self.extraBands = parInfo['EXTRABANDS'][0]
-        #self.nExtraBands = self.extraBands.size
-        #self.exposureFile = parInfo['EXPOSUREFILE'][0]
-
-        #self.bands = np.core.defchararray.strip(self.bands[:])
-        #self.fitBands = np.core.defchararray.strip(self.fitBands[:])
-        #self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
         self.nCCD = fgcmConfig.nCCD
         self.bands = fgcmConfig.bands
@@ -525,21 +516,41 @@ class FgcmParameters(object):
         self.parQESysIntercept = pars['PARQESYSINTERCEPT'][0]
         self.parQESysSlope = pars['PARQESYSSLOPE'][0]
 
+        if (fgcmConfig.resetParameters):
+            # reset many of the parameters
+            self.parAlpha[:] = fgcmConfig.alphaStd
+            self.parO3[:] = fgcmConfig.o3Std
+            self.parTauIntercept[:] = fgcmConfig.tauStd
+            self.parTauSlope[:] = 0.0
+            self.parPWVIntercept[:] = fgcmConfig.pwvStd
+            self.parPWVSlope[:] = 0.0
+            # leave the QESysIntercept and Slope as previously fit
+            # though we want to play with this
+
         self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPWV:
             self.pwvFile = str(parInfo['PWVFILE'][0]).rstrip()
-            self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
-            self.parExternalPWVOffset = pars['PAREXTERNALPWVOFFSET'][0]
             self.hasExternalPWV = True
             self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
+            self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
+            self.parExternalPWVOffset[:] = pars['PAREXTERNALPWVOFFSET'][0]
+
+            if (fgcmConfig.resetParameters):
+                self.parExternalPWVScale = 1.0
+                self.parExternalPWVOffset[:] = 0.0
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalTau:
             self.tauFile = str(parInfo['TAUFILE'][0]).rstrip()
-            self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
-            self.parExternalTauOffset = pars['PAREXTERNALTAUOFFSET'][0]
             self.hasExternalTau = True
             self.loadExternalTau()
+            self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
+            self.parExternalTauOffset[:] = pars['PAREXTERNALTAUOFFSET'][0]
+
+            if (fgcmConfig.resetParameters):
+                self.parExternalTauScale = 1.0
+                self.parExternalTauOffset[:] = 0.0
+
 
         self.compAperCorrPivot = pars['COMPAPERCORRPIVOT'][0]
         self.compAperCorrSlope = pars['COMPAPERCORRSLOPE'][0]
@@ -549,6 +560,8 @@ class FgcmParameters(object):
         self.compExpGray = pars['COMPEXPGRAY'][0]
         self.compVarGray = pars['COMPVARGRAY'][0]
         self.compNGoodStarPerExp = pars['COMPNGOODSTARPEREXP'][0]
+
+        self.compSigFgcm = pars['COMPSIGFGCM'][0]
 
         self._arrangeParArray()
         self._setParRanges(fgcmConfig)
@@ -628,7 +641,8 @@ class FgcmParameters(object):
                ('COMPAPERCORRRANGE','f8',self.compAperCorrRange.size),
                ('COMPEXPGRAY','f8',self.compExpGray.size),
                ('COMPVARGRAY','f8',self.compVarGray.size),
-               ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size)]
+               ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
+               ('COMPSIGFGCM','f8',self.compSigFgcm.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -667,6 +681,8 @@ class FgcmParameters(object):
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
+
+        pars['COMPSIGFGCM'][:] = self.compSigFgcm
 
         fitsio.write(parFile,pars,extname='PARAMS')
 
