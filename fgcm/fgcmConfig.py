@@ -135,7 +135,7 @@ class FgcmConfig(object):
         else:
             self.resetParameters = True
 
-        if (self.expGrayRecoverCut > self.expGrayPhotometricCut) :
+        if (self.expGrayRecoverCut > self.expGrayPhotometricCut.min()) :
             raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
         if (self.expVarGrayPhotometricCut <= 0.0):
             raise ValueError("expVarGrayPhotometricCut must be > 0.0")
