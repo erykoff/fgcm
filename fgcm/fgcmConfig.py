@@ -162,6 +162,12 @@ class FgcmConfig(object):
             if ('inParameterFile' not in configDict):
                 raise ValueError("Must provide inParameterFile for cycleNumber > 0")
             self.inParameterFile = configDict['inParameterFile']
+            if ('inBadStarFile' not in configDict):
+                raise ValueError("Must provide inBadStarFile for cycleNumber > 0")
+            self.inBadStarFile = configDict['inBadStarFile']
+        else:
+            self.inParameterFile = None
+            self.inBadStarFile = None
 
         if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
             raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
@@ -314,7 +320,7 @@ class FgcmConfig(object):
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
 
-    def saveConfigForNextCycle(self,fileName,parFile):
+    def saveConfigForNextCycle(self,fileName,parFile,badStarFile):
         configDict = self.configDictSaved.copy()
 
         # save the outputPath
@@ -325,6 +331,8 @@ class FgcmConfig(object):
         # do we want to increase maxIter?  Hmmm.
 
         configDict['inParameterFile'] = parFile
+
+        configDict['inBadStarFile'] = badStarFile
 
         # do we want to guess as to the photometric cut?  not now.
 
