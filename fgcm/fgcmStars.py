@@ -45,6 +45,8 @@ class FgcmStars(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
+        self.inBadStarFile = fgcmConfig.inBadStarFile
+
         self.mapLongitudeRef = fgcmConfig.mapLongitudeRef
         self.mapNside = fgcmConfig.mapNside
 
@@ -263,6 +265,24 @@ class FgcmStars(object):
         # and create a objFlag which flags bad stars as they fall out...
 
         self.objFlagHandle = snmm.createArray(self.nStars,dtype='i2')
+
+        # and read in the previous bad stars if available
+        if (self.inBadStarFile is not None):
+            self.fgcmLog.log('INFO','Reading in list of previous bad stars from %s' %
+                             (self.inBadStarFile))
+
+            objID = snmm.getArray(self.objIDHandle)
+            objFlag = snmm.getArray(self.objFlagHandle)
+
+            inBadStars = fitsio.read(self.inBadStarFile,ext=1)
+
+            a,b=esutil.numpy_util.match(inBadStars['OBJID'],
+                                        objID)
+
+            self.fgcmLog.log('INFO','Flagging %d stars as bad.' %
+                             (a.size))
+
+            objFlag[b] = inBadStars['OBJFLAG'][a]
 
         # And we need to record the mean mag, error, SED slopes...
 
@@ -633,31 +653,26 @@ class FgcmStars(object):
 
         obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
+    def saveBadStarIndices(self,badStarFile):
+        """
+        """
 
 
-    ## The following does not work in a multiprocessing environment.
-    ##  further study is required...
-    #def __del__(self):
-    #    snmm.freeArray(self.obsIndexHandle)
-    #    snmm.freeArray(self.obsExpHandle)
-    #    snmm.freeArray(self.obsExpIndexHandle)
-    #    snmm.freeArray(self.obsCCDHandle)
-    #    snmm.freeArray(self.obsBandIndexHandle)
-    #    snmm.freeArray(self.obsRAHandle)
-    #    snmm.freeArray(self.obsDecHandle)
-    #    snmm.freeArray(self.obsSecZenithHandle)
-    #    snmm.freeArray(self.obsMagADUHandle)
-    #    snmm.freeArray(self.obsMagADUErrHandle)
-    #    snmm.freeArray(self.obsMagStdHandle)
-    #    snmm.freeArray(self.objIDHandle)
-    #    snmm.freeArray(self.objRAHandle)
-    #    snmm.freeArray(self.objDecHandle)
-    #    snmm.freeArray(self.objObsIndexHandle)
-    #    snmm.freeArray(self.objNobsHandle)
-    #    snmm.freeArray(self.objNGoodObsHandle)
-    #    snmm.freeArray(self.obsObjIDIndexHandle)
-    #    snmm.freeArray(self.objFlagHandle)
-    #    snmm.freeArray(self.objMagStdMeanHandle)
-    #    snmm.freeArray(self.objMagStdMeanErrHandle)
-    #    snmm.freeArray(self.objSEDSlopeHandle)
+        objID = snmm.getArray(self.objIDHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        bad,=np.where(objFlag > 0)
+
+        self.fgcmLog.log('INFO','Saving %d bad star indices to %s' %
+                         (bad.size,badStarFile))
+
+
+        badObjStruct = np.zeros(bad.size,dtype=[('OBJID',objID.dtype),
+                                                ('OBJFLAG',objFlag.dtype)])
+        badObjStruct['OBJID'] = objID[bad]
+        badObjStruct['OBJFLAG'] = objFlag[bad]
+
+        # set clobber == True?
+        fitsio.write(badStarFile,badObjStruct,clobber=True)
+
 
