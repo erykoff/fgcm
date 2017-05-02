@@ -132,7 +132,7 @@ class FgcmConfig(object):
         if 'resetParameters' in configDict:
             self.resetParameters = bool(configDict['resetParameters'])
         else:
-            self.resetParameters = False
+            self.resetParameters = True
 
         if (self.expGrayPhotometricCut >= 0.0) :
             raise ValueError("expGrayPhotometricCut must be negative.")
