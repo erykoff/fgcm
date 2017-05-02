@@ -18,6 +18,8 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
+## FIXME: derivatives should not be zero when hitting the boundary (check)
+
 class FgcmChisq(object):
     """
     """
