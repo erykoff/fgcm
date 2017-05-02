@@ -38,7 +38,8 @@ class FgcmConfig(object):
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
-                      'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun']
+                      'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun',
+                      'varNSig','varMinBand']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -91,10 +92,12 @@ class FgcmConfig(object):
         self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
         self.sigma0Cal = float(configDict['sigma0Cal'])
         self.logLevel = configDict['logLevel']
-        self.sigma0Phot = configDict['sigma0Phot']
-        self.mapLongitudeRef = configDict['mapLongitudeRef']
-        self.mapNside = configDict['mapNside']
-        self.nStarPerRun = configDict['nStarPerRun']
+        self.sigma0Phot = float(configDict['sigma0Phot'])
+        self.mapLongitudeRef =float( configDict['mapLongitudeRef'])
+        self.mapNside = int(configDict['mapNside'])
+        self.nStarPerRun = int(configDict['nStarPerRun'])
+        self.varNSig = float(configDict['varNSig'])
+        self.varMinBand = int(configDict['varMinBand'])
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -126,6 +129,10 @@ class FgcmConfig(object):
             self.experimentalMode = bool(configDict['experimentalMode'])
         else:
             self.experimentalMode = False
+        if 'resetParameters' in configDict:
+            self.resetParameters = bool(configDict['resetParameters'])
+        else:
+            self.resetParameters = False
 
         if (self.expGrayPhotometricCut >= 0.0) :
             raise ValueError("expGrayPhotometricCut must be negative.")
@@ -176,6 +183,8 @@ class FgcmConfig(object):
 
         if (self.experimentalMode) :
             self.fgcmLog.log('INFO','ExperimentalMode set to True')
+        if (self.resetParameters) :
+            self.fgcmLog.log('INFO','Will reset atmosphere parameters')
 
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
