@@ -11,7 +11,8 @@ def _pickle_method(m):
 
 objFlagDict = {'TOO_FEW_OBS':2**0,
                'BAD_COLOR':2**1,
-               'TEMPORARY_BAD_STAR':2**2}
+               'VARIABLE':2**2,
+               'TEMPORARY_BAD_STAR':2**3}
 
 obsFlagDict = {'NO_EXPOSURE':2**0,
                'BAD_ERROR':2**1}
