@@ -476,7 +476,7 @@ class FgcmZeropoints(object):
         """
         """
 
-        sigFgcm = self.fgcmGray.sigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
+        sigFgcm = self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
         nTilingsM1 = np.clip(zpStruct['FGCM_TILINGS'][zpIndex]-1.0,1.0,1e10)
 
         zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
