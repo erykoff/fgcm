@@ -4,9 +4,11 @@ import numpy as np
 import fitsio
 import scipy.interpolate as interpolate
 import scipy.integrate as integrate
-import fgcm_y3a1_tools
+#import fgcm_y3a1_tools
 import os
 import sys
+
+from modtranGenerator import ModtranGenerator
 
 from fgcmUtilities import _pickle_method
 
@@ -127,10 +129,12 @@ class FgcmLUT(object):
         self.lutConfig = lutConfig
 
         # this will generate an exception if things aren't set up properly
-        self.modGen = fgcm_y3a1_tools.ModtranGenerator(self.lutConfig['elevation'])
+        self.modGen = ModtranGenerator(self.lutConfig['elevation'])
         self.pmbElevation = self.modGen.pmbElevation
 
         self.bands = np.array(self.lutConfig['bands'])
+
+        ## FIXME: need other filter description!
 
         self.filters = fgcm_y3a1_tools.DESFilters()
         self.nCCD = self.filters.nCCD
