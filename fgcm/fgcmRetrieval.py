@@ -119,7 +119,6 @@ class FgcmRetrieval(object):
 
         # deltaMag = m_b^inst(i,j)  - <m_b^std(j) + QE_sys
         #   we want to take out the gray term from the qe
-        ## FIXME: check sign
 
         # compute deltaMag and error
         deltaMag = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
@@ -143,7 +142,6 @@ class FgcmRetrieval(object):
 
         # do all the exp/ccd sums
 
-        ## FIXME: check these
         # IMatrix[0,0] = sum (1./sigma_f^2)
         # IMatrix[0,1] = sum (F'_nu/sigma_f^2)
         # IMatrix[1,0] = IMatrix[0,1]
@@ -199,7 +197,7 @@ class FgcmRetrieval(object):
                                                               ccdIndexUse[i]]),
                                     RHS[:,expIndexUse[i],ccdIndexUse[i]])
             except:
-                # FIXME: write exposure number, ccd number not index
+                ## FIXME: write exposure number, ccd number not index
                 self.fgcmLog.log('DEBUG','Failed to compute R0, R1 for %d/%d'
                                  % (expIndexUse[i],ccdIndexUse[i]))
                 continue
