@@ -338,6 +338,10 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
 
+        # record as a class element
+        self.zpStruct = zpStruct
+
+        ## FIXME: move saving outside so we don't require fitsio
 
         # and save...
         outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
@@ -358,6 +362,10 @@ class FgcmZeropoints(object):
                                      self.fgcmPars.cosLatitude *
                                      np.cos(self.fgcmPars.expTelHA))
 
+        # record as a class element
+        self.atmStruct=atmStruct
+
+        ## FIXME: move saving outside so we don't require fitsio
         outFile = '%s/%s_atm.fits' % (self.outputPath,self.outfileBaseWithCycle)
         self.fgcmLog.log('INFO','Saving atmosphere parameters to %s' % (outFile))
         fitsio.write(outFile,atmStruct,clobber=True,extname='ATMPARS')
@@ -399,7 +407,14 @@ class FgcmZeropoints(object):
             ax=fig.add_subplot(111)
 
             ax.hexbin(i1,r1,cmap=plt.get_cmap('gray_r'),rasterized=True)
-            ax.plot(ax.get_xlim(),ax.get_ylim(),'b--',linewidth=2)
+            # and overplot a 1-1 line that best covers the range of the data
+            xlim = ax.get_xlim()
+            #ylim = ax.get_ylim()
+            #range0 = np.min([xlim[0],ylim[0]])+0.0001
+            #range1 = np.max([xlim[1],ylim[1]])-0.0001
+            range0 = xlim[0]+0.001
+            range1 = xlim[1]-0.001
+            ax.plot([range0,range1],[range0,range1],'b--',linewidth=2)
 
             ax.set_xlabel(r'$I_1$ from FGCM Fit',fontsize=16)
             ax.set_ylabel(r'$R_1$ from Retrieval',fontsize=16)
