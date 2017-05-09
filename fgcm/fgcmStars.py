@@ -33,6 +33,7 @@ class FgcmStars(object):
 
         self.bands = fgcmConfig.bands
         self.nBands = fgcmConfig.bands.size
+        self.nCCD = fgcmConfig.nCCD
         self.minPerBand = fgcmConfig.minObsPerBand
         self.fitBands = fgcmConfig.fitBands
         self.nFitBands = fgcmConfig.fitBands.size
@@ -72,7 +73,9 @@ class FgcmStars(object):
         if (computeNobs):
             allExps = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
             self.fgcmLog.log('INFO','Checking stars with full possible range of exp numbers')
-            self.selectStarsMinObs(goodExps=allExps,doPlots=False)
+            #self.selectStarsMinObs(goodExps=allExps,doPlots=False)
+            allExpsIndex = np.arange(fgcmPars.expArray.size)
+            self.selectStarsMinObsExpIndex(allExpsIndex)
 
         self.magConstant = 2.5/np.log(10)
 
@@ -325,7 +328,112 @@ class FgcmStars(object):
         self.fgcmLog.log('INFO','Computed secZenith in %.1f seconds.' %
                          (time.time() - startTime))
 
-    def selectStarsMinObs(self,goodExps=None,goodExpsIndex=None,doPlots=False,temporary=False):
+
+    def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
+                                  minPerBand=None):
+        """
+        """
+        if (minPerBand is None):
+            minPerBand = self.minPerBand
+
+        # Given a list of good exposures, which stars have at least minObs observations
+        #  in each required band?
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        self.fgcmLog.log('INFO','Selecting good stars from %d exposures.' %
+                         (goodExpsIndex.size))
+        _,goodObs=esutil.numpy_util.match(goodExpsIndex,obsExpIndex)
+
+        # Filter out bad (previously flagged) individual observations
+        gd, = np.where(obsFlag[goodObs] == 0)
+        goodObs = goodObs[gd]
+
+        # count all the good observations
+        objNGoodObs[:,:] = 0
+        np.add.at(objNGoodObs,
+                  (obsObjIDIndex[goodObs],
+                   obsBandIndex[goodObs]),
+                  1)
+
+        # and find the minimum of all the required bands
+        minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
+
+        # reset too few obs flag if it's already set
+        objFlag &= ~objFlagDict['TOO_FEW_OBS']
+
+        # choose the bad objects with too few observations
+        bad,=np.where(minObs < minPerBand)
+
+        if (not temporary) :
+            objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
+
+            self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+        else:
+            objFlag[bad] |= objFlagDict['TEMPORARY_BAD_STAR']
+
+            self.fgcmLog.log('INFO','Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
+
+
+    def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minPerBand=None):
+        """
+        """
+
+        if (minPerBand is None):
+            minPerBand = self.minPerBand
+
+        if (goodExps.size != goodCCDs.size) :
+            raise ValueError("Length of goodExps and goodCCDs must be the same")
+
+        obsExp = snmm.getArray(self.obsExpHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsCCD = snmm.getArray(self.obsCCDHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        self.fgcmLog.log('INFO', 'Selecting good stars from %d exposure/ccd pairs.' %
+                         (goodExps.size))
+
+        # hash together exposure and ccd and match this
+        obsHash = obsExp * (self.nCCD + self.ccdStartIndex) + obsCCD
+        goodHash = goodExps * (self.nCCD + self.ccdStartIndex) + goodCCDs
+
+        _,goodObs = esutil.numpy_util.match(goodHash, obsHash)
+
+        # Filter out bad (previously flagged) individual observations
+        gd, = np.where(obsFlag[goodObs] == 0)
+        goodObs = goodObs[gd]
+
+        # count all the good observations
+        objNGoodObs[:,:] = 0
+        np.add.at(objNGoodObs,
+                  (obsObjIDIndex[goodObs],
+                   obsBandIndex[goodObs]),
+                  1)
+
+                # and find the minimum of all the required bands
+        minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
+
+        # reset too few obs flag if it's already set
+        objFlag &= ~objFlagDict['TOO_FEW_OBS']
+
+        # choose the bad objects with too few observations
+        bad,=np.where(minObs < minPerBand)
+
+        objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
+        self.fgcmLog.log('INFO','Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+
+
+    def selectStarsMinObs(self, goodExps=None, goodExpsIndex=None,
+                          doPlots=False, temporary=False):
         """
         """
 
@@ -333,7 +441,6 @@ class FgcmStars(object):
             raise ValueError("Must supply *one* of goodExps or goodExpsIndex")
         if (goodExps is not None and goodExpsIndex is not None):
             raise ValueError("Must supply one of goodExps *or* goodExpsIndex")
-
 
         # Given a list of good exposures, which stars have at least minObs observations
         #  in each required band?
@@ -369,6 +476,10 @@ class FgcmStars(object):
         minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
 
         objFlag = snmm.getArray(self.objFlagHandle)
+
+        # reset too few obs flag if it's already set
+        objFlag &= ~objFlagDict['TOO_FEW_OBS']
+
         bad,=np.where(minObs < self.minPerBand)
 
         if (not temporary) :
@@ -381,10 +492,10 @@ class FgcmStars(object):
             self.fgcmLog.log('INFO','Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
 
 
-        if (doPlots):
-            self.plotStarMap()
+        #if (doPlots):
+        #    self.plotStarMap()
 
-    def plotStarMap(self):
+    def plotStarMap(self,mapType='initial'):
         """
         """
         import healpy as hp
@@ -414,8 +525,8 @@ class FgcmStars(object):
                              decRange=[np.min(decStar),np.max(decStar)],
                              lonRef = self.mapLongitudeRef)
 
-        fig.savefig('%s/%s_initialGoodStars.png' % (self.plotPath,
-                                                    self.outfileBaseWithCycle))
+        fig.savefig('%s/%s_%sGoodStars.png' % (self.plotPath, self.outfileBaseWithCycle,
+                                               mapType))
 
 
     def computeObjectSEDSlope(self,objIndex):
