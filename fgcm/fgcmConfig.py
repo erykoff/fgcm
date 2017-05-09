@@ -11,7 +11,7 @@ from fgcmLogger import FgcmLogger
 
 import types
 import copy_reg
-import sharedmem as shm
+#import sharedmem as shm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
