@@ -24,6 +24,9 @@ from fgcmExposureSelector import FgcmExposureSelector
 from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
 
+from fgcmUtilities import zpFlagDict
+
+
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmFitCycle(object):
@@ -93,7 +96,9 @@ class FgcmFitCycle(object):
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.log('DEBUG','FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
-        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
+        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
+        self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+        self.fgcmStars.plotStarMap(mapType='initial')
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
@@ -129,7 +134,8 @@ class FgcmFitCycle(object):
             # reflag bad stars with too few observations
             #  (we don't go back and select exposures at this point)
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-            self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+            #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+            self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
             ## EXPERIMENTAL
             ## not needed as far as I can tell
@@ -148,7 +154,8 @@ class FgcmFitCycle(object):
 
         # We need one last selection to cut last of bad stars
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+        self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
         self.fgcmLog.logMemoryUsage('INFO','FitCycle Pre-Fit')
 
@@ -223,6 +230,17 @@ class FgcmFitCycle(object):
                                                self.fgcmConfig.outfileBaseWithCycle)
         self.fgcmStars.saveBadStarIndices(outBadStarFile)
 
+        ## FIXME: save standard stars if desired.  (Need code to save std stars)
+
+        badZpMask = (zpFlagDict['NOFIT_NIGHT'] |
+                     zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
+                     zpFlagDict['TOO_FEW_STARS_ON_CCD'])
+        zpOk, = np.where((fgcmZpts.zpStruct['FGCM_FLAG'] & badZpMask) == 0)
+        okExps = fgcmZpts.zpStruct[self.fgcmConfig.expField][zpOk]
+        okCCDs = fgcmZpts.zpStruct[self.fgcmConfig.ccdField][zpOk]
+        self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minPerBand=1)
+        self.fgcmStars.plotStarMap(mapType='okcoverage')
+
         # Save yaml for input to next fit cycle
         outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
                                                       self.fgcmConfig.outfileBase,
@@ -288,6 +306,8 @@ class FgcmFitCycle(object):
         """
         """
 
+        ## FIXME: remove this method, it's not useful
+
         from fgcmUtilities import expFlagDict
         from fgcmUtilities import objFlagDict
 
@@ -309,7 +329,8 @@ class FgcmFitCycle(object):
         goodExpsIndex,=np.where(self.fgcmPars.expFlag == 0)
 
         # don't know how to reverse this...make a "temporary" thing"
-        self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
+        self.fgcmStars.selectStarsMinObsExpIndex(goodExpIndex, temporary=True)
 
         # and bound everything but SOptics ... replace with input numbers
         # and store backups to refill
