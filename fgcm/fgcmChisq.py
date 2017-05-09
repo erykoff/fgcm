@@ -103,6 +103,7 @@ class FgcmChisq(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
+        ## FIXME: do caching of matches...
         preStartTime=time.time()
         self.fgcmLog.log('INFO','Pre-matching stars and observations...')
         goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
