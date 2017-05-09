@@ -121,6 +121,7 @@ class FgcmMakeStars(object):
                 bad,=np.where((inObs['BAND'] == self.starConfig['referenceBand']) &
                               ((np.abs(inObs['SPREAD_MODEL']) > 0.003) |
                                (inObs['CLASS_STAR'] < 0.75)))
+                ## FIXME: need imaflags_iso (oops)
                 print("Removing %d observations due to DES star selection." % (bad.size))
                 if (bad.size > 0):
                     mark[bad] = False
