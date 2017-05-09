@@ -765,7 +765,7 @@ class FgcmParameters(object):
         self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
                                                  self.parQESysInterceptLoc+self.nWashIntervals] / unitDict['qeSysUnit']
 
-        
+
         self.parQESysSlope[:] = parArray[self.parQESysSlopeLoc:
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
         # done
@@ -930,6 +930,7 @@ class FgcmParameters(object):
                        self.parExternalPWVOffsetLoc + \
                         self.nCampaignNights] = ( \
                 3.0 * unitDict['pwvUnit'])
+            ## FIXME: set bounds per night?  Or clip?
         if (self.hasExternalTau):
             parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
             parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
@@ -941,6 +942,7 @@ class FgcmParameters(object):
                         self.parExternalTauOffsetLoc + \
                         self.nCampaignNights] = ( \
                 0.03 * unitDict['tauUnit'])
+            ## FIXME: set bounds per night?  Or clip?
 
         parLow[self.parQESysInterceptLoc: \
                    self.parQESysInterceptLoc + \
