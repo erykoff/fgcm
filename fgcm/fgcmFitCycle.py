@@ -172,22 +172,26 @@ class FgcmFitCycle(object):
         self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
 
+        self.fgcmLog.logMemoryUsage('INFO','After recomputing chisq for all exposures')
 
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.log('DEBUG','FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
+        self.fgcmLog.logMemoryUsage('INFO','After computing CCD and Exp Gray')
 
         # Compute sigFgcm
         self.fgcmLog.log('DEBUG','FitCycle computing sigFgcm')
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
         self.fgcmSigFgcm.computeSigFgcm()
+        self.fgcmLog.logMemoryUsage('INFO','After computing sigFGCM')
 
         # Flag variables for next cycle
         self.fgcmLog.log('DEBUG','FitCycle flagging variables')
         self.fgcmFlagVars = FgcmFlagVariables(self.fgcmConfig,self.fgcmPars,
                                               self.fgcmStars)
         self.fgcmFlagVars.flagVariables()
+        self.fgcmLog.logMemoryUsage('INFO','After flagging variables')
 
         # Re-flag exposures for superstar, aperture, etc.
         self.fgcmLog.log('DEBUG','FitCycle re-selecting good exposures')
@@ -198,16 +202,19 @@ class FgcmFitCycle(object):
         self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,
                                            self.fgcmStars,self.fgcmLUT)
         self.fgcmRetrieval.computeRetrievedIntegrals()
+        self.fgcmLog.logMemoryUsage('INFO','After computing retrieved integrals')
 
         # Compute SuperStar Flats
         self.fgcmLog.log('DEBUG','FitCycle computing SuperStarFlats')
         superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         superStarFlat.computeSuperStarFlats()
+        self.fgcmLog.logMemoryUsage('INFO','After computing superstar flats')
 
         # Compute Aperture Corrections
         self.fgcmLog.log('DEBUG','FitCycle computing ApertureCorrections')
         aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         aperCorr.computeApertureCorrections()
+        self.fgcmLog.logMemoryUsage('INFO','After computing aperture corrections')
 
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
@@ -219,6 +226,7 @@ class FgcmFitCycle(object):
                                   self.fgcmLUT,self.fgcmGray,
                                   self.fgcmRetrieval)
         fgcmZpts.computeZeropoints()
+        self.fgcmLog.logMemoryUsage('INFO','After computing zeropoints')
 
         # Save parameters
         outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
