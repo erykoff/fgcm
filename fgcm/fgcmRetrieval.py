@@ -115,56 +115,6 @@ class FgcmRetrieval(object):
         self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
 
-        # and pre-compute numbers
-        #self.deltaMagHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-        #self.deltaMagErr2Handle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-
-        #deltaMag = snmm.getArray(self.deltaMagHandle)
-
-        # what arrays we need...
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
-
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.ObsMagADUErrHandle)
-
-        # compute delta mags
-        # deltaMag = m_b^inst(i,j)  - <m_b^std>(j) + QE_sys
-        #   we want to take out the gray term from the qe
-
-        deltaMagGO = np.zeros(goodObs.size,dtype='f8')
-        deltaMagErr2GO = np.zeros(goodObs.size,dtype='f8')
-
-        deltaMagGO[:] = (obsMagADU[goodObs] -
-                         objMagStdMean[obsObjIDIndex[goodObs],
-                                       obsBandIndex[goodObs]] +
-                         self.fgcmPars.expQESys[obsExpIndex[goodObs]])
-        deltaMagErr2GO[:] = (obsMagErr[goodObs]**2. +
-                             objMagStdMeanErr[obsObjIDIndex[goodObs],
-                                              obsBandIndex[goodObs]]**2.)
-
-        # and convert to flux units
-        # note that these are full arrays which allows easier indexing down the line
-        #  at a cost of some memory.  (check this?)
-        self.fObsHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-        self.fObsErr2Handle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-        self.deltaStdHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-        self.deltaStdWeightHandle = snmm.createArray(self.fgcmStars.nStarObs,dtype='f8')
-
-        fObs = snmm.getArray(self.fObsHandle)
-        fObsErr2 = snmm.getArray(self.fObsErr2Handle)
-        deltaStd = snmm.getArray(self.deltaStdHandle)
-        deltaStdWeight = snmm.getArray(self.deltaStdWeightHandle)
-
-        fObs[goodObs] = 10.**(-0.4*deltaMagGO)
-        fObsErr2[goodObs] = deltaMagErr2GO * ((2.5/np.log(10.)) * fObs[goodObs])**2.
-        deltaStd[goodObs] = (1.0 + objSEDSlope[obsObjIDIndex[goodObs],
-                                               obsBandIndex[goodObs]] *
-                             self.I10Std[obsBandIndex[goodObs]])
-        deltaStdWeight[goodObs] = 1./(fObsErr2[goodObs] * deltaStd[goodObs] * deltaStd[goodObs])
-
         # which exposures have stars?
         uExpIndex = np.unique(obsExpIndex[goodObs])
 
@@ -172,16 +122,17 @@ class FgcmRetrieval(object):
         if (self.debug):
             # debug mode: single core
 
-            self._worker(self.fgcmPars.expArray[uExpIndex])
+            #self._worker(self.fgcmPars.expArray[uExpIndex])
+            self._worker(uExpIndex)
 
         else:
             # regular multi-core
             self.fgcmLog.log('INFO','Running retrieval on %d cores' % (self.nCore))
 
             # split exposures into a list of arrays of roughly equal size
-            nSections = self.fgcmPars.expArray.size // self.nExpPerRun + 1
+            #nSections = self.fgcmPars.expArray.size // self.nExpPerRun + 1
+            nSections = uExpIndex.size // self.nExpPerRun + 1
 
-            uExpIndex = np.unique(obsExpIndex[goodObs])
             uExpIndexList = np.array_split(uExpIndex,nSections)
 
             # may want to sort by nObservations, but only if we pre-split
@@ -193,10 +144,6 @@ class FgcmRetrieval(object):
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)
-        snmm.freeArray(self.fObsHandle)
-        snmm.freeArray(self.fObsErr2Handle)
-        snmm.freeArray(self.deltaStdHandle)
-        snmm.freeArray(self.deltaStdWeightHandle)
 
         # and we're done
         self.fgcmLog.log('INFO','Computed retrieved integrals in %.2f seconds.' %
@@ -210,23 +157,44 @@ class FgcmRetrieval(object):
         workerStarTime = time.time()
 
         goodObsAll = snmm.getArray(self.goodObsHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
 
         _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndex[goodObsAll])
         goodObs = goodObsAll[temp]
 
+        obsExpIndexGO = obsExpIndex[goodObs]
+
         temp = None
 
-        
-
-        fObsGO = snmm.getArray(self.fObsHandle)[goodObs]
-        fObsErr2GO = snmm.getArray(self.fObsErr2Handle)[goodObs]
-        deltaStdGO = snmm.getArray(self.deltaStdHandle)[goodObs]
-        deltaStdWeightGO = snmm.getArray(self.deltaStdWeightHandle)[goodObs]
-
-        obsExpIndexGO = snmm.getArray(self.fgcmStars.obsExpIndex)[goodObs]
-        obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDIndex)[goodObs]
-        obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
+        # arrays we need...
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+
+        obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
+        obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
+        obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
+        obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
+        obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
+
+        # compute delta mags
+        # deltaMag = m_b^inst(i,j)  - <m_b^std>(j) + QE_sys
+        #   we want to take out the gray term from the qe
+
+        deltaMagGO = (obsMagADUGO -
+                      objMagStdMean[obsObjIDIndexGO,
+                                    obsBandIndexGO] +
+                      self.fgcmPars.expQESys[obsExpIndexGO])
+        deltaMagErr2GO = (obsMagErrGO**2. +
+                          objMagStdMeanErr[obsObjIDIndexGO,
+                                           obsBandIndexGO]**2.)
+
+        # and to flux space
+        fObsGO = 10.**(-0.4*deltaMagGO)
+        fObsErr2GO = deltaMagErr2GO * ((2.5/np.log(10.)) * fObsGO)**2.
+        deltaStdGO = (1.0 + objSEDSlope[obsObjIDIndexGO,
+                                        obsBandIndexGO])
+        deltaStdWeightGO = 1./(fObsErr2GO * deltaStdGO * deltaStdGO)
 
         # and compress obsExpIndexGO
         theseObsExpIndexGO=np.searchsorted(uExpIndex, obsExpIndexGO)
@@ -245,9 +213,9 @@ class FgcmRetrieval(object):
         # RHS[1] = sum ((F'_nu * f^obs / (sigma_f^2 * deltaStd))
 
 
-        IMatrix = np.zeros((2,2,uExpIndexGO.size,self.fgcmPars.nCCD),dtype='f8')
-        RHS = np.zeros((2,uExpIndexGO.size,self.fgcmPars.nCCD),dtype='f8')
-        nStar = np.zeros((uExpIndexGO.size,self.fgcmPars.nCCD),dtype='i4')
+        IMatrix = np.zeros((2,2,uExpIndex.size,self.fgcmPars.nCCD),dtype='f8')
+        RHS = np.zeros((2,uExpIndex.size,self.fgcmPars.nCCD),dtype='f8')
+        nStar = np.zeros((uExpIndex.size,self.fgcmPars.nCCD),dtype='i4')
 
         np.add.at(IMatrix,
                   (0,0,theseObsExpIndexGO,obsCCDIndexGO),
