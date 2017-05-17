@@ -13,7 +13,8 @@ from fgcmConfig import FgcmConfig
 from fgcmParameters import FgcmParameters
 from fgcmChisq import FgcmChisq
 from fgcmStars import FgcmStars
-from fgcmLUT import FgcmLUTSHM
+#from fgcmLUT import FgcmLUTSHM
+from fgcmLUT import FgcmLUT
 from fgcmGray import FgcmGray
 from fgcmZeropoints import FgcmZeropoints
 from fgcmSuperStarFlat import FgcmSuperStarFlat
@@ -64,7 +65,7 @@ class FgcmFitCycle(object):
 
         # Read in LUT
         self.fgcmLog.log('DEBUG','FitCycle is making FgcmLUT')
-        self.fgcmLUT = FgcmLUTSHM(self.fgcmConfig.lutFile)
+        self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
 
         # And prepare the chisq function
         self.fgcmLog.log('DEBUG','FitCycle is making FgcmChisq')
@@ -201,7 +202,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.log('DEBUG','FitCycle computing retrieved R0/R1')
         self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,
                                            self.fgcmStars,self.fgcmLUT)
-        self.fgcmRetrieval.computeRetrievedIntegrals()
+        #self.fgcmRetrieval.computeRetrievedIntegrals()
+        self.fgcmRetrieval.computeRetrievalIntegrals()
         self.fgcmLog.logMemoryUsage('INFO','After computing retrieved integrals')
 
         # Compute SuperStar Flats
