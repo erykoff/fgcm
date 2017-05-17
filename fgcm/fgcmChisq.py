@@ -341,16 +341,20 @@ class FgcmChisq(object):
                                                obsSecZenithGO,
                                                obsCCDIndexGO,
                                                self.fgcmPars.expPmb[obsExpIndexGO])
-        I0GO = self.fgcmLUT.computeI0(obsBandIndexGO,
-                                      self.fgcmPars.expPWV[obsExpIndexGO],
+        I0GO = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[obsExpIndexGO],
                                       self.fgcmPars.expO3[obsExpIndexGO],
                                       np.log(self.fgcmPars.expTau[obsExpIndexGO]),
                                       self.fgcmPars.expAlpha[obsExpIndexGO],
                                       obsSecZenithGO,
-                                      obsCCDIndexGO,
                                       self.fgcmPars.expPmb[obsExpIndexGO],
                                       lutIndicesGO)
-        I10GO = self.fgcmLUT.computeI1(lutIndicesGO) / I0GO
+        I10GO = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[obsExpIndexGO],
+                                       self.fgcmPars.expO3[obsExpIndexGO],
+                                       np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                       self.fgcmPars.expAlpha[obsExpIndexGO],
+                                       obsSecZenithGO,
+                                       self.fgcmPars.expPmb[obsExpIndexGO],
+                                       lutIndicesGO) / I0GO
 
         #self.fgcmLog.log('DEBUG','chisq %d: LUTs in %.1f sec.' %
         #                 (thisCore, time.time() - startTime),printOnly=True)
