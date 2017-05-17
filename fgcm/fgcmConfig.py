@@ -39,7 +39,7 @@ class FgcmConfig(object):
                       'expGrayPhotometricCut','expGrayRecoverCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
                       'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun',
-                      'varNSig','varMinBand']
+                      'nExpPerRun','varNSig','varMinBand']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -97,6 +97,7 @@ class FgcmConfig(object):
         self.mapLongitudeRef =float( configDict['mapLongitudeRef'])
         self.mapNside = int(configDict['mapNside'])
         self.nStarPerRun = int(configDict['nStarPerRun'])
+        self.nExpPerRun = int(configDict['nExpPerRun'])
         self.varNSig = float(configDict['varNSig'])
         self.varMinBand = int(configDict['varMinBand'])
 
@@ -343,29 +344,3 @@ class FgcmConfig(object):
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)
 
-
-#        confDict = {'exposureFile':self.exposureFile,
-#                    'ccdOffsetFile':self.ccdOffsetFile,
-#                    'obsFile':self.obsFile,
-#                    'indexFile':self.indexFile,
-#                    'UTBoundary':self.UTBoundary,
-#                    'washMJDs':list(self.washMJDs),
-#                    'epochMJDs':list(self.epochMJDs),
-#                    'lutFile':self.lutFile,
-#                    'expField':self.expField,
-#                    'ccdField':self.ccdField,
-#                    'latitude':self.latitude,
-#                    'seeingField':self.seeingField,
-#                    'fitBands':list(self.fitBands),
-#                    'extraBands':list(self.extraBands),
-#                    'deepFlag':self.deepFlag,
-#                    'minObsPerBand':self.minObsPerBand,
-#                    'nCore':self.nCore,
-#                    'brightObsGrayMax':self.brightObsGrayMax,
-#                    'minStarPerCCD':self.minStarPerCCD,
-#                    'minCCDPerExp':self.minCCDPerExp,
-#                    'maxCCDGrayErr':self.maxCCDGrayErr,
-#                    'aperCorrFitNBins':self.aperCorrFitNBins,
-#                    'illegalValue':self.illegalValue,
-#                    'sedFitBandFudgeFactors':list(self.sedFitBandFudgeFactors),
-#                    '
