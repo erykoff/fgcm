@@ -16,7 +16,7 @@ import copy_reg
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-from fgcmLUT import FgcmLUTSHM
+from fgcmLUT import FgcmLUT
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
@@ -378,7 +378,8 @@ class FgcmParameters(object):
         self.stepUnitReference = fgcmConfig.stepUnitReference
         self.stepGrain = fgcmConfig.stepGrain
 
-        LUT = FgcmLUTSHM(fgcmConfig.lutFile)
+        ## FIXME: need to make this not read in a copy
+        LUT = FgcmLUT(fgcmConfig.lutFile)
 
         secZenithStd = 1./np.cos(LUT.zenithStd*np.pi/180.)
 
@@ -417,9 +418,9 @@ class FgcmParameters(object):
             raise ValueError("Require z band for PWV ...")
 
         indicesStd = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Std = LUT.computeI0(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd,indicesStd)
+        i0Std = LUT.computeI0(LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesStd)
         indicesPlus = LUT.getIndices(bandIndex,LUT.pwvStd+1.0,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Plus = LUT.computeI0(bandIndex,LUT.pwvStd+1.0,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd,indicesPlus)
+        i0Plus = LUT.computeI0(LUT.pwvStd+1.0,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesPlus)
         deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
         self.pwvStepUnits = np.abs(deltaMagPWV[0]) / self.stepUnitReference / self.stepGrain
 
@@ -439,9 +440,9 @@ class FgcmParameters(object):
             raise ValueError("Require r band for O3...")
 
         indicesStd = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Std = LUT.computeI0(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd,indicesStd)
+        i0Std = LUT.computeI0(LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesStd)
         indicesPlus = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std+1.0,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Plus = LUT.computeI0(bandIndex,LUT.pwvStd,LUT.o3Std+1.0,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd,indicesPlus)
+        i0Plus = LUT.computeI0(LUT.pwvStd,LUT.o3Std+1.0,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesPlus)
         deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
         self.o3StepUnits = np.abs(deltaMagO3[0]) / self.stepUnitReference / self.stepGrain
 
