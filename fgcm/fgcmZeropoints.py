@@ -176,16 +176,20 @@ class FgcmZeropoints(object):
                                              ccdSecZenith,
                                              zpCCDIndex,
                                              self.fgcmPars.expPmb[zpExpIndex])
-        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expBandIndex[zpExpIndex],
-                                                        self.fgcmPars.expPWV[zpExpIndex],
+        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[zpExpIndex],
                                                         self.fgcmPars.expO3[zpExpIndex],
                                                         np.log(self.fgcmPars.expTau[zpExpIndex]),
                                                         self.fgcmPars.expAlpha[zpExpIndex],
                                                         ccdSecZenith,
-                                                        zpCCDIndex,
                                                         self.fgcmPars.expPmb[zpExpIndex],
                                                         lutIndices)
-        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(lutIndices) / zpStruct['FGCM_I0'][:]
+        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[zpExpIndex],
+                                                         self.fgcmPars.expO3[zpExpIndex],
+                                                         np.log(self.fgcmPars.expTau[zpExpIndex]),
+                                                         self.fgcmPars.expAlpha[zpExpIndex],
+                                                         ccdSecZenith,
+                                                         self.fgcmPars.expPmb[zpExpIndex],
+                                                         lutIndices) / zpStruct['FGCM_I0'][:]
 
         # Set the tilings, gray values, and zptvar
 
