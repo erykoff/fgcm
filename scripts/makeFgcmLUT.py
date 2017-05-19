@@ -26,7 +26,12 @@ if __name__ == '__main__':
         print("LUT file %s already found, and clobber set to False." % (lutConfig['lutFile']))
         sys.exit(0)
 
-    fgcmLUT = fgcm.FgcmLUT(lutConfig=lutConfig)
-    fgcmLUT.makeLUT(lutConfig['lutFile'],clobber=True)
-    fgcmLUT.makeLUTDerivatives(lutConfig['lutFile'])
+    #fgcmLUT = fgcm.FgcmLUT(lutConfig=lutConfig)
+    #fgcmLUT.makeLUT(lutConfig['lutFile'],clobber=True)
+    #fgcmLUT.makeLUTDerivatives(lutConfig['lutFile'])
+
+    fgcmLUT = fgcm.FgcmLUTMaker(lutConfig)
+    fgcmLUT.makeLUT()
+    fgcmLUT.saveLUT(lutConfig['lutFile'])
+
 
