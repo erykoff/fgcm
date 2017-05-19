@@ -486,6 +486,20 @@ class FgcmChisq(object):
                                                    self.fgcmPars.expTau[
                         obsExpIndexGO]))
 
+            if (self.fgcmLUT.hasI1Derivatives) :
+                (dLdPWVI1GO,dLdO3I1GO,dLdTauI1GO,dLdAlphaI1GO) = (
+                    self.fgcmLUT.computeLogDerivativesI1(lutIndicesGO,
+                                                         I0GO,
+                                                         I10GO,
+                                                         objSEDSlope[obsObjIDIndexGO,
+                                                                     obsBandIndexGO],
+                                                         self.fgcmPars.expTau[
+                            obsExpIndexGO]))
+                dLdPWVGO += dLdPWVI1GO
+                dLdO3GO += dLdO3I1GO
+                dLdTauGO += dLdTauI1GO
+                dLdAlphaGO += dLdAlphaI1GO
+
 
             # we have objMagStdMeanErr[objIndex,:] = \Sum_{i"} 1/\sigma^2_{i"j}
             #   note that this is summed over all observations of an object in a band
