@@ -274,11 +274,12 @@ class FgcmFitCycle(object):
 
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
+        self.fgcmChisq.clearMatchCache()
 
         pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                    parInitial,       # initial guess
                                                    fprime=None,      # in fgcmChisq()
-                                                   args=(True,True), # fitterUnits, deriv
+                                                   args=(True,True,False,True), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
                                                    approx_grad=False,# don't approx grad
                                                    bounds=parBounds, # boundaries
                                                    m=10,             # "variable metric conditions"
@@ -290,6 +291,7 @@ class FgcmFitCycle(object):
                                                    callback=None)    # no callback
 
         self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+        self.fgcmChisq.clearMatchCache()
 
         if (doPlots):
             fig=plt.figure(1,figsize=(8,6))
