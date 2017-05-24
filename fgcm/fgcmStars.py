@@ -565,9 +565,13 @@ class FgcmStars(object):
                     (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
                     (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
                 (S[tempIndex+1]-S[tempIndex]))
+            #objSEDSlope[objIndex,tempIndex] = (
+            #    S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
+            #        S[tempIndex+1] + S[tempIndex]))
 
             # and the middle ones...
             #  these are straight averages
+            ## FIXME: include Fudge factors!!!!!
             for tempIndex in self.bandRequiredIndex[1:-1]:
                 objSEDSlope[objIndex,tempIndex] = (S[tempIndex-1] + S[tempIndex]) / 2.0
 
@@ -640,9 +644,6 @@ class FgcmStars(object):
         # can this be non-looped?
         S=np.zeros((goodIndicesOI.size,self.nBands-1),dtype='f8')
         for i in xrange(self.nBands-1):
-            #S[:,i] = (-1/self.magConstant) * (objMagStdMean[objIndices,i+1] -
-            #                                  objMagStdMean[objIndices,i]) / (
-            #    (self.lambdaStd[i+1] - self.lambdaStd[i]))
             S[:,i] = (-1/self.magConstant) * (objMagStdMeanOI[goodIndicesOI,i+1] -
                                               objMagStdMeanOI[goodIndicesOI,i]) / (
                 (self.lambdaStd[i+1] - self.lambdaStd[i]))
@@ -650,16 +651,15 @@ class FgcmStars(object):
         ## FIXME: will have to handle u band "extra"
 
         tempIndex=self.bandRequiredIndex[0]
-        #objSEDSlope[objIndices,tempIndex] = (
-        #    S[:,tempIndex] + self.sedFitBandFudgeFactors[0] * (
-        #        (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
-        #        (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
-        #    (S[:,tempIndex+1] - S[:,tempIndex]))
+        ## HACK
         objSEDSlopeOI[goodIndicesOI,tempIndex] = (
             S[:,tempIndex] + self.sedFitBandFudgeFactors[0] * (
                 (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
                 (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
             (S[:,tempIndex+1] - S[:,tempIndex]))
+        #objSEDSlopeOI[goodIndicesOI, tempIndex] = (
+        #    S[:, tempIndex] + self.sedFitBandFudgeFactors[0] * (
+        #        S[:, tempIndex+1] + S[:, tempIndex]))
 
         # and the middle ones...
         #  these are straight averages
