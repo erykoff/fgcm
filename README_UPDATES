@@ -1,0 +1,8 @@
+List of fundamental updates since the FGCM paper.  This does not include
+general code improvements and streamlining, which are a given.
+
+- LUTs are now generated per CCD per atmosphere (rather than as a delta on top
+  of the standard)
+- LUTs now include a dI1 term for smoother interpolation in the I1 LUT
+- g band SED approx formula updated
+- aperture corrections included
