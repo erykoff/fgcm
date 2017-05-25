@@ -39,7 +39,7 @@ class FgcmConfig(object):
                       'expGrayPhotometricCut','expGrayRecoverCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
                       'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun',
-                      'nExpPerRun','varNSig','varMinBand']
+                      'nExpPerRun','varNSig','varMinBand','useSedLUT']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -100,6 +100,7 @@ class FgcmConfig(object):
         self.nExpPerRun = int(configDict['nExpPerRun'])
         self.varNSig = float(configDict['varNSig'])
         self.varMinBand = int(configDict['varMinBand'])
+        self.useSedLUT = configDict['useSedLUT']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
