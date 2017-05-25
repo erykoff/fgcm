@@ -25,7 +25,7 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 class FgcmBrightObs(object):
     """
     """
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+    def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -35,11 +35,18 @@ class FgcmBrightObs(object):
         self.fgcmPars = fgcmPars
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
+        # and fgcmLUT for the SEDs (this makes me unhappy)
+        self.fgcmLUT = fgcmLUT
 
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
         self.nStarPerRun = fgcmConfig.nStarPerRun
+
+        if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
+            self.useSedLUT = True
+        else:
+            self.useSedLUT = False
 
     def brightestObsMeanMag(self,debug=False,computeSEDSlopes=False):
         """
@@ -227,6 +234,9 @@ class FgcmBrightObs(object):
 
         # finally, compute SED slopes if desired
         if (self.computeSEDSlopes):
-            self.fgcmStars.computeObjectSEDSlopes(goodStars)
+            if (self.useSedLUT):
+                self.fgcmStars.computeObjectSEDSlopesLUT(goodStars, self.fgcmLUT)
+            else:
+                self.fgcmStars.computeObjectSEDSlopes(goodStars)
 
         # and we're done
