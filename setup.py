@@ -1,6 +1,8 @@
-from setuptools import setup, find_packages, Extension
-import numpy
+import distutils
+from distutils.core import setup
 import glob
+import os
+import fnmatch
 
 exec(open('fgcm/_version.py').read())
 
@@ -8,6 +10,13 @@ scripts = ['scripts/runFgcmFitCycle.py',
            'scripts/makeFgcmLUT.py',
            'scripts/makeFgcmStars.py']
 
+name='fgcm'
+
+def fileList(name, relpath, globstr):
+    return [relpath + x for x in
+            fnmatch.filter(os.listdir(name+'/'+relpath+'/'),globstr)]
+
+datafiles = fileList(name,'data/templates/','*.fits')
 
 setup(
     name='fgcm',
@@ -15,8 +24,9 @@ setup(
     description='Forward Global Calibration Method (FGCM)',
     author='Eli Rykoff, Dave Burke',
     author_email='erykoff@stanford.edu',
-    packages=find_packages(),
-    data_files=[],
+    packages=[name],
+    package_dir = {name: name},
+    package_data = {name: datafiles},
     scripts=scripts
 )
 
