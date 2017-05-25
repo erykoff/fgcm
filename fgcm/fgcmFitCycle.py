@@ -118,7 +118,7 @@ class FgcmFitCycle(object):
             self.fgcmChisq(parArray,allExposures=True)
 
             # run the bright observation algorithm, computing SEDs
-            brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+            brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
             brightObs.brightestObsMeanMag(computeSEDSlopes=True)
 
             self.fgcmLog.logMemoryUsage('INFO','FitCycle Post Bright-Obs')
