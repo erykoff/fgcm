@@ -149,6 +149,7 @@ class FgcmMakeStars(object):
             i2 = matches['i2']
         else:
             # slower htm matching...
+            htm = esutil.htm.HTM(11)
 
             matcher = esutil.htm.Matcher(11, raArray, decArray)
             matches = matcher.match(raArray, decArray,
@@ -217,6 +218,7 @@ class FgcmMakeStars(object):
                 i2=matches['i2']
             else:
                 # slower htm matching...
+                htm = esutil.htm.HTM(11)
 
                 matcher = esutil.htm.Matcher(10, brightStarsRA, brightStarsDec)
                 matches = matcher.match(raArray, decArray, brightStarsRadius,
@@ -236,6 +238,7 @@ class FgcmMakeStars(object):
             i2=matches['i2']
         else:
             # slower htm matching...
+            htm = esutil.htm.HTM(11)
 
             matcher = esutil.htm.Matcher(self.objCat['RA'], self.objCat['DEC'])
             matches = matcher.match(self.objCat['RA'], self.objCat['DEC'],
@@ -282,6 +285,7 @@ class FgcmMakeStars(object):
             i2=matches['i2']
         else:
             # slower htm matching...
+            htm = esutil.htm.HTM(11)
 
             matcher = esutil.htm.Matcher(11, self.objCat['RA'], self.objCat['DEC'])
             matches = matcher.match(raArray, decArray,
