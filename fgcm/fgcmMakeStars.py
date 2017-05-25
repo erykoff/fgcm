@@ -13,33 +13,35 @@ class FgcmMakeStars(object):
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
-        requiredKeys=['exposureFile','fileGlobs',
-                      'blacklistFile','brightStarFile',
-                      'bands','requiredFlag',
+        requiredKeys=['bands','requiredFlag',
                       'minPerBand','matchRadius',
-                      'isolationRadius','nside',
-                      'maxPerPixel','referenceBand',
-                      'zpDefault','starSelectionMode',
-                      'nCCD',
-                      'starfileBase']
+                      'isolationRadius','densNSide',
+                      'densMaxPerPixel','referenceBand',
+                      'zpDefault']
 
         for key in requiredKeys:
             if (key not in starConfig):
                 raise ValueError("required %s not in starConfig" % (key))
 
-        self.starConfig['observationFile'] = self.starConfig['starfileBase']+'_observations.fits'
-        self.starConfig['starPrePositionFile'] = self.starConfig['starfileBase']+'_prepositions.fits'
-        self.starConfig['obsIndexFile'] = self.starConfig['starfileBase']+'_obs_index.fits'
-
-        self.nside=4096
+        self.smatchNSide=4096
         self.objCat = None
 
-    def run(self,clobber=False):
+    def runFromFits(self, clobber=False):
         """
         """
 
-        self.makeReferenceStars(clobber=clobber)
-        self.makeMatchedStars(clobber=clobber)
+        if 'starfileBase' not in self.starConfig:
+            raise ValueError("Required starfileBase not in starConfig")
+
+        observationFile = self.starConfig['starfileBase']+'_observations.fits'
+
+        if (not os.path.isfile(observationFile)):
+            raise IOError("Could not find observationFile %s" % (observationFile))
+
+        obsIndexFile = self.starConfig['starfileBase']+'_obs_index.fits'
+
+        self.makeReferenceStarsFromFits(observationFile)
+        self.makeMatchedStarsFromFits(observationFile, obsIndexFile, clobber=clobber)
 
     def makeReferenceStarsFromFits(self, observationFile):
         """
@@ -141,7 +143,7 @@ class FgcmMakeStars(object):
             # faster smatch...
 
             matches = smatch.match(raArray, decArray, self.starConfig['matchRadius']/3600.0,
-                                   raArray, decArray, nside=self.nside, maxmatch=0)
+                                   raArray, decArray, nside=self.smatchNSide, maxmatch=0)
 
             i1 = matches['i1']
             i2 = matches['i2']
@@ -195,21 +197,21 @@ class FgcmMakeStars(object):
                 starInd=i2[i1a]
                 # make sure this doesn't get used again
                 hist[starInd] = 0
-                objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
-                objCat['DEC'][index] = np.sum(obsCat['DEC'][starInd])/starInd.size
+                self.objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
+                self.objCat['DEC'][index] = np.sum(obsCat['DEC'][starInd])/starInd.size
                 index = index+1
 
         # restore negative RAs
-        lo,=np.where(objCat['RA'] < 0.0)
+        lo,=np.where(self.objCat['RA'] < 0.0)
         if (lo.size > 0):
-            objCat['RA'][lo] = objCat['RA'][lo] + 360.0
+            self.objCat['RA'][lo] = self.objCat['RA'][lo] + 360.0
 
         if (cutBrightStars):
             if (hasSmatch):
                 # faster smatch...
 
                 matches = smatch.match(brightStarsRA, brightStarsDec, brightStarsRadius,
-                                       objCat['RA'], objCat['DEC'], nside=self.nside,
+                                       self.objCat['RA'], self.objCat['DEC'], nside=self.smatchNSide,
                                        maxmatch=0)
                 i1=matches['i1']
                 i2=matches['i2']
@@ -222,21 +224,21 @@ class FgcmMakeStars(object):
                 i1=matches[0]
                 i2=matches[1]
 
-            objCat = np.delete(objCat,i2)
+            self.objCat = np.delete(self.objCat,i2)
 
         # and remove stars with near neighbors
         if (hasSmatch):
             # faster smatch...
 
-            matches=smatch.match(objCat['RA'], objCat['DEC'], self.starConfig['isolationRadius']/3600.0,
-                                 objCat['RA'], objCat['DEC'], nside=self.nside, maxmatch=0)
+            matches=smatch.match(self.objCat['RA'], self.objCat['DEC'], self.starConfig['isolationRadius']/3600.0,
+                                 self.objCat['RA'], self.objCat['DEC'], nside=self.smatchNSide, maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
             # slower htm matching...
 
-            matcher = esutil.htm.Matcher(objCat['RA'], objCat['DEC'])
-            matches = matcher.match(objCat['RA'], objCat['DEC'],
+            matcher = esutil.htm.Matcher(self.objCat['RA'], self.objCat['DEC'])
+            matches = matcher.match(self.objCat['RA'], self.objCat['DEC'],
                                     self.starConfig['isolationRadius']/3600.0,
                                     maxmatch = 0)
             i1=matches[0]
@@ -245,7 +247,7 @@ class FgcmMakeStars(object):
         use,=np.where(i1 != i2)
         if (use.size > 0):
             neighbored = np.unique(i2[use])
-            objCat = np.delete(objCat, neighbored)
+            self.objCat = np.delete(self.objCat, neighbored)
 
         # and we're done
 
@@ -275,7 +277,7 @@ class FgcmMakeStars(object):
 
             matches=smatch.match(self.objCat['RA'], self.objCat['DEC'],
                                  self.starConfig['matchRadius']/3600.0,
-                                 raArray, decArray, nside=self.nside, maxmatch=0)
+                                 raArray, decArray, nside=self.smatchNSide, maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
@@ -325,15 +327,15 @@ class FgcmMakeStars(object):
         theta = (90.0 - self.objCat['DEC'][gd])*np.pi/180.
         phi = self.objCat['RA'][gd]*np.pi/180.
 
-        ipring = hp.ang2pix(self.starConfig['nside'], theta, phi)
+        ipring = hp.ang2pix(self.starConfig['densNSide'], theta, phi)
         hist, rev = esutil.stat.histogram(ipring, rev=True)
 
-        high,=np.where(hist > self.starConfig['maxPerPixel'])
+        high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
         print("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
         for i in xrange(high.size):
             i1a=rev[rev[high[i]]:rev[high[i]+1]]
-            cut=np.random.choice(i1a,size=i1a.size-self.starConfig['maxPerPixel'],replace=False)
+            cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
             objClass[gd[cut]] = 0
 
         # redo the good object selection after sampling
