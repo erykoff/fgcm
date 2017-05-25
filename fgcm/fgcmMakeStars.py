@@ -17,13 +17,12 @@ class FgcmMakeStars(object):
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','referenceBand',
-                      'zpDefault']
+                      'zpDefault','matchNSide']
 
         for key in requiredKeys:
             if (key not in starConfig):
                 raise ValueError("required %s not in starConfig" % (key))
 
-        self.smatchNSide=4096
         self.objCat = None
 
     def runFromFits(self, clobber=False):
@@ -137,13 +136,14 @@ class FgcmMakeStars(object):
         else:
             cutBrightStars = False
 
-        print("Matching referenceBand catalog to itself")
+        print("Matching %s observations in the referenceBand catalog to itself" %
+              (raArray.size))
 
         if (hasSmatch):
             # faster smatch...
 
             matches = smatch.match(raArray, decArray, self.starConfig['matchRadius']/3600.0,
-                                   raArray, decArray, nside=self.smatchNSide, maxmatch=0)
+                                   raArray, decArray, nside=self.starConfig['matchNSide'], maxmatch=0)
 
             i1 = matches['i1']
             i2 = matches['i2']
@@ -212,7 +212,7 @@ class FgcmMakeStars(object):
                 # faster smatch...
 
                 matches = smatch.match(brightStarsRA, brightStarsDec, brightStarsRadius,
-                                       self.objCat['RA'], self.objCat['DEC'], nside=self.smatchNSide,
+                                       self.objCat['RA'], self.objCat['DEC'], nside=self.starConfig['matchNSide'],
                                        maxmatch=0)
                 i1=matches['i1']
                 i2=matches['i2']
@@ -233,7 +233,7 @@ class FgcmMakeStars(object):
             # faster smatch...
 
             matches=smatch.match(self.objCat['RA'], self.objCat['DEC'], self.starConfig['isolationRadius']/3600.0,
-                                 self.objCat['RA'], self.objCat['DEC'], nside=self.smatchNSide, maxmatch=0)
+                                 self.objCat['RA'], self.objCat['DEC'], nside=self.starConfig['matchNSide'], maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
@@ -280,7 +280,7 @@ class FgcmMakeStars(object):
 
             matches=smatch.match(self.objCat['RA'], self.objCat['DEC'],
                                  self.starConfig['matchRadius']/3600.0,
-                                 raArray, decArray, nside=self.smatchNSide, maxmatch=0)
+                                 raArray, decArray, nside=self.starConfig['matchNSide'], maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
