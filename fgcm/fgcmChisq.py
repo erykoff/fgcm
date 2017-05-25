@@ -43,6 +43,11 @@ class FgcmChisq(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
 
+        if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
+            self.useSedLUT = True
+        else:
+            self.useSedLUT = False
+
         self.resetFitChisqList()
 
         # this is the default number of parameters
@@ -379,7 +384,10 @@ class FgcmChisq(object):
             # and release the lock.
             objMagStdMeanLock.release()
 
-            self.fgcmStars.computeObjectSEDSlopes(goodStars)
+            if (self.useSedLUT):
+                self.fgcmStars.computeObjectSEDSlopesLUT(goodStars,self.fgcmLUT)
+            else:
+                self.fgcmStars.computeObjectSEDSlopes(goodStars)
 
         # compute linearized chromatic correction
         deltaStdGO = 2.5 * np.log10((1.0 +
