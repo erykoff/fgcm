@@ -5,6 +5,8 @@ import scipy.interpolate as interpolate
 import scipy.integrate as integrate
 import os
 import sys
+from pkg_resources import resource_filename
+
 
 ## FIXME: move this dependence to fits reading
 import fitsio
@@ -26,6 +28,14 @@ class FgcmLUTMaker(object):
         self._checkLUTConfig(lutConfig)
 
         self.magConstant = 2.5/np.log(10)
+
+        try:
+            self.stellarTemplateFile = resource_filename(__name__,'data/templates/stellar_templates_master.fits')
+        except:
+            raise IOError("Could not find stellar template file")
+
+        if (not os.path.isfile(self.stellarTemplateFile)):
+            raise IOError("Could not find stellar template file")
 
     def _checkLUTConfig(self,lutConfig):
         """
@@ -401,6 +411,90 @@ class FgcmLUTMaker(object):
                                         )
 
 
+        ## and the SED LUT
+        print("Building SED LUT")
+
+        # arbitrary.  Configure?  Fit?  Seems stable...
+        delta = 600.0
+
+        # blah on fits here...
+        import fitsio
+
+        # how many extensions?
+        fits=fitsio.FITS(self.stellarTemplateFile)
+        fits.update_hdu_list()
+        extNames = []
+        for hdu in fits.hdu_list:
+            extName = hdu.get_extname()
+            if ('TEMPLATE_' in extName):
+                extNames.append(extName)
+
+        # set up SED look-up table
+        nTemplates = len(extNames)
+
+        self.sedLUT = np.zeros(nTemplates, dtype=[('TEMPLATE','i4'),
+                                                  ('SYNTHMAG','f4',self.bands.size),
+                                                  ('FPRIME','f4',self.bands.size)])
+
+        # figure out range for each band...
+        #fitRange = np.zeros((self.bands.size,2))
+        #for i in xrange(self.bands.size):
+        #    passband = (self.filters.interpolatedFilters[i]['THROUGHPUT_AVG'] *
+        #                self.atmStdTrans)
+        #    maxVal = np.max(passband)
+        #    use,=np.where(passband > 0.9*maxVal)
+        #    fitRange[i,0] = self.atmLambda[use[0]]
+        #    fitRange[i,1] = self.atmLambda[use[-1]]
+        #    print('%d: [%.2f, %.2f]' % (i, fitRange[i,0], fitRange[i,1]))
+
+        # now do it...looping is no problem since there aren't that many.
+
+        for i in xrange(nTemplates):
+            data = fits[extNames[i]].read()
+
+            templateLambda = data['LAMBDA']
+            templateFLambda = data['FLUX']
+            templateFnu = templateFLambda * templateLambda * templateLambda
+
+            parts=extNames[i].split('_')
+            self.sedLUT['TEMPLATE'][i] = int(parts[1])
+
+            # interpolate to atmLambda
+            intFunc = interpolate.interp1d(templateLambda, templateFnu)
+            fnu = np.zeros(self.atmLambda.size)
+            good,=np.where((self.atmLambda >= templateLambda[0]) &
+                           (self.atmLambda <= templateLambda[-1]))
+            fnu[good] = intFunc(self.atmLambda[good])
+
+            # out of range, let it hit the limit
+            lo,=np.where(self.atmLambda < templateLambda[0])
+            if (lo.size > 0):
+                fnu[lo] = intFunc(self.atmLambda[good[0]])
+            hi,=np.where(self.atmLambda > templateLambda[-1])
+            if (hi.size > 0):
+                fnu[hi] = intFunc(self.atmLambda[good[-1]])
+
+            # compute synthetic mags
+            for j in xrange(self.bands.size):
+                num = integrate.simps(fnu * self.filters.interpolatedFilters[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                denom = integrate.simps(self.filters.interpolatedFilters[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+
+                self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
+
+            # and compute fprimes
+            for j in xrange(self.bands.size):
+                #use,=np.where((templateLambda >= fitRange[j,0]) &
+                #              (templateLambda <= fitRange[j,1]))
+                use,=np.where((templateLambda >= (self.lambdaStd[j]-delta)) &
+                              (templateLambda <= (self.lambdaStd[j]+delta)))
+
+                fit = np.polyfit(templateLambda[use] - self.lambdaStd[j],
+                                 templateFnu[use],
+                                 1)
+
+                self.sedLUT['FPRIME'][i,j] = fit[0] / fit[1]
+
+        fits.close()
 
     def saveLUT(self,lutFile,clobber=False):
         """
@@ -480,7 +574,12 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,stdVals,extname='STD')
 
         # and the derivatives
+        print("Writing Derivative LUT")
         fitsio.write(lutFile,self.lutDeriv.flatten(),extname='DERIV')
+
+        # and the SED LUT
+        print("Writing SED LUT")
+        fitsio.write(lutFile,self.sedLUT,extname='SED')
 
 
 class FgcmLUT(object):
@@ -583,6 +682,23 @@ class FgcmLUT(object):
 
         self.magConstant = 2.5/np.log(10)
 
+        # finally, read in the sedLUT
+        self.hasSedLUT = False
+        try:
+            self.sedLUT = fitsio.read(lutFile,ext='SED')
+            self.hasSedLUT = True
+        except:
+            print("Warning: Could not find SED LUT in lutfile.")
+
+        if (self.hasSedLUT):
+            # this is currently *not* general, but quick
+            ## FIXME: make general
+            self.sedColor = self.sedLUT['SYNTHMAG'][:,0] - self.sedLUT['SYNTHMAG'][:,2]
+            st = np.argsort(self.sedColor)
+
+            self.sedColor = self.sedColor[st]
+            self.sedLUT = self.sedLUT[st]
+
     def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         """
         """
@@ -680,3 +796,19 @@ class FgcmLUT(object):
                 preFactor * (I0 * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] -
                              I10 * I0 * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]]))
 
+    #def computeObjectSEDSlopesFromColor(self):
+    #    """
+    #    """#
+
+    #    pass
+    def computeSEDSlopes(self, objectSedColor):
+        """
+        """
+
+        indices = np.clip(np.searchsorted(self.sedColor, objectSedColor),0,self.sedColor.size-2)
+        # right now, a straight matching to the nearest sedColor (g-i)
+        #  though I worry about this.
+        #  in fact, maybe the noise will make this not work?  Or this is real?
+        #  but the noise in g-r is going to cause things to bounce around.  Pout.
+
+        return self.sedLUT['FPRIME'][indices,:]
