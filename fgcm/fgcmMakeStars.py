@@ -109,8 +109,10 @@ class FgcmMakeStars(object):
         try:
             import smatch
             hasSmatch = True
+            print("Good news!  smatch is available.")
         except:
             hasSmatch = False
+            print("Bad news.  smatch not found.")
 
         if (raArray.size != decArray.size):
             raise ValueError("raArray, decArray must be same length.")
@@ -140,7 +142,6 @@ class FgcmMakeStars(object):
 
         if (hasSmatch):
             # faster smatch...
-
             matches = smatch.match(raArray, decArray, self.starConfig['matchRadius']/3600.0,
                                    raArray, decArray, nside=self.starConfig['matchNSide'], maxmatch=0)
 
@@ -177,7 +178,14 @@ class FgcmMakeStars(object):
                 histTemp[matches['i2'][i1a]] = 0
                 count=count+1
 
+        print("Found %d unique objects with >= %d observations in %s band." %
+              (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
+
         # make the object catalog
+        dtype=[('FGCM_ID','i4'),
+               ('RA','f8'),
+               ('DEC','f8')]
+
         self.objCat = np.zeros(count,dtype=dtype)
         self.objCat['FGCM_ID'] = np.arange(count)+1
 
