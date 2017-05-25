@@ -206,7 +206,7 @@ class FgcmMakeStars(object):
                 # make sure this doesn't get used again
                 hist[starInd] = 0
                 self.objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
-                self.objCat['DEC'][index] = np.sum(obsCat['DEC'][starInd])/starInd.size
+                self.objCat['DEC'][index] = np.sum(decArray[starInd])/starInd.size
                 index = index+1
 
         # restore negative RAs
