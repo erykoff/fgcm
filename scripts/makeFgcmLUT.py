@@ -30,8 +30,8 @@ if __name__ == '__main__':
     #fgcmLUT.makeLUT(lutConfig['lutFile'],clobber=True)
     #fgcmLUT.makeLUTDerivatives(lutConfig['lutFile'])
 
-    fgcmLUT = fgcm.FgcmLUTMaker(lutConfig)
-    fgcmLUT.makeLUT()
-    fgcmLUT.saveLUT(lutConfig['lutFile'])
+    fgcmLUTMaker = fgcm.FgcmLUTMaker(lutConfig)
+    fgcmLUTMaker.makeLUT()
+    fgcmLUTMaker.saveLUT(lutConfig['lutFile'])
 
 
