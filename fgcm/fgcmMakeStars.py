@@ -110,7 +110,6 @@ class FgcmMakeStars(object):
             import smatch
             hasSmatch = True
         except:
-            import esutil
             hasSmatch = False
 
         if (raArray.size != decArray.size):
@@ -266,7 +265,6 @@ class FgcmMakeStars(object):
             import smatch
             hasSmatch = True
         except:
-            import esutil
             hasSmatch = False
 
         if (raArray.size != decArray.size or
