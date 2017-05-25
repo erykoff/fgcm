@@ -312,7 +312,7 @@ class FgcmMakeStars(object):
 
         # this could be made more efficient
         print("Computing number of observations per band")
-        nObs = np.zeros((reqBands.size, objCat.size), dtype='i4')
+        nObs = np.zeros((reqBands.size, self.objCat.size), dtype='i4')
         for i in xrange(reqBands.size):
             use,=np.where(bandArray[i2] == reqBands[i])
             hist = esutil.stat.histogram(i1[use], min=0, max=self.objCat.size-1)
