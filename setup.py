@@ -7,8 +7,7 @@ import fnmatch
 exec(open('fgcm/_version.py').read())
 
 scripts = ['scripts/runFgcmFitCycle.py',
-           'scripts/makeFgcmLUT.py',
-           'scripts/makeFgcmStars.py']
+           'scripts/makeFgcmLUT.py']
 
 name='fgcm'
 
