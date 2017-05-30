@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
 import os
 import sys
 import esutil
@@ -345,13 +344,6 @@ class FgcmZeropoints(object):
         # record as a class element
         self.zpStruct = zpStruct
 
-        ## FIXME: move saving outside so we don't require fitsio
-
-        # and save...
-        outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
-        self.fgcmLog.log('INFO','Saving zeropoints to %s' % (outFile))
-        fitsio.write(outFile,zpStruct,clobber=True,extname='ZPTS')
-
         #################################
         # and make the parameter file
         atmStruct[self.expField] = self.fgcmPars.expArray
@@ -368,12 +360,6 @@ class FgcmZeropoints(object):
 
         # record as a class element
         self.atmStruct=atmStruct
-
-        ## FIXME: move saving outside so we don't require fitsio
-        outFile = '%s/%s_atm.fits' % (self.outputPath,self.outfileBaseWithCycle)
-        self.fgcmLog.log('INFO','Saving atmosphere parameters to %s' % (outFile))
-        fitsio.write(outFile,atmStruct,clobber=True,extname='ATMPARS')
-
 
         ############
         ## plots
@@ -501,4 +487,24 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
                                                    zpStruct['FGCM_ZPTVAR'][zpIndex] +
                                                    self.sigma0Cal**2.)
+
+    def saveZptFits(self):
+        """
+        """
+
+        import fitsio
+
+        outFile = '%s/%s_zpt.fits' % (self.outputPath,self.outfileBaseWithCycle)
+        self.fgcmLog.log('INFO','Saving zeropoints to %s' % (outFile))
+        fitsio.write(outFile,self.zpStruct,clobber=True,extname='ZPTS')
+
+    def saveAtmFits(self):
+        """
+        """
+
+        import fitsio
+
+        outFile = '%s/%s_atm.fits' % (self.outputPath,self.outfileBaseWithCycle)
+        self.fgcmLog.log('INFO','Saving atmosphere parameters to %s' % (outFile))
+        fitsio.write(outFile,self.atmStruct,clobber=True,extname='ATMPARS')
 
