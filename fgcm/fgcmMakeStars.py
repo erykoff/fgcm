@@ -57,8 +57,8 @@ class FgcmMakeStars(object):
             brightStarCat = fitsio.read(self.starConfig['brightStarFile'],ext=1,upper=True)
 
             brightStarRA = brightStarCat['RA']
-            brightStarDec = brightStarCat['DDEC']
-            brightStarRaidus = brightStarCat['RADIUS']
+            brightStarDec = brightStarCat['DEC']
+            brightStarRadius = brightStarCat['RADIUS']
 
         else :
             brightStarRA = None
@@ -91,7 +91,7 @@ class FgcmMakeStars(object):
         self.makeMatchedStars(obsCat['RA'], obsCat['DEC'], bandArray)
 
         # and save the outputs...
-        fits=fitsio.FITS(obsIndexFile, mode='w', clobber=True)
+        fits=fitsio.FITS(obsIndexFile, mode='rw', clobber=True)
         fits.create_table_hdu(data=self.objIndexCat, extname='POS')
         fits[1].write(self.objIndexCat)
 
@@ -215,10 +215,11 @@ class FgcmMakeStars(object):
             self.objCat['RA'][lo] = self.objCat['RA'][lo] + 360.0
 
         if (cutBrightStars):
+            print("Matching to bright stars for masking...")
             if (hasSmatch):
                 # faster smatch...
 
-                matches = smatch.match(brightStarsRA, brightStarsDec, brightStarsRadius,
+                matches = smatch.match(brightStarRA, brightStarDec, brightStarRadius,
                                        self.objCat['RA'], self.objCat['DEC'], nside=self.starConfig['matchNSide'],
                                        maxmatch=0)
                 i1=matches['i1']
@@ -227,12 +228,13 @@ class FgcmMakeStars(object):
                 # slower htm matching...
                 htm = esutil.htm.HTM(11)
 
-                matcher = esutil.htm.Matcher(10, brightStarsRA, brightStarsDec)
-                matches = matcher.match(raArray, decArray, brightStarsRadius,
+                matcher = esutil.htm.Matcher(10, brightStarRA, brightStarDec)
+                matches = matcher.match(raArray, decArray, brightStarRadius,
                                         maxmatch=0)
                 i1=matches[0]
                 i2=matches[1]
 
+            print("Cutting %d objects too near bright stars." % (i2.size))
             self.objCat = np.delete(self.objCat,i2)
 
         # and remove stars with near neighbors
@@ -361,7 +363,7 @@ class FgcmMakeStars(object):
         self.objIndexCat['RA'][:] = self.objCat['RA'][gd]
         self.objIndexCat['DEC'][:] = self.objCat['DEC'][gd]
         # this is the number of observations per object
-        self.objIndexCat['NOBS'][:] = self.nObsPerObj[gd]
+        self.objIndexCat['NOBS'][:] = nObsPerObj[gd]
         # and the index is given by the cumulative sum
         self.objIndexCat['OBSARRINDEX'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
 
