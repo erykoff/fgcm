@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
 import os
 import sys
 import esutil
