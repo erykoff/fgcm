@@ -224,11 +224,14 @@ class FgcmFitCycle(object):
 
         # Make Zeropoints -- save also
         self.fgcmLog.log('DEBUG','FitCycle computing zeropoints.')
-        fgcmZpts = FgcmZeropoints(self.fgcmConfig,self.fgcmPars,
-                                  self.fgcmLUT,self.fgcmGray,
-                                  self.fgcmRetrieval)
-        fgcmZpts.computeZeropoints()
+        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig,self.fgcmPars,
+                                       self.fgcmLUT,self.fgcmGray,
+                                       self.fgcmRetrieval)
+        self.fgcmZpts.computeZeropoints()
         self.fgcmLog.logMemoryUsage('INFO','After computing zeropoints')
+
+        self.fgcmZpts.saveZptFits()
+        self.fgcmZpts.saveAtmFits()
 
         # Save parameters
         outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
