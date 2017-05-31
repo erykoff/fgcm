@@ -238,11 +238,14 @@ class FgcmMakeStars(object):
             self.objCat = np.delete(self.objCat,i2)
 
         # and remove stars with near neighbors
+        print("Matching stars to neighbors...")
         if (hasSmatch):
             # faster smatch...
 
-            matches=smatch.match(self.objCat['RA'], self.objCat['DEC'], self.starConfig['isolationRadius']/3600.0,
-                                 self.objCat['RA'], self.objCat['DEC'], nside=self.starConfig['matchNSide'], maxmatch=0)
+            matches=smatch.match(self.objCat['RA'], self.objCat['DEC'],
+                                 self.starConfig['isolationRadius']/3600.0,
+                                 self.objCat['RA'], self.objCat['DEC'],
+                                 nside=self.starConfig['matchNSide'], maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
@@ -257,8 +260,11 @@ class FgcmMakeStars(object):
             i2=matches[1]
 
         use,=np.where(i1 != i2)
+
         if (use.size > 0):
             neighbored = np.unique(i2[use])
+            print("Cutting %d objects within %.2f arcsec of a neighbor" %
+                  (neighbored.size, self.starConfig['isolationRadius']))
             self.objCat = np.delete(self.objCat, neighbored)
 
         # and we're done
