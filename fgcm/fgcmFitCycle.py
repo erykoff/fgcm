@@ -106,7 +106,7 @@ class FgcmFitCycle(object):
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         if (not initialCycle):
             # get the SED from the chisq function
-            self.fgcmChisq(parArray,computeSEDSlopes=True)
+            self.fgcmChisq(parArray,computeSEDSlopes=True,includeReserve=True)
 
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
@@ -116,7 +116,7 @@ class FgcmFitCycle(object):
 
             # first, use fgcmChisq to compute m^std for every observation
             ## FIXME: check that this should be allExposures = True
-            self.fgcmChisq(parArray,allExposures=True)
+            self.fgcmChisq(parArray,allExposures=True,includeReserve=True)
 
             # run the bright observation algorithm, computing SEDs
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
@@ -170,9 +170,15 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.logMemoryUsage('INFO','FitCycle Post-Fit')
 
+        # another run to soak up the reserve stars...
+        # FIXME: look for more efficient way of doing this
+        self.fgcmLog.log('DEBUG','FitCycle computing FgcmChisq all + reserve stars')
+        _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
+
         # One last run to compute mstd all observations of all exposures
         self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
-        _ = self.fgcmChisq(self.fgcmPars.getParArray(),allExposures=True)
+        _ = self.fgcmChisq(self.fgcmPars.getParArray(), allExposures=True, includeReserve=True)
+
 
         self.fgcmLog.logMemoryUsage('INFO','After recomputing chisq for all exposures')
 
@@ -185,7 +191,9 @@ class FgcmFitCycle(object):
         self.fgcmLog.log('DEBUG','FitCycle computing sigFgcm')
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
-        self.fgcmSigFgcm.computeSigFgcm()
+        # first compute with all...(better stats)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=False,doPlots=True,save=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False)
         self.fgcmLog.logMemoryUsage('INFO','After computing sigFGCM')
 
         # Flag variables for next cycle
@@ -240,9 +248,9 @@ class FgcmFitCycle(object):
         self.fgcmPars.saveParFile(outParFile)
 
         # Save bad stars
-        outBadStarFile = '%s/%s_badstars.fits' % (self.fgcmConfig.outputPath,
+        outFlagStarFile = '%s/%s_flaggedstars.fits' % (self.fgcmConfig.outputPath,
                                                self.fgcmConfig.outfileBaseWithCycle)
-        self.fgcmStars.saveBadStarIndices(outBadStarFile)
+        self.fgcmStars.saveFlagStarIndices(outFlagStarFile)
 
         ## FIXME: save standard stars if desired.  (Need code to save std stars)
 
@@ -259,7 +267,7 @@ class FgcmFitCycle(object):
         outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
                                                       self.fgcmConfig.outfileBase,
                                                       self.fgcmConfig.cycleNumber+1)
-        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outBadStarFile)
+        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
 
 
         self.fgcmLog.logMemoryUsage('INFO','FitCycle Completed')
