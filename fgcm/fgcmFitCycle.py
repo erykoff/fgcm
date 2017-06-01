@@ -61,7 +61,8 @@ class FgcmFitCycle(object):
 
         # Read in Stars
         self.fgcmLog.log('DEBUG','FitCycle is making FgcmStars')
-        self.fgcmStars = FgcmStars(self.fgcmConfig,self.fgcmPars)
+        self.fgcmStars = FgcmStars(self.fgcmConfig)
+        self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
 
         # Read in LUT
         self.fgcmLog.log('DEBUG','FitCycle is making FgcmLUT')
@@ -248,9 +249,9 @@ class FgcmFitCycle(object):
         badZpMask = (zpFlagDict['NOFIT_NIGHT'] |
                      zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
                      zpFlagDict['TOO_FEW_STARS_ON_CCD'])
-        zpOk, = np.where((fgcmZpts.zpStruct['FGCM_FLAG'] & badZpMask) == 0)
-        okExps = fgcmZpts.zpStruct[self.fgcmConfig.expField][zpOk]
-        okCCDs = fgcmZpts.zpStruct[self.fgcmConfig.ccdField][zpOk]
+        zpOk, = np.where((self.fgcmZpts.zpStruct['FGCM_FLAG'] & badZpMask) == 0)
+        okExps = self.fgcmZpts.zpStruct[self.fgcmConfig.expField][zpOk]
+        okCCDs = self.fgcmZpts.zpStruct[self.fgcmConfig.ccdField][zpOk]
         self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minPerBand=1)
         self.fgcmStars.plotStarMap(mapType='okcoverage')
 
