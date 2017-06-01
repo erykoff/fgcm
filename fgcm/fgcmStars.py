@@ -44,8 +44,9 @@ class FgcmStars(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.expField = fgcmConfig.expField
         self.ccdField = fgcmConfig.ccdField
+        self.reserveFraction = fgcmConfig.reserveFraction
 
-        self.inBadStarFile = fgcmConfig.inBadStarFile
+        self.inFlagStarFile = fgcmConfig.inFlagStarFile
 
         self.mapLongitudeRef = fgcmConfig.mapLongitudeRef
         self.mapNside = fgcmConfig.mapNside
@@ -109,17 +110,17 @@ class FgcmStars(object):
 
         obsBand = np.core.defchararray.strip(obs['BAND'][:])
 
-        if (self.inBadStarFile is not None):
-            self.fgcmLog.log('INFO', 'Reading in list of previous bad stars from %s' %
-                             (self.inBadStarFile))
+        if (self.inFlagStarFile is not None):
+            self.fgcmLog.log('INFO', 'Reading in list of previous flagged stars from %s' %
+                             (self.inFlagStarFile))
 
-            inBadStars = fitsio.read(self.inBadStarFile, ext=1)
+            inFlagStars = fitsio.read(self.inFlagStarFile, ext=1)
 
-            badID = inBadStars['OBJID']
-            badFlag = inBadStars['BADFLAG']
+            flagID = inFlagStars['OBJID']
+            flagFlag = inFlagStars['OBJFLAG']
         else:
-            badID = None
-            badFlag = None
+            flagID = None
+            flagFlag = None
 
         # process
         self.loadStars(fgcmPars,
@@ -135,8 +136,8 @@ class FgcmStars(object):
                        pos['DEC'],
                        pos['OBSINDEX'],
                        pos['NOBS'],
-                       badID=badID,
-                       badFlag=badFlag,
+                       flagID=flagID,
+                       flagFlag=flagFlag,
                        computeNobs=computeNobs)
 
         # and clear memory
@@ -147,7 +148,7 @@ class FgcmStars(object):
     def loadStars(self, fgcmPars,
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsBand,
                   objID, objRA, objDec, objObsIndex, objNobs,
-                  badID=None, badFlag=None, computeNobs=True):
+                  flagID=None, flagFlag=None, computeNobs=True):
         """
         """
 
@@ -370,15 +371,34 @@ class FgcmStars(object):
         #                     (a.size))
 
         #    objFlag[b] = inBadStars['OBJFLAG'][a]
-        if (badID is not None):
+        if (flagID is not None):
+            # the objFlag contains information on RESERVED stars
             objID = snmm.getArray(self.objIDHandle)
             objFlag = snmm.getArray(self.objFlagHandle)
 
-            a,b=esutil.numpy_util.match(badID, objID)
+            a,b=esutil.numpy_util.match(flagID, objID)
 
-            self.fgcmLog.log('INFO','Flagging %d stars as bad.' % (a.size))
+            #self.fgcmLog.log('INFO','Flagging %d stars.' % (a.size))
+            test,=np.where((objFlag & objFlagDict['VARIABLE']) > 0)
+            self.fgcmLog.log('INFO','Flagging %d stars as reserved from previous fit.' %
+                             (test.size))
+            test,=np.where((objFlag & objFlagDict['RESERVED']) > 0)
+            self.fgcmLog.log('INFO','Flagging %d stars as reserved from previous cycle.' %
+                             (test.size))
 
-            objFlag[b] = badFlag[a]
+            objFlag[b] = flagFlag[a]
+        else:
+            # we want to reserve stars, if necessary
+            if self.reserveFraction > 0.0:
+                objFlag = snmm.getArray(self.objFlagHandle)
+
+                nReserve = int(self.reserveFraction * objFlag.size)
+                reserve = np.random.choice(objFlag.size,
+                                           size=nReserve,
+                                           replace=False)
+
+                self.fgcmLog.log('INFO','Reserving %d stars from the fit.' % (nReserve))
+                objFlag[reserve] |= objFlagDict['RESERVED']
 
 
 
@@ -880,7 +900,7 @@ class FgcmStars(object):
 
         obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
-    def saveBadStarIndices(self,badStarFile):
+    def saveFlagStarIndices(self,flagStarFile):
         """
         """
 
@@ -889,18 +909,22 @@ class FgcmStars(object):
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
-        bad,=np.where(objFlag > 0)
+        # we only store VARIABLE and RESERVED stars
+        # everything else should be recomputed based on the good exposures, calibrations, etc
+        flagMask = (objFlagDict['VARIABLE'] |
+                    objFlagDict['RESERVED'])
 
-        self.fgcmLog.log('INFO','Saving %d bad star indices to %s' %
-                         (bad.size,badStarFile))
+        flagged,=np.where((objFlag & flagMask) > 0)
 
+        self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
+                         (flagged.size,flagStarFile))
 
-        badObjStruct = np.zeros(bad.size,dtype=[('OBJID',objID.dtype),
-                                                ('OBJFLAG',objFlag.dtype)])
-        badObjStruct['OBJID'] = objID[bad]
-        badObjStruct['OBJFLAG'] = objFlag[bad]
+        flagObjStruct = np.zeros(flagged.size,dtype=[('OBJID',objID.dtype),
+                                                     ('OBJFLAG',objFlag.dtype)])
+        flagObjStruct['OBJID'] = objID[flagged]
+        flagObjStruct['OBJFLAG'] = objFlag[flagged]
 
         # set clobber == True?
-        fitsio.write(badStarFile,badObjStruct,clobber=True)
+        fitsio.write(flagStarFile,flagObjStruct,clobber=True)
 
 
