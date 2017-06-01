@@ -11,7 +11,6 @@ from fgcmLogger import FgcmLogger
 
 import types
 import copy_reg
-#import sharedmem as shm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
@@ -39,7 +38,8 @@ class FgcmConfig(object):
                       'expGrayPhotometricCut','expGrayRecoverCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
                       'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun',
-                      'nExpPerRun','varNSig','varMinBand','useSedLUT']
+                      'nExpPerRun','varNSig','varMinBand','useSedLUT',
+                      'reserveFraction']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -101,6 +101,7 @@ class FgcmConfig(object):
         self.varNSig = float(configDict['varNSig'])
         self.varMinBand = int(configDict['varMinBand'])
         self.useSedLUT = configDict['useSedLUT']
+        self.reserveFraction = configDict['reserveFraction']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -163,12 +164,12 @@ class FgcmConfig(object):
             if ('inParameterFile' not in configDict):
                 raise ValueError("Must provide inParameterFile for cycleNumber > 0")
             self.inParameterFile = configDict['inParameterFile']
-            if ('inBadStarFile' not in configDict):
-                raise ValueError("Must provide inBadStarFile for cycleNumber > 0")
-            self.inBadStarFile = configDict['inBadStarFile']
+            if ('inFlagStarFile' not in configDict):
+                raise ValueError("Must provide inFlagStarFile for cycleNumber > 0")
+            self.inFlagStarFile = configDict['inFlagStarFile']
         else:
             self.inParameterFile = None
-            self.inBadStarFile = None
+            self.inFlagStarFile = None
 
         if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
             raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
@@ -326,7 +327,7 @@ class FgcmConfig(object):
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
 
-    def saveConfigForNextCycle(self,fileName,parFile,badStarFile):
+    def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
         configDict = self.configDictSaved.copy()
 
         # save the outputPath
@@ -338,7 +339,7 @@ class FgcmConfig(object):
 
         configDict['inParameterFile'] = parFile
 
-        configDict['inBadStarFile'] = badStarFile
+        configDict['inFlagStarFile'] = flagStarFile
 
         # do we want to guess as to the photometric cut?  not now.
 
