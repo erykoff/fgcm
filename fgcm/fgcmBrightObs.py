@@ -9,6 +9,8 @@ import time
 
 from fgcmUtilities import _pickle_method
 from fgcmChisq import FgcmChisq
+from fgcmUtilities import objFlagDict
+
 
 import types
 import copy_reg
@@ -67,7 +69,10 @@ class FgcmBrightObs(object):
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
         # and select good stars!  This might be all stars at this point, but good to check
-        goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+        #goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+        # we want to include reserved stars for this, so we have values
+        resMask = 255 & ~objFlagDict['RESERVED']
+        goodStars,=np.where((snmm.getArray(self.fgcmStars.objFlagHandle) & resMask) == 0)
 
         self.fgcmLog.log('INFO','Found %d good stars for bright obs' % (goodStars.size))
 
