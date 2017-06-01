@@ -7,6 +7,7 @@ import esutil
 import time
 
 from fgcmUtilities import _pickle_method
+from fgcmUtilities import objFlagDict
 
 import types
 import copy_reg
@@ -64,7 +65,7 @@ class FgcmChisq(object):
         self.goodObs = None
         self.goodStarsSub = None
 
-    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,debug=False,allExposures=False):
+    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,debug=False,allExposures=False,includeReserve=False):
         """
         """
 
@@ -77,6 +78,7 @@ class FgcmChisq(object):
         self.fitterUnits = fitterUnits
         self.allExposures = allExposures
         self.useMatchCache = useMatchCache
+        self.includeReserve = includeReserve
 
         self.fgcmLog.log('DEBUG','FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -86,6 +88,8 @@ class FgcmChisq(object):
                          (int(fitterUnits)))
         self.fgcmLog.log('DEBUG','FgcmChisq: allExposures = %d' %
                          (int(allExposures)))
+        self.fgcmLog.log('DEBUG','FgcmChisq: includeReserve = %d' %
+                         (int(includeReserve)))
 
         startTime = time.time()
 
@@ -101,7 +105,13 @@ class FgcmChisq(object):
             snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
             snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+        # do we want to include reserve stars?
+        if (self.includeReserve):
+            # this mask will filter everything but RESERVED
+            resMask = 255 & ~objFlagDict['RESERVED']
+            goodStars,=np.where((snmm.getArray(self.fgcmStars.objFlagHandle) & resMask) == 0)
+        else:
+            goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
         self.fgcmLog.log('INFO','Found %d good stars for chisq' % (goodStars.size))
 
