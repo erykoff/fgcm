@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 from fgcmUtilities import gaussFunction
 from fgcmUtilities import histoGauss
+from fgcmUtilities import objFlagDict
+
 
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -38,7 +40,7 @@ class FgcmSigFgcm(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
 
-    def computeSigFgcm(self,doPlots=True):
+    def computeSigFgcm(self,reserved=False,doPlots=True,save=True):
         """
         """
 
@@ -68,8 +70,14 @@ class FgcmSigFgcm(object):
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
         # select good stars...
-        goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
-                            (objFlag == 0))
+        if (reserved):
+            # only reserved stars
+            goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+                                ((objFlag & objFlagDict['RESERVED']) > 0))
+        else:
+            # all good stars
+            goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+                                (objFlag == 0))
 
         # match the good stars to the observations
         _,goodObs = esutil.numpy_util.match(goodStars,
@@ -91,6 +99,8 @@ class FgcmSigFgcm(object):
                        obsMagErr[goodObs]**2.)
 
         # now we can compute sigFgcm
+
+        sigFgcm = np.zeros(self.fgcmStars.nBands)
 
         for bandIndex in xrange(self.fgcmStars.nBands):
             if (bandIndex in self.fgcmStars.bandRequiredIndex):
@@ -120,17 +130,24 @@ class FgcmSigFgcm(object):
 
             coeff = histoGauss(ax, EGrayGO[sigUse])
 
-            self.fgcmPars.compSigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
-                                                           np.median(EGrayErr2GO[sigUse]))
+            #self.fgcmPars.compSigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
+            #                                               np.median(EGrayErr2GO[sigUse]))
+            sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
+                                         np.median(EGrayErr2GO[sigUse]))
 
-            if (not np.isfinite(self.fgcmPars.compSigFgcm[bandIndex])):
+            #if (not np.isfinite(self.fgcmPars.compSigFgcm[bandIndex])):
+            if (not np.isfinite(sigFgcm[bandIndex])):
                 self.fgcmLog.log('INFO',"Failed to compute sigFgcm (%s).  Setting to 0.05?" %
                                  (self.fgcmPars.bands[bandIndex]))
-                self.fgcmPars.compSigFgcm[bandIndex] = 0.05
+                #self.fgcmPars.compSigFgcm[bandIndex] = 0.05
+                sigFgcm[bandIndex] = 0.05
 
             self.fgcmLog.log('INFO',"sigFgcm (%s) = %.4f" % (
                     self.fgcmPars.bands[bandIndex],
-                    self.fgcmPars.compSigFgcm[bandIndex]))
+                    sigFgcm[bandIndex]))
+
+            if (save):
+                self.fgcmPars.compSigFgcm[bandIndex] = sigFgcm[bandIndex]
 
             if (not doPlots):
                 continue
@@ -141,14 +158,21 @@ class FgcmSigFgcm(object):
                 r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
                 r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
                 r'$\sigma_\mathrm{tot} = %.4f$' % (coeff[2]) + '\n' + \
-                r'$\sigma_\mathrm{FGCM} = %.4f$' % (self.fgcmPars.compSigFgcm[bandIndex])
+                r'$\sigma_\mathrm{FGCM} = %.4f$' % (sigFgcm[bandIndex])
+                #r'$\sigma_\mathrm{FGCM} = %.4f$' % (self.fgcmPars.compSigFgcm[bandIndex])
 
             ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
             ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=16)
 
-            fig.savefig('%s/%s_sigfgcm_%s.png' % (self.plotPath,
-                                                  self.outfileBaseWithCycle,
-                                                  self.fgcmPars.bands[bandIndex]))
+            if (reserved):
+                extraName = 'reserved'
+            else:
+                extraName = 'all'
+
+            fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle,
+                                                     extraName,
+                                                     self.fgcmPars.bands[bandIndex]))
 
 
         self.fgcmLog.log('INFO','Done computing sigFgcm in %.2f sec.' %
