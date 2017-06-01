@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
 import esutil
 import time
 
@@ -11,7 +10,6 @@ from fgcmUtilities import obsFlagDict
 
 import types
 import copy_reg
-#import sharedmem as shm
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -21,8 +19,7 @@ class FgcmStars(object):
     """
     """
 
-    def __init__(self,fgcmConfig,fgcmPars,computeNobs=True):
-        # need fgcmPars for the exposures
+    def __init__(self,fgcmConfig):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -45,6 +42,8 @@ class FgcmStars(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.expField = fgcmConfig.expField
+        self.ccdField = fgcmConfig.ccdField
 
         self.inBadStarFile = fgcmConfig.inBadStarFile
 
@@ -62,67 +61,135 @@ class FgcmStars(object):
         self.bandExtra = fgcmConfig.bandExtra
         self.bandExtraIndex = np.where(self.bandExtra)[0]
 
-        self.expArray = fgcmPars.expArray
+        #self.expArray = fgcmPars.expArray
 
-        self._loadStars(fgcmPars)
+        #self._loadStars(fgcmPars)
 
         self.magStdComputed = False
         self.allMagStdComputed = False
         self.sedSlopeComputed = False
 
-        if (computeNobs):
-            allExps = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
-            self.fgcmLog.log('INFO','Checking stars with full possible range of exp numbers')
+        #if (computeNobs):
+        #    allExps = np.arange(fgcmConfig.expRange[0],fgcmConfig.expRange[1],dtype='i4')
+        #    self.fgcmLog.log('INFO','Checking stars with full possible range of exp numbers')
             #self.selectStarsMinObs(goodExps=allExps,doPlots=False)
-            allExpsIndex = np.arange(fgcmPars.expArray.size)
-            self.selectStarsMinObsExpIndex(allExpsIndex)
+        #    allExpsIndex = np.arange(fgcmPars.expArray.size)
+        #    self.selectStarsMinObsExpIndex(allExpsIndex)
 
         self.magConstant = 2.5/np.log(10)
 
-    def _loadStars(self,fgcmPars):
+    def loadStarsFromFits(self,fgcmPars,computeNobs=True):
+        """
+        """
+
+        import fitsio
+
+        # read in the observation indices...
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Reading in observation indices...')
+        index = fitsio.read(self.indexFile, ext='INDEX')
+        self.fgcmLog.log('INFO','Done reading in %d observation indices in %.1f seconds.' %
+                         (index.size, time.time() - startTime))
+
+        # read in obsfile and cut
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Reading in star observations...')
+        obs = fitsio.read(self.obsFile, ext=1)
+        # cut down to those that are indexed
+        obs = obs[index['OBSINDEX']]
+        self.fgcmLog.log('INFO','Done reading in %d observations in %.1f seconds.' %
+                         (obs.size, time.time() - startTime))
+
+        # and positions...
+        startTime = time.time()
+        self.fgcmLog.log('INFO','Reading in star positions...')
+        pos = fitsio.read(self.indexFile, ext='POS')
+        self.fgcmLog.log('INFO','Done reading in %d unique star positions in %.1f secondds.' %
+                         (pos.size, time.time() - startTime))
+
+        obsBand = np.core.defchararray.strip(obs['BAND'][:])
+
+        if (self.inBadStarFile is not None):
+            self.fgcmLog.log('INFO', 'Reading in list of previous bad stars from %s' %
+                             (self.inBadStarFile))
+
+            inBadStars = fitsio.read(self.inBadStarFile, ext=1)
+
+            badID = inBadStars['OBJID']
+            badFlag = inBadStars['BADFLAG']
+        else:
+            badID = None
+            badFlag = None
+
+        # process
+        self.loadStars(fgcmPars,
+                       obs[self.expField],
+                       obs[self.ccdField],
+                       obs['RA'],
+                       obs['DEC'],
+                       obs['MAG'],
+                       obs['MAGERR'],
+                       obsBand,
+                       pos['FGCM_ID'],
+                       pos['RA'],
+                       pos['DEC'],
+                       pos['OBSINDEX'],
+                       pos['NOBS'],
+                       badID=badID,
+                       badFlag=badFlag,
+                       computeNobs=computeNobs)
+
+        # and clear memory
+        index = None
+        obs = None
+        pos = None
+
+    def loadStars(self, fgcmPars,
+                  obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsBand,
+                  objID, objRA, objDec, objObsIndex, objNobs,
+                  badID=None, badFlag=None, computeNobs=True):
+        """
+        """
+
+
+    #def _loadStars(self,fgcmPars):
 
         # read in the observational indices
-        startTime=time.time()
-        self.fgcmLog.log('INFO','Reading in observation indices...')
-        index=fitsio.read(self.indexFile,ext='INDEX')
-        self.fgcmLog.log('INFO','Done reading in %d observation indices in %.1f seconds.' %
-                         (index.size,time.time()-startTime))
+        #startTime=time.time()
+        #self.fgcmLog.log('INFO','Reading in observation indices...')
+        #index=fitsio.read(self.indexFile,ext='INDEX')
+        #self.fgcmLog.log('INFO','Done reading in %d observation indices in %.1f seconds.' %
+        #                 (index.size,time.time()-startTime))
 
         # sort them for reference
-        startTime=time.time()
-
-        ## sorting unnecessary
-        #self.fgcmLog.log('INFO','Sorting observation indices...')
-        #indexSort = np.argsort(index['OBSINDEX'])
-        #self.fgcmLog.log('INFO','Done sorting indices in %.1f seconds.' %
-        #                 (time.time()-startTime))
+        #startTime=time.time()
 
         # and only read these entries from the obs table
-        startTime=time.time()
-        self.fgcmLog.log('INFO','Reading in star observations...')
+        #startTime=time.time()
+        #self.fgcmLog.log('INFO','Reading in star observations...')
         ## new trade-off: read in whole file and cut it down.
         ##  Much faster overall, I think.
         #obs=fitsio.read(self.obsFile,ext=1,rows=index['OBSINDEX'][indexSort])
-        obs=fitsio.read(self.obsFile,ext=1)
-        obs=obs[index['OBSINDEX']]
-        self.fgcmLog.log('INFO','Done reading in %d observations in %.1f seconds.' %
-                         (obs.size,time.time()-startTime))
+        #obs=fitsio.read(self.obsFile,ext=1)
+        #obs=obs[index['OBSINDEX']]
+        #self.fgcmLog.log('INFO','Done reading in %d observations in %.1f seconds.' %
+        #                 (obs.size,time.time()-startTime))
 
         # and fill in new, cut indices
         #  obsIndex: pointer to a particular row in the obs table
         #            this is used with objObsIndex to get all the observations
         #            of an individual object
-        #startTime=time.time()
-        #self.fgcmLog.log('INFO','Re-indexing observations...')
-        self.obsIndexHandle = snmm.createArray(index.size,dtype='i4')
-        #snmm.getArray(self.obsIndexHandle)[:] = np.searchsorted(index['OBSINDEX'][indexSort],index['OBSINDEX'])
-        snmm.getArray(self.obsIndexHandle)[:] = np.arange(index.size)
-        #self.fgcmLog.log('INFO','Done re-indexing observations in %.1f seconds.' %
-        #                 (time.time() - startTime))
+
+        #self.obsIndexHandle = snmm.createArray(index.size,dtype='i4')
+        #snmm.getArray(self.obsIndexHandle)[:] = np.arange(index.size)
+        self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i4')
+        snmm.getArray(self.obsIndexHandle)[:] = np.arange(obsRA.size)
+
 
         # need to stuff into shared memory objects.
         #  nStarObs: total number of observations of all starus
-        self.nStarObs = obs.size
+        #self.nStarObs = obs.size
+        self.nStarObs = obsRA.size
 
         #  obsExp: exposure number of individual observation (pointed by obsIndex)
         self.obsExpHandle = snmm.createArray(self.nStarObs,dtype='i4')
@@ -149,13 +216,20 @@ class FgcmStars(object):
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4',syncAccess=True)
 
 
-        snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
-        snmm.getArray(self.obsCCDHandle)[:] = obs['CCDNUM'][:]
-        snmm.getArray(self.obsRAHandle)[:] = obs['RA'][:]
-        snmm.getArray(self.obsDecHandle)[:] = obs['DEC'][:]
-        snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
-        snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
-        snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
+        #snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
+        #snmm.getArray(self.obsCCDHandle)[:] = obs['CCDNUM'][:]
+        #snmm.getArray(self.obsRAHandle)[:] = obs['RA'][:]
+        #snmm.getArray(self.obsDecHandle)[:] = obs['DEC'][:]
+        #snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
+        #snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
+        #snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
+        snmm.getArray(self.obsExpHandle)[:] = obsExp
+        snmm.getArray(self.obsCCDHandle)[:] = obsCCD
+        snmm.getArray(self.obsRAHandle)[:] = obsRA
+        snmm.getArray(self.obsDecHandle)[:] = obsDec
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag
+        snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag   # same as raw at first
 
         self.fgcmLog.log('INFO','Applying sigma0Phot = %.4f to mag errs' %
                          (self.sigma0Phot))
@@ -163,7 +237,7 @@ class FgcmStars(object):
         obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
 
         obsFlag = snmm.getArray(self.obsFlagHandle)
-        bad,=np.where(obsMagADUErr <= 0.0)
+        bad, = np.where(obsMagADUErr <= 0.0)
         obsFlag[bad] |= obsFlagDict['BAD_ERROR']
         if (bad.size > 0):
             self.fgcmLog.log('INFO','Flagging %d observations with bad errors.' %
@@ -171,17 +245,17 @@ class FgcmStars(object):
 
         obsMagADUErr[:] = np.sqrt(obsMagADUErr[:]**2. + self.sigma0Phot**2.)
 
-        startTime=time.time()
+        startTime = time.time()
         self.fgcmLog.log('INFO','Matching observations to exposure table.')
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsExpIndex[:] = -1
-        a,b=esutil.numpy_util.match(self.expArray,
+        a,b=esutil.numpy_util.match(fgcmPars.expArray,
                                     snmm.getArray(self.obsExpHandle)[:])
         obsExpIndex[b] = a
         self.fgcmLog.log('INFO','Observations matched in %.1f seconds.' %
                          (time.time() - startTime))
 
-        bad,=np.where(obsExpIndex < 0)
+        bad, = np.where(obsExpIndex < 0)
         obsFlag[bad] |= obsFlagDict['NO_EXPOSURE']
 
         if (bad.size > 0):
@@ -191,9 +265,10 @@ class FgcmStars(object):
         startTime = time.time()
         self.fgcmLog.log('INFO','Matching observations to bands.')
         # and match bands to indices
-        bandStrip = np.core.defchararray.strip(obs['BAND'][:])
+        #bandStrip = np.core.defchararray.strip(obs['BAND'][:])
         for i in xrange(self.nBands):
-            use,=np.where(bandStrip == self.bands[i])
+            #use, = np.where(bandStrip == self.bands[i])
+            use, = np.where(obsBand == self.bands[i])
             if (use.size == 0):
                 raise ValueError("No observations in band %s!" % (self.bands[i]))
             snmm.getArray(self.obsBandIndexHandle)[use] = i
@@ -201,16 +276,17 @@ class FgcmStars(object):
                          (time.time() - startTime))
 
 
-        obs=None
+        #obs=None
 
-        startTime=time.time()
-        self.fgcmLog.log('INFO','Reading in star positions...')
-        pos=fitsio.read(self.indexFile,ext='POS')
-        self.fgcmLog.log('INFO','Done reading in %d unique star positions in %.1f secondds.' %
-                         (pos.size,time.time()-startTime))
+        #startTime=time.time()
+        #self.fgcmLog.log('INFO','Reading in star positions...')
+        #pos=fitsio.read(self.indexFile,ext='POS')
+        #self.fgcmLog.log('INFO','Done reading in %d unique star positions in %.1f secondds.' %
+        #                 (pos.size,time.time()-startTime))
 
         #  nStars: total number of unique stars
-        self.nStars = pos.size
+        #self.nStars = pos.size
+        self.nStars = objID.size
 
         #  objID: unique object ID
         self.objIDHandle = snmm.createArray(self.nStars,dtype='i4')
@@ -225,16 +301,22 @@ class FgcmStars(object):
         #  objNGoodObsHandle: number of good observations, per band
         self.objNGoodObsHandle = snmm.createArray((self.nStars,self.nBands),dtype='i4')
 
-        snmm.getArray(self.objIDHandle)[:] = pos['FGCM_ID'][:]
-        snmm.getArray(self.objRAHandle)[:] = pos['RA'][:]
-        snmm.getArray(self.objDecHandle)[:] = pos['DEC'][:]
-        try:
+        #snmm.getArray(self.objIDHandle)[:] = pos['FGCM_ID'][:]
+        #snmm.getArray(self.objRAHandle)[:] = pos['RA'][:]
+        #snmm.getArray(self.objDecHandle)[:] = pos['DEC'][:]
+        snmm.getArray(self.objIDHandle)[:] = objID
+        snmm.getArray(self.objRAHandle)[:] = objRA
+        snmm.getArray(self.objDecHandle)[:] = objDec
+
+        #try:
             # new field name
-            snmm.getArray(self.objObsIndexHandle)[:] = pos['OBSARRINDEX'][:]
-        except:
+        #    snmm.getArray(self.objObsIndexHandle)[:] = pos['OBSARRINDEX'][:]
+        #except:
             # old field name
-            snmm.getArray(self.objObsIndexHandle)[:] = pos['OBSINDEX'][:]
-        snmm.getArray(self.objNobsHandle)[:] = pos['NOBS'][:]
+        #    snmm.getArray(self.objObsIndexHandle)[:] = pos['OBSINDEX'][:]
+        #snmm.getArray(self.objNobsHandle)[:] = pos['NOBS'][:]
+        snmm.getArray(self.objObsIndexHandle)[:] = objObsIndex
+        snmm.getArray(self.objNobsHandle)[:] = objNobs
 
 
         #  minObjID: minimum object ID
@@ -245,7 +327,7 @@ class FgcmStars(object):
         #  obsObjIDIndex: object ID Index of each observation
         #    (to get objID, then objID[obsObjIDIndex]
 
-        startTime=time.time()
+        startTime = time.time()
         self.fgcmLog.log('INFO','Indexing star observations...')
         self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
@@ -253,12 +335,14 @@ class FgcmStars(object):
         obsIndex = snmm.getArray(self.obsIndexHandle)
         objObsIndex = snmm.getArray(self.objObsIndexHandle)
         objNobs = snmm.getArray(self.objNobsHandle)
+        ## FIXME: check if this extra obsIndex reference is necessary or not.
+        ##   probably extraneous.
         for i in xrange(self.nStars):
             obsObjIDIndex[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = i
         self.fgcmLog.log('INFO','Done indexing in %.1f seconds.' %
                          (time.time() - startTime))
 
-        pos=None
+        #pos=None
         obsObjIDIndex = None
         objID = None
         obsIndex = None
@@ -270,22 +354,33 @@ class FgcmStars(object):
         self.objFlagHandle = snmm.createArray(self.nStars,dtype='i2')
 
         # and read in the previous bad stars if available
-        if (self.inBadStarFile is not None):
-            self.fgcmLog.log('INFO','Reading in list of previous bad stars from %s' %
-                             (self.inBadStarFile))
+        #if (self.inBadStarFile is not None):
+        #   self.fgcmLog.log('INFO','Reading in list of previous bad stars from %s' %
+        #                     (self.inBadStarFile))
 
+        #    objID = snmm.getArray(self.objIDHandle)
+        #    objFlag = snmm.getArray(self.objFlagHandle)
+
+        #    inBadStars = fitsio.read(self.inBadStarFile,ext=1)
+
+        #    a,b=esutil.numpy_util.match(inBadStars['OBJID'],
+        #                                objID)
+
+        #    self.fgcmLog.log('INFO','Flagging %d stars as bad.' %
+        #                     (a.size))
+
+        #    objFlag[b] = inBadStars['OBJFLAG'][a]
+        if (badID is not None):
             objID = snmm.getArray(self.objIDHandle)
             objFlag = snmm.getArray(self.objFlagHandle)
 
-            inBadStars = fitsio.read(self.inBadStarFile,ext=1)
+            a,b=esutil.numpy_util.match(badID, objID)
 
-            a,b=esutil.numpy_util.match(inBadStars['OBJID'],
-                                        objID)
+            self.fgcmLog.log('INFO','Flagging %d stars as bad.' % (a.size))
 
-            self.fgcmLog.log('INFO','Flagging %d stars as bad.' %
-                             (a.size))
+            objFlag[b] = badFlag[a]
 
-            objFlag[b] = inBadStars['OBJFLAG'][a]
+
 
         # And we need to record the mean mag, error, SED slopes...
 
@@ -327,6 +422,13 @@ class FgcmStars(object):
         snmm.getArray(self.obsSecZenithHandle)[:] = tempSecZenith
         self.fgcmLog.log('INFO','Computed secZenith in %.1f seconds.' %
                          (time.time() - startTime))
+
+        if (computeNobs):
+            self.fgcmLog.log('INFO','Checking stars with all exposure numbers')
+            allExpsIndex = np.arange(fgcmPars.expArray.size)
+            self.selectStarsMinObsExpIndex(allExpsIndex)
+
+
 
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
@@ -782,6 +884,7 @@ class FgcmStars(object):
         """
         """
 
+        import fitsio
 
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
