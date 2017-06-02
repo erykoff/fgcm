@@ -134,7 +134,7 @@ class FgcmStars(object):
                        pos['FGCM_ID'],
                        pos['RA'],
                        pos['DEC'],
-                       pos['OBSINDEX'],
+                       pos['OBSARRINDEX'],
                        pos['NOBS'],
                        flagID=flagID,
                        flagFlag=flagFlag,
