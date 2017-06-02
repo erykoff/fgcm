@@ -70,6 +70,8 @@ class FgcmMakeStars(object):
                                 brightStarDec = brightStarDec,
                                 brightStarRadius = brightStarRadius)
 
+        fitsio.write(self.starConfig['starfileBase']+'_prepositions.fits',self.objCat,clobber=True)
+
 
     def makeMatchedStarsFromFits(self, observationFile, obsIndexFile, clobber=False):
         """
@@ -294,7 +296,9 @@ class FgcmMakeStars(object):
 
             matches=smatch.match(self.objCat['RA'], self.objCat['DEC'],
                                  self.starConfig['matchRadius']/3600.0,
-                                 raArray, decArray, nside=self.starConfig['matchNSide'], maxmatch=0)
+                                 raArray, decArray,
+                                 nside=self.starConfig['matchNSide'],
+                                 maxmatch=0)
             i1=matches['i1']
             i2=matches['i2']
         else:
@@ -375,7 +379,7 @@ class FgcmMakeStars(object):
 
         # and we need to create the observation indices from the OBSARRINDEX
 
-        nTotObs = self.objIndexCat['OBSARRINDEX'][-1]
+        nTotObs = self.objIndexCat['OBSARRINDEX'][-1] + self.objIndexCat['NOBS'][-1]
 
         self.obsIndexCat = np.zeros(nTotObs,
                                     dtype=[('OBSINDEX','i4')])
@@ -383,6 +387,7 @@ class FgcmMakeStars(object):
         print("Spooling out %d observation indices." % (nTotObs))
         for i in gd:
             self.obsIndexCat[ctr:ctr+nObsPerObj[i]] = i2[obsInd[obsInd[i]:obsInd[i+1]]]
+            ctr+=nObsPerObj[i]
 
         # and we're done
 
