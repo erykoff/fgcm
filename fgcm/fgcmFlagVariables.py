@@ -63,8 +63,12 @@ class FgcmFlagVariables(object):
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
         # select good stars...
+        #goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+        #                    (objFlag == 0))
+        # compute this for all possibly good stars *including* reserves
+        resMask = 255 & ~objFlagDict['RESERVED']
         goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
-                            (objFlag == 0))
+                            ((objFlag & resMask) == 0))
 
         # match the good stars to the observations
         goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
