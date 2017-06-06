@@ -510,10 +510,12 @@ class FgcmChisq(object):
             # set up arrays
             magdLdPWVIntercept = np.zeros((self.fgcmPars.nCampaignNights,
                                            self.fgcmPars.nFitBands))
-            magdLdPWVSlope = np.zeros_like(magdLdPWVIntercept)
+            #magdLdPWVSlope = np.zeros_like(magdLdPWVIntercept)
+            magdLdPWVPerSlope = np.zeros_like(magdLdPWVIntercept)
             magdLdPWVOffset = np.zeros_like(magdLdPWVIntercept)
             magdLdTauIntercept = np.zeros_like(magdLdPWVIntercept)
-            magdLdTauSlope = np.zeros_like(magdLdPWVIntercept)
+            #magdLdTauSlope = np.zeros_like(magdLdPWVIntercept)
+            magdLdTauPerSlope = np.zeros_like(magdLdPWVIntercept)
             magdLdTauOffset = np.zeros_like(magdLdPWVIntercept)
             magdLdAlpha = np.zeros_like(magdLdPWVIntercept)
             magdLdO3 = np.zeros_like(magdLdPWVIntercept)
@@ -665,30 +667,58 @@ class FgcmChisq(object):
                          uNightIndexNoExt] += 1
 
             # PWV Nightly Slope
-            np.add.at(magdLdPWVSlope,
+            #np.add.at(magdLdPWVSlope,
+            #          (expNightIndexGOF[noExtGOF],
+            #           obsBandIndexGO[obsFitUseGO[noExtGOF]]),
+            #          self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+            #          dLdPWVGO[obsFitUseGO[noExtGOF]] /
+            #          obsMagErr2GO[obsFitUseGO[noExtGOF]])
+            #np.multiply.at(magdLdPWVSlope,
+            #               (expNightIndexGOF[noExtGOF],
+            #                obsBandIndexGO[obsFitUseGO[noExtGOF]]),
+            #               objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
+            #np.add.at(partialArray[self.fgcmPars.parPWVSlopeLoc:
+            #                           (self.fgcmPars.parPWVSlopeLoc+
+            #                            self.fgcmPars.nCampaignNights)],
+            #          expNightIndexGOF[noExtGOF],
+            #          deltaMagWeightedGOF[noExtGOF] * (
+            #        (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+            #         dLdPWVGO[obsFitUseGO[noExtGOF]] -
+            #         magdLdPWVSlope[expNightIndexGOF[noExtGOF],
+            #                        obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
+
+            #partialArray[self.fgcmPars.parPWVSlopeLoc +
+            #             uNightIndex] *= (2.0 / unitDict['pwvSlopeUnit'])
+            #partialArray[self.fgcmPars.nFitPars +
+            #             self.fgcmPars.parPWVSlopeLoc] += 1
+
+            # PWV Nightly Percent Slope
+            np.add.at(magdLdPWVPerSlope,
                       (expNightIndexGOF[noExtGOF],
                        obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                       self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                      self.fgcmPars.expPWV[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                       dLdPWVGO[obsFitUseGO[noExtGOF]] /
                       obsMagErr2GO[obsFitUseGO[noExtGOF]])
-            np.multiply.at(magdLdPWVSlope,
+            np.multiply.at(magdLdPWVPerSlope,
                            (expNightIndexGOF[noExtGOF],
                             obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                            objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
-            np.add.at(partialArray[self.fgcmPars.parPWVSlopeLoc:
-                                       (self.fgcmPars.parPWVSlopeLoc+
+            np.add.at(partialArray[self.fgcmPars.parPWVPerSlopeLoc:
+                                       (self.fgcmPars.parPWVPerSlopeLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       deltaMagWeightedGOF[noExtGOF] * (
                     (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                     self.fgcmPars.expPWV[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                      dLdPWVGO[obsFitUseGO[noExtGOF]] -
-                     magdLdPWVSlope[expNightIndexGOF[noExtGOF],
-                                    obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
+                     magdLdPWVPerSlope[expNightIndexGOF[noExtGOF],
+                                       obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
 
-            partialArray[self.fgcmPars.parPWVSlopeLoc +
-                         uNightIndex] *= (2.0 / unitDict['pwvSlopeUnit'])
+            partialArray[self.fgcmPars.parPWVPerSlopeLoc +
+                         uNightIndex] *= (2.0 / unitDict['pwvPerSlopeUnit'])
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parPWVSlopeLoc] += 1
+                         self.fgcmPars.parPWVPerSlopeLoc] += 1
 
             #############
             ## Tau External
@@ -775,31 +805,61 @@ class FgcmChisq(object):
                          uNightIndexNoExt] += 1
 
             # Tau Nightly Slope
-            np.add.at(magdLdTauSlope,
+            #np.add.at(magdLdTauSlope,
+            #         (expNightIndexGOF[noExtGOF],
+            #           obsBandIndexGO[obsFitUseGO[noExtGOF]]),
+            #          self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+            #          dLdTauGO[obsFitUseGO[noExtGOF]] /
+            #          obsMagErr2GO[obsFitUseGO[noExtGOF]])
+            #np.multiply.at(magdLdTauSlope,
+            #               (expNightIndexGOF[noExtGOF],
+            #                obsBandIndexGO[obsFitUseGO[noExtGOF]]),
+            #               objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
+            #np.add.at(partialArray[self.fgcmPars.parTauSlopeLoc:
+            #                           (self.fgcmPars.parTauSlopeLoc+
+            #                            self.fgcmPars.nCampaignNights)],
+            #          expNightIndexGOF[noExtGOF],
+            #          deltaMagWeightedGOF[noExtGOF] * (
+            #        (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+            #         dLdTauGO[obsFitUseGO[noExtGOF]] -
+            #         magdLdTauSlope[expNightIndexGOF[noExtGOF],
+            #                        obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
+
+            #partialArray[self.fgcmPars.parTauSlopeLoc +
+            #             uNightIndexNoExt] *= (2.0 / unitDict['tauSlopeUnit'])
+            #partialArray[self.fgcmPars.nFitPars +
+            #             self.fgcmPars.parTauSlopeLoc +
+            #             uNightIndexNoExt] += 1
+
+            # Tau nightly percent slope
+            np.add.at(magdLdTauPerSlope,
                       (expNightIndexGOF[noExtGOF],
                        obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                       self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                      self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                       dLdTauGO[obsFitUseGO[noExtGOF]] /
                       obsMagErr2GO[obsFitUseGO[noExtGOF]])
-            np.multiply.at(magdLdTauSlope,
+            np.multiply.at(magdLdTauPerSlope,
                            (expNightIndexGOF[noExtGOF],
                             obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                            objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
-            np.add.at(partialArray[self.fgcmPars.parTauSlopeLoc:
-                                       (self.fgcmPars.parTauSlopeLoc+
+            np.add.at(partialArray[self.fgcmPars.parTauPerSlopeLoc:
+                                       (self.fgcmPars.parTauPerSlopeLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       deltaMagWeightedGOF[noExtGOF] * (
                     (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                     self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                      dLdTauGO[obsFitUseGO[noExtGOF]] -
-                     magdLdTauSlope[expNightIndexGOF[noExtGOF],
-                                    obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
+                     magdLdTauPerSlope[expNightIndexGOF[noExtGOF],
+                                       obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
 
-            partialArray[self.fgcmPars.parTauSlopeLoc +
-                         uNightIndexNoExt] *= (2.0 / unitDict['tauSlopeUnit'])
+            partialArray[self.fgcmPars.parTauPerSlopeLoc +
+                         uNightIndexNoExt] *= (2.0 / unitDict['tauPerSlopeUnit'])
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parTauSlopeLoc +
+                         self.fgcmPars.parTauPerSlopeLoc +
                          uNightIndexNoExt] += 1
+
 
             #############
             ## Washes (QE Sys)
