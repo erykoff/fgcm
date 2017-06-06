@@ -378,12 +378,11 @@ class FgcmStars(object):
 
             a,b=esutil.numpy_util.match(flagID, objID)
 
-            #self.fgcmLog.log('INFO','Flagging %d stars.' % (a.size))
-            test,=np.where((objFlag & objFlagDict['VARIABLE']) > 0)
-            self.fgcmLog.log('INFO','Flagging %d stars as reserved from previous fit.' %
+            test,=np.where((flagFlag[a] & objFlagDict['VARIABLE']) > 0)
+            self.fgcmLog.log('INFO','Flagging %d stars as variable from previous cycles.' %
                              (test.size))
-            test,=np.where((objFlag & objFlagDict['RESERVED']) > 0)
-            self.fgcmLog.log('INFO','Flagging %d stars as reserved from previous cycle.' %
+            test,=np.where((flagFlag[a] & objFlagDict['RESERVED']) > 0)
+            self.fgcmLog.log('INFO','Flagging %d stars as reserved from previous cycles.' %
                              (test.size))
 
             objFlag[b] = flagFlag[a]
