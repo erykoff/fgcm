@@ -254,6 +254,16 @@ class FgcmFitCycle(object):
 
         ## FIXME: save standard stars if desired.  (Need code to save std stars)
 
+
+        # Save yaml for input to next fit cycle
+        outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
+                                                      self.fgcmConfig.outfileBase,
+                                                      self.fgcmConfig.cycleNumber+1)
+        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
+
+        # and make map of coverage
+
+        self.fgcmLog.log('INFO','Making map of coverage')
         badZpMask = (zpFlagDict['NOFIT_NIGHT'] |
                      zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
                      zpFlagDict['TOO_FEW_STARS_ON_CCD'])
@@ -263,11 +273,6 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minPerBand=1)
         self.fgcmStars.plotStarMap(mapType='okcoverage')
 
-        # Save yaml for input to next fit cycle
-        outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
-                                                      self.fgcmConfig.outfileBase,
-                                                      self.fgcmConfig.cycleNumber+1)
-        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
 
 
         self.fgcmLog.logMemoryUsage('INFO','FitCycle Completed')
@@ -291,7 +296,7 @@ class FgcmFitCycle(object):
         pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                    parInitial,       # initial guess
                                                    fprime=None,      # in fgcmChisq()
-                                                   args=(True,True,False,True), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
+                                                   args=(True,True,False,False), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
                                                    approx_grad=False,# don't approx grad
                                                    bounds=parBounds, # boundaries
                                                    m=10,             # "variable metric conditions"
