@@ -109,9 +109,11 @@ class FgcmParameters(object):
         self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.alphaStd
         self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.o3Std
         self.parTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.tauStd
-        self.parTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        #self.parTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parTauPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
         self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.pwvStd
-        self.parPWVSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        #self.parPWVSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
@@ -169,7 +171,7 @@ class FgcmParameters(object):
         #  pwv, O3, lnTau, alpha
         self.nFitPars = (self.campaignNights.size +  # O3
                          self.campaignNights.size +  # tauIntercept
-                         self.campaignNights.size +  # tauSlope
+                         self.campaignNights.size +  # tauPerSlope
                          self.campaignNights.size +  # alpha
                          self.campaignNights.size +  # pwv Intercept
                          self.campaignNights.size)   # pwv Slope
@@ -178,13 +180,15 @@ class FgcmParameters(object):
         ctr+=self.campaignNights.size
         self.parTauInterceptLoc = ctr
         ctr+=self.campaignNights.size
-        self.parTauSlopeLoc = ctr
+        #self.parTauSlopeLoc = ctr
+        self.parTauPerSlopeLoc = ctr
         ctr+=self.campaignNights.size
         self.parAlphaLoc = ctr
         ctr+=self.campaignNights.size
         self.parPWVInterceptLoc = ctr
         ctr+=self.campaignNights.size
-        self.parPWVSlopeLoc = ctr
+        #self.parPWVSlopeLoc = ctr
+        self.parPWVPerSlopeLoc = ctr
         ctr+=self.campaignNights.size
 
         if (self.hasExternalPWV):
@@ -390,8 +394,12 @@ class FgcmParameters(object):
         self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
 
         # and the tau slope units
-        self.tauSlopeStepUnits = self.tauStepUnits * self.meanNightDuration
-        self.fgcmLog.log('INFO','tau slope step unit set to %f' % (self.tauSlopeStepUnits))
+        #self.tauSlopeStepUnits = self.tauStepUnits * self.meanNightDuration
+        #self.fgcmLog.log('INFO','tau slope step unit set to %f' % (self.tauSlopeStepUnits))
+        ## FIXME: unsure about this
+        self.tauPerSlopeStepUnits = self.tauStepUnits * self.meanNightDuration / LUT.tauStd
+        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
+                         (self.tauPerSlopeStepUnits))
 
         # alpha units -- reference to g, or r if not available
         ## FIXME: will need to allow band names other than g, r
@@ -431,8 +439,12 @@ class FgcmParameters(object):
         self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
 
         # PWV slope units
-        self.pwvSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration
-        self.fgcmLog.log('INFO','pwv slope step unit set to %f' % (self.pwvSlopeStepUnits))
+        #self.pwvSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration
+        #self.fgcmLog.log('INFO','pwv slope step unit set to %f' % (self.pwvSlopeStepUnits))
+        ## FIXME: check these
+        self.pwvPerSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration / LUT.pwvStd
+        self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
+                         (self.pwvPerSlopeStepUnits))
 
         # O3 units -- reference to r
         bandIndex,=np.where(self.bands == 'r')
@@ -483,21 +495,27 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo(fgcmConfig)
 
         self.tauStepUnits = parInfo['TAUSTEPUNITS'][0]
-        self.tauSlopeStepUnits = parInfo['TAUSLOPESTEPUNITS'][0]
+        #self.tauSlopeStepUnits = parInfo['TAUSLOPESTEPUNITS'][0]
+        self.tauPerSlopeStepUnits = parInfo['TAUPERSLOPESTEPUNITS'][0]
         self.alphaStepUnits = parInfo['ALPHASTEPUNITS'][0]
         self.pwvStepUnits = parInfo['PWVSTEPUNITS'][0]
-        self.pwvSlopeStepUnits = parInfo['PWVSLOPESTEPUNITS'][0]
+        #self.pwvSlopeStepUnits = parInfo['PWVSLOPESTEPUNITS'][0]
+        self.pwvPerSlopeStepUnits = parInfo['PWVPERSLOPESTEPUNITS'][0]
         self.o3StepUnits = parInfo['O3STEPUNITS'][0]
         self.washStepUnits = parInfo['WASHSTEPUNITS'][0]
         self.washSlopeStepUnits = parInfo['WASHSLOPESTEPUNITS'][0]
 
         self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
-        self.fgcmLog.log('INFO','tau slope step unit set to %f' %
-                         (self.tauSlopeStepUnits))
+        #self.fgcmLog.log('INFO','tau slope step unit set to %f' %
+        #                 (self.tauSlopeStepUnits))
+        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
+                         (self.tauPerSlopeStepUnits))
         self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.alphaStepUnits))
         self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
-        self.fgcmLog.log('INFO','pwv slope step unit set to %f' %
-                         (self.pwvSlopeStepUnits))
+        #self.fgcmLog.log('INFO','pwv slope step unit set to %f' %
+        #                 (self.pwvSlopeStepUnits))
+        self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
+                         (self.pwvPerSlopeStepUnits))
         self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.o3StepUnits))
         self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
         self.fgcmLog.log('INFO','wash slope step unit set to %f' %
@@ -511,9 +529,11 @@ class FgcmParameters(object):
         self.parAlpha = pars['PARALPHA'][0]
         self.parO3 = pars['PARO3'][0]
         self.parTauIntercept = pars['PARTAUINTERCEPT'][0]
-        self.parTauSlope = pars['PARTAUSLOPE'][0]
+        #self.parTauSlope = pars['PARTAUSLOPE'][0]
+        self.parTauPerSlope = pars['PARTAUPERSLOPE'][0]
         self.parPWVIntercept = pars['PARPWVINTERCEPT'][0]
-        self.parPWVSlope = pars['PARPWVSLOPE'][0]
+        #self.parPWVSlope = pars['PARPWVSLOPE'][0]
+        self.parPWVPerSlope = pars['PARPWVPERSLOPE'][0]
         self.parQESysIntercept = pars['PARQESYSINTERCEPT'][0]
         self.parQESysSlope = pars['PARQESYSSLOPE'][0]
 
@@ -522,9 +542,11 @@ class FgcmParameters(object):
             self.parAlpha[:] = fgcmConfig.alphaStd
             self.parO3[:] = fgcmConfig.o3Std
             self.parTauIntercept[:] = fgcmConfig.tauStd
-            self.parTauSlope[:] = 0.0
+            #self.parTauSlope[:] = 0.0
+            self.parTauPerSlope[:] = 0.0
             self.parPWVIntercept[:] = fgcmConfig.pwvStd
-            self.parPWVSlope[:] = 0.0
+            #self.parPWVSlope[:] = 0.0
+            self.parPWVPerSlope[:] = 0.0
             # leave the QESysIntercept and Slope as previously fit
             # though we want to play with this
 
@@ -587,10 +609,12 @@ class FgcmParameters(object):
                ('EXTRABANDS','a2',self.extraBands.size),
                ('EXPOSUREFILE','a%d' % (len(self.exposureFile)+1)),
                ('TAUSTEPUNITS','f8'),
-               ('TAUSLOPESTEPUNITS','f8'),
+               #('TAUSLOPESTEPUNITS','f8'),
+               ('TAUPERSLOPESTEPUNITS','f8'),
                ('ALPHASTEPUNITS','f8'),
                ('PWVSTEPUNITS','f8'),
-               ('PWVSLOPESTEPUNITS','f8'),
+               #('PWVSLOPESTEPUNITS','f8'),
+               ('PWVPERSLOPESTEPUNITS','f8'),
                ('O3STEPUNITS','f8'),
                ('WASHSTEPUNITS','f8'),
                ('WASHSLOPESTEPUNITS','f8'),
@@ -610,10 +634,12 @@ class FgcmParameters(object):
         parInfo['EXPOSUREFILE'] = self.exposureFile
 
         parInfo['TAUSTEPUNITS'] = self.tauStepUnits
-        parInfo['TAUSLOPESTEPUNITS'] = self.tauSlopeStepUnits
+        #parInfo['TAUSLOPESTEPUNITS'] = self.tauSlopeStepUnits
+        parInfo['TAUPERSLOPESTEPUNITS'] = self.tauPerSlopeStepUnits
         parInfo['ALPHASTEPUNITS'] = self.alphaStepUnits
         parInfo['PWVSTEPUNITS'] = self.pwvStepUnits
-        parInfo['PWVSLOPESTEPUNITS'] = self.pwvSlopeStepUnits
+        #parInfo['PWVSLOPESTEPUNITS'] = self.pwvSlopeStepUnits
+        parInfo['PWVPERSLOPESTEPUNITS'] = self.pwvPerSlopeStepUnits
         parInfo['O3STEPUNITS'] = self.o3StepUnits
         parInfo['WASHSTEPUNITS'] = self.washStepUnits
         parInfo['WASHSLOPESTEPUNITS'] = self.washSlopeStepUnits
@@ -631,9 +657,11 @@ class FgcmParameters(object):
         dtype=[('PARALPHA','f8',self.parAlpha.size),
                ('PARO3','f8',self.parO3.size),
                ('PARTAUINTERCEPT','f8',self.parTauIntercept.size),
-               ('PARTAUSLOPE','f8',self.parTauSlope.size),
+               #('PARTAUSLOPE','f8',self.parTauSlope.size),
+               ('PARTAUPERSLOPE','f8',self.parTauPerSlope.size),
                ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
-               ('PARPWVSLOPE','f8',self.parPWVSlope.size),
+               #('PARPWVSLOPE','f8',self.parPWVSlope.size),
+               ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
@@ -659,9 +687,11 @@ class FgcmParameters(object):
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3
         pars['PARTAUINTERCEPT'][:] = self.parTauIntercept
-        pars['PARTAUSLOPE'][:] = self.parTauSlope
+        #pars['PARTAUSLOPE'][:] = self.parTauSlope
+        pars['PARTAUPERSLOPE'][:] = self.parTauPerSlope
         pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
-        pars['PARPWVSLOPE'][:] = self.parPWVSlope
+        #pars['PARPWVSLOPE'][:] = self.parPWVSlope
+        pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
 
@@ -743,14 +773,20 @@ class FgcmParameters(object):
 
         self.parPWVIntercept[:] = parArray[self.parPWVInterceptLoc:
                                                self.parPWVInterceptLoc+self.nCampaignNights] / unitDict['pwvUnit']
-        self.parPWVSlope[:] = parArray[self.parPWVSlopeLoc:
-                                           self.parPWVSlopeLoc+self.nCampaignNights] / unitDict['pwvSlopeUnit']
+        #self.parPWVSlope[:] = parArray[self.parPWVSlopeLoc:
+        #                                   self.parPWVSlopeLoc+self.nCampaignNights] / unitDict['pwvSlopeUnit']
+        self.parPWVPerSlope[:] = parArray[self.parPWVPerSlopeLoc:
+                                              self.parPWVPerSlopeLoc + self.nCampaignNights] / unitDict['pwvPerSlopeUnit']
         self.parO3[:] = parArray[self.parO3Loc:
                                      self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
         self.parTauIntercept[:] = parArray[self.parTauInterceptLoc:
                                                self.parTauInterceptLoc+self.nCampaignNights] / unitDict['tauUnit']
-        self.parTauSlope[:] = parArray[self.parTauSlopeLoc:
-                                           self.parTauSlopeLoc+self.nCampaignNights] / unitDict['tauSlopeUnit']
+        #self.parTauSlope[:] = parArray[self.parTauSlopeLoc:
+        #                                   self.parTauSlopeLoc+self.nCampaignNights] / unitDict['tauSlopeUnit']
+        self.parTauPerSlope[:] = (parArray[self.parTauPerSlopeLoc:
+                                               self.parTauPerSlopeLoc + self.nCampaignNights] /
+                                  unitDict['tauPerSlopeUnit'])
+
         self.parAlpha[:] = parArray[self.parAlphaLoc:
                                         self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
         if (self.hasExternalPWV):
@@ -791,9 +827,12 @@ class FgcmParameters(object):
         self.expAlpha = self.parAlpha[self.expNightIndex]
 
 
-        # default to the nightly slope/intercept 
+        # default to the nightly slope/intercept
+        #self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
+        #               self.parPWVSlope[self.expNightIndex] * self.expDeltaUT)
         self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
-                       self.parPWVSlope[self.expNightIndex] * self.expDeltaUT)
+                       (self.parPWVPerSlope[self.expNightIndex] *
+                        self.parPWVIntercept[self.expNightIndex]) * self.expDeltaUT)
 
         if (self.hasExternalPWV):
             # replace where we have these
@@ -802,8 +841,11 @@ class FgcmParameters(object):
                                                  self.externalPWV[self.externalPWVFlag])
 
         # default to nightly slope/intercept
+        #self.expTau = (self.parTauIntercept[self.expNightIndex] +
+        #               self.parTauSlope[self.expNightIndex] * self.expDeltaUT)
         self.expTau = (self.parTauIntercept[self.expNightIndex] +
-                           self.parTauSlope[self.expNightIndex] * self.expDeltaUT)
+                       (self.parTauPerSlope[self.expNightIndex] *
+                        self.parTauIntercept[self.expNightIndex]) * self.expDeltaUT)
 
         if (self.hasExternalTau):
             # replace where we have these
@@ -830,14 +872,18 @@ class FgcmParameters(object):
 
         parArray[self.parPWVInterceptLoc:
                      self.parPWVInterceptLoc+self.nCampaignNights] = self.parPWVIntercept[:] * unitDict['pwvUnit']
-        parArray[self.parPWVSlopeLoc:
-                     self.parPWVSlopeLoc+self.nCampaignNights] = self.parPWVSlope[:] * unitDict['pwvSlopeUnit']
+        #parArray[self.parPWVSlopeLoc:
+        #             self.parPWVSlopeLoc+self.nCampaignNights] = self.parPWVSlope[:] * unitDict['pwvSlopeUnit']
+        parArray[self.parPWVPerSlopeLoc:
+                     self.parPWVPerSlopeLoc + self.nCampaignNights] = self.parPWVPerSlope[:] * unitDict['pwvPerSlopeUnit']
         parArray[self.parO3Loc:
                      self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
         parArray[self.parTauInterceptLoc:
                      self.parTauInterceptLoc+self.nCampaignNights] = self.parTauIntercept[:] * unitDict['tauUnit']
-        parArray[self.parTauSlopeLoc:
-                     self.parTauSlopeLoc+self.nCampaignNights] = self.parTauSlope[:] * unitDict['tauSlopeUnit']
+        #parArray[self.parTauSlopeLoc:
+        #             self.parTauSlopeLoc+self.nCampaignNights] = self.parTauSlope[:] * unitDict['tauSlopeUnit']
+        parArray[self.parTauPerSlopeLoc:
+                     self.parTauPerSlopeLoc + self.nCampaignNights] = self.parTauPerSlope[:] * unitDict['tauPerSlopeUnit']
         parArray[self.parAlphaLoc:
                      self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
         if (self.hasExternalPWV):
@@ -868,24 +914,40 @@ class FgcmParameters(object):
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
         ## MAYBE: configure slope ranges?
+        #parLow[self.parPWVInterceptLoc: \
+        #           self.parPWVInterceptLoc + \
+        #       self.nCampaignNights] = ( \
+        #    (self.pwvRange[0] + 5.0*0.2) * \
+        #        unitDict['pwvUnit'])
+        #parHigh[self.parPWVInterceptLoc: \
+        #            self.parPWVInterceptLoc + \
+        #            self.nCampaignNights] = ( \
+        #    (self.pwvRange[1] - 5.0*0.2) * \
+        #        unitDict['pwvUnit'])
         parLow[self.parPWVInterceptLoc: \
                    self.parPWVInterceptLoc + \
                self.nCampaignNights] = ( \
-            (self.pwvRange[0] + 5.0*0.2) * \
-                unitDict['pwvUnit'])
+            self.pwvRange[0] * unitDict['pwvUnit'])
         parHigh[self.parPWVInterceptLoc: \
                     self.parPWVInterceptLoc + \
                     self.nCampaignNights] = ( \
-            (self.pwvRange[1] - 5.0*0.2) * \
-                unitDict['pwvUnit'])
-        parLow[self.parPWVSlopeLoc: \
-                   self.parPWVSlopeLoc + \
+            self.pwvRange[1] * unitDict['pwvUnit'])
+        #parLow[self.parPWVSlopeLoc: \
+        #           self.parPWVSlopeLoc + \
+        #           self.nCampaignNights] = ( \
+        #               -0.2 * unitDict['pwvSlopeUnit'])
+        #parHigh[self.parPWVSlopeLoc: \
+        #            self.parPWVSlopeLoc + \
+        #            self.nCampaignNights] = ( \
+        #    0.2 * unitDict['pwvSlopeUnit'])
+        parLow[self.parPWVPerSlopeLoc: \
+                   self.parPWVPerSlopeLoc + \
                    self.nCampaignNights] = ( \
-                       -0.2 * unitDict['pwvSlopeUnit'])
-        parHigh[self.parPWVSlopeLoc: \
-                    self.parPWVSlopeLoc + \
+            -0.05 * unitDict['pwvPerSlopeUnit'])
+        parHigh[self.parPWVPerSlopeLoc: \
+                    self.parPWVPerSlopeLoc + \
                     self.nCampaignNights] = ( \
-            0.2 * unitDict['pwvSlopeUnit'])
+            0.05 * unitDict['pwvPerSlopeUnit'])
         parLow[self.parO3Loc: \
                    self.parO3Loc + \
                    self.nCampaignNights] = ( \
@@ -894,24 +956,40 @@ class FgcmParameters(object):
                     self.parO3Loc + \
                     self.nCampaignNights] = ( \
             self.O3Range[1] * unitDict['o3Unit'])
+        #parLow[self.parTauInterceptLoc: \
+        #           self.parTauInterceptLoc + \
+        #           self.nCampaignNights] = ( \
+        #    (self.tauRange[0] + 5.0*0.0025) * \
+        #        unitDict['tauUnit'])
+        #parHigh[self.parTauInterceptLoc: \
+        #            self.parTauInterceptLoc + \
+        #        self.nCampaignNights] = ( \
+        #    (self.tauRange[1] - 5.0*0.0025) * \
+        #        unitDict['tauUnit'])
         parLow[self.parTauInterceptLoc: \
                    self.parTauInterceptLoc + \
                    self.nCampaignNights] = ( \
-            (self.tauRange[0] + 5.0*0.0025) * \
-                unitDict['tauUnit'])
+            self.tauRange[0] * unitDict['tauUnit'])
         parHigh[self.parTauInterceptLoc: \
-                    self.parTauInterceptLoc +
+                    self.parTauInterceptLoc + \
                 self.nCampaignNights] = ( \
-            (self.tauRange[1] - 5.0*0.0025) * \
-                unitDict['tauUnit'])
-        parLow[self.parTauSlopeLoc: \
-                   self.parTauSlopeLoc + \
+            self.tauRange[1] * unitDict['tauUnit'])
+        #parLow[self.parTauSlopeLoc: \
+        #           self.parTauSlopeLoc + \
+        #           self.nCampaignNights] = ( \
+        #    -0.0025 * unitDict['tauSlopeUnit'])
+        #parHigh[self.parTauSlopeLoc: \
+        #            self.parTauSlopeLoc + \
+        #            self.nCampaignNights] = ( \
+        #    0.0025 * unitDict['tauSlopeUnit'])
+        parLow[self.parTauPerSlopeLoc: \
+                   self.parTauPerSlopeLoc + \
                    self.nCampaignNights] = ( \
-            -0.0025 * unitDict['tauSlopeUnit'])
-        parHigh[self.parTauSlopeLoc: \
-                    self.parTauSlopeLoc + \
+            -0.05 * unitDict['tauPerSlopeUnit'])
+        parHigh[self.parTauPerSlopeLoc: \
+                    self.parTauPerSlopeLoc + \
                     self.nCampaignNights] = ( \
-            0.0025 * unitDict['tauSlopeUnit'])
+            0.05 * unitDict['tauPerSlopeUnit'])
         parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
                    self.nCampaignNights] = ( \
@@ -974,19 +1052,23 @@ class FgcmParameters(object):
 
     def getUnitDict(self,fitterUnits=False):
         unitDict = {'pwvUnit':1.0,
-                    'pwvSlopeUnit':1.0,
+                    #'pwvSlopeUnit':1.0,
+                    'pwvPerSlopeUnit':1.0,
                     'o3Unit':1.0,
                     'tauUnit':1.0,
-                    'tauSlopeUnit':1.0,
+                    #'tauSlopeUnit':1.0,
+                    'tauPerSlopeUnit':1.0,
                     'alphaUnit':1.0,
                     'qeSysUnit':1.0,
                     'qeSysSlopeUnit':1.0}
         if (fitterUnits):
             unitDict['pwvUnit'] = self.pwvStepUnits
-            unitDict['pwvSlopeUnit'] = self.pwvSlopeStepUnits
+            #unitDict['pwvSlopeUnit'] = self.pwvSlopeStepUnits
+            unitDict['pwvPerSlopeUnit'] = self.pwvPerSlopeStepUnits
             unitDict['o3Unit'] = self.o3StepUnits
             unitDict['tauUnit'] = self.tauStepUnits
-            unitDict['tauSlopeUnit'] = self.tauSlopeStepUnits
+            #unitDict['tauSlopeUnit'] = self.tauSlopeStepUnits
+            unitDict['tauPerSlopeUnit'] = self.tauPerSlopeStepUnits
             unitDict['alphaUnit'] = self.alphaStepUnits
             unitDict['qeSysUnit'] = self.washStepUnits
             unitDict['qeSysSlopeUnit'] = self.washSlopeStepUnits
