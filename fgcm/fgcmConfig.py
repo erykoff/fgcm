@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
+#import fitsio
 import os
 import sys
 import yaml
@@ -17,11 +17,7 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 class FgcmConfig(object):
     """
     """
-    def __init__(self,configFile):
-        self.configFile = configFile
-
-        with open(self.configFile) as f:
-            configDict = yaml.load(f)
+    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets):
 
         requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
@@ -68,7 +64,6 @@ class FgcmConfig(object):
         self.minStarPerExp = int(configDict['minStarPerExp'])
         self.minCCDPerExp = int(configDict['minCCDPerExp'])
         self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
-        #self.expGrayPhotometricCut = float(configDict['expGrayPhotometricCut'])
         self.expGrayPhotometricCut = np.array(configDict['expGrayPhotometricCut'])
         self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
         self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
@@ -187,7 +182,6 @@ class FgcmConfig(object):
                                   self.logLevel)
 
         self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
-        self.fgcmLog.log('INFO','Configuration read from %s' % (self.configFile))
 
         if (self.experimentalMode) :
             self.fgcmLog.log('INFO','ExperimentalMode set to True')
@@ -209,16 +203,16 @@ class FgcmConfig(object):
             raise ValueError("Must set illegalValue to a negative number")
 
         # and look at the lutFile
-        lutStats=fitsio.read(self.lutFile,ext='INDEX')
+        #lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
-        self.nCCD = lutStats['NCCD'][0]
-        self.bands = lutStats['BANDS'][0]
-        self.pmbRange = np.array([np.min(lutStats['PMB']),np.max(lutStats['PMB'])])
-        self.pwvRange = np.array([np.min(lutStats['PWV']),np.max(lutStats['PWV'])])
-        self.O3Range = np.array([np.min(lutStats['O3']),np.max(lutStats['O3'])])
-        self.tauRange = np.array([np.min(lutStats['TAU']),np.max(lutStats['TAU'])])
-        self.alphaRange = np.array([np.min(lutStats['ALPHA']),np.max(lutStats['ALPHA'])])
-        self.zenithRange = np.array([np.min(lutStats['ZENITH']),np.max(lutStats['ZENITH'])])
+        self.nCCD = lutIndex['NCCD'][0]
+        self.bands = lutIndex['BANDS'][0]
+        self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
+        self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
+        self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
+        self.tauRange = np.array([np.min(lutIndex['TAU']),np.max(lutIndex['TAU'])])
+        self.alphaRange = np.array([np.min(lutIndex['ALPHA']),np.max(lutIndex['ALPHA'])])
+        self.zenithRange = np.array([np.min(lutIndex['ZENITH']),np.max(lutIndex['ZENITH'])])
 
         # make sure we drop trailing spaces
         self.bands = np.core.defchararray.strip(self.bands[:])
@@ -231,7 +225,7 @@ class FgcmConfig(object):
         self.fgcmLog.log('INFO','Found %d CCDs and %d bands (%s)' %
                          (self.nCCD,self.bands.size,bandString))
 
-        lutStd = fitsio.read(self.lutFile,ext='STD')
+        #lutStd = fitsio.read(self.lutFile,ext='STD')
         self.pmbStd = lutStd['PMBSTD'][0]
         self.pwvStd = lutStd['PWVSTD'][0]
         self.o3Std = lutStd['O3STD'][0]
@@ -246,13 +240,14 @@ class FgcmConfig(object):
             raise ValueError("expGrayPhotometricCut must all be negative")
 
         # and look at the exposure file and grab some stats
-        expInfo = fitsio.read(self.exposureFile,ext=1)
+        #expInfo = fitsio.read(self.exposureFile,ext=1)
         self.expRange = np.array([np.min(expInfo['EXPNUM']),np.max(expInfo['EXPNUM'])])
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
 
         # read in the ccd offset file
-        self.ccdOffsets = fitsio.read(self.ccdOffsetFile,ext=1)
+        #self.ccdOffsets = fitsio.read(self.ccdOffsetFile,ext=1)
+        self.ccdOffsets = ccdOffsets
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
@@ -326,6 +321,42 @@ class FgcmConfig(object):
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
+
+    @staticmethod
+    def _readConfigDict(configFile):
+        """
+        """
+
+        with open(configFile) as f:
+            configDict = yaml.load(f)
+
+        ##self.fgcmLog.log('INFO','Configuration read from %s' % (configFile))
+        print("Configuration read from %s" % (configFile))
+
+        return configDict
+
+    @classmethod
+    def configWithFits(cls, configDict):
+    #def configWithFits(cls, configFile):
+        """
+        """
+
+        import fitsio
+
+        #configDict = cls._readConfigDict(configFile)
+
+        expInfo = fitsio.read(configDict['exposureFile'], ext=1)
+
+        try:
+            lutIndex = fitsio.read(configDict['lutFile'], ext='INDEX')
+            lutStd = fitsio.read(configDict['lutFile'], ext='STD')
+        except:
+            raise IOError("Could not read LUT info")
+
+        ccdOffsets = fitsio.read(configDict['ccdOffsetFile'], ext=1)
+
+        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets)
+
 
     def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
         configDict = self.configDictSaved.copy()
