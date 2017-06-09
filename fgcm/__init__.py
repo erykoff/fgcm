@@ -24,8 +24,5 @@ from fgcmLogger import FgcmLogger
 from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
 import fgcmPlotmaps
-from desGPSFormat import DESGPSFormatter
-from desExposureFormat import DESExposureFormatter
-from desCCDFormat import DESCCDFormatter
 
 
