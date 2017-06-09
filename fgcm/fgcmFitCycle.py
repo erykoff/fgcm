@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
 import os
 import sys
 import esutil
@@ -13,7 +12,6 @@ from fgcmConfig import FgcmConfig
 from fgcmParameters import FgcmParameters
 from fgcmChisq import FgcmChisq
 from fgcmStars import FgcmStars
-#from fgcmLUT import FgcmLUTSHM
 from fgcmLUT import FgcmLUT
 from fgcmGray import FgcmGray
 from fgcmZeropoints import FgcmZeropoints
@@ -33,59 +31,141 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 class FgcmFitCycle(object):
     """
     """
-    def __init__(self,configFile):
-        self.fgcmConfig = FgcmConfig(configFile)
+
+    def __init__(self, configDict, useFits=False, noFitsDict=None):
+        # are we in fits mode?
+        self.useFits = useFits
+
+        if (not self.useFits):
+            if (noFitsDict is None):
+                raise ValueErrir("if useFits is False, must supply noFitsDict")
+
+            if (('lutIndex' not in noFitsDict) or
+                ('lutStd' not in noFitsDict) or
+                ('expInfo' not in noFitsDict) or
+                ('ccdOffsets' not in noFitsDict)):
+                raise ValueError("if useFits is False, must supply lutIndex, lutStd, expInfo, ccdOffsets in noFitsDict")
+
+
+        if self.useFits:
+            # Everything can be loaded from fits
+            self.fgcmConfig = FgcmConfig.configWithFits(configDict)
+        else:
+            # everything must be passed in.
+            self.fgcmConfig = FgcmConfig(configDict,
+                                            noFitsDict['lutIndex'],
+                                            noFitsDict['lutStd'],
+                                            noFitsDict['expInfo'],
+                                            noFitsDict['ccdOffsets'])
+        # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
+
+        # and set up cycle info
+
+        self.initialCycle = False
+        if (self.fgcmConfig.cycleNumber == 0):
+            self.initialCycle = True
+
+        self.fgcmLUT = None
+        self.fgcmPars = None
+        self.fgcmStars = None
+        self.setupComplete = False
+
+    def runWithFits(self):
+        """
+        """
+
+        self._setupWithFits()
+        self.run()
+
+    def setStars(self, fgcmStars):
+        """
+        """
+        # this has to be done outside for memory issues
+
+        self.fgcmStars = fgcmStars
+
+    def setLUT(self, fgcmLUT):
+        """
+        """
+        # this has to be done outside for memory issues
+
+        self.fgcmLUT = fgcmLUT
+
+    def setPars(self, fgcmPars):
+        """
+        """
+        # this has to be done outside for memory issues
+
+        self.fgcmPars = fgcmPars
+
+    def _setupWithFits(self):
+        """
+        """
+
+        self.fgcmLog.logMemoryUsage('INFO', 'Setting Up with fits')
+
+        # read in the LUT
+        # FIXME: make fits/non-fits versions
+        self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
+
+        # Generate or Read Parameters
+        if (self.initialCycle):
+            self.fgcmPars = FgcmParameters.newParsWithFits(self.fgcmConfig,
+                                                              self.fgcmLUT)
+        else:
+            self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig)
+
+        # Read in the stars
+        self.fgcmStars = FgcmStars(self.fgcmConfig)
+        self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
+
+        self.finishSetup()
+
+    def finishSetup(self):
+        """
+        """
+
+        if (self.fgcmLUT is None):
+            raise RuntimeError("Must set fgcmLUT")
+        if (self.fgcmPars is None):
+            raise RuntimeError("Must set fgcmPars")
+        if (self.fgcmStars is None):
+            raise RuntimeError("Must set fgcmStars")
+
+        # these are things that can happen without fits
+
+        # And prepare the chisq function
+        self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
+                                   self.fgcmStars,self.fgcmLUT)
+
+        # And the exposure selector
+        self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
+
+        # And the Gray code
+        self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+
+        self.setupComplete = True
+        self.fgcmLog.logMemoryUsage('INFO','FitCycle Prepared')
+
+
 
     def run(self):
         """
         """
 
-        # unsure whether memory usage should be start or not
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Start')
+        if (not self.setupComplete):
+            raise RuntimeError("Must complete fitCycle setup first!")
 
-        # Check if this is the initial cycle
-        initialCycle = False
-        if (self.fgcmConfig.cycleNumber == 0):
-            initialCycle = True
 
-        # Generate or Read Parameters
-        if (initialCycle):
+        if (self.initialCycle):
             self.fgcmLog.log('INFO','Fit initial cycle starting...')
-            self.fgcmPars = FgcmParameters(self.fgcmConfig)
         else:
             self.fgcmLog.log('INFO','Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
-            self.fgcmPars = FgcmParameters(self.fgcmConfig,
-                                           parFile=self.fgcmConfig.inParameterFile)
-
-
-        # Read in Stars
-        self.fgcmLog.log('DEBUG','FitCycle is making FgcmStars')
-        self.fgcmStars = FgcmStars(self.fgcmConfig)
-        self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
-
-        # Read in LUT
-        self.fgcmLog.log('DEBUG','FitCycle is making FgcmLUT')
-        self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
-
-        # And prepare the chisq function
-        self.fgcmLog.log('DEBUG','FitCycle is making FgcmChisq')
-        self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
-                                   self.fgcmStars,self.fgcmLUT)
-
-        # And the exposure selector
-        self.fgcmLog.log('DEBUG','FitCycle is making FgcmExposureSelector')
-        self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
-
-        # And the Gray code
-        self.fgcmLog.log('DEBUG','FitCycle is making FgcmGray')
-        self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
-
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Prepared')
 
         # Apply aperture corrections and SuperStar if available
         # select exposures...
-        if (not initialCycle):
+        if (not self.initialCycle):
             self.fgcmLog.log('DEBUG','FitCycle is applying SuperStarFlat')
             self.fgcmStars.applySuperStarFlat(self.fgcmPars)
             self.fgcmLog.log('DEBUG','FitCycle is applying ApertureCorrection')
@@ -104,7 +184,7 @@ class FgcmFitCycle(object):
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
-        if (not initialCycle):
+        if (not self.initialCycle):
             # get the SED from the chisq function
             self.fgcmChisq(parArray,computeSEDSlopes=True,includeReserve=True)
 
@@ -146,7 +226,7 @@ class FgcmFitCycle(object):
                 outParFileTemp =  '%s/%s_parameters_soptics.fits' % (
                     self.fgcmConfig.outputPath,
                     self.fgcmConfig.outfileBaseWithCycle)
-                self.fgcmPars.saveParFile(outParFileTemp)
+                self.fgcmPars.saveParsFits(outParFileTemp)
 
                 # do we need to compute EXP^gray here? yes, probably.  In the _doSOpticsFit
 
@@ -245,7 +325,7 @@ class FgcmFitCycle(object):
         # Save parameters
         outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
                                                 self.fgcmConfig.outfileBaseWithCycle)
-        self.fgcmPars.saveParFile(outParFile)
+        self.fgcmPars.saveParsFits(outParFile)
 
         # Save bad stars
         outFlagStarFile = '%s/%s_flaggedstars.fits' % (self.fgcmConfig.outputPath,
