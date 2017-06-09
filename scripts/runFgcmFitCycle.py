@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import fgcm
+import yaml
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Code to run FGCM fit cycle')
@@ -15,7 +16,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    fgcmFitCycle = fgcm.FgcmFitCycle(args.config)
+    #fgcmFitCycle = fgcm.FgcmFitCycle(args.config)
+    #fgcmFitCycle = fgcm.FgcmFitCycleNew(args.config)
+    #fgcmFitCycle.run()
 
-    fgcmFitCycle.run()
+    with open(args.config) as f:
+        configDict = yaml.load(f)
+
+    print("Configuration read from %s" % (args.config))
+
+    fgcmFitCycle = fgcm.FgcmFitCycleNew(configDict, useFits=True)
+    fgcmFitCycle.runWithFits()
+    
 
