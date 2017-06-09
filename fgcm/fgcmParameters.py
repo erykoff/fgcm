@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
-import fitsio
+#import fitsio
 import os
 import sys
 import esutil
@@ -16,16 +16,28 @@ import copy_reg
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-from fgcmLUT import FgcmLUT
+#from fgcmLUT import FgcmLUT
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
-class FgcmParameters(object):
+class FgcmParametersNew(object):
     """
     """
-    #def __init__(self,parFile=None,
-    #             fgcmConfig=None):
-    def __init__(self,fgcmConfig,parFile=None):
+
+    def __init__(self, fgcmConfig, expInfo=None, fgcmLUT=None,
+                 inParInfo=None, inParams=None, inSuperStar=None):
+
+        initNew = False
+        loadOld = False
+        if (expInfo is not None and fgcmLUT is not None):
+            initNew = True
+        if (inParInfo is not None and inParams is not None and inSuperStar is not None):
+            loadOld = True
+
+        if (initNew and loadOld):
+            raise ValueError("Too many parameters specified: either expInfo/fgcmLUT or inParInof/inParams/inSuperStar")
+        if (not initNew and not loadOld):
+            raise ValueError("Too few parameters specificed: either expInfo/fgcmLUT or inParInof/inParams/inSuperStar")
 
         self.hasExternalPWV = False
         self.hasExternalTau = False
@@ -40,50 +52,7 @@ class FgcmParameters(object):
         # for plotting
         self.minExpPerNight = fgcmConfig.minExpPerNight
 
-        #if (fgcmConfig is not None):
-        #    self._initializeParameters(fgcmConfig)
-        if (parFile is not None):
-            self._loadParFile(fgcmConfig,parFile)
-        else:
-            self._initializeParameters(fgcmConfig)
-
-
-    def _initializeParameters(self, fgcmConfig):
-        """
-        """
-        # initialize parameters from a config dictionary
-        # will need to know the following:
-        #   all exposure numbers (from demand list) [done]
-        #   all exposure MJDs [done]
-        #   UT boundary for nights (From config) [done]
-        #   all exposure pressure values [done-ish]
-        #   all exposure ZDs (-> secZenith and Airmass)
-        #   all exposure bands (and link index) [done]
-        #   all exposure exptimes [done]
-        #   all exposure psf_fwhms -- or delta-aperture [done]
-        #   all wash dates (will need to crop to exposure range) and link [done]
-        #   all epochs (will need to crop to exposure range) and link [done]
-        #   flag for special (e.g. SN) exposures? [done]
-        #   lutfile here?  no.
-        #   flag for exposure quality: 0 is good, and numbers for
-        #      rejections of various types
-        #     256 - bad band
-
-        # default is to have a pwv_int, pwv_slope per night [done]
-        #  but will change to different parameters if loadExternalPWV
-        # default is to have a tau_int, tau_slope per night [done]
-        #  but will change to different parameters if loadExternalTau
-        # default is to have an alpha per night [done]
-        #  but will change to ... something if loadExternalAlpha
-        # default is to have an Ozone per night [done]
-        #  but will change to global additive/multiplicative factor if loadExternalOzone
-
-        # need an index to get quickly from exposure number to night
-
-        #######################################################
-        #######################################################
-
-        # record necessary info here...
+        # get stuff from config file
         self.nCCD = fgcmConfig.nCCD
         self.bands = fgcmConfig.bands
         self.nBands = self.bands.size
@@ -92,27 +61,120 @@ class FgcmParameters(object):
         self.extraBands = fgcmConfig.extraBands
         self.nExtraBands = self.extraBands.size
 
+        self.alphaStd = fgcmConfig.alphaStd
+        self.o3Std = fgcmConfig.o3Std
+        self.tauStd = fgcmConfig.tauStd
+        self.pwvStd = fgcmConfig.pwvStd
+        self.pmbStd = fgcmConfig.pmbStd
+        self.zenithStd = fgcmConfig.zenithStd
+        self.secZenithStd = 1./np.cos(self.zenithStd*np.pi/180.)
+
+        self.pmbRange = fgcmConfig.pmbRange
+        self.pwvRange = fgcmConfig.pwvRange
+        self.O3Range = fgcmConfig.O3Range
+        self.tauRange = fgcmConfig.tauRange
+        self.alphaRange = fgcmConfig.alphaRange
+        self.zenithRange = fgcmConfig.zenithRange
+
+        self.nExp = fgcmConfig.nExp
+        self.seeingField = fgcmConfig.seeingField
+        self.deepFlag = fgcmConfig.deepFlag
+        self.expField = fgcmConfig.expField
+        self.UTBoundary = fgcmConfig.UTBoundary
+        self.latitude = fgcmConfig.latitude
+        self.sinLatitude = np.sin(np.radians(self.latitude))
+        self.cosLatitude = np.cos(np.radians(self.latitude))
+
+        self.epochMJDs = fgcmConfig.epochMJDs
+        self.washMJDs = fgcmConfig.washMJDs
+
+        self.stepUnitReference = fgcmConfig.stepUnitReference
+        self.stepGrain = fgcmConfig.stepGrain
+
+        self.resetParameters = fgcmConfig.resetParameters
+        self.pwvFile = fgcmConfig.pwvFile
+        self.tauFile = fgcmConfig.tauFile
+        self.externalPWVDeltaT = fgcmConfig.externalPWVDeltaT
+
+        # and the default unit dict
+        self.unitDictOnes = {'pwvUnit':1.0,
+                             'pwvPerSlopeUnit':1.0,
+                             'o3Unit':1.0,
+                             'tauUnit':1.0,
+                             'tauPerSlopeUnit':1.0,
+                             'alphaUnit':1.0,
+                             'qeSysUnit':1.0,
+                             'qeSysSlopeUnit':1.0}
+
+        if (initNew):
+            self._initializeNewParameters(expInfo, fgcmLUT)
+        else:
+            self._loadOldParameters(expInfo, inParInfo, inParams, inSuperStar)
+
+    @classmethod
+    def newParsWithFits(cls, fgcmConfig, fgcmLUT):
+        """
+        """
+
+        import fitsio
+
+        expInfoFile = fgcmConfig.exposureFile
+
+        expInfo = fitsio.read(expInfoFile, ext=1)
+        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
+
+    @classmethod
+    def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo):
+        """
+        """
+
+        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
+
+    @classmethod
+    def loadParsWithFits(cls, fgcmConfig):
+        """
+        """
+
+        import fitsio
+
+        expInfoFile = fgcmConfig.exposureFile
+        inParFile = fgcmConfig.inParameterFile
+
+        expInfo = fitsio.read(expInfoFile, ext=1)
+        inParInfo = fitsio.read(inParFile, ext='PARINFO')
+        inParams = fitsio.read(inParFile, ext='PARAMS')
+        inSuperStar = fitsio.read(inParFile, ext='SUPER')
+
+        return cls(fgcmConfig, expInfo=expInfo,
+                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
+
+    @classmethod
+    def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar):
+        """
+        """
+
+        return cls(fgcmConfig, expInfo=expInfo,
+                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
+
+    def _initializeNewParameters(self, expInfo, fgcmLUT):
+        """
+        """
+
+        # link band indices
         self._makeBandIndices()
 
-        # first thing is to get the exposure numbers...
-        self.exposureFile = fgcmConfig.exposureFile
+        # load the exposure information
+        self._loadExposureInfo(expInfo)
 
-        self._loadExposureInfo(fgcmConfig)
+        # load observing epochs and link indices
+        self._loadEpochAndWashInfo()
 
-        # set up the observing epochs and link indices
-
-        self._loadEpochAndWashInfo(fgcmConfig)
-
-        # set up the parameters with nightly values
-        # need to include the default stuff...
-
-        self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.alphaStd
-        self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.o3Std
-        self.parTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.tauStd
-        #self.parTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        # and make the new parameter arrays
+        self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.alphaStd
+        self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.o3Std
+        self.parTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.tauStd
         self.parTauPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
-        self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmConfig.pwvStd
-        #self.parPWVSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.pwvStd
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
@@ -122,20 +184,21 @@ class FgcmParameters(object):
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
         self.parQESysSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
 
+        ## FIXME: need to completely refactor
         self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
-        if (fgcmConfig.pwvFile is not None):
+        if (self.pwvFile is not None):
             self.fgcmLog.log('INFO','Found external PWV file.')
-            self.pwvFile = fgcmConfig.pwvFile
+            self.pwvFile = self.pwvFile
             self.hasExternalPWV = True
-            self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
+            self.loadExternalPWV(self.externalPWVDeltaT)
             # need to add two global parameters!
             #self.parExternalPWVScale = 1.0
             #self.parExternalPWVOffset = 0.0
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
-        if (fgcmConfig.tauFile is not None):
+        if (self.tauFile is not None):
             self.fgcmLog.log('INFO','Found external tau file.')
-            self.tauFile = fgcmConfig.tauFile
+            self.tauFile = self.tauFile
             self.hasExternalTau = True
             self.loadExternalTau()
             # need to add two global parameters!
@@ -156,74 +219,124 @@ class FgcmParameters(object):
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
 
-        # and compute the units...
-        self._computeStepUnits(fgcmConfig)
+        # compute the units
+        self.unitDictSteps = fgcmLUT.computeStepUnits(self.stepUnitReference,
+                                                      self.stepGrain,
+                                                      self.meanNightDuration,
+                                                      self.meanWashIntervalDuration,
+                                                      self.fitBands)
 
-        # and need to be able to pack and unpack the parameters and scalings
-        #  this part is going to be the hardest
+        # do lookups on parameter array
+        self._arrangeParArray()
+
+        # and we're done
+
+    def _loadOldParameters(self, expInfo, inParInfo, inParams, inSuperStar):
+        """
+        """
+
+        # link band indices
+        self._makeBandIndices()
+        self._loadExposureInfo(expInfo)
+
+        self._loadEpochAndWashInfo()
+
+        # set the units from the inParInfo
+        #self.tauStepUnits = inParInfo['TAUSTEPUNITS'][0]
+        #self.tauPerSlopeStepUnits = inParInfo['TAUPERSLOPESTEPUNITS'][0]
+        #self.alphaStepUnits = inParInfo['ALPHASTEPUNITS'][0]
+        #self.pwvStepUnits = inParInfo['PWVSTEPUNITS'][0]
+        #self.pwvPerSlopeStepUnits = inParInfo['PWVPERSLOPESTEPUNITS'][0]
+        #self.o3StepUnits = inParInfo['O3STEPUNITS'][0]
+        #self.washStepUnits = inParInfo['WASHSTEPUNITS'][0]
+        #self.washSlopeStepUnits = inParInfo['WASHSLOPESTEPUNITS'][0]
+        self.unitDictSteps = {'tauUnit': inParInfo['TAUUNIT'][0],
+                              'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
+                              'alphaUnit': inParInfo['ALPHAUNIT'][0],
+                              'pwvUnit': inParInfo['PWVUNIT'][0],
+                              'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0],
+                              'o3Unit': inParInfo['O3UNIT'][0],
+                              'qeSysUnit': inParInfo['QESYSUNIT'][0],
+                              'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0]}
+
+        # and log
+        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.unitDictSteps['tauUnit']))
+        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
+                         (self.unitDictSteps['tauPerSlopeUnit']))
+        self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.unitDictSteps['alphaUnit']))
+        self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.unitDictSteps['pwvUnit']))
+        self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
+                         (self.unitDictSteps['pwvPerSlopeUnit']))
+        self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.unitDictSteps['o3Unit']))
+        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.unitDictSteps['qeSysUnit']))
+        self.fgcmLog.log('INFO','wash slope step unit set to %f' %
+                         (self.unitDictSteps['qeSysSlopeUnit']))
+
+        # look at external...
+        self.hasExternalPWV = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
+        self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
+
+        ## and copy the parameters
+        self.parAlpha = inParams['PARALPHA'][0]
+        self.parO3 = inParams['PARO3'][0]
+        self.parTauIntercept = inParams['PARTAUINTERCEPT'][0]
+        self.parTauPerSlope = inParams['PARTAUPERSLOPE'][0]
+        self.parPWVIntercept = inParams['PARPWVINTERCEPT'][0]
+        self.parPWVPerSlope = inParams['PARPWVPERSLOPE'][0]
+        self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0]
+        self.parQESysSlope = inParams['PARQESYSSLOPE'][0]
+
+        if (self.resetParameters):
+            # reset many of the parameters
+            self.parAlpha[:] = self.alphaStd
+            self.parO3[:] = self.o3Std
+            self.parTauIntercept[:] = self.tauStd
+            self.parTauPerSlope[:] = 0.0
+            self.parPWVIntercept[:] = self.pwvStd
+            self.parPWVPerSlope[:] = 0.0
+            # leave the QESysIntercept and Slope as previously fit
+            # though we want to play with this
+
+        self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
+        if self.hasExternalPWV:
+            self.pwvFile = str(inParInfo['PWVFILE'][0]).rstrip()
+            self.hasExternalPWV = True
+            self.loadExternalPWV(self.externalPWVDeltaT)
+            self.parExternalPWVScale = inParams['PAREXTERNALPWVSCALE'][0]
+            self.parExternalPWVOffset[:] = inParams['PAREXTERNALPWVOFFSET'][0]
+
+            if (self.resetParameters):
+                self.parExternalPWVScale = 1.0
+                self.parExternalPWVOffset[:] = 0.0
+
+        self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
+        if self.hasExternalTau:
+            self.tauFile = str(inParInfo['TAUFILE'][0]).rstrip()
+            self.hasExternalTau = True
+            self.loadExternalTau()
+            self.parExternalTauScale = inParams['PAREXTERNALTAUSCALE'][0]
+            self.parExternalTauOffset[:] = inParams['PAREXTERNALTAUOFFSET'][0]
+
+            if (self.resetParameters):
+                self.parExternalTauScale = 1.0
+                self.parExternalTauOffset[:] = 0.0
+
+
+        self.compAperCorrPivot = inParams['COMPAPERCORRPIVOT'][0]
+        self.compAperCorrSlope = inParams['COMPAPERCORRSLOPE'][0]
+        self.compAperCorrSlopeErr = inParams['COMPAPERCORRSLOPEERR'][0]
+        self.compAperCorrRange = np.reshape(inParams['COMPAPERCORRRANGE'][0],(2,self.nBands))
+
+        self.compExpGray = inParams['COMPEXPGRAY'][0]
+        self.compVarGray = inParams['COMPVARGRAY'][0]
+        self.compNGoodStarPerExp = inParams['COMPNGOODSTARPEREXP'][0]
+
+        self.compSigFgcm = inParams['COMPSIGFGCM'][0]
 
         self._arrangeParArray()
-        self._setParRanges(fgcmConfig)
 
-
-    def _arrangeParArray(self):
-        # make pointers to a fit parameter array...
-        #  pwv, O3, lnTau, alpha
-        self.nFitPars = (self.campaignNights.size +  # O3
-                         self.campaignNights.size +  # tauIntercept
-                         self.campaignNights.size +  # tauPerSlope
-                         self.campaignNights.size +  # alpha
-                         self.campaignNights.size +  # pwv Intercept
-                         self.campaignNights.size)   # pwv Slope
-        ctr=0
-        self.parO3Loc = ctr
-        ctr+=self.campaignNights.size
-        self.parTauInterceptLoc = ctr
-        ctr+=self.campaignNights.size
-        #self.parTauSlopeLoc = ctr
-        self.parTauPerSlopeLoc = ctr
-        ctr+=self.campaignNights.size
-        self.parAlphaLoc = ctr
-        ctr+=self.campaignNights.size
-        self.parPWVInterceptLoc = ctr
-        ctr+=self.campaignNights.size
-        #self.parPWVSlopeLoc = ctr
-        self.parPWVPerSlopeLoc = ctr
-        ctr+=self.campaignNights.size
-
-        if (self.hasExternalPWV):
-            self.nFitPars += (1+self.campaignNights.size)
-            self.parExternalPWVScaleLoc = ctr
-            ctr+=1
-            self.parExternalPWVOffsetLoc = ctr
-            ctr+=self.campaignNights.size
-
-        if (self.hasExternalTau):
-            self.nFitPars += (1+self.campaignNights.size)
-            self.parExternalTauScaleLoc = ctr
-            ctr+=1
-            self.parExternalTauOffsetLoc = ctr
-            ctr+=self.campaignNights.size
-
-        self.nFitPars += (self.nWashIntervals + # parQESysIntercept
-                          self.nWashIntervals)  # parQESysSlope
-
-        self.parQESysInterceptLoc = ctr
-        ctr+=self.nWashIntervals
-        self.parQESysSlopeLoc = ctr
-        ctr+=self.nWashIntervals
-
-    def _setParRanges(self,fgcmConfig):
-        """
-        """
-
-        self.pmbRange = fgcmConfig.pmbRange
-        self.pwvRange = fgcmConfig.pwvRange
-        self.O3Range = fgcmConfig.O3Range
-        self.tauRange = fgcmConfig.tauRange
-        self.alphaRange = fgcmConfig.alphaRange
-        self.zenithRange = fgcmConfig.zenithRange
-
+        # need to load the superstarflats
+        self.parSuperStarFlat = inSuperStar
 
     def _makeBandIndices(self):
         """
@@ -246,17 +359,15 @@ class FgcmParameters(object):
                 raise ValueError("extraBand %s not in list of bands!" % (self.extraBands[i]))
             self.extraBandIndex[i] = u[0]
 
-    def _loadExposureInfo(self,fgcmConfig):
+    def _loadExposureInfo(self, expInfo):
         """
         """
-
-        expInfo = fitsio.read(self.exposureFile,ext=1)
 
         # ensure sorted by exposure number
         st=np.argsort(expInfo['EXPNUM'])
         expInfo=expInfo[st]
 
-        self.nExp = fgcmConfig.nExp
+        self.nExp = self.nExp
 
         self.fgcmLog.log('INFO','Loading info on %d exposures.' % (self.nExp))
 
@@ -264,18 +375,18 @@ class FgcmParameters(object):
         self.expFlag = np.zeros(self.nExp,dtype=np.int8)
         self.expExptime = expInfo['EXPTIME']
 
-        self.expSeeingVariable = expInfo[fgcmConfig.seeingField]
-        self.expDeepFlag = expInfo[fgcmConfig.deepFlag]
+        self.expSeeingVariable = expInfo[self.seeingField]
+        self.expDeepFlag = expInfo[self.deepFlag]
 
         # we need the nights of the survey (integer MJD, maybe rotated)
         self.expMJD = expInfo['MJD']
-        mjdForNight = np.floor(self.expMJD + fgcmConfig.UTBoundary).astype(np.int32)
+        mjdForNight = np.floor(self.expMJD + self.UTBoundary).astype(np.int32)
         self.campaignNights = np.unique(mjdForNight)
         self.nCampaignNights = self.campaignNights.size
 
         self.fgcmLog.log('INFO','Exposures taken on %d nights.' % (self.nCampaignNights))
 
-        self.expDeltaUT = (self.expMJD + fgcmConfig.UTBoundary) - mjdForNight
+        self.expDeltaUT = (self.expMJD + self.UTBoundary) - mjdForNight
 
         # and link the exposure numbers to the nights...
         a,b=esutil.numpy_util.match(self.campaignNights,mjdForNight)
@@ -304,8 +415,8 @@ class FgcmParameters(object):
             self.expTelRA[hi] -= 2.0*np.pi
 
         # and get the secant of the Zenith angle
-        self.sinLatitude = np.sin(np.radians(fgcmConfig.latitude))
-        self.cosLatitude = np.cos(np.radians(fgcmConfig.latitude))
+        self.sinLatitude = np.sin(np.radians(self.latitude))
+        self.cosLatitude = np.cos(np.radians(self.latitude))
 
         self.expPmb = expInfo['PMB']
 
@@ -329,32 +440,35 @@ class FgcmParameters(object):
         # set up the observing epochs and link indices
 
         # the epochs should contain all the MJDs.
-        self.nEpochs = fgcmConfig.epochMJDs.size - 1
+        self.nEpochs = self.epochMJDs.size - 1
 
         self.expEpochIndex = np.zeros(self.nExp,dtype='i4')
         for i in xrange(self.nEpochs):
-            use,=np.where((self.expMJD > fgcmConfig.epochMJDs[i]) &
-                          (self.expMJD < fgcmConfig.epochMJDs[i+1]))
+            use,=np.where((self.expMJD > self.epochMJDs[i]) &
+                          (self.expMJD < self.epochMJDs[i+1]))
             self.expEpochIndex[use] = i
 
-    def _loadEpochAndWashInfo(self,fgcmConfig):
+    def _loadEpochAndWashInfo(self):
         """
         """
+
         # the epochs should contain all the MJDs.
-        self.nEpochs = fgcmConfig.epochMJDs.size - 1
+        self.nEpochs = self.epochMJDs.size - 1
 
         self.expEpochIndex = np.zeros(self.nExp,dtype='i4')
         for i in xrange(self.nEpochs):
-            use,=np.where((self.expMJD > fgcmConfig.epochMJDs[i]) &
-                          (self.expMJD < fgcmConfig.epochMJDs[i+1]))
+            use,=np.where((self.expMJD > self.epochMJDs[i]) &
+                          (self.expMJD < self.epochMJDs[i+1]))
             self.expEpochIndex[use] = i
 
         # and set up the wash mjds and link indices
         # the first "washMJD" is set to the first exposure date.
         # the number of *intervals* is one less than the dates?
 
-        self.nWashIntervals = fgcmConfig.washMJDs.size+1
-        self.washMJDs = np.insert(fgcmConfig.washMJDs,0,np.min(self.expMJD)-1.0)
+        ## FIXME: should this happen in fgcmConfig?  But I don't want that
+        # to have to have all the info...hmmm.  More refactoring!
+        self.nWashIntervals = self.washMJDs.size+1
+        self.washMJDs = np.insert(self.washMJDs,0,np.min(self.expMJD)-1.0)
 
         self.expWashIndex = np.zeros(self.nExp,dtype='i4')
         tempWashMJDs = self.washMJDs
@@ -375,252 +489,96 @@ class FgcmParameters(object):
         self.meanExpPerWash = np.mean(self.expPerWash)
 
 
-
-    def _computeStepUnits(self,fgcmConfig):
+    def _arrangeParArray(self):
         """
         """
-        self.stepUnitReference = fgcmConfig.stepUnitReference
-        self.stepGrain = fgcmConfig.stepGrain
 
-        ## FIXME: need to make this not read in a copy
-        LUT = FgcmLUT(fgcmConfig.lutFile)
+        # make pointers to a fit parameter array...
+        #  pwv, O3, lnTau, alpha
+        self.nFitPars = (self.campaignNights.size +  # O3
+                         self.campaignNights.size +  # tauIntercept
+                         self.campaignNights.size +  # tauPerSlope
+                         self.campaignNights.size +  # alpha
+                         self.campaignNights.size +  # pwv Intercept
+                         self.campaignNights.size)   # pwv Slope
+        ctr=0
+        self.parO3Loc = ctr
+        ctr+=self.campaignNights.size
+        self.parTauInterceptLoc = ctr
+        ctr+=self.campaignNights.size
+        self.parTauPerSlopeLoc = ctr
+        ctr+=self.campaignNights.size
+        self.parAlphaLoc = ctr
+        ctr+=self.campaignNights.size
+        self.parPWVInterceptLoc = ctr
+        ctr+=self.campaignNights.size
+        self.parPWVPerSlopeLoc = ctr
+        ctr+=self.campaignNights.size
 
-        secZenithStd = 1./np.cos(LUT.zenithStd*np.pi/180.)
+        if (self.hasExternalPWV):
+            self.nFitPars += (1+self.campaignNights.size)
+            self.parExternalPWVScaleLoc = ctr
+            ctr+=1
+            self.parExternalPWVOffsetLoc = ctr
+            ctr+=self.campaignNights.size
 
-        # compute tau units
-        deltaMagTau = (2.5*np.log10(np.exp(-secZenithStd*LUT.tauStd)) -
-                       2.5*np.log10(np.exp(-secZenithStd*(LUT.tauStd+1.0))))
-        self.tauStepUnits = np.abs(deltaMagTau) / self.stepUnitReference / self.stepGrain
-        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
+        if (self.hasExternalTau):
+            self.nFitPars += (1+self.campaignNights.size)
+            self.parExternalTauScaleLoc = ctr
+            ctr+=1
+            self.parExternalTauOffsetLoc = ctr
+            ctr+=self.campaignNights.size
 
-        # and the tau slope units
-        #self.tauSlopeStepUnits = self.tauStepUnits * self.meanNightDuration
-        #self.fgcmLog.log('INFO','tau slope step unit set to %f' % (self.tauSlopeStepUnits))
-        ## FIXME: unsure about this
-        self.tauPerSlopeStepUnits = self.tauStepUnits * self.meanNightDuration / LUT.tauStd
-        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
-                         (self.tauPerSlopeStepUnits))
+        self.nFitPars += (self.nWashIntervals + # parQESysIntercept
+                          self.nWashIntervals)  # parQESysSlope
 
-        # alpha units -- reference to g, or r if not available
-        ## FIXME: will need to allow band names other than g, r
-        bandIndex,=np.where(self.bands == 'g')
-        if bandIndex.size == 0:
-            bandIndex,=np.where(self.bands == 'r')
-            if bandIndex.size == 0:
-                raise ValueError("Must have either g or r band...")
+        self.parQESysInterceptLoc = ctr
+        ctr+=self.nWashIntervals
+        self.parQESysSlopeLoc = ctr
+        ctr+=self.nWashIntervals
 
-        deltaMagAlpha = (2.5*np.log10(np.exp(-secZenithStd*LUT.tauStd*(LUT.lambdaStd[bandIndex]/LUT.lambdaNorm)**LUT.alphaStd)) -
-                         2.5*np.log10(np.exp(-secZenithStd*LUT.tauStd*(LUT.lambdaStd[bandIndex]/LUT.lambdaNorm)**(LUT.alphaStd+1.0))))
-        self.alphaStepUnits = np.abs(deltaMagAlpha[0]) / self.stepUnitReference /self.stepGrain
-
-        # scale by fraction of bands are affected...
-        use,=np.where((self.fitBands == 'u') |
-                      (self.fitBands == 'g') |
-                      (self.fitBands == 'r'))
-        self.alphaStepUnits *= float(use.size) / float(self.nFitBands)
-        self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.alphaStepUnits))
-
-        # pwv units -- reference to z
-        bandIndex,=np.where(self.bands == 'z')
-        if bandIndex.size == 0:
-            raise ValueError("Require z band for PWV ...")
-
-        indicesStd = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Std = LUT.computeI0(LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesStd)
-        indicesPlus = LUT.getIndices(bandIndex,LUT.pwvStd+1.0,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Plus = LUT.computeI0(LUT.pwvStd+1.0,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesPlus)
-        deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
-        self.pwvStepUnits = np.abs(deltaMagPWV[0]) / self.stepUnitReference / self.stepGrain
-
-        # scale by fraction of bands that are affected
-        use,=np.where((self.fitBands == 'z') |
-                      (self.fitBands == 'Y'))
-        self.pwvStepUnits *= float(use.size) / float(self.nFitBands)
-        self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
-
-        # PWV slope units
-        #self.pwvSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration
-        #self.fgcmLog.log('INFO','pwv slope step unit set to %f' % (self.pwvSlopeStepUnits))
-        ## FIXME: check these
-        self.pwvPerSlopeStepUnits = self.pwvStepUnits * self.meanNightDuration / LUT.pwvStd
-        self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
-                         (self.pwvPerSlopeStepUnits))
-
-        # O3 units -- reference to r
-        bandIndex,=np.where(self.bands == 'r')
-        if bandIndex.size == 0:
-            raise ValueError("Require r band for O3...")
-
-        indicesStd = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Std = LUT.computeI0(LUT.pwvStd,LUT.o3Std,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesStd)
-        indicesPlus = LUT.getIndices(bandIndex,LUT.pwvStd,LUT.o3Std+1.0,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.nCCD,LUT.pmbStd)
-        i0Plus = LUT.computeI0(LUT.pwvStd,LUT.o3Std+1.0,np.log(LUT.tauStd),LUT.alphaStd,secZenithStd,LUT.pmbStd,indicesPlus)
-        deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
-        self.o3StepUnits = np.abs(deltaMagO3[0]) / self.stepUnitReference / self.stepGrain
-
-        # scale by fraction of bands that are affected
-        use,=np.where((self.fitBands == 'r'))
-        self.o3StepUnits *= float(use.size) / float(self.nFitBands)
-        self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.o3StepUnits))
-
-        # wash parameters units...
-        self.washStepUnits = 1.0/self.stepUnitReference / self.stepGrain
-        self.washSlopeStepUnits = self.washStepUnits * self.meanWashIntervalDuration
-        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
-        self.fgcmLog.log('INFO','wash slope step unit set to %f' % (self.washSlopeStepUnits))
-
-
-    def _loadParFile(self, fgcmConfig, parFile):
+    def saveParsFits(self, parFile):
         """
         """
-        # read in the parameter file...
-        # need to decide on a format
 
-        self.fgcmLog.log('INFO','Loading parameters from %s' % (parFile))
+        import fitsio
 
-        parInfo=fitsio.read(parFile,ext='PARINFO')
-
-        self.nCCD = fgcmConfig.nCCD
-        self.bands = fgcmConfig.bands
-        self.nBands = self.bands.size
-        self.fitBands = fgcmConfig.fitBands
-        self.nFitBands = fgcmConfig.fitBands.size
-        self.extraBands = fgcmConfig.extraBands
-        self.nExtraBands = fgcmConfig.extraBands.size
-        self.exposureFile = fgcmConfig.exposureFile
-
-        self._makeBandIndices()
-        self._loadExposureInfo(fgcmConfig)
-
-        self._loadEpochAndWashInfo(fgcmConfig)
-
-        self.tauStepUnits = parInfo['TAUSTEPUNITS'][0]
-        #self.tauSlopeStepUnits = parInfo['TAUSLOPESTEPUNITS'][0]
-        self.tauPerSlopeStepUnits = parInfo['TAUPERSLOPESTEPUNITS'][0]
-        self.alphaStepUnits = parInfo['ALPHASTEPUNITS'][0]
-        self.pwvStepUnits = parInfo['PWVSTEPUNITS'][0]
-        #self.pwvSlopeStepUnits = parInfo['PWVSLOPESTEPUNITS'][0]
-        self.pwvPerSlopeStepUnits = parInfo['PWVPERSLOPESTEPUNITS'][0]
-        self.o3StepUnits = parInfo['O3STEPUNITS'][0]
-        self.washStepUnits = parInfo['WASHSTEPUNITS'][0]
-        self.washSlopeStepUnits = parInfo['WASHSLOPESTEPUNITS'][0]
-
-        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.tauStepUnits))
-        #self.fgcmLog.log('INFO','tau slope step unit set to %f' %
-        #                 (self.tauSlopeStepUnits))
-        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
-                         (self.tauPerSlopeStepUnits))
-        self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.alphaStepUnits))
-        self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.pwvStepUnits))
-        #self.fgcmLog.log('INFO','pwv slope step unit set to %f' %
-        #                 (self.pwvSlopeStepUnits))
-        self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
-                         (self.pwvPerSlopeStepUnits))
-        self.fgcmLog.log('INFO','O3 step unit set to %f' % (self.o3StepUnits))
-        self.fgcmLog.log('INFO','wash step unit set to %f' % (self.washStepUnits))
-        self.fgcmLog.log('INFO','wash slope step unit set to %f' %
-                         (self.washSlopeStepUnits))
-
-
-        self.hasExternalPWV = parInfo['HASEXTERNALPWV'][0].astype(np.bool)
-        self.hasExternalTau = parInfo['HASEXTERNALTAU'][0].astype(np.bool)
-
-        pars=fitsio.read(parFile,ext='PARAMS')
-        self.parAlpha = pars['PARALPHA'][0]
-        self.parO3 = pars['PARO3'][0]
-        self.parTauIntercept = pars['PARTAUINTERCEPT'][0]
-        #self.parTauSlope = pars['PARTAUSLOPE'][0]
-        self.parTauPerSlope = pars['PARTAUPERSLOPE'][0]
-        self.parPWVIntercept = pars['PARPWVINTERCEPT'][0]
-        #self.parPWVSlope = pars['PARPWVSLOPE'][0]
-        self.parPWVPerSlope = pars['PARPWVPERSLOPE'][0]
-        self.parQESysIntercept = pars['PARQESYSINTERCEPT'][0]
-        self.parQESysSlope = pars['PARQESYSSLOPE'][0]
-
-        if (fgcmConfig.resetParameters):
-            # reset many of the parameters
-            self.parAlpha[:] = fgcmConfig.alphaStd
-            self.parO3[:] = fgcmConfig.o3Std
-            self.parTauIntercept[:] = fgcmConfig.tauStd
-            #self.parTauSlope[:] = 0.0
-            self.parTauPerSlope[:] = 0.0
-            self.parPWVIntercept[:] = fgcmConfig.pwvStd
-            #self.parPWVSlope[:] = 0.0
-            self.parPWVPerSlope[:] = 0.0
-            # leave the QESysIntercept and Slope as previously fit
-            # though we want to play with this
-
-        self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
-        if self.hasExternalPWV:
-            self.pwvFile = str(parInfo['PWVFILE'][0]).rstrip()
-            self.hasExternalPWV = True
-            self.loadExternalPWV(fgcmConfig.externalPWVDeltaT)
-            self.parExternalPWVScale = pars['PAREXTERNALPWVSCALE'][0]
-            self.parExternalPWVOffset[:] = pars['PAREXTERNALPWVOFFSET'][0]
-
-            if (fgcmConfig.resetParameters):
-                self.parExternalPWVScale = 1.0
-                self.parExternalPWVOffset[:] = 0.0
-
-        self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
-        if self.hasExternalTau:
-            self.tauFile = str(parInfo['TAUFILE'][0]).rstrip()
-            self.hasExternalTau = True
-            self.loadExternalTau()
-            self.parExternalTauScale = pars['PAREXTERNALTAUSCALE'][0]
-            self.parExternalTauOffset[:] = pars['PAREXTERNALTAUOFFSET'][0]
-
-            if (fgcmConfig.resetParameters):
-                self.parExternalTauScale = 1.0
-                self.parExternalTauOffset[:] = 0.0
-
-
-        self.compAperCorrPivot = pars['COMPAPERCORRPIVOT'][0]
-        self.compAperCorrSlope = pars['COMPAPERCORRSLOPE'][0]
-        self.compAperCorrSlopeErr = pars['COMPAPERCORRSLOPEERR'][0]
-        self.compAperCorrRange = np.reshape(pars['COMPAPERCORRRANGE'][0],(2,self.nBands))
-
-        self.compExpGray = pars['COMPEXPGRAY'][0]
-        self.compVarGray = pars['COMPVARGRAY'][0]
-        self.compNGoodStarPerExp = pars['COMPNGOODSTARPEREXP'][0]
-
-        self.compSigFgcm = pars['COMPSIGFGCM'][0]
-
-        self._arrangeParArray()
-        self._setParRanges(fgcmConfig)
-
-        # should check these are all the right size...
-
-        # need to load the superstarflats
-        self.parSuperStarFlat = fitsio.read(parFile,ext='SUPER')
-
-
-    def saveParFile(self, parFile):
-        """
-        """
         # save the parameter file...
-        # need to decide on a format
-
         self.fgcmLog.log('INFO','Saving parameters to %s' % (parFile))
+
+        parInfo, pars = self.parsToArrays()
+
+        # clobber?
+        # parameter info
+        fitsio.write(parFile,parInfo,extname='PARINFO',clobber=True)
+
+        # parameters
+        fitsio.write(parFile,pars,extname='PARAMS')
+
+        # and need to record the superstar flats
+        fitsio.write(parFile,self.parSuperStarFlat,extname='SUPER')
+
+    def parsToArrays(self):
+        """
+        """
+        # this can be run without fits
 
         dtype=[('NCCD','i4'),
                ('BANDS','a2',self.bands.size),
                ('FITBANDS','a2',self.fitBands.size),
                ('EXTRABANDS','a2',self.extraBands.size),
-               ('EXPOSUREFILE','a%d' % (len(self.exposureFile)+1)),
-               ('TAUSTEPUNITS','f8'),
-               #('TAUSLOPESTEPUNITS','f8'),
-               ('TAUPERSLOPESTEPUNITS','f8'),
-               ('ALPHASTEPUNITS','f8'),
-               ('PWVSTEPUNITS','f8'),
-               #('PWVSLOPESTEPUNITS','f8'),
-               ('PWVPERSLOPESTEPUNITS','f8'),
-               ('O3STEPUNITS','f8'),
-               ('WASHSTEPUNITS','f8'),
-               ('WASHSLOPESTEPUNITS','f8'),
+               ('TAUUNIT','f8'),
+               ('TAUPERSLOPEUNIT','f8'),
+               ('ALPHAUNIT','f8'),
+               ('PWVUNIT','f8'),
+               ('PWVPERSLOPEUNIT','f8'),
+               ('O3UNIT','f8'),
+               ('QESYSUNIT','f8'),
+               ('QESYSSLOPEUNIT','f8'),
                ('HASEXTERNALPWV','i2'),
                ('HASEXTERNALTAU','i2')]
 
+        ## FIXME: change from these files...
         if (self.hasExternalPWV):
             dtype.extend([('PWVFILE','a%d' % (len(self.pwvFile)+1))])
         if (self.hasExternalTau):
@@ -631,18 +589,15 @@ class FgcmParameters(object):
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
         parInfo['EXTRABANDS'] = self.extraBands
-        parInfo['EXPOSUREFILE'] = self.exposureFile
 
-        parInfo['TAUSTEPUNITS'] = self.tauStepUnits
-        #parInfo['TAUSLOPESTEPUNITS'] = self.tauSlopeStepUnits
-        parInfo['TAUPERSLOPESTEPUNITS'] = self.tauPerSlopeStepUnits
-        parInfo['ALPHASTEPUNITS'] = self.alphaStepUnits
-        parInfo['PWVSTEPUNITS'] = self.pwvStepUnits
-        #parInfo['PWVSLOPESTEPUNITS'] = self.pwvSlopeStepUnits
-        parInfo['PWVPERSLOPESTEPUNITS'] = self.pwvPerSlopeStepUnits
-        parInfo['O3STEPUNITS'] = self.o3StepUnits
-        parInfo['WASHSTEPUNITS'] = self.washStepUnits
-        parInfo['WASHSLOPESTEPUNITS'] = self.washSlopeStepUnits
+        parInfo['TAUUNIT'] = self.unitDictSteps['tauUnit']
+        parInfo['TAUPERSLOPEUNIT'] = self.unitDictSteps['tauPerSlopeUnit']
+        parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
+        parInfo['PWVUNIT'] = self.unitDictSteps['pwvUnit']
+        parInfo['PWVPERSLOPEUNIT'] = self.unitDictSteps['pwvPerSlopeUnit']
+        parInfo['O3UNIT'] = self.unitDictSteps['o3Unit']
+        parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
+        parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPWV
         if (self.hasExternalPWV):
@@ -651,16 +606,11 @@ class FgcmParameters(object):
         if (self.hasExternalTau):
             parInfo['TAUFILE'] = self.tauFile
 
-        # clobber?
-        fitsio.write(parFile,parInfo,extname='PARINFO',clobber=True)
-
         dtype=[('PARALPHA','f8',self.parAlpha.size),
                ('PARO3','f8',self.parO3.size),
                ('PARTAUINTERCEPT','f8',self.parTauIntercept.size),
-               #('PARTAUSLOPE','f8',self.parTauSlope.size),
                ('PARTAUPERSLOPE','f8',self.parTauPerSlope.size),
                ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
-               #('PARPWVSLOPE','f8',self.parPWVSlope.size),
                ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
@@ -687,10 +637,8 @@ class FgcmParameters(object):
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3
         pars['PARTAUINTERCEPT'][:] = self.parTauIntercept
-        #pars['PARTAUSLOPE'][:] = self.parTauSlope
         pars['PARTAUPERSLOPE'][:] = self.parTauPerSlope
         pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
-        #pars['PARPWVSLOPE'][:] = self.parPWVSlope
         pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
@@ -715,16 +663,14 @@ class FgcmParameters(object):
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
 
-        fitsio.write(parFile,pars,extname='PARAMS')
-
-        # and need to record the superstar flats
-        fitsio.write(parFile,self.parSuperStarFlat,extname='SUPER')
-
-
+        return parInfo, pars
 
     def loadExternalPWV(self, externalPWVDeltaT):
         """
         """
+
+        import fitsio
+
         # loads a file with PWV, matches to exposures/times
         # flags which ones need the nightly fit
 
@@ -773,16 +719,12 @@ class FgcmParameters(object):
 
         self.parPWVIntercept[:] = parArray[self.parPWVInterceptLoc:
                                                self.parPWVInterceptLoc+self.nCampaignNights] / unitDict['pwvUnit']
-        #self.parPWVSlope[:] = parArray[self.parPWVSlopeLoc:
-        #                                   self.parPWVSlopeLoc+self.nCampaignNights] / unitDict['pwvSlopeUnit']
         self.parPWVPerSlope[:] = parArray[self.parPWVPerSlopeLoc:
                                               self.parPWVPerSlopeLoc + self.nCampaignNights] / unitDict['pwvPerSlopeUnit']
         self.parO3[:] = parArray[self.parO3Loc:
                                      self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
         self.parTauIntercept[:] = parArray[self.parTauInterceptLoc:
                                                self.parTauInterceptLoc+self.nCampaignNights] / unitDict['tauUnit']
-        #self.parTauSlope[:] = parArray[self.parTauSlopeLoc:
-        #                                   self.parTauSlopeLoc+self.nCampaignNights] / unitDict['tauSlopeUnit']
         self.parTauPerSlope[:] = (parArray[self.parTauPerSlopeLoc:
                                                self.parTauPerSlopeLoc + self.nCampaignNights] /
                                   unitDict['tauPerSlopeUnit'])
@@ -807,12 +749,6 @@ class FgcmParameters(object):
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
         # done
 
-
-    ## MAYBE? should these be properties?
-    ##  The problem is that I think I want these pre-computed, though I don't know
-    ##  if that actually helps the performance.  TEST because properties would be
-    ##  very convenient
-
     def parsToExposures(self):
         """
         """
@@ -828,8 +764,6 @@ class FgcmParameters(object):
 
 
         # default to the nightly slope/intercept
-        #self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
-        #               self.parPWVSlope[self.expNightIndex] * self.expDeltaUT)
         self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
                        (self.parPWVPerSlope[self.expNightIndex] *
                         self.parPWVIntercept[self.expNightIndex]) * self.expDeltaUT)
@@ -841,8 +775,6 @@ class FgcmParameters(object):
                                                  self.externalPWV[self.externalPWVFlag])
 
         # default to nightly slope/intercept
-        #self.expTau = (self.parTauIntercept[self.expNightIndex] +
-        #               self.parTauSlope[self.expNightIndex] * self.expDeltaUT)
         self.expTau = (self.parTauIntercept[self.expNightIndex] +
                        (self.parTauPerSlope[self.expNightIndex] *
                         self.parTauIntercept[self.expNightIndex]) * self.expDeltaUT)
@@ -872,16 +804,12 @@ class FgcmParameters(object):
 
         parArray[self.parPWVInterceptLoc:
                      self.parPWVInterceptLoc+self.nCampaignNights] = self.parPWVIntercept[:] * unitDict['pwvUnit']
-        #parArray[self.parPWVSlopeLoc:
-        #             self.parPWVSlopeLoc+self.nCampaignNights] = self.parPWVSlope[:] * unitDict['pwvSlopeUnit']
         parArray[self.parPWVPerSlopeLoc:
                      self.parPWVPerSlopeLoc + self.nCampaignNights] = self.parPWVPerSlope[:] * unitDict['pwvPerSlopeUnit']
         parArray[self.parO3Loc:
                      self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
         parArray[self.parTauInterceptLoc:
                      self.parTauInterceptLoc+self.nCampaignNights] = self.parTauIntercept[:] * unitDict['tauUnit']
-        #parArray[self.parTauSlopeLoc:
-        #             self.parTauSlopeLoc+self.nCampaignNights] = self.parTauSlope[:] * unitDict['tauSlopeUnit']
         parArray[self.parTauPerSlopeLoc:
                      self.parTauPerSlopeLoc + self.nCampaignNights] = self.parTauPerSlope[:] * unitDict['tauPerSlopeUnit']
         parArray[self.parAlphaLoc:
@@ -913,17 +841,6 @@ class FgcmParameters(object):
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
-        ## MAYBE: configure slope ranges?
-        #parLow[self.parPWVInterceptLoc: \
-        #           self.parPWVInterceptLoc + \
-        #       self.nCampaignNights] = ( \
-        #    (self.pwvRange[0] + 5.0*0.2) * \
-        #        unitDict['pwvUnit'])
-        #parHigh[self.parPWVInterceptLoc: \
-        #            self.parPWVInterceptLoc + \
-        #            self.nCampaignNights] = ( \
-        #    (self.pwvRange[1] - 5.0*0.2) * \
-        #        unitDict['pwvUnit'])
         parLow[self.parPWVInterceptLoc: \
                    self.parPWVInterceptLoc + \
                self.nCampaignNights] = ( \
@@ -932,14 +849,6 @@ class FgcmParameters(object):
                     self.parPWVInterceptLoc + \
                     self.nCampaignNights] = ( \
             self.pwvRange[1] * unitDict['pwvUnit'])
-        #parLow[self.parPWVSlopeLoc: \
-        #           self.parPWVSlopeLoc + \
-        #           self.nCampaignNights] = ( \
-        #               -0.2 * unitDict['pwvSlopeUnit'])
-        #parHigh[self.parPWVSlopeLoc: \
-        #            self.parPWVSlopeLoc + \
-        #            self.nCampaignNights] = ( \
-        #    0.2 * unitDict['pwvSlopeUnit'])
         parLow[self.parPWVPerSlopeLoc: \
                    self.parPWVPerSlopeLoc + \
                    self.nCampaignNights] = ( \
@@ -956,16 +865,6 @@ class FgcmParameters(object):
                     self.parO3Loc + \
                     self.nCampaignNights] = ( \
             self.O3Range[1] * unitDict['o3Unit'])
-        #parLow[self.parTauInterceptLoc: \
-        #           self.parTauInterceptLoc + \
-        #           self.nCampaignNights] = ( \
-        #    (self.tauRange[0] + 5.0*0.0025) * \
-        #        unitDict['tauUnit'])
-        #parHigh[self.parTauInterceptLoc: \
-        #            self.parTauInterceptLoc + \
-        #        self.nCampaignNights] = ( \
-        #    (self.tauRange[1] - 5.0*0.0025) * \
-        #        unitDict['tauUnit'])
         parLow[self.parTauInterceptLoc: \
                    self.parTauInterceptLoc + \
                    self.nCampaignNights] = ( \
@@ -974,14 +873,6 @@ class FgcmParameters(object):
                     self.parTauInterceptLoc + \
                 self.nCampaignNights] = ( \
             self.tauRange[1] * unitDict['tauUnit'])
-        #parLow[self.parTauSlopeLoc: \
-        #           self.parTauSlopeLoc + \
-        #           self.nCampaignNights] = ( \
-        #    -0.0025 * unitDict['tauSlopeUnit'])
-        #parHigh[self.parTauSlopeLoc: \
-        #            self.parTauSlopeLoc + \
-        #            self.nCampaignNights] = ( \
-        #    0.0025 * unitDict['tauSlopeUnit'])
         parLow[self.parTauPerSlopeLoc: \
                    self.parTauPerSlopeLoc + \
                    self.nCampaignNights] = ( \
@@ -1051,29 +942,10 @@ class FgcmParameters(object):
         return parBounds
 
     def getUnitDict(self,fitterUnits=False):
-        unitDict = {'pwvUnit':1.0,
-                    #'pwvSlopeUnit':1.0,
-                    'pwvPerSlopeUnit':1.0,
-                    'o3Unit':1.0,
-                    'tauUnit':1.0,
-                    #'tauSlopeUnit':1.0,
-                    'tauPerSlopeUnit':1.0,
-                    'alphaUnit':1.0,
-                    'qeSysUnit':1.0,
-                    'qeSysSlopeUnit':1.0}
         if (fitterUnits):
-            unitDict['pwvUnit'] = self.pwvStepUnits
-            #unitDict['pwvSlopeUnit'] = self.pwvSlopeStepUnits
-            unitDict['pwvPerSlopeUnit'] = self.pwvPerSlopeStepUnits
-            unitDict['o3Unit'] = self.o3StepUnits
-            unitDict['tauUnit'] = self.tauStepUnits
-            #unitDict['tauSlopeUnit'] = self.tauSlopeStepUnits
-            unitDict['tauPerSlopeUnit'] = self.tauPerSlopeStepUnits
-            unitDict['alphaUnit'] = self.alphaStepUnits
-            unitDict['qeSysUnit'] = self.washStepUnits
-            unitDict['qeSysSlopeUnit'] = self.washSlopeStepUnits
-
-        return unitDict
+            return self.unitDictSteps
+        else:
+            return self.unitDictOnes
 
     @property
     def expCCDSuperStar(self):
@@ -1112,7 +984,6 @@ class FgcmParameters(object):
         # want nightly averages, on calibratable nights (duh)
 
         # this is fixed here
-        #minExpPerNight = 
 
         # make sure we have this...probably redundant
         self.parsToExposures()
