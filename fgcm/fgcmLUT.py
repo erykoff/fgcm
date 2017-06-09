@@ -250,15 +250,6 @@ class FgcmLUTMaker(object):
         #################################
 
         print("Building look-up table...")
-        #self.lut = np.zeros((self.bands.size,
-        #                     self.pwv.size,
-        #                     self.o3.size,
-        #                     self.tau.size,
-        #                     self.alpha.size,
-        #                     self.zenith.size,
-        #                     self.nCCDStep),
-        #                    dtype=[('I0','f4'),
-        #                           ('I1','f4')])
         lutPlus = np.zeros((self.bands.size,
                             pwvPlus.size,
                             o3Plus.size,
@@ -670,6 +661,7 @@ class FgcmLUT(object):
         self.tauStd = stdVals['TAUSTD'][0]
         self.alphaStd = stdVals['ALPHASTD'][0]
         self.zenithStd = stdVals['ZENITHSTD'][0]
+        self.secZenithStd = 1./np.cos(np.radians(self.zenithStd))
         self.lambdaRange = stdVals['LAMBDARANGE'][0]
         self.lambdaStep = stdVals['LAMBDASTEP'][0]
         self.lambdaStd = stdVals['LAMBDASTD'][0]
@@ -796,11 +788,6 @@ class FgcmLUT(object):
                 preFactor * (I0 * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] -
                              I10 * I0 * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]]))
 
-    #def computeObjectSEDSlopesFromColor(self):
-    #    """
-    #    """#
-
-    #    pass
     def computeSEDSlopes(self, objectSedColor):
         """
         """
@@ -812,3 +799,86 @@ class FgcmLUT(object):
         #  but the noise in g-r is going to cause things to bounce around.  Pout.
 
         return self.sedLUT['FPRIME'][indices,:]
+
+    def computeStepUnits(self, stepUnitReference, stepGrain, meanNightDuration,
+                         meanWashIntervalDuration, fitBands):
+        """
+        """
+
+        unitDict = {}
+
+
+        # compute tau units
+        deltaMagTau = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd)) -
+                       2.5*np.log10(np.exp(-self.secZenithStd*(self.tauStd+1.0))))
+
+        unitDict['tauUnit'] = np.abs(deltaMagTau) / stepUnitReference / stepGrain
+
+        # tau percent slope units
+        ## FIXME: check these
+        unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration /
+                                            self.tauStd)
+
+        # alpha units -- reference to g, or r if not available
+        bandIndex, = np.where(self.bands == 'g')
+        if bandIndex.size == 0:
+            bandIndex, = np.where(self.bands == 'r')
+            if bandIndex.size == 0:
+                raise ValueError("Must have either g or r band...")
+
+        deltaMagAlpha = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[bandIndex]/self.lambdaNorm)**self.alphaStd)) -
+                         2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[bandIndex]/self.lambdaNorm)**(self.alphaStd+1.0))))
+        unitDict['alphaUnit'] = np.abs(deltaMagAlpha[0]) / stepUnitReference / stepGrain
+
+        # and scale these by fraction of bands affected...
+        use, = np.where((fitBands == 'u') |
+                        (fitBands == 'g') |
+                        (fitBands == 'r'))
+        unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
+
+        # pwv units -- reference to z
+        bandIndex, = np.where(self.bands == 'z')
+        if bandIndex.size == 0:
+            raise ValueError("Require z band for PWV...")
+
+        indicesStd = self.getIndices(bandIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
+        indicesPlus = self.getIndices(bandIndex,self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        i0Plus = self.computeI0(self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
+        deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
+
+        unitDict['pwvUnit'] = np.abs(deltaMagPWV[0]) / stepUnitReference / stepGrain
+
+        # scale by fraction of bands affected
+        use,=np.where((fitBands == 'z') |
+                      (fitBands == 'Y'))
+        unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
+
+        # PWV percent slope units
+        ## FIXME: check these
+        unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration / self.pwvStd
+
+        # O3 units -- reference to r
+        bandIndex,=np.where(self.bands == 'r')
+        if bandIndex.size == 0:
+            raise ValueError("Require r band for O3...")
+
+        indicesStd = self.getIndices(bandIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
+        indicesPlus = self.getIndices(bandIndex,self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        i0Plus = self.computeI0(self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
+        deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
+
+        unitDict['o3Unit'] = np.abs(deltaMagO3[0]) / stepUnitReference / stepGrain
+
+        # scale by fraction of bands that are affected
+        use,=np.where((fitBands == 'r'))
+        unitDict['o3Unit'] *= float(use.size) / float(fitBands.size)
+
+        # wash parameters units...
+        unitDict['qeSysUnit'] = 1.0 / stepUnitReference / stepGrain
+        unitDict['qeSysSlopeUnit'] = unitDict['qeSysUnit'] * meanWashIntervalDuration
+
+        return unitDict
+
+
