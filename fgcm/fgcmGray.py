@@ -295,8 +295,10 @@ class FgcmGray(object):
         EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
                    obsMagStd[goodObs])
         # and need the error for Egray: sum in quadrature of individual and avg errs
-        EGrayErr2GO = (objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2. +
-                       obsMagErr[goodObs]**2.)
+        #EGrayErr2GO = (objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2. +
+        #               obsMagErr[goodObs]**2.)
+        EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
         gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
