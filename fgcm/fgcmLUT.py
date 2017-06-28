@@ -8,12 +8,6 @@ import sys
 from pkg_resources import resource_filename
 
 
-## FIXME: move this dependence to fits reading
-import fitsio
-
-## FIXME: remove this dependence for the filters
-import fgcm_y3a1_tools
-
 from modtranGenerator import ModtranGenerator
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -28,6 +22,7 @@ class FgcmLUTMaker(object):
         self._checkLUTConfig(lutConfig)
 
         self.magConstant = 2.5/np.log(10)
+        self._setThroughput = False
 
         try:
             self.stellarTemplateFile = resource_filename(__name__,'data/templates/stellar_templates_master.fits')
@@ -41,7 +36,7 @@ class FgcmLUTMaker(object):
         """
         """
 
-        requiredKeys=['elevation','bands',
+        requiredKeys=['elevation','bands','nCCD',
                       'pmbRange','pmbSteps',
                       'pwvRange','pwvSteps',
                       'o3Range','o3Steps',
@@ -66,18 +61,8 @@ class FgcmLUTMaker(object):
 
         self.bands = np.array(self.lutConfig['bands'])
 
-        ## FIXME: need other filter description!
-
-        self.filters = fgcm_y3a1_tools.DESFilters()
-        self.nCCD = self.filters.nCCD
+        self.nCCD = self.lutConfig['nCCD']
         self.nCCDStep = self.nCCD+1
-
-        # and match up the band indices
-        self.bInd = np.zeros(self.bands.size,dtype='i2')-1
-        for i in xrange(self.bands.size):
-            if (self.bands[i] not in self.filters.bands):
-                raise ValueError("Requested band %s not in list of filters!" % (self.bands[i]))
-            self.bInd[i], = np.where(self.bands[i] == self.filters.bands)
 
         # and record the standard values out of the config
         #  (these will also come out of the save file)
@@ -104,9 +89,47 @@ class FgcmLUTMaker(object):
         else:
             self.lambdaNorm = 7750.0
 
+    def setThroughputs(self, throughputDict):
+        """
+        """
+
+        self.inThroughputs=[]
+        for b in self.bands:
+            try:
+                lam = throughputDict[b]['LAMBDA']
+            except:
+                raise ValueError("Wavelength LAMBDA not found for band %s in throughputDict!" % (b))
+
+            tput = np.zeros(lam.size, dtype=[('LAMBDA','f4'),
+                                             ('THROUGHPUT_AVG','f4'),
+                                             ('THROUGHPUT_CCD','f4',self.nCCD)])
+            tput['LAMBDA'][:] = lam
+            for ccdIndex in xrange(self.nCCD):
+                try:
+                    tput['THROUGHPUT_CCD'][:,ccdIndex] = throughputDict[b][ccdIndex]
+                except:
+                    raise ValueError("CCD Index %d not found for band %s in throughputDict!" % (ccdIndex,b))
+
+            # check if the average is there, if not compute it
+            if ('AVG' in throughputDict[b]):
+                tput['THROUGHPUT_AVG'][:] = throughputDict[b]['AVG']
+            else:
+                print("Average throughput not found in throughputDict for band %s.  Computing now..." % (b))
+                for i in lam.size:
+                    use,=np.where(tput['THROUGHPUT_CCD'][i,:] > 0.0)
+                    tput['THROUGHPUT_AVG'][i] = np.mean(tput['THROUGHPUT_CCD'][i,use])
+
+            self.inThroughputs.append(tput)
+
+        self._setThroughput = True
+
     def makeLUT(self):
         """
         """
+
+        if not self._setThroughput:
+            raise ValueError("Must set the throughput before running makeLUT")
+
         # we need a standard atmosphere and lambdas...
         self.atmStd = self.modGen(pmb=self.pmbStd,pwv=self.pwvStd,
                                   o3=self.o3Std,tau=self.tauStd,
@@ -214,23 +237,39 @@ class FgcmLUTMaker(object):
 
         # get the filters over the same lambda ranges...
         print("\nInterpolating filters...")
-        ## FIXME: remove dependence here
-        self.filters.interpolateFilters(self.atmLambda)
+        self.throughputs = []
+        for i in xrange(len(self.bands)):
+            inLam = self.inThroughputs[i]['LAMBDA']
+
+            tput = np.zeros(self.atmLambda.size, dtype=[('LAMBDA','f4'),
+                                                        ('THROUGHPUT_AVG','f4'),
+                                                        ('THROUGHPUT_CCD','f4',self.nCCD)])
+            tput['LAMBDA'][:] = self.atmLambda
+
+            for ccdIndex in xrange(self.nCCD):
+                ifunc = interpolate.interp1d(inLam, self.inThroughputs[i]['THROUGHPUT_CCD'][:,ccdIndex])
+                tput['THROUGHPUT_CCD'][:,ccdIndex] = np.clip(ifunc(self.atmLambda),
+                                                             0.0,
+                                                             1e100)
+            ifunc = interpolate.interp1d(inLam, self.inThroughputs[i]['THROUGHPUT_AVG'])
+            tput['THROUGHPUT_AVG'][:] = np.clip(ifunc(self.atmLambda), 0.0, 1e100)
+
+            self.throughputs.append(tput)
 
         # and now we can get the standard atmosphere and lambda_b
         print("Computing lambdaB")
         self.lambdaB = np.zeros(self.bands.size)
         for i in xrange(self.bands.size):
-            num = integrate.simps(self.atmLambda * self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
-            denom = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
+            num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
+            denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
             self.lambdaB[i] = num / denom
             print("Band: %s, lambdaB = %.3f" % (self.bands[i], self.lambdaB[i]))
 
         print("Computing lambdaStd")
         self.lambdaStd = np.zeros(self.bands.size)
         for i in xrange(self.bands.size):
-            num = integrate.simps(self.atmLambda * self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            denom = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+            num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+            denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             self.lambdaStd[i] = num / denom
             print("Band: %s, lambdaStd = %.3f" % (self.bands[i],self.lambdaStd[i]))
 
@@ -240,8 +279,8 @@ class FgcmLUTMaker(object):
         self.I1Std = np.zeros(self.bands.size)
 
         for i in xrange(self.bands.size):
-            self.I0Std[i] = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            self.I1Std[i] = integrate.simps(self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+            self.I0Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+            self.I1Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
 
         self.I10Std = self.I1Std / self.I0Std
 
@@ -279,9 +318,9 @@ class FgcmLUTMaker(object):
                                 aerosolTauLambda = np.exp(-1.0*tauPlus[m]*airmassPlus[o]*(self.atmLambda/self.lambdaNorm)**(-alphaPlus[n]))
                                 for p in xrange(self.nCCDStep):
                                     if (p == self.nCCD):
-                                        Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_AVG'] * o2AtmTable[o,:] * rayleighAtmTable[o,:] * pwvAtmTable[j,o,:] * o3AtmTable[k,o,:] * aerosolTauLambda
+                                        Sb = self.throughputs[i]['THROUGHPUT_AVG'] * o2AtmTable[o,:] * rayleighAtmTable[o,:] * pwvAtmTable[j,o,:] * o3AtmTable[k,o,:] * aerosolTauLambda
                                     else:
-                                        Sb = self.filters.interpolatedFilters[self.bInd[i]]['THROUGHPUT_CCD'][:,p] * o2AtmTable[o,:] * rayleighAtmTable[o,:] * pwvAtmTable[j,o,:] * o3AtmTable[k,o,:] * aerosolTauLambda
+                                        Sb = self.throughputs[i]['THROUGHPUT_CCD'][:,p] * o2AtmTable[o,:] * rayleighAtmTable[o,:] * pwvAtmTable[j,o,:] * o3AtmTable[k,o,:] * aerosolTauLambda
 
                                     lutPlus['I0'][i,j,k,m,n,o,p] = integrate.simps(Sb / self.atmLambda, self.atmLambda)
                                     lutPlus['I1'][i,j,k,m,n,o,p] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
@@ -427,17 +466,6 @@ class FgcmLUTMaker(object):
                                                   ('SYNTHMAG','f4',self.bands.size),
                                                   ('FPRIME','f4',self.bands.size)])
 
-        # figure out range for each band...
-        #fitRange = np.zeros((self.bands.size,2))
-        #for i in xrange(self.bands.size):
-        #    passband = (self.filters.interpolatedFilters[i]['THROUGHPUT_AVG'] *
-        #                self.atmStdTrans)
-        #    maxVal = np.max(passband)
-        #    use,=np.where(passband > 0.9*maxVal)
-        #    fitRange[i,0] = self.atmLambda[use[0]]
-        #    fitRange[i,1] = self.atmLambda[use[-1]]
-        #    print('%d: [%.2f, %.2f]' % (i, fitRange[i,0], fitRange[i,1]))
-
         # now do it...looping is no problem since there aren't that many.
 
         for i in xrange(nTemplates):
@@ -467,15 +495,13 @@ class FgcmLUTMaker(object):
 
             # compute synthetic mags
             for j in xrange(self.bands.size):
-                num = integrate.simps(fnu * self.filters.interpolatedFilters[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-                denom = integrate.simps(self.filters.interpolatedFilters[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                num = integrate.simps(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                denom = integrate.simps(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
 
                 self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
 
             # and compute fprimes
             for j in xrange(self.bands.size):
-                #use,=np.where((templateLambda >= fitRange[j,0]) &
-                #              (templateLambda <= fitRange[j,1]))
                 use,=np.where((templateLambda >= (self.lambdaStd[j]-delta)) &
                               (templateLambda <= (self.lambdaStd[j]+delta)))
 
@@ -576,14 +602,11 @@ class FgcmLUTMaker(object):
 class FgcmLUT(object):
     """
     """
-    def __init__(self,lutFile):
 
-        ## FIXME: work with data inputs for LSST
-
-        self.lutFile = lutFile
-
-        lutFlat = fitsio.read(self.lutFile,ext='LUT')
-        indexVals = fitsio.read(self.lutFile,ext='INDEX')
+    #def __init__(self,lutFile):
+    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None):
+        #lutFlat = fitsio.read(self.lutFile,ext='LUT')
+        #indexVals = fitsio.read(self.lutFile,ext='INDEX')
 
         self.bands = indexVals['BANDS'][0]
         self.pmb = indexVals['PMB'][0]
@@ -618,7 +641,7 @@ class FgcmLUT(object):
         snmm.getArray(self.lutI1Handle)[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
 
         # and read in the derivatives
-        lutDerivFlat = fitsio.read(self.lutFile,ext='DERIV')
+        #lutDerivFlat = fitsio.read(self.lutFile,ext='DERIV')
 
         # create shared memory
         self.lutDPWVHandle = snmm.createArray(sizeTuple,dtype='f4')
@@ -650,10 +673,9 @@ class FgcmLUT(object):
         except:
             # just fill with zeros
             print("No I1 derivative information")
-            pass
 
         # get the standard values
-        stdVals = fitsio.read(lutFile,ext='STD')
+        #stdVals = fitsio.read(lutFile,ext='STD')
 
         self.pmbStd = stdVals['PMBSTD'][0]
         self.pwvStd = stdVals['PWVSTD'][0]
@@ -675,14 +697,19 @@ class FgcmLUT(object):
         self.magConstant = 2.5/np.log(10)
 
         # finally, read in the sedLUT
+        ## this is experimental
         self.hasSedLUT = False
-        try:
-            self.sedLUT = fitsio.read(lutFile,ext='SED')
-            self.hasSedLUT = True
-        except:
-            print("Warning: Could not find SED LUT in lutfile.")
+        if (sedLUT is not None):
+            self.sedLUT = sedLUT
 
-        if (self.hasSedLUT):
+            self.hasSedLUT = True
+        #try:
+        #    self.sedLUT = fitsio.read(lutFile,ext='SED')
+        #    self.hasSedLUT = True
+        #except:
+        #    print("Warning: Could not find SED LUT in lutfile.")
+
+        #if (self.hasSedLUT):
             # this is currently *not* general, but quick
             ## FIXME: make general
             self.sedColor = self.sedLUT['SYNTHMAG'][:,0] - self.sedLUT['SYNTHMAG'][:,2]
@@ -690,6 +717,26 @@ class FgcmLUT(object):
 
             self.sedColor = self.sedColor[st]
             self.sedLUT = self.sedLUT[st]
+
+    @classmethod
+    def initFromFits(cls, lutFile):
+        """
+        """
+
+        import fitsio
+
+        lutFlat = fitsio.read(lutFile, ext='LUT')
+        lutDerivFlat = fitsio.read(lutFile, ext='DERIV')
+        indexVals = fitsio.read(lutFile, ext='INDEX')
+        stdVals = fitsio.read(lutFile, ext='STD')
+
+        try:
+            sedLUT = fitsio.read(lutFile, ext='SED')
+        except:
+            sedLUT = None
+
+        return cls(indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=sedLUT)
+
 
     def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         """
