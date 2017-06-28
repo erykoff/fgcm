@@ -106,8 +106,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.logMemoryUsage('INFO', 'Setting Up with fits')
 
         # read in the LUT
-        # FIXME: make fits/non-fits versions
-        self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
+        #self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
+        self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile)
 
         # Generate or Read Parameters
         if (self.initialCycle):
