@@ -20,7 +20,7 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
-class FgcmParametersNew(object):
+class FgcmParameters(object):
     """
     """
 
