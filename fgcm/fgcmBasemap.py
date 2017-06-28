@@ -91,11 +91,24 @@ class FgcmBasemap(Basemap):
 
         ax = plt.gca()
 
-        lon = np.linspace(0, 360., xsize)
-        lat = np.linspace(-90., 90., xsize)
+        #lon = np.linspace(0, 360., xsize)
+        #lat = np.linspace(-90., 90., xsize)
+        #lon, lat = np.meshgrid(lon, lat)
+        nside = healpy.get_nside(hpxmap.data)
+
+        ipring,=np.where(hpxmap.data > healpy.UNSEEN)
+        thetaMap,phiMap = healpy.pix2ang(nside, ipring)
+        lonMap = np.degrees(phiMap)
+        latMap = 90.0-np.degrees(thetaMap)
+        #hi,=np.where(lonMap > 180.0)  # FIXME
+        #lonMap[hi] -= 360.0
+        print(lonMap.min(), lonMap.max())
+        print(latMap.min(), latMap.max())
+
+        lon = np.linspace(lonMap.min(), lonMap.max(), xsize)
+        lat = np.linspace(latMap.min(), latMap.max(), xsize)
         lon, lat = np.meshgrid(lon, lat)
 
-        nside = healpy.get_nside(hpxmap.data)
         theta = np.radians(90.0-lat)
         phi = np.radians(lon)
         pix = healpy.ang2pix(nside, theta,phi)
