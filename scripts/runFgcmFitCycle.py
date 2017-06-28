@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     print("Configuration read from %s" % (args.config))
 
-    fgcmFitCycle = fgcm.FgcmFitCycleNew(configDict, useFits=True)
+    fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=True)
     fgcmFitCycle.runWithFits()
     
 
