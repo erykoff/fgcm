@@ -461,7 +461,10 @@ class FgcmChisq(object):
         # compute delta-mags
 
         deltaMagGO = (obsMagStdGO - objMagStdMeanGO)
-        deltaMagErr2GO = (obsMagErr2GO + objMagStdMeanErr2GO)
+        #deltaMagErr2GO = (obsMagErr2GO + objMagStdMeanErr2GO)
+        #deltaMagErr2GO = (obsMagErr2GO - objMagStdMeanErr2GO)
+        # I am not happy about any of these options at the moment.
+        deltaMagErr2GO = obsMagErr2GO
         deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] / deltaMagErr2GO[obsFitUseGO]
 
         # and compute chisq
