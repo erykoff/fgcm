@@ -118,7 +118,7 @@ def plot_hpxmap_hist(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     if isinstance(hpxmap,basestring):
         hpxmap = healpy.read_map(f)
 
-    fig = plt.figure(10,figsize=(12,4))
+    fig = plt.figure(10,figsize=(10,4))
     fig.clf()
     gridspec=plt.GridSpec(1, 3)
 
@@ -152,7 +152,7 @@ def plot_hpxmap(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     if isinstance(hpxmap,basestring):
         hpxmap = healpy.read_map(f)
 
-    fig = plt.figure(10,figsize=(8,4))
+    fig = plt.figure(10,figsize=(6.5,4))
     fig.clf()
     gridspec=plt.GridSpec(1,2)
 
