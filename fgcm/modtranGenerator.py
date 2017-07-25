@@ -126,6 +126,7 @@ class ModtranGenerator(object):
 
             # Card 1a2:  template computational resolution
             f.write('DATA/B2001_05.BIN\n')
+            #f.write('DATA/B2001_01.BIN\n')
 
             # Card 2:    template mix and miscellaneous
             f.write('    0    0    0    0    0    0     0.000      .000      .000      .000\n')
@@ -134,7 +135,18 @@ class ModtranGenerator(object):
             f.write('    %6.3f     0.000    %6.3f     0.000     0.000     0.000    0          0.000\n' % (self.elevation/1000.0, self.zenith) )
 
             # Card 4:    template wavelength range and resolution
+            # 1.00TN:
+            #  1.00 is slit FGCM
+            #  T is for transmittances output (also R: Radiances)
+            #  N for nanometers for output (also W: wavenumbers, M: microns)
+
+            # NGAA:
+            #  N is for nanometers (also W: wavenumber, M micron)
+            #  G is for Gaussian (also T: Triangular, R: rectangular, S: sinc, C: sinc^2, H: Hamming)
+            #  A is for absolute FGCM (also R: relative)
+            #  A is for degrade all radiance and transmittance components
             f.write('   %7.1f   %7.1f     %5.2f      1.00TN       $NGAA\n' % (self.lambdaRange[0], self.lambdaRange[1], self.lambdaStep))
+            #f.write('   %7.1f   %7.1f     %5.2f      0.1TN       $NGAA\n' % (self.lambdaRange[0], self.lambdaRange[1], self.lambdaStep))
 
             # Line of sight cards
             f.write('    0\n')
