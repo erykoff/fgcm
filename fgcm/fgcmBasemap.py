@@ -76,7 +76,7 @@ class FgcmBasemap(Basemap):
             self.set_defaults(kw,v)
             self.annotate(**kw)
 
-    def draw_hpxmap(self, hpxmap, xsize=800, **kwargs):
+    def draw_hpxmap(self, hpxmap, xsize=1600, **kwargs):
         """
         Use pcolormesh to draw healpix map
         """
@@ -102,11 +102,11 @@ class FgcmBasemap(Basemap):
         latMap = 90.0-np.degrees(thetaMap)
         #hi,=np.where(lonMap > 180.0)  # FIXME
         #lonMap[hi] -= 360.0
-        print(lonMap.min(), lonMap.max())
-        print(latMap.min(), latMap.max())
+        #print(lonMap.min(), lonMap.max())
+        #print(latMap.min(), latMap.max())
 
         lon = np.linspace(lonMap.min(), lonMap.max(), xsize)
-        lat = np.linspace(latMap.min(), latMap.max(), xsize)
+        lat = np.linspace(latMap.min(), latMap.max(), xsize*self.aspect)
         lon, lat = np.meshgrid(lon, lat)
 
         theta = np.radians(90.0-lat)
@@ -169,6 +169,12 @@ class FgcmBasemap(Basemap):
         ax.set_xlim(min(x),max(x))
         ax.set_ylim(min(y),max(y))
         ax.grid(True)
+
+        if self.fix_aspect:
+            ax.set_aspect('equal', anchor=self.anchor)
+        else:
+            ax.set_aspect('auto', anchor=self.anchor)
+
         return ax.get_xlim(),ax.get_ylim()
 
 
