@@ -88,11 +88,34 @@ class ModtranGenerator(object):
         with open("%s/%s.tp6" % (self.tempRunPath, self.modtranRoot), 'r') as f:
             lines=f.readlines()
 
-        m=re.search("CONTAINED\ +(\d+\.\d+)\ +", lines[33])
+        # for OZONE, find line with "OZONE DENSITIES".
+        #  we want the next line
+        for i,line in enumerate(lines):
+            m=re.search("OZONE DENSITIES", line)
+            if m is not None:
+                o3Line = lines[i+1]
+                break
+        m=re.search("CONTAINED\ +(\d+\.\d+)\ +", o3Line)
         self._o3DefaultSealevel = float(m.groups()[0])
-        m=re.search("INITIAL:\ +(\d+\.\d+)\ +", lines[37])
+
+        # for PWV, find line with "THE WATER PROFILE".
+        #  we want the next line
+        for i,line in enumerate(lines):
+            m=re.search("THE WATER PROFILE", line)
+            if m is not None:
+                pwvLine = lines[i+1]
+                break
+        m=re.search("INITIAL:\ +(\d+\.\d+)\ +", pwvLine)
         self._h2oDefaultSealevel = float(m.groups()[0])
-        parts=lines[471].split()
+
+        # for the H2O, O3 values at elevation, find line "H2O         O3" (9 spaces)
+        #  we want line+=2
+        for i,line in enumerate(lines):
+            m=re.search("H2O         O3", line)
+            if m is not None:
+                valueLine = lines[i+2]
+                break
+        parts=valueLine.split()
         pwvElevation = float(parts[0])
         o3Elevation = float(parts[1])
 
