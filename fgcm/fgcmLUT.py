@@ -115,7 +115,7 @@ class FgcmLUTMaker(object):
                 tput['THROUGHPUT_AVG'][:] = throughputDict[b]['AVG']
             else:
                 print("Average throughput not found in throughputDict for band %s.  Computing now..." % (b))
-                for i in lam.size:
+                for i in xrange(lam.size):
                     use,=np.where(tput['THROUGHPUT_CCD'][i,:] > 0.0)
                     tput['THROUGHPUT_AVG'][i] = np.mean(tput['THROUGHPUT_CCD'][i,use])
 
@@ -768,10 +768,13 @@ class FgcmLUT(object):
         dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
         dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
 
-        indicesPlus = np.array(indices[:-1])
-        indicesPlus[5] += 1
+        indicesSecZenithPlus = np.array(indices[:-1])
+        indicesSecZenithPlus[5] += 1
+        indicesPWVPlus = np.array(indices[:-1])
+        indicesPWVPlus[1] += 1
 
-        # also include a cross-term
+        # also include cross-terms for tau and pwv
+        # and a second-derivative term for pwv
         #  note that indices[-1] is the PMB vactor
 
         return indices[-1]*(snmm.getArray(self.lutI0Handle)[indices[:-1]] +
@@ -780,8 +783,13 @@ class FgcmLUT(object):
                             dlnTau * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] +
                             dAlpha * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] +
                             dSecZenith * snmm.getArray(self.lutDSecZenithHandle)[indices[:-1]] +
-                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauHandle)[tuple(indicesPlus)] -
-                                                   snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta)
+                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauHandle)[tuple(indicesSecZenithPlus)] -
+                                                   snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta +
+                            dPWV * dSecZenith * (snmm.getArray(self.lutDPWVHandle)[tuple(indicesSecZenithPlus)] -
+                                                 snmm.getArray(self.lutDPWVHandle)[indices[:-1]])/self.secZenithDelta +
+                            dPWV * (dPWV - self.pwvDelta) * (snmm.getArray(self.lutDPWVHandle)[tuple(indicesPWVPlus)] -
+                                                             snmm.getArray(self.lutDPWVHandle)[indices[:-1]]))
+
 
     def computeI1(self, pwv, o3, lnTau, alpha, secZenith, pmb, indices):
         # do a simple linear interpolation
@@ -791,10 +799,12 @@ class FgcmLUT(object):
         dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
         dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
 
-        indicesPlus = np.array(indices[:-1])
-        indicesPlus[5] += 1
+        indicesSecZenithPlus = np.array(indices[:-1])
+        indicesSecZenithPlus[5] += 1
+        indicesPWVPlus = np.array(indices[:-1])
+        indicesPWVPlus[1] += 1
 
-        # also include a cross-term
+        # also include a cross-term for tau
         #  note that indices[-1] is the PMB vactor
 
         return indices[-1]*(snmm.getArray(self.lutI1Handle)[indices[:-1]] +
@@ -803,8 +813,12 @@ class FgcmLUT(object):
                             dlnTau * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]] +
                             dAlpha * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]] +
                             dSecZenith * snmm.getArray(self.lutDSecZenithI1Handle)[indices[:-1]] +
-                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauI1Handle)[tuple(indicesPlus)] -
-                                                   snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]])/self.secZenithDelta)
+                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauI1Handle)[tuple(indicesSecZenithPlus)] -
+                                                   snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]])/self.secZenithDelta +
+                            dPWV * dSecZenith * (snmm.getArray(self.lutDPWVI1Handle)[tuple(indicesSecZenithPlus)] -
+                                                 snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]])/self.secZenithDelta +
+                            dPWV * (dPWV - self.pwvDelta) * (snmm.getArray(self.lutDPWVI1Handle)[tuple(indicesPWVPlus)] -
+                                                             snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]]))
 
     def computeI1Old(self, indices):
         return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
