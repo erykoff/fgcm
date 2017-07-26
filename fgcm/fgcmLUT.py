@@ -18,11 +18,12 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 class FgcmLUTMaker(object):
     """
     """
-    def __init__(self,lutConfig):
+    def __init__(self,lutConfig,makeSeds=False):
         self._checkLUTConfig(lutConfig)
 
         self.magConstant = 2.5/np.log(10)
         self._setThroughput = False
+        self.makeSeds = makeSeds
 
         try:
             self.stellarTemplateFile = resource_filename(__name__,'data/templates/stellar_templates_master.fits')
@@ -117,7 +118,8 @@ class FgcmLUTMaker(object):
                 print("Average throughput not found in throughputDict for band %s.  Computing now..." % (b))
                 for i in xrange(lam.size):
                     use,=np.where(tput['THROUGHPUT_CCD'][i,:] > 0.0)
-                    tput['THROUGHPUT_AVG'][i] = np.mean(tput['THROUGHPUT_CCD'][i,use])
+                    if (use.size > 0):
+                        tput['THROUGHPUT_AVG'][i] = np.mean(tput['THROUGHPUT_CCD'][i,use])
 
             self.inThroughputs.append(tput)
 
@@ -441,77 +443,78 @@ class FgcmLUTMaker(object):
                                         )
 
 
+        if (self.makeSeds):
         ## and the SED LUT
-        print("Building SED LUT")
+            print("Building SED LUT")
 
-        # arbitrary.  Configure?  Fit?  Seems stable...
-        delta = 600.0
+            # arbitrary.  Configure?  Fit?  Seems stable...
+            delta = 600.0
 
-        # blah on fits here...
-        import fitsio
+            # blah on fits here...
+            import fitsio
 
-        # how many extensions?
-        fits=fitsio.FITS(self.stellarTemplateFile)
-        fits.update_hdu_list()
-        extNames = []
-        for hdu in fits.hdu_list:
-            extName = hdu.get_extname()
-            if ('TEMPLATE_' in extName):
-                extNames.append(extName)
+            # how many extensions?
+            fits=fitsio.FITS(self.stellarTemplateFile)
+            fits.update_hdu_list()
+            extNames = []
+            for hdu in fits.hdu_list:
+                extName = hdu.get_extname()
+                if ('TEMPLATE_' in extName):
+                    extNames.append(extName)
 
-        # set up SED look-up table
-        nTemplates = len(extNames)
+            # set up SED look-up table
+            nTemplates = len(extNames)
 
-        self.sedLUT = np.zeros(nTemplates, dtype=[('TEMPLATE','i4'),
-                                                  ('SYNTHMAG','f4',self.bands.size),
-                                                  ('FPRIME','f4',self.bands.size)])
+            self.sedLUT = np.zeros(nTemplates, dtype=[('TEMPLATE','i4'),
+                                                      ('SYNTHMAG','f4',self.bands.size),
+                                                      ('FPRIME','f4',self.bands.size)])
 
-        # now do it...looping is no problem since there aren't that many.
+            # now do it...looping is no problem since there aren't that many.
 
-        for i in xrange(nTemplates):
-            data = fits[extNames[i]].read()
+            for i in xrange(nTemplates):
+                data = fits[extNames[i]].read()
 
-            templateLambda = data['LAMBDA']
-            templateFLambda = data['FLUX']
-            templateFnu = templateFLambda * templateLambda * templateLambda
+                templateLambda = data['LAMBDA']
+                templateFLambda = data['FLUX']
+                templateFnu = templateFLambda * templateLambda * templateLambda
 
-            parts=extNames[i].split('_')
-            self.sedLUT['TEMPLATE'][i] = int(parts[1])
+                parts=extNames[i].split('_')
+                self.sedLUT['TEMPLATE'][i] = int(parts[1])
 
-            # interpolate to atmLambda
-            intFunc = interpolate.interp1d(templateLambda, templateFnu)
-            fnu = np.zeros(self.atmLambda.size)
-            good,=np.where((self.atmLambda >= templateLambda[0]) &
-                           (self.atmLambda <= templateLambda[-1]))
-            fnu[good] = intFunc(self.atmLambda[good])
+                # interpolate to atmLambda
+                intFunc = interpolate.interp1d(templateLambda, templateFnu)
+                fnu = np.zeros(self.atmLambda.size)
+                good,=np.where((self.atmLambda >= templateLambda[0]) &
+                               (self.atmLambda <= templateLambda[-1]))
+                fnu[good] = intFunc(self.atmLambda[good])
 
-            # out of range, let it hit the limit
-            lo,=np.where(self.atmLambda < templateLambda[0])
-            if (lo.size > 0):
-                fnu[lo] = intFunc(self.atmLambda[good[0]])
-            hi,=np.where(self.atmLambda > templateLambda[-1])
-            if (hi.size > 0):
-                fnu[hi] = intFunc(self.atmLambda[good[-1]])
+                # out of range, let it hit the limit
+                lo,=np.where(self.atmLambda < templateLambda[0])
+                if (lo.size > 0):
+                    fnu[lo] = intFunc(self.atmLambda[good[0]])
+                hi,=np.where(self.atmLambda > templateLambda[-1])
+                if (hi.size > 0):
+                    fnu[hi] = intFunc(self.atmLambda[good[-1]])
 
-            # compute synthetic mags
-            for j in xrange(self.bands.size):
-                num = integrate.simps(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-                denom = integrate.simps(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                # compute synthetic mags
+                for j in xrange(self.bands.size):
+                    num = integrate.simps(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                    denom = integrate.simps(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
 
-                self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
+                    self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
 
-            # and compute fprimes
-            for j in xrange(self.bands.size):
-                use,=np.where((templateLambda >= (self.lambdaStd[j]-delta)) &
-                              (templateLambda <= (self.lambdaStd[j]+delta)))
+                # and compute fprimes
+                for j in xrange(self.bands.size):
+                    use,=np.where((templateLambda >= (self.lambdaStd[j]-delta)) &
+                                  (templateLambda <= (self.lambdaStd[j]+delta)))
 
-                fit = np.polyfit(templateLambda[use] - self.lambdaStd[j],
-                                 templateFnu[use],
-                                 1)
+                    fit = np.polyfit(templateLambda[use] - self.lambdaStd[j],
+                                     templateFnu[use],
+                                     1)
 
-                self.sedLUT['FPRIME'][i,j] = fit[0] / fit[1]
+                    self.sedLUT['FPRIME'][i,j] = fit[0] / fit[1]
 
-        fits.close()
+            fits.close()
 
     def saveLUT(self,lutFile,clobber=False):
         """
