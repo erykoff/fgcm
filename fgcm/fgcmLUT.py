@@ -598,8 +598,9 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,self.lutDeriv.flatten(),extname='DERIV')
 
         # and the SED LUT
-        print("Writing SED LUT")
-        fitsio.write(lutFile,self.sedLUT,extname='SED')
+        if (self.makeSeds):
+            print("Writing SED LUT")
+            fitsio.write(lutFile,self.sedLUT,extname='SED')
 
 
 class FgcmLUT(object):
