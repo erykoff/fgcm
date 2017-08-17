@@ -364,14 +364,14 @@ class FgcmParameters(object):
         """
 
         # ensure sorted by exposure number
-        st=np.argsort(expInfo['EXPNUM'])
+        st=np.argsort(expInfo[self.expField])
         expInfo=expInfo[st]
 
         self.nExp = self.nExp
 
         self.fgcmLog.log('INFO','Loading info on %d exposures.' % (self.nExp))
 
-        self.expArray = expInfo['EXPNUM']
+        self.expArray = expInfo[self.expField]
         self.expFlag = np.zeros(self.nExp,dtype=np.int8)
         self.expExptime = expInfo['EXPTIME']
 
