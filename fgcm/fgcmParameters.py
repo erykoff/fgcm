@@ -95,6 +95,8 @@ class FgcmParameters(object):
         self.pwvFile = fgcmConfig.pwvFile
         self.tauFile = fgcmConfig.tauFile
         self.externalPWVDeltaT = fgcmConfig.externalPWVDeltaT
+        self.externalTauDeltaT = fgcmConfig.externalTauDeltaT
+
 
         # and the default unit dict
         self.unitDictOnes = {'pwvUnit':1.0,
