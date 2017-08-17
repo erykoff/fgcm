@@ -523,7 +523,7 @@ class FgcmLUTMaker(object):
         import fitsio
 
         if (os.path.isfile(lutFile) and not clobber):
-            print("lutFile %s already exists, and clobber is False.")
+            print("lutFile %s already exists, and clobber is False." % (lutFile))
             return
 
         print("Saving LUT to %s" % (lutFile))
@@ -775,7 +775,9 @@ class FgcmLUT(object):
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
         indicesPWVPlus = np.array(indices[:-1])
-        indicesPWVPlus[1] += 1
+        #if (indicesPWVPlus[1] < self.pwv.size):
+        #    indicesPWVPlus[1] += 1
+        indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
 
         # also include cross-terms for tau and pwv
         # and a second-derivative term for pwv
@@ -806,7 +808,8 @@ class FgcmLUT(object):
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
         indicesPWVPlus = np.array(indices[:-1])
-        indicesPWVPlus[1] += 1
+        #indicesPWVPlus[1] += 1
+        indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
 
         # also include a cross-term for tau
         #  note that indices[-1] is the PMB vactor
