@@ -100,21 +100,25 @@ class FgcmConfig(object):
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
+        else:
+            self.pvwFile = None
+            self.externalPWVDeltaT = None
+
+        if (self.pwvFile is not None):
             if ('externalPWVDeltaT' not in configDict):
                 raise ValueError("Must include externalPWVDeltaT with pwvFile")
             self.externalPWVDeltaT = configDict['externalPWVDeltaT']
 
-        else:
-            self.pwvFile = None
-
         if 'tauFile' in configDict:
             self.tauFile = configDict['tauFile']
+        else:
+            self.tauFile = None
+            self.externalTauDeltaT = None
+
+        if (self.tauFile is not None):
             if ('externalTauDeltaT' not in configDict):
                 raise ValueError("Must include externalTauDeltaT with tauFile")
             self.externalTauDeltaT = configDict['externalTauDeltaT']
-
-        else:
-            self.tauFile = None
 
         if 'stepUnitReference' in configDict:
             self.stepUnitReference = configDict['stepUnitReference']
