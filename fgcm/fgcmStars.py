@@ -49,7 +49,7 @@ class FgcmStars(object):
         self.inFlagStarFile = fgcmConfig.inFlagStarFile
 
         self.mapLongitudeRef = fgcmConfig.mapLongitudeRef
-        self.mapNside = fgcmConfig.mapNside
+        self.mapNSide = fgcmConfig.mapNSide
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
@@ -217,13 +217,6 @@ class FgcmStars(object):
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4',syncAccess=True)
 
 
-        #snmm.getArray(self.obsExpHandle)[:] = obs['EXPNUM'][:]
-        #snmm.getArray(self.obsCCDHandle)[:] = obs['CCDNUM'][:]
-        #snmm.getArray(self.obsRAHandle)[:] = obs['RA'][:]
-        #snmm.getArray(self.obsDecHandle)[:] = obs['DEC'][:]
-        #snmm.getArray(self.obsMagADUHandle)[:] = obs['MAG'][:]
-        #snmm.getArray(self.obsMagADUErrHandle)[:] = obs['MAGERR'][:]
-        #snmm.getArray(self.obsMagStdHandle)[:] = obs['MAG'][:]
         snmm.getArray(self.obsExpHandle)[:] = obsExp
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
         snmm.getArray(self.obsRAHandle)[:] = obsRA
@@ -627,9 +620,9 @@ class FgcmStars(object):
         theta = (90.0-snmm.getArray(self.objDecHandle)[goodStars])*np.pi/180.
         phi = snmm.getArray(self.objRAHandle)[goodStars]*np.pi/180.
 
-        ipring = hp.ang2pix(self.mapNside,theta,phi)
+        ipring = hp.ang2pix(self.mapNSide,theta,phi)
 
-        densMap = esutil.stat.histogram(ipring,min=0,max=12*self.mapNside*self.mapNside-1)
+        densMap = esutil.stat.histogram(ipring,min=0,max=12*self.mapNSide*self.mapNSide-1)
         densMap = densMap.astype(np.float32)
 
         bad,=np.where(densMap == 0)
