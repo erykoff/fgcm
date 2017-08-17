@@ -101,7 +101,7 @@ class FgcmConfig(object):
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
         else:
-            self.pvwFile = None
+            self.pwvFile = None
             self.externalPWVDeltaT = None
 
         if (self.pwvFile is not None):
