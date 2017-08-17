@@ -33,7 +33,7 @@ class FgcmConfig(object):
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
-                      'sigma0Phot','mapLongitudeRef','mapNside','nStarPerRun',
+                      'sigma0Phot','mapLongitudeRef','mapNSide','nStarPerRun',
                       'nExpPerRun','varNSig','varMinBand','useSedLUT',
                       'reserveFraction']
 
@@ -90,7 +90,7 @@ class FgcmConfig(object):
         self.logLevel = configDict['logLevel']
         self.sigma0Phot = float(configDict['sigma0Phot'])
         self.mapLongitudeRef =float( configDict['mapLongitudeRef'])
-        self.mapNside = int(configDict['mapNside'])
+        self.mapNSide = int(configDict['mapNSide'])
         self.nStarPerRun = int(configDict['nStarPerRun'])
         self.nExpPerRun = int(configDict['nExpPerRun'])
         self.varNSig = float(configDict['varNSig'])
@@ -241,7 +241,7 @@ class FgcmConfig(object):
 
         # and look at the exposure file and grab some stats
         #expInfo = fitsio.read(self.exposureFile,ext=1)
-        self.expRange = np.array([np.min(expInfo['EXPNUM']),np.max(expInfo['EXPNUM'])])
+        self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
 
