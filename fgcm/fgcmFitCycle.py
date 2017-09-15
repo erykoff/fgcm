@@ -319,27 +319,28 @@ class FgcmFitCycle(object):
         self.fgcmZpts.computeZeropoints()
         self.fgcmLog.logMemoryUsage('INFO','After computing zeropoints')
 
-        self.fgcmZpts.saveZptFits()
-        self.fgcmZpts.saveAtmFits()
+        if (self.useFits):
+            self.fgcmZpts.saveZptFits()
+            self.fgcmZpts.saveAtmFits()
 
-        # Save parameters
-        outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
-                                                self.fgcmConfig.outfileBaseWithCycle)
-        self.fgcmPars.saveParsFits(outParFile)
+            # Save parameters
+            outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
+                                                    self.fgcmConfig.outfileBaseWithCycle)
+            self.fgcmPars.saveParsFits(outParFile)
 
-        # Save bad stars
-        outFlagStarFile = '%s/%s_flaggedstars.fits' % (self.fgcmConfig.outputPath,
-                                               self.fgcmConfig.outfileBaseWithCycle)
-        self.fgcmStars.saveFlagStarIndices(outFlagStarFile)
+            # Save bad stars
+            outFlagStarFile = '%s/%s_flaggedstars.fits' % (self.fgcmConfig.outputPath,
+                                                           self.fgcmConfig.outfileBaseWithCycle)
+            self.fgcmStars.saveFlagStarIndices(outFlagStarFile)
 
-        ## FIXME: save standard stars if desired.  (Need code to save std stars)
+            ## FIXME: save standard stars if desired.  (Need code to save std stars)
 
 
-        # Save yaml for input to next fit cycle
-        outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
-                                                      self.fgcmConfig.outfileBase,
-                                                      self.fgcmConfig.cycleNumber+1)
-        self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
+            # Save yaml for input to next fit cycle
+            outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
+                                                          self.fgcmConfig.outfileBase,
+                                                          self.fgcmConfig.cycleNumber+1)
+            self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
 
         # and make map of coverage
 
