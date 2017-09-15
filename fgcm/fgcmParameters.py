@@ -961,7 +961,7 @@ class FgcmParameters(object):
                     self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
             parLow[self.parTauInterceptLoc: \
                    self.parTauInterceptLoc + \
-                   self.nCampaignNights] = self.tauStd * unitDuct['tauUnit']
+                   self.nCampaignNights] = self.tauStd * unitDict['tauUnit']
             parHigh[self.parTauInterceptLoc: \
                     self.parTauInterceptLoc + \
                 self.nCampaignNights] = self.tauStd * unitDict['tauUnit']
