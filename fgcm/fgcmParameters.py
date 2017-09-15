@@ -61,6 +61,7 @@ class FgcmParameters(object):
         self.extraBands = fgcmConfig.extraBands
         self.nExtraBands = self.extraBands.size
 
+        self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
         self.o3Std = fgcmConfig.o3Std
         self.tauStd = fgcmConfig.tauStd
@@ -937,6 +938,46 @@ class FgcmParameters(object):
                     self.parQESysSlopeLoc + \
                     self.nWashIntervals] = ( \
             0.001 * unitDict['qeSysSlopeUnit'])
+
+        if self.freezeStdAtmosphere:
+            # atmosphere parameters set to std values
+            parLow[self.parPWVInterceptLoc: \
+                   self.parPWVInterceptLoc + \
+               self.nCampaignNights] = self.pwvStd * unitDict['pwvUnit']
+            parHigh[self.parPWVInterceptLoc: \
+                    self.parPWVInterceptLoc + \
+                    self.nCampaignNights] = self.pwvStd * unitDict['pwvUnit']
+            parLow[self.parPWVPerSlopeLoc: \
+                   self.parPWVPerSlopeLoc + \
+                   self.nCampaignNights] = 0.0
+            parHigh[self.parPWVPerSlopeLoc: \
+                    self.parPWVPerSlopeLoc + \
+                    self.nCampaignNights] = 0.0
+            parLow[self.parO3Loc: \
+                   self.parO3Loc + \
+                   self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+            parHigh[self.parO3Loc: \
+                    self.parO3Loc + \
+                    self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+            parLow[self.parTauInterceptLoc: \
+                   self.parTauInterceptLoc + \
+                   self.nCampaignNights] = self.tauStd * unitDuct['tauUnit']
+            parHigh[self.parTauInterceptLoc: \
+                    self.parTauInterceptLoc + \
+                self.nCampaignNights] = self.tauStd * unitDict['tauUnit']
+            parLow[self.parTauPerSlopeLoc: \
+                   self.parTauPerSlopeLoc + \
+                   self.nCampaignNights] = 0.0
+            parHigh[self.parTauPerSlopeLoc: \
+                    self.parTauPerSlopeLoc + \
+                    self.nCampaignNights] = 0.0
+            parLow[self.parAlphaLoc: \
+                   self.parAlphaLoc + \
+                   self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
+            parHigh[self.parAlphaLoc: \
+                    self.parAlphaLoc + \
+                    self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
+
 
         # zip these into a list of tuples
         parBounds = zip(parLow, parHigh)
