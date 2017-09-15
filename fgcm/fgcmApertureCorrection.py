@@ -34,6 +34,13 @@ class FgcmApertureCorrection(object):
         """
         """
 
+        if (self.aperCorrFitNBins == 0):
+            self.fgcmLog.log('INFO','No aperture correction will be computed')
+            self.fgcmPars.compAperCorrPivot[:] = 0.0
+            self.fgcmPars.compAperCorrSlope[:] = 0.0
+            self.fgcmPars.compAperCorrSlopeErr[:] = 0.0
+            return
+
         startTime=time.time()
         self.fgcmLog.log('INFO','Computing aperture corrections with %d bins' %
                          (self.aperCorrFitNBins))
