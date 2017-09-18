@@ -126,17 +126,10 @@ class FgcmSuperStarFlat(object):
         # and we're done.
 
     def plotSuperStarFlats(self, superStarArray, superStarMean, superStarSigma,
-                           nCCDArray=None, name='superstar'):
+                            nCCDArray=None, name='superstar'):
         """
         """
-
-        cm = plt.get_cmap('rainbow')
-        plt.set_cmap('rainbow')
-
-        plotRARange = [self.ccdOffsets['DELTA_RA'].min() - self.ccdOffsets['RA_SIZE'].max()/2.,
-                       self.ccdOffsets['DELTA_RA'].max() + self.ccdOffsets['RA_SIZE'].max()/2.]
-        plotDecRange = [self.ccdOffsets['DELTA_DEC'].min() - self.ccdOffsets['DEC_SIZE'].max()/2.,
-                        self.ccdOffsets['DELTA_DEC'].max() + self.ccdOffsets['DEC_SIZE'].max()/2.]
+        from fgcmUtilities import plotCCDMap
 
         for i in xrange(self.fgcmPars.nEpochs):
             for j in xrange(self.fgcmPars.nBands):
@@ -146,70 +139,27 @@ class FgcmSuperStarFlat(object):
                 else:
                     use,=np.where(superStarArray[i,j,:] > self.illegalValue)
 
-                # kick out if there is nothing to plot here
                 if use.size == 0:
                     continue
-
-                # first, we plot the total superstar flat
-                st=np.argsort(superStarArray[i,j,use])
-
-                # add some padding of 1mmag for all zeros
-                lo=superStarArray[i,j,use[st[int(0.02*st.size)]]]-0.001
-                hi=superStarArray[i,j,use[st[int(0.98*st.size)]]]+0.001
-
-                cNorm = colors.Normalize(vmin=lo,vmax=hi)
-                scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
-
-                Z=[[0,0],[0,0]]
-                levels=np.linspace(lo,hi,num=150)
-                CS3=plt.contourf(Z,levels,cmap=cm)
 
                 fig=plt.figure(1,figsize=(8,6))
                 fig.clf()
 
                 ax=fig.add_subplot(111)
 
-                ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
-                ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
-                ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
-                ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
-                ax.tick_params(axis='both',which='major',labelsize=14)
-
-                for k in xrange(use.size):
-                    off=[self.ccdOffsets['DELTA_RA'][use[k]],
-                         self.ccdOffsets['DELTA_DEC'][use[k]]]
-
-                    ax.add_patch(
-                        patches.Rectangle(
-                            (off[0]-self.ccdOffsets['RA_SIZE'][use[k]]/2.,
-                             off[1]-self.ccdOffsets['DEC_SIZE'][use[k]]/2.),
-                            self.ccdOffsets['RA_SIZE'][use[k]],
-                            self.ccdOffsets['DEC_SIZE'][use[k]],
-                            edgecolor="none",
-                            facecolor=scalarMap.to_rgba(superStarArray[i,j,use[k]]))
-                        )
-
-                cb=None
-                # god damn I hate matplotlib
-                #  probably have to specify tick...and need to find round numbers.  blah
-                cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
-                #cb = plt.colorbar(CS3)
-
-                cb.set_label('Superflat Correction (mag)',fontsize=14)
+                plotCCDMap(ax, self.ccdOffsets[use], superStarArray[i,j,use],
+                           'Superflat Correction (mag)')
 
                 text = r'$(%s)$' % (self.fgcmPars.bands[j]) + '\n' + \
                     r'%.4f +/- %.4f' % (superStarMean[i,j],superStarSigma[i,j])
-
-                #ax.annotate(r'$(%s)$' % (self.fgcmPars.bands[j]),
-                #            (0.1,0.93),xycoords='axes fraction',
-                #            ha='left',va='top',fontsize=18)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
-
 
                 fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
                                                     self.outfileBaseWithCycle,
                                                     name,
                                                     self.fgcmPars.bands[j],
                                                     self.epochNames[i]))
+
+
