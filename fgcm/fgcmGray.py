@@ -227,7 +227,7 @@ class FgcmGray(object):
                                                           self.fgcmPars.bands[i]))
 
 
-    def computeCCDAndExpGray(self,doPlots=True):
+    def computeCCDAndExpGray(self,doPlots=True,onlyObsErr=False):
         """
         """
 
@@ -297,8 +297,13 @@ class FgcmGray(object):
         # and need the error for Egray: sum in quadrature of individual and avg errs
         #EGrayErr2GO = (objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2. +
         #               obsMagErr[goodObs]**2.)
-        EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        if (onlyObsErr):
+            # only obs error ... use this option when doing initial guess at superstarflat
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            # take into account correlated average mag error
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
         gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
