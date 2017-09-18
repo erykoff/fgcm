@@ -216,8 +216,19 @@ class FgcmFitCycle(object):
             # reflag bad stars with too few observations
             #  (we don't go back and select exposures at this point)
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-            #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+
+            if (self.fgcmConfig.precomputeSuperStarInitialCycle):
+                # we want to precompute the superstar flat here...
+                self.fgcmLog.log('INFO','Configured to precompute superstar flat on initial cycle')
+                # we can compute gray values, but only use obs error (since all the fields aren't filled yet)
+                self.fgcmGray.computeCCDAndExpGray(onlyObsErr=True)
+                # and average them into superstar flats
+                preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+                preSuperStarFlat.computeSuperStarFlats(doPlots=False)
+
+                self.fgcmLog.log('DEBUG','FitCycle is applying pre-computed SuperStarFlat')
+                self.fgcmStars.applySuperStarFlat(self.fgcmPars)
 
             ## EXPERIMENTAL
             ## not needed as far as I can tell
