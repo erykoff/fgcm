@@ -155,3 +155,64 @@ def histoGauss(ax,array):
     ax.locator_params(axis='x',nbins=6)  # hmmm
 
     return coeff
+
+def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+    plt.set_cmap('rainbow')
+
+    plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
+                   ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
+    plotDecRange = [ccdOffsets['DELTA_DEC'].min() - ccdOffsets['DEC_SIZE'].max()/2.,
+                    ccdOffsets['DELTA_DEC'].max() + ccdOffsets['DEC_SIZE'].max()/2.]
+
+    if (loHi is None):
+        st=np.argsort(values)
+
+        lo=values[st[int(0.02*st.size)]]
+        hi=values[st[int(0.98*st.size)]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z=[[0,0],[0,0]]
+    levels=np.linspace(lo,hi,num=150)
+    CS3=plt.contourf(Z,levels,cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
+    ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
+    ax.tick_params(axis='both',which='major',labelsize=14)
+
+    for k in xrange(values.size):
+        off=[ccdOffsets['DELTA_RA'][k],
+             ccdOffsets['DELTA_DEC'][k]]
+
+        ax.add_patch(
+            patches.Rectangle(
+                (off[0]-ccdOffsets['RA_SIZE'][k]/2.,
+                 off[1]-ccdOffsets['DEC_SIZE'][k]/2.),
+                ccdOffsets['RA_SIZE'][k],
+                ccdOffsets['DEC_SIZE'][k],
+                edgecolor="none",
+                facecolor=scalarMap.to_rgba(values[k]))
+            )
+
+    cb=None
+    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
+
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None
+
+
