@@ -35,7 +35,8 @@ class FgcmConfig(object):
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
                       'sigma0Phot','mapLongitudeRef','mapNSide','nStarPerRun',
                       'nExpPerRun','varNSig','varMinBand','useSedLUT',
-                      'freezeStdAtmosphere','reserveFraction']
+                      'freezeStdAtmosphere','reserveFraction',
+                      'precomputeSuperStarInitialCycle']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -98,6 +99,7 @@ class FgcmConfig(object):
         self.useSedLUT = configDict['useSedLUT']
         self.freezeStdAtmosphere = configDict['freezeStdAtmosphere']
         self.reserveFraction = configDict['reserveFraction']
+        self.precomputeSuperStarInitialCycle = configDict['precomputeSuperStarInitialCycle']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
