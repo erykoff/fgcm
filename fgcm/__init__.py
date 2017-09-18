@@ -20,6 +20,7 @@ from fgcmApertureCorrection import FgcmApertureCorrection
 from fgcmExposureSelector import FgcmExposureSelector
 from fgcmFitCycle import FgcmFitCycle
 from fgcmZeropoints import FgcmZeropoints
+from fgcmZeropoints import FgcmZeropointPlotter
 from fgcmLogger import FgcmLogger
 from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
