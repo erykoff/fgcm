@@ -17,7 +17,7 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 class FgcmConfig(object):
     """
     """
-    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets):
+    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
         requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
@@ -162,16 +162,17 @@ class FgcmConfig(object):
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
 
-        if (self.cycleNumber >= 1):
+        self.inParameterFile = None
+        self.inFlagStarFile = None
+
+        if (self.cycleNumber >= 1) and checkFiles:
             if ('inParameterFile' not in configDict):
                 raise ValueError("Must provide inParameterFile for cycleNumber > 0")
             self.inParameterFile = configDict['inParameterFile']
             if ('inFlagStarFile' not in configDict):
                 raise ValueError("Must provide inFlagStarFile for cycleNumber > 0")
             self.inFlagStarFile = configDict['inFlagStarFile']
-        else:
-            self.inParameterFile = None
-            self.inFlagStarFile = None
+
 
         if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
             raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
@@ -362,7 +363,7 @@ class FgcmConfig(object):
 
         ccdOffsets = fitsio.read(configDict['ccdOffsetFile'], ext=1)
 
-        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets)
+        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=True)
 
 
     def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
