@@ -898,6 +898,36 @@ class FgcmStars(object):
 
         import fitsio
 
+        #objID = snmm.getArray(self.objIDHandle)
+        #objFlag = snmm.getArray(self.objFlagHandle)
+
+        # we only store VARIABLE and RESERVED stars
+        # everything else should be recomputed based on the good exposures, calibrations, etc
+        #flagMask = (objFlagDict['VARIABLE'] |
+        #            objFlagDict['RESERVED'])
+
+        #flagged,=np.where((objFlag & flagMask) > 0)
+
+        #self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
+        #                 (flagged.size,flagStarFile))
+
+        #flagObjStruct = np.zeros(flagged.size,dtype=[('OBJID',objID.dtype),
+        #                                             ('OBJFLAG',objFlag.dtype)])
+        #flagObjStruct['OBJID'] = objID[flagged]
+        #flagObjStruct['OBJFLAG'] = objFlag[flagged]
+
+        flagObjStruct = self.getFlagStarIndices()
+
+        self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
+                         (flagObjStruct.size,flagStarFile))
+
+        # set clobber == True?
+        fitsio.write(flagStarFile,flagObjStruct,clobber=True)
+
+    def getFlagStarIndices(self):
+        """
+        """
+        
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
@@ -908,15 +938,9 @@ class FgcmStars(object):
 
         flagged,=np.where((objFlag & flagMask) > 0)
 
-        self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
-                         (flagged.size,flagStarFile))
-
         flagObjStruct = np.zeros(flagged.size,dtype=[('OBJID',objID.dtype),
                                                      ('OBJFLAG',objFlag.dtype)])
         flagObjStruct['OBJID'] = objID[flagged]
         flagObjStruct['OBJFLAG'] = objFlag[flagged]
 
-        # set clobber == True?
-        fitsio.write(flagStarFile,flagObjStruct,clobber=True)
-
-
+        return flagObjStruct
