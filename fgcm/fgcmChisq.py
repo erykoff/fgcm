@@ -313,6 +313,7 @@ class FgcmChisq(object):
 
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
         obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
@@ -328,6 +329,7 @@ class FgcmChisq(object):
         # cut these down now, faster later
         obsObjIDIndexGO = obsObjIDIndex[goodObs]
         obsBandIndexGO = obsBandIndex[goodObs]
+        obsLUTFilterIndexGO = obsLUTFilterIndex[goodObs]
         obsExpIndexGO = obsExpIndex[goodObs]
         obsSecZenithGO = obsSecZenith[goodObs]
         obsCCDIndexGO = obsCCDIndex[goodObs]
@@ -340,7 +342,7 @@ class FgcmChisq(object):
         # add GO to index names that are cut to goodObs
         # add GOF to index names that are cut to goodObs[obsFitUseGO]
 
-        lutIndicesGO = self.fgcmLUT.getIndices(obsBandIndexGO,
+        lutIndicesGO = self.fgcmLUT.getIndices(obsLUTFilterIndexGO,
                                                self.fgcmPars.expPWV[obsExpIndexGO],
                                                self.fgcmPars.expO3[obsExpIndexGO],
                                                #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
@@ -412,7 +414,7 @@ class FgcmChisq(object):
                                                obsBandIndexGO] * I10GO) /
                                   (1.0 + objSEDSlope[obsObjIDIndexGO,
                                                      obsBandIndexGO] *
-                                   self.fgcmLUT.I10Std[obsBandIndexGO]))
+                                   self.fgcmLUT.I10Std[obsLUTFilterIndexGO]))
 
         if self.noChromaticCorrections:
             # NOT RECOMMENDED

@@ -12,6 +12,9 @@ from fgcmUtilities import expFlagDict
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
+## FIXME with plotter!
+## also note retrieval!
+
 class FgcmZeropoints(object):
     """
     """
@@ -168,7 +171,7 @@ class FgcmZeropoints(object):
                            np.cos(ccdDec) * self.fgcmPars.cosLatitude * np.cos(ccdHA))
 
         # and do the LUT lookups
-        lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expBandIndex[zpExpIndex],
+        lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expLUTFilterIndex[zpExpIndex],
                                              self.fgcmPars.expPWV[zpExpIndex],
                                              self.fgcmPars.expO3[zpExpIndex],
                                              #np.log(self.fgcmPars.expTau[zpExpIndex]),

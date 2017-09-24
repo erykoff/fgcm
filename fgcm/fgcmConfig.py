@@ -19,9 +19,10 @@ class FgcmConfig(object):
     """
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
-        requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile',
+        requiredKeys=['bands','fitBands','extraBands','bandAlias',
+                      'exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
-                      'ccdField','latitude','seeingField','fitBands','extraBands',
+                      'ccdField','latitude','seeingField',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr',
                       'aperCorrFitNBins','illegalValue','sedFitBandFudgeFactors',
@@ -47,6 +48,10 @@ class FgcmConfig(object):
             if (key not in configDict):
                 raise ValueError("required %s not in configFile" % (key))
 
+        self.bands = np.array(configDict['bands'])
+        self.fitBands = np.array(configDict['fitBands'])
+        self.extraBands = np.array(configDict['extraBands'])
+        self.bandAlias = np.array(configDict['bandAlias'])
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
         self.obsFile = configDict['obsFile']
@@ -62,8 +67,6 @@ class FgcmConfig(object):
         self.deepFlag = configDict['deepFlag']
         self.cosLatitude = np.cos(np.radians(self.latitude))
         self.sinLatitude = np.sin(np.radians(self.latitude))
-        self.fitBands = np.array(configDict['fitBands'])
-        self.extraBands = np.array(configDict['extraBands'])
         self.nCore = int(configDict['nCore'])
         self.brightObsGrayMax = float(configDict['brightObsGrayMax'])
         self.minStarPerCCD = int(configDict['minStarPerCCD'])
@@ -237,7 +240,8 @@ class FgcmConfig(object):
         #lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
         self.nCCD = lutIndex['NCCD'][0]
-        self.bands = lutIndex['BANDS'][0]
+        #self.bands = lutIndex['BANDS'][0]
+        self.lutFilterNames = lutIndex['FILTERNAME'][0]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -251,12 +255,38 @@ class FgcmConfig(object):
         if (self.extraBands.size > 0):
             self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
-        bandString = ''
-        for b in self.bands: bandString += b + ' '
+        # band checks:
+        #  1) check that all the filters in bandAlias are in lutFilterNames
+        #  2) check that all the bands are in bandAlias
+        #  3) check that all the fitBands are in bands
+        #  4) check that all the extraBands are in bands
+
+        for filterName in self.bandAlias:
+            test,=np.where(filterName == self.lutFilterNames)
+            if (test.size == 0):
+                raise ValueError("Filter %s from bandAlias not in LUT" % (filterName))
+        for band in self.bands:
+            found = False
+            for filterName in self.bandAlias:
+                if self.bandAlias[filterName] == band:
+                    found=True
+                    break
+            if not found:
+                raise ValueError("Band %s from bands not in bandAlias" % (band))
+        for fitBand in self.fitBands:
+            test,=np.where(fitBand == self.bands)
+            if (test.size == 0):
+                raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
+        for extraBand in self.extraBands:
+            test,=np.where(extraBand == self.bands)
+            if (test.size == 0):
+                raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
+
+        bandString = " ".join(self.bands)
         self.fgcmLog.log('INFO','Found %d CCDs and %d bands (%s)' %
                          (self.nCCD,self.bands.size,bandString))
 
-        #lutStd = fitsio.read(self.lutFile,ext='STD')
+        # get LUT standard values
         self.pmbStd = lutStd['PMBSTD'][0]
         self.pwvStd = lutStd['PWVSTD'][0]
         self.o3Std = lutStd['O3STD'][0]
@@ -321,17 +351,29 @@ class FgcmConfig(object):
         self.washMJDs = self.washMJDs[gd]
 
         # and deal with fit band indices and extra band indices
-        self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
-        self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
+        #self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
+        #self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
+        #for i in xrange(self.bands.size):
+        #    if (self.bands[i] in self.fitBands):
+        #        self.bandRequired[i] = True
+        #    if (self.extraBands.size > 0):
+        #        if (self.bands[i] in self.extraBands):
+        #            self.bandExtra[i] = True
+        #        if (self.bands[i] in self.fitBands and
+        #            self.bands[i] in self.extraBands):
+        #            raise ValueError("Cannot have the same band as fit and extra")
+        self.bandRequiredFlag = np.zeros(self.bands.size, dtype=np.bool)
+        self.bandExtraFlag = np.zeros(self.bands.size, dtype=np.bool)
         for i in xrange(self.bands.size):
             if (self.bands[i] in self.fitBands):
-                self.bandRequired[i] = True
+                self.bandRequiredFlag[i] = True
             if (self.extraBands.size > 0):
                 if (self.bands[i] in self.extraBands):
-                    self.bandExtra[i] = True
+                    self.bandExtraFlag[i] = True
                 if (self.bands[i] in self.fitBands and
                     self.bands[i] in self.extraBands):
                     raise ValueError("Cannot have the same band as fit and extra")
+
 
         # and check the star color cuts and replace with indices...
         #  note that self.starColorCuts is a copy so that we don't overwrite.

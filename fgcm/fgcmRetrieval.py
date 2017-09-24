@@ -21,7 +21,6 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
-
 class FgcmRetrieval(object):
     """
     """
@@ -35,7 +34,8 @@ class FgcmRetrieval(object):
 
         self.fgcmStars = fgcmStars
 
-        self.I0Std = fgcmLUT.I0Std
+        ## FIXME
+        #self.I0Std = fgcmLUT.I0Std
         self.I10Std = fgcmLUT.I10Std
 
         # and record configuration variables
@@ -173,6 +173,7 @@ class FgcmRetrieval(object):
 
         obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
+        #obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
         obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
@@ -195,6 +196,7 @@ class FgcmRetrieval(object):
                                            obsBandIndexGO]**2.)
 
         # and to flux space
+        ## FIXME: why don't I have a I10Std here?
         fObsGO = 10.**(-0.4*deltaMagGO)
         fObsErr2GO = deltaMagErr2GO * ((2.5/np.log(10.)) * fObsGO)**2.
         deltaStdGO = (1.0 + objSEDSlope[obsObjIDIndexGO,
@@ -275,6 +277,7 @@ class FgcmRetrieval(object):
 
 
     def computeRetrievedIntegrals(self,debug=False):
+        ### THIS IS NOT USED I THINK
         """
         """
 
@@ -298,6 +301,7 @@ class FgcmRetrieval(object):
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
@@ -352,7 +356,7 @@ class FgcmRetrieval(object):
         fObsErr2 = deltaMagErr2 * ((2.5/np.log(10.)) * fObs)**2.
         deltaStd = (1.0 + objSEDSlope[obsObjIDIndex[obsIndex],
                                       obsBandIndex[obsIndex]] *
-                    self.I10Std[obsBandIndex[obsIndex]])
+                    self.I10Std[obsLUTFilterIndex[obsIndex]])
         deltaStdWeight = fObsErr2 * deltaStd * deltaStd
 
         # do all the exp/ccd sums

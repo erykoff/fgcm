@@ -60,14 +60,15 @@ class FgcmSuperStarFlat(object):
         self.fgcmLog.log('INFO','SuperStarFlats based on %d exposures' % (gd.size))
 
         # sum up ccdGray values
+        #  note that this is done per *filter* not per *band*
         np.add.at(deltaSuperStarFlat,
                   (self.fgcmPars.expEpochIndex[expIndexUse],
-                   self.fgcmPars.expBandIndex[expIndexUse],
+                   self.fgcmPars.expLUTFilterIndex[expIndexUse],
                    ccdIndexUse),
                   ccdGray[expIndexUse,ccdIndexUse])
         np.add.at(deltaSuperStarFlatNCCD,
                   (self.fgcmPars.expEpochIndex[expIndexUse],
-                   self.fgcmPars.expBandIndex[expIndexUse],
+                   self.fgcmPars.expLUTFilterIndex[expIndexUse],
                    ccdIndexUse),
                   1)
 
@@ -81,14 +82,15 @@ class FgcmSuperStarFlat(object):
         ## MAYBE: change fgcmGray to remove the deltaSuperStarFlat?
         ##  or we can rely on the iterations.  Try that first.
 
+        ## FIXME
         self.deltaSuperStarFlatMean = np.zeros((self.fgcmPars.nEpochs,
-                                                self.fgcmPars.nBands),dtype='f8')
+                                                self.fgcmPars.nLUTFilter),dtype='f8')
         self.deltaSuperStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
         self.superStarFlatMean = np.zeros_like(self.deltaSuperStarFlatMean)
         self.superStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
 
         for i in xrange(self.fgcmPars.nEpochs):
-            for j in xrange(self.fgcmPars.nBands):
+            for j in xrange(self.fgcmPars.nLUTFilter):
                 use,=np.where(deltaSuperStarFlatNCCD[i,j,:] > 0)
 
                 if use.size < 3:
@@ -98,12 +100,13 @@ class FgcmSuperStarFlat(object):
                 self.deltaSuperStarFlatSigma[i,j] = np.std(deltaSuperStarFlat[i,j,use])
                 self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use])
                 self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use])
-                self.fgcmLog.log('INFO','Superstar epoch %d band %s: %.4f +/- %.4f' %
-                                 (i,self.fgcmPars.bands[j],
+                self.fgcmLog.log('INFO','Superstar epoch %d filter %s: %.4f +/- %.4f' %
+                                 (i,self.fgcmPars.lutFilterNames[j],
                                   self.superStarFlatMean[i,j],
                                   self.superStarFlatSigma[i,j]))
-                self.fgcmLog.log('INFO','DeltaSuperStar epoch %d band %s: %.4f +/- %.4f' %
-                                 (i,self.fgcmPars.bands[j],
+
+                self.fgcmLog.log('INFO','DeltaSuperStar epoch %d filter %s: %.4f +/- %.4f' %
+                                 (i,self.fgcmPars.lutFilterNames[j],
                                   self.deltaSuperStarFlatMean[i,j],
                                   self.deltaSuperStarFlatSigma[i,j]))
 
@@ -132,7 +135,7 @@ class FgcmSuperStarFlat(object):
         from fgcmUtilities import plotCCDMap
 
         for i in xrange(self.fgcmPars.nEpochs):
-            for j in xrange(self.fgcmPars.nBands):
+            for j in xrange(self.fgcmPars.nLUTFilter):
                 # only do those that had a non-zero number of CCDs to fit in this epoch
                 if (nCCDArray is not None):
                     use,=np.where(nCCDArray[i,j,:] > 0)
@@ -150,7 +153,7 @@ class FgcmSuperStarFlat(object):
                 plotCCDMap(ax, self.ccdOffsets[use], superStarArray[i,j,use],
                            'Superflat Correction (mag)')
 
-                text = r'$(%s)$' % (self.fgcmPars.bands[j]) + '\n' + \
+                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[j]) + '\n' + \
                     r'%.4f +/- %.4f' % (superStarMean[i,j],superStarSigma[i,j])
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
@@ -159,7 +162,7 @@ class FgcmSuperStarFlat(object):
                 fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
                                                     self.outfileBaseWithCycle,
                                                     name,
-                                                    self.fgcmPars.bands[j],
+                                                    self.fgcmPars.lutFilterNames[j],
                                                     self.epochNames[i]))
 
 

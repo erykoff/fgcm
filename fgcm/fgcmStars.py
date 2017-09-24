@@ -53,14 +53,13 @@ class FgcmStars(object):
 
         self.lambdaStd = fgcmConfig.lambdaStd
 
-        #self.bandRequired = np.zeros(self.nBands,dtype=np.bool)
-        #for i in xrange(self.nBands):
-        #    if (self.bands[i] in self.fitBands):
-        #        self.bandRequired[i] = True
-        self.bandRequired = fgcmConfig.bandRequired
-        self.bandRequiredIndex = np.where(self.bandRequired)[0]
-        self.bandExtra = fgcmConfig.bandExtra
-        self.bandExtraIndex = np.where(self.bandExtra)[0]
+        self.bandRequiredFlag = fgcmConfig.bandRequiredFlag
+        self.bandRequiredIndex = np.where(self.bandRequiredFlag)[0]
+        self.bandExtraFlag = fgcmConfig.bandExtraFlag
+        self.bandExtraIndex = np.where(self.bandExtraFlag)[0]
+
+        self.lutFilterNames = fgcmConfig.lutFilterNames
+        self.bandAlias = fgcmConfig.bandAlias
 
         #self.expArray = fgcmPars.expArray
 
@@ -108,7 +107,8 @@ class FgcmStars(object):
         self.fgcmLog.log('INFO','Done reading in %d unique star positions in %.1f secondds.' %
                          (pos.size, time.time() - startTime))
 
-        obsBand = np.core.defchararray.strip(obs['BAND'][:])
+        #obsBand = np.core.defchararray.strip(obs['BAND'][:])
+        obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
 
         if (self.inFlagStarFile is not None):
             self.fgcmLog.log('INFO', 'Reading in list of previous flagged stars from %s' %
@@ -130,7 +130,7 @@ class FgcmStars(object):
                        obs['DEC'],
                        obs['MAG'],
                        obs['MAGERR'],
-                       obsBand,
+                       obsFilterName,
                        pos['FGCM_ID'],
                        pos['RA'],
                        pos['DEC'],
@@ -146,7 +146,7 @@ class FgcmStars(object):
         pos = None
 
     def loadStars(self, fgcmPars,
-                  obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsBand,
+                  obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
@@ -168,6 +168,8 @@ class FgcmStars(object):
         self.obsCCDHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsBandIndex: band index of individual observation
         self.obsBandIndexHandle = snmm.createArray(self.nStarObs,dtype='i2')
+        #  obsLUTFilterIndex: filter index in LUT of individual observation
+        self.obsLUTFilterIndexHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsFlag: individual bad observation
         self.obsFlagHandle = snmm.createArray(self.nStarObs,dtype='i2')
         #  obsRA: RA of individual observation
@@ -224,16 +226,28 @@ class FgcmStars(object):
             self.fgcmLog.log('INFO','Flagging %d observations with no associated exposure.' %
                              (bad.size))
 
+        # match bands and filters to indices
         startTime = time.time()
         self.fgcmLog.log('INFO','Matching observations to bands.')
-        # and match bands to indices
-        #bandStrip = np.core.defchararray.strip(obs['BAND'][:])
-        for i in xrange(self.nBands):
-            #use, = np.where(bandStrip == self.bands[i])
-            use, = np.where(obsBand == self.bands[i])
-            if (use.size == 0):
-                raise ValueError("No observations in band %s!" % (self.bands[i]))
-            snmm.getArray(self.obsBandIndexHandle)[use] = i
+
+        #for i in xrange(self.nBands):
+        #    use, = np.where(obsBand == self.bands[i])
+        #    if (use.size == 0):
+        #        raise ValueError("No observations in band %s!" % (self.bands[i]))
+        #    snmm.getArray(self.obsBandIndexHandle)[use] = i
+
+        # new version for multifilter support
+        # First, we have the filterNames
+        for filterIndex,filterName in enumerate(self.lutFilterNames.size):
+            bandIndex, = np.where(self.bandAlias[filterName] == self.bands)
+
+            use, = np.where(obsFilterName == filterName)
+            if use.size == 0:
+                self.fgcmLog.log('INFO','WARNING: no observations in filter %s' % (filterName))
+            else:
+                snmm.getArray(self.obsLUTFilterIndexHandle)[use] = filterIndex
+                snmm.getArray(self.obsBandIndexHandle)[use] = bandIndex
+
         self.fgcmLog.log('INFO','Observations matched in %.1f seconds.' %
                          (time.time() - startTime))
 

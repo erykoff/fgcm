@@ -60,6 +60,10 @@ class FgcmParameters(object):
         self.extraBands = fgcmConfig.extraBands
         self.nExtraBands = self.extraBands.size
 
+        self.lutFilterNames = fgcmConfig.lutFilterNames
+        self.nLUTFilter = self.lutFilterNames.size
+        self.bandAlias = fgcmConfig.bandAlias
+
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
         self.o3Std = fgcmConfig.o3Std
@@ -186,7 +190,8 @@ class FgcmParameters(object):
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
-        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
+        #self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
+        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD),dtype=np.float32)
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -214,6 +219,7 @@ class FgcmParameters(object):
             #self.parExternalTauOffset = 0.0
 
         # and the aperture corrections
+        ## FIXME: should these be per band or filter??
         self.compAperCorrPivot = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrSlope = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
@@ -391,7 +397,10 @@ class FgcmParameters(object):
         """
         """
 
-        self.bandIndex = np.arange(self.nBands,dtype='i2')
+        ## FIXME
+
+        #self.bandIndex = np.arange(self.nBands,dtype='i2')
+        #self.lutFilterIndex = np.arange(self.nBands,dtype='i2')
         self.fitBandIndex = np.zeros(self.nFitBands,dtype='i2')
         self.extraBandIndex = np.zeros(self.nExtraBands,dtype='i2')
 
@@ -470,12 +479,26 @@ class FgcmParameters(object):
         self.expPmb = expInfo['PMB']
 
         # link exposures to bands
-        self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
-        for i in xrange(self.bands.size):
-            use,=np.where(self.bands[i] == np.core.defchararray.strip(expInfo['BAND']))
-            self.expBandIndex[use] = i
+        #self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
+        #for i in xrange(self.bands.size):
+        #    use,=np.where(self.bands[i] == np.core.defchararray.strip(expInfo['BAND']))
+        #    self.expBandIndex[use] = i
 
-        bad,=np.where(self.expBandIndex < 0)
+        self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
+        self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
+        expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
+        for filterIndex,filterName in enumerate(self.lutFilterNames):
+            bandIndex, = np.where(self.bandAlias[filterName] == self.bands)
+
+            use,=np.where(expFilterName == filterName)
+            if use.size == 0:
+                self.fgcmLog.log('INFO','WARNING: no exposures in filter %s' % (filterName))
+            else:
+                self.expBandIndex[use] = bandIndex
+                self.expLUTFilterIndex[use] = filterIndex
+
+        #bad,=np.where(self.expBandIndex < 0)
+        bad,=np.where(self.expLUTFilterIndex < 0)
         if (bad.size > 0):
             self.fgcmLog.log('INFO','***Warning: %d exposures with band not in LUT!' % (bad.size))
             self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
@@ -625,6 +648,7 @@ class FgcmParameters(object):
         # this can be run without fits
 
         dtype=[('NCCD','i4'),
+               ('LUTFILTERNAMES','a2',self.lutFilterNames.size),
                ('BANDS','a2',self.bands.size),
                ('FITBANDS','a2',self.fitBands.size),
                ('EXTRABANDS','a2',self.extraBands.size),
@@ -648,6 +672,7 @@ class FgcmParameters(object):
 
         parInfo=np.zeros(1,dtype=dtype)
         parInfo['NCCD'] = self.nCCD
+        parInfo['LUTFILTERNAMES'] = self.lutFilterNames
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
         parInfo['EXTRABANDS'] = self.extraBands
@@ -1148,7 +1173,7 @@ class FgcmParameters(object):
         expCCDSuperStar = np.zeros((self.nExp,self.nCCD),dtype='f8')
 
         expCCDSuperStar[:,:] = self.parSuperStarFlat[self.expEpochIndex,
-                                                     self.expBandIndex,
+                                                     self.expLUTFilterIndex,
                                                      :]
 
         return expCCDSuperStar
@@ -1160,6 +1185,7 @@ class FgcmParameters(object):
 
         expApertureCorrection = np.zeros(self.nExp,dtype='f8')
 
+        ## FIXME if changing aperture correction
         expSeeingVariableClipped = np.clip(self.expSeeingVariable,
                                            self.compAperCorrRange[0,self.expBandIndex],
                                            self.compAperCorrRange[1,self.expBandIndex])
@@ -1247,6 +1273,7 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names  (bandLike or something)
+        ## FIXME with aliases?  actually, these are the aliases
         gBandIndex,=np.where(self.bands=='g')[0]
         rBandIndex,=np.where(self.bands=='r')[0]
 
