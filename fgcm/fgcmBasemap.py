@@ -76,7 +76,7 @@ class FgcmBasemap(Basemap):
             self.set_defaults(kw,v)
             self.annotate(**kw)
 
-    def draw_hpxmap(self, hpxmap, xsize=1600, **kwargs):
+    def draw_hpxmap(self, hpxmap, xsize=1600, percRange=[0.1,99.9], **kwargs):
         """
         Use pcolormesh to draw healpix map
         """
@@ -84,7 +84,7 @@ class FgcmBasemap(Basemap):
             mask = ~np.isfinite(hpxmap) | (hpxmap==healpy.UNSEEN)
             hpxmap = np.ma.MaskedArray(hpxmap,mask=mask)
 
-        vmin,vmax = np.percentile(hpxmap.compressed(),[0.1,99.9])
+        vmin,vmax = np.percentile(hpxmap.compressed(),percRange)
 
         defaults = dict(latlon=True, rasterized=True, vmin=vmin, vmax=vmax)
         self.set_defaults(kwargs,defaults)
