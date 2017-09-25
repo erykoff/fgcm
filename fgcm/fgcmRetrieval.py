@@ -192,7 +192,8 @@ class FgcmRetrieval(object):
         fObsGO = 10.**(-0.4*deltaMagGO)
         fObsErr2GO = deltaMagErr2GO * ((2.5/np.log(10.)) * fObsGO)**2.
         deltaStdGO = (1.0 + objSEDSlope[obsObjIDIndexGO,
-                                        obsBandIndexGO])
+                                        obsBandIndexGO] *
+                      self.I10Std[obsBandIndexGO])
         deltaStdWeightGO = 1./(fObsErr2GO * deltaStdGO * deltaStdGO)
 
         # and compress obsExpIndexGO
