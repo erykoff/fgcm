@@ -148,6 +148,7 @@ def plot_hpxmap_hist(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     return fig,[ax1,ax2],ret
 
 def plot_hpxmap(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
+                percRange=[0.1,99.9],
                 cbar_kwargs=dict(),hpxmap_kwargs=dict()):
     if isinstance(hpxmap,basestring):
         hpxmap = healpy.read_map(f)
@@ -159,7 +160,7 @@ def plot_hpxmap(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     bmap = FgcmBasemap(lonRef=lonRef,raMin=raRange[0],raMax=raRange[1],
                        decMin=decRange[0],decMax=decRange[1])
     bmap.create_axes(rect=gridspec[0:2])
-    im = bmap.draw_hpxmap(hpxmap,**hpxmap_kwargs)
+    im = bmap.draw_hpxmap(hpxmap,percRange=percRange,**hpxmap_kwargs)
     bmap.draw_inset_colorbar(**cbar_kwargs)
     ax = plt.gca()
     ax.axis['right'].major_ticklabels.set_visible(False)
