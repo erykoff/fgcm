@@ -173,7 +173,7 @@ class FgcmRetrieval(object):
 
         obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
-        #obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
+        obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
         obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
