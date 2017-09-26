@@ -45,6 +45,9 @@ class FgcmChisq(object):
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
 
+        # these are the standard *band* I10s
+        self.I10StdBand = fgcmConfig.I10StdBand
+
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
         else:
@@ -414,7 +417,7 @@ class FgcmChisq(object):
                                                obsBandIndexGO] * I10GO) /
                                   (1.0 + objSEDSlope[obsObjIDIndexGO,
                                                      obsBandIndexGO] *
-                                   self.fgcmLUT.I10Std[obsLUTFilterIndexGO]))
+                                   self.I10StdBand[obsBandIndexGO]))
 
         if self.noChromaticCorrections:
             # NOT RECOMMENDED
