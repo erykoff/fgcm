@@ -706,7 +706,7 @@ class FgcmLUT(object):
             # just set up a 1-1 mapping
             self.bandAlias = {}
             for filterName in self.filterNames:
-                self.bandAlias[filterName] = filterName
+                self.bandAlias[filterName] = [filterName,1]
         else:
             self.bandAlias = bandAlias
 
@@ -914,8 +914,8 @@ class FgcmLUT(object):
 
         alphaFilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName] == 'g' or
-                self.bandAlias[filterName] == 'r'):
+            if (self.bandAlias[filterName][0] == 'g' or
+                self.bandAlias[filterName][0] == 'r'):
                 alphaFilterIndex = i
                 break
         if (alphaFilterIndex == -1):
@@ -936,9 +936,9 @@ class FgcmLUT(object):
         #                (fitBands == 'r'))
         alphaNAffectedBands = 0
         for filterName in self.filterNames:
-            if (self.bandAlias[filterName] == 'u' or
-                self.bandAlias[filterName] == 'g' or
-                self.bandAlias[filterName] == 'r'):
+            if (self.bandAlias[filterName][0] == 'u' or
+                self.bandAlias[filterName][0] == 'g' or
+                self.bandAlias[filterName][0] == 'r'):
                 alphaNAffectedBands += 1
 
         #unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
@@ -951,7 +951,7 @@ class FgcmLUT(object):
 
         pwvFilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName] == 'z'):
+            if (self.bandAlias[filterName][0] == 'z'):
                 pwvFilterIndex = i
                 break
         if pwvFilterIndex == -1:
@@ -971,9 +971,9 @@ class FgcmLUT(object):
         #unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
         pwvNAffectedBands = 0
         for filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName] == 'z' or
-                self.bandAlias[filterName] == 'y' or
-                self.bandAlias[filterName] == 'Y'):
+            if (self.bandAlias[filterName][0] == 'z' or
+                self.bandAlias[filterName][0] == 'y' or
+                self.bandAlias[filterName][0] == 'Y'):
                 pwvNAffectedBands += 1
         unitDict['pwvUnit'] *= float(pwvNAffectedBands) / float(fitBands.size)
 
@@ -989,7 +989,7 @@ class FgcmLUT(object):
         #    raise ValueError("Require r band for O3...")
         o3FilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if self.bandAlias[filterName] == 'r':
+            if self.bandAlias[filterName][0] == 'r':
                 o3FilterIndex = i
                 break
         if o3FilterIndex == -1:
@@ -1008,7 +1008,7 @@ class FgcmLUT(object):
         #unitDict['o3Unit'] *= float(use.size) / float(fitBands.size)
         o3NAffectedBands = 0
         for filterName in self.filterNames:
-            if self.bandAlias[filterName] == 'r':
+            if self.bandAlias[filterName][0] == 'r':
                 o3NAffectedBands += 1
         unitDict['o3Unit'] *= float(o3NAffectedBands) / float(fitBands.size)
 
