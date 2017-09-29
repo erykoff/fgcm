@@ -7,20 +7,7 @@ import esutil
 import glob
 import healpy as hp
 
-def resourceUsage(where):
-    status = None
-    result = {'peak':0, 'rss':0}
-    try:
-        status = open('/proc/self/status')
-        for line in status:
-            parts = line.split()
-            key = parts[0][2:-1].lower()
-            if key in result:
-                result[key] = int(parts[1])/1000
-        print('Memory usage at %s:  %d MB current and %d MB peak.'  %(where, result['rss'], result['peak']))
-    except:
-        print('Could not find self status.')
-    return
+from fgcmLogger import FgcmLogger
 
 
 class FgcmMakeStars(object):
@@ -53,6 +40,11 @@ class FgcmMakeStars(object):
                     break
             if not found:
                 raise ValueError("requiredBand %s not in bandAlias!" % (reqBand))
+
+        if 'logger' in starConfig:
+            self.fgcmLog = starConfig['logger']
+        else:
+            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
 
 
     def runFromFits(self, clobber=False):
@@ -120,7 +112,8 @@ class FgcmMakeStars(object):
 
         if (not clobber):
             if (os.path.isfile(obsIndexFile)):
-                print("Found %s " % (obsIndexFile))
+                #print("Found %s " % (obsIndexFile))
+                self.fgcmLog.info("Found %s " % (obsIndexFile))
                 return
 
 
@@ -151,10 +144,12 @@ class FgcmMakeStars(object):
         try:
             import smatch
             hasSmatch = True
-            print("Good news!  smatch is available.")
+            #print("Good news!  smatch is available.")
+            self.fgcmLog.info("Good news!  smatch is available.")
         except:
             hasSmatch = False
-            print("Bad news.  smatch not found.")
+            #print("Bad news.  smatch not found.")
+            self.fgcmLog.info("Bad news.  smatch not found.")
 
         if (raArray.size != decArray.size):
             raise ValueError("raArray, decArray must be same length.")
@@ -191,8 +186,10 @@ class FgcmMakeStars(object):
         else:
             cutBrightStars = False
 
-        print("Matching %s observations in the referenceBand catalog to itself" %
-              (raArray.size))
+        #print("Matching %s observations in the referenceBand catalog to itself" %
+        #      (raArray.size))
+        self.fgcmLog.info("Matching %s observations in the referenceBand catalog to itself" %
+                          (raArray.size))
 
         dtype=[('FGCM_ID','i4'),
                ('RA','f8'),
@@ -322,12 +319,12 @@ class FgcmMakeStars(object):
 
         self.objCat['FGCM_ID'] = np.arange(count)+1
 
-        print("Found %d unique objects with >= %d observations in %s band." %
-              (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
+        self.fgcmLog.info("Found %d unique objects with >= %d observations in %s band." %
+                          (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
 
 
         if (cutBrightStars):
-            print("Matching to bright stars for masking...")
+            self.fgcmLog.info("Matching to bright stars for masking...")
             if (hasSmatch):
                 # faster smatch...
 
@@ -346,11 +343,11 @@ class FgcmMakeStars(object):
                 i1=matches[0]
                 i2=matches[1]
 
-            print("Cutting %d objects too near bright stars." % (i2.size))
+            self.fgcmLog.info("Cutting %d objects too near bright stars." % (i2.size))
             self.objCat = np.delete(self.objCat,i2)
 
         # and remove stars with near neighbors
-        print("Matching stars to neighbors...")
+        self.fgcmLog.info("Matching stars to neighbors...")
         if (hasSmatch):
             # faster smatch...
 
@@ -375,7 +372,7 @@ class FgcmMakeStars(object):
 
         if (use.size > 0):
             neighbored = np.unique(i2[use])
-            print("Cutting %d objects within %.2f arcsec of a neighbor" %
+            self.fgcmLog.info("Cutting %d objects within %.2f arcsec of a neighbor" %
                   (neighbored.size, self.starConfig['isolationRadius']))
             self.objCat = np.delete(self.objCat, neighbored)
 
@@ -407,7 +404,7 @@ class FgcmMakeStars(object):
             bandArray[use] = self.starConfig['bandAlias'][filterName][0]
 
 
-        print("Matching positions to observations...")
+        self.fgcmLog.info("Matching positions to observations...")
 
         if (hasSmatch):
             # faster smatch...
@@ -430,7 +427,7 @@ class FgcmMakeStars(object):
             i1 = matches[0]
             i2 = matches[1]
 
-        print("Collating observations")
+        self.fgcmLog.info("Collating observations")
         nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
 
         if (nObsPerObj.size != self.objCat.size):
@@ -443,7 +440,7 @@ class FgcmMakeStars(object):
         reqBands = np.array(self.starConfig['requiredBands'])
 
         # this could be made more efficient
-        print("Computing number of observations per band")
+        self.fgcmLog.info("Computing number of observations per band")
         nObs = np.zeros((reqBands.size, self.objCat.size), dtype='i4')
         for i in xrange(reqBands.size):
             use,=np.where(bandArray[i2] == reqBands[i])
@@ -461,7 +458,7 @@ class FgcmMakeStars(object):
         # make sure we have enough per band
         gd,=np.where(minObs >= self.starConfig['minPerBand'])
         objClass[gd] = 1
-        print("There are %d stars with at least %d observations in each required band." %
+        self.fgcmLog.info("There are %d stars with at least %d observations in each required band." %
               (gd.size, self.starConfig['minPerBand']))
 
 
@@ -475,7 +472,7 @@ class FgcmMakeStars(object):
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
-        print("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
+        self.fgcmLog.info("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
         for i in xrange(high.size):
             i1a=rev[rev[high[i]]:rev[high[i]+1]]
             cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
@@ -505,7 +502,7 @@ class FgcmMakeStars(object):
         self.obsIndexCat = np.zeros(nTotObs,
                                     dtype=[('OBSINDEX','i4')])
         ctr = 0
-        print("Spooling out %d observation indices." % (nTotObs))
+        self.fgcmLog.info("Spooling out %d observation indices." % (nTotObs))
         for i in gd:
             self.obsIndexCat[ctr:ctr+nObsPerObj[i]] = i2[obsInd[obsInd[i]:obsInd[i+1]]]
             ctr+=nObsPerObj[i]

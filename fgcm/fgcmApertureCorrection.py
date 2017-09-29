@@ -17,7 +17,7 @@ class FgcmApertureCorrection(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.log('INFO','Initializing FgcmApertureCorrection')
+        self.fgcmLog.info('Initializing FgcmApertureCorrection')
 
         self.fgcmPars = fgcmPars
 
@@ -35,14 +35,14 @@ class FgcmApertureCorrection(object):
         """
 
         if (self.aperCorrFitNBins == 0):
-            self.fgcmLog.log('INFO','No aperture correction will be computed')
+            self.fgcmLog.info('No aperture correction will be computed')
             self.fgcmPars.compAperCorrPivot[:] = 0.0
             self.fgcmPars.compAperCorrSlope[:] = 0.0
             self.fgcmPars.compAperCorrSlopeErr[:] = 0.0
             return
 
         startTime=time.time()
-        self.fgcmLog.log('INFO','Computing aperture corrections with %d bins' %
+        self.fgcmLog.info('Computing aperture corrections with %d bins' %
                          (self.aperCorrFitNBins))
 
         # need to make a local copy since we're modifying
@@ -52,7 +52,7 @@ class FgcmApertureCorrection(object):
         # first, remove any previous correction if necessary...
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
-            self.fgcmLog.log('INFO','Removing old aperture corrections')
+            self.fgcmLog.info('Removing old aperture corrections')
 
             expSeeingVariableClipped = np.clip(self.fgcmPars.expSeeingVariable,
                                                self.fgcmPars.compAperCorrRange[0,self.fgcmPars.expBandIndex],
@@ -77,7 +77,7 @@ class FgcmApertureCorrection(object):
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
 
             if (use.size == 0):
-                self.fgcmLog.log('INFO','ApertureCorrection: No good observations in %s band.' % (self.fgcmPars.bands[i]))
+                self.fgcmLog.info('ApertureCorrection: No good observations in %s band.' % (self.fgcmPars.bands[i]))
                 continue
 
             # sort to set the range...
@@ -101,7 +101,7 @@ class FgcmApertureCorrection(object):
             # remove any empty bins...
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
             if (gd.size < 3):
-                self.fgcmLog.log('INFO','Warning: could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
+                self.fgcmLog.info('Warning: could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
 
@@ -119,7 +119,7 @@ class FgcmApertureCorrection(object):
                                  cov=True)
 
             if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
-                self.fgcmLog.log('INFO','Warning: Aperture correction computation failed for band %s' %
+                self.fgcmLog.info('Warning: Aperture correction computation failed for band %s' %
                                  (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
@@ -129,7 +129,7 @@ class FgcmApertureCorrection(object):
                 self.fgcmPars.compAperCorrSlope[i] = fit[0]
                 self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
 
-                self.fgcmLog.log('INFO','Aperture correction slope in band %s is %.4f +/- %.4f' %
+                self.fgcmLog.info('Aperture correction slope in band %s is %.4f +/- %.4f' %
                                  (self.fgcmPars.bands[i],
                                   self.fgcmPars.compAperCorrSlope[i],
                                   self.fgcmPars.compAperCorrSlopeErr[i]))
@@ -172,5 +172,5 @@ class FgcmApertureCorrection(object):
         ## MAYBE: modify ccd gray and exp gray?
         ##  could rely on the iterations taking care of this.
 
-        self.fgcmLog.log('INFO','Computed aperture corrections in %.2f seconds.' %
+        self.fgcmLog.info('Computed aperture corrections in %.2f seconds.' %
                          (time.time() - startTime))

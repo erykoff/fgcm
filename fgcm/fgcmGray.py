@@ -23,7 +23,7 @@ class FgcmGray(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing fgcmGray')
+        self.fgcmLog.info('Initializing fgcmGray')
 
         # need fgcmPars because it tracks good exposures
         #  also this is where the gray info is stored
@@ -87,7 +87,7 @@ class FgcmGray(object):
         # Note this computes ExpGray for all exposures, good and bad
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing ExpGray for initial selection')
+        self.fgcmLog.info('Computing ExpGray for initial selection')
 
         # useful numbers
         expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
@@ -137,7 +137,7 @@ class FgcmGray(object):
         gd,=np.where(obsFlag[goodObs] == 0)
         goodObs = goodObs[gd]
 
-        self.fgcmLog.log('INFO','FgcmGray initial exp gray using %d observations from %d good stars.' %
+        self.fgcmLog.info('FgcmGray initial exp gray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
 
         # and first, we only use the required bands
@@ -183,9 +183,9 @@ class FgcmGray(object):
         expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expNGoodStarForInitialSelection[gd]) -
                                              (expGrayForInitialSelection[gd])**2.)
 
-        self.fgcmLog.log('INFO','ExpGray for initial selection computed for %d exposures.' %
+        self.fgcmLog.info('ExpGray for initial selection computed for %d exposures.' %
                          (gd.size))
-        self.fgcmLog.log('INFO','Computed ExpGray for initial selection in %.2f seconds.' %
+        self.fgcmLog.info('Computed ExpGray for initial selection in %.2f seconds.' %
                          (time.time() - startTime))
 
         if (not doPlots):
@@ -235,7 +235,7 @@ class FgcmGray(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing CCDGray and ExpGray.')
+        self.fgcmLog.info('Computing CCDGray and ExpGray.')
 
         # Note: this computes the gray values for all exposures, good and bad
 
@@ -311,7 +311,7 @@ class FgcmGray(object):
         EGrayGO=EGrayGO[gd]
         EGrayErr2GO=EGrayErr2GO[gd]
 
-        self.fgcmLog.log('INFO','FgcmGray using %d observations from %d good stars.' %
+        self.fgcmLog.info('FgcmGray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
 
 
@@ -407,7 +407,7 @@ class FgcmGray(object):
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
-        self.fgcmLog.log('INFO','Computed CCDGray for %d CCDs' % (gd[0].size))
+        self.fgcmLog.info('Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
         bad = np.where(ccdNGoodStars < 2)
@@ -430,7 +430,7 @@ class FgcmGray(object):
                            (ccdGrayErr > 0.0) &
                            (ccdGrayErr < self.maxCCDGrayErr))
 
-        self.fgcmLog.log('INFO','For ExpGray, found %d good CCDs' %
+        self.fgcmLog.info('For ExpGray, found %d good CCDs' %
                          (goodCCD[0].size))
 
         # note: goodCCD[0] refers to the expIndex, goodCCD[1] to the CCDIndex
@@ -485,8 +485,8 @@ class FgcmGray(object):
 
         ##  per band we plot the expGray for photometric exposures...
 
-        self.fgcmLog.log('INFO','ExpGray computed for %d exposures.' % (gd.size))
-        self.fgcmLog.log('INFO','Computed CCDGray and ExpGray in %.2f seconds.' %
+        self.fgcmLog.info('ExpGray computed for %d exposures.' % (gd.size))
+        self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
                          (time.time() - startTime))
 
         #if (not doPlots):

@@ -25,7 +25,7 @@ class FgcmSigFgcm(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing FgcmSigFgcm')
+        self.fgcmLog.info('Initializing FgcmSigFgcm')
 
         # need fgcmPars because it has the sigFgcm
         self.fgcmPars = fgcmPars
@@ -48,7 +48,7 @@ class FgcmSigFgcm(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing sigFgcm.')
+        self.fgcmLog.info('Computing sigFgcm.')
 
         # input numbers
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -140,7 +140,7 @@ class FgcmSigFgcm(object):
                                      (gmiGO < gmiCutHigh[c]))
 
                 if (sigUse.size == 0):
-                    self.fgcmLog.log('INFO','sigFGCM: No good observations in %s band (color cut %d).' %
+                    self.fgcmLog.info('sigFGCM: No good observations in %s band (color cut %d).' %
                                      (self.fgcmPars.bands[bandIndex],c))
                     continue
 
@@ -155,11 +155,11 @@ class FgcmSigFgcm(object):
                                              np.median(EGrayErr2GO[sigUse]))
 
                 if (not np.isfinite(sigFgcm[bandIndex])):
-                    self.fgcmLog.log('INFO',"Failed to compute sigFgcm (%s) (%s).  Setting to 0.05?" %
+                    self.fgcmLog.info("Failed to compute sigFgcm (%s) (%s).  Setting to 0.05?" %
                                      (self.fgcmPars.bands[bandIndex],gmiCutNames[c]))
                     sigFgcm[bandIndex] = 0.05
 
-                self.fgcmLog.log('INFO',"sigFgcm (%s) (%s) = %.4f" % (
+                self.fgcmLog.info("sigFgcm (%s) (%s) = %.4f" % (
                         self.fgcmPars.bands[bandIndex],
                         gmiCutNames[c],
                         sigFgcm[bandIndex]))
@@ -194,8 +194,7 @@ class FgcmSigFgcm(object):
                                                             self.fgcmPars.bands[bandIndex],
                                                             gmiCutNames[c]))
 
-
-        self.fgcmLog.log('INFO','Done computing sigFgcm in %.2f sec.' %
+        self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
                          (time.time() - startTime))
 
 

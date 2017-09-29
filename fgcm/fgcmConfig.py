@@ -216,16 +216,29 @@ class FgcmConfig(object):
                 raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
 
         # set up logger are we get the name...
-        self.fgcmLog = FgcmLogger(logFile, self.logLevel, printOnly=configDict['printOnly'])
-
-        self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
+        if ('logger' not in configDict):
+            self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
+                                                     self.outfileBaseWithCycle),
+                                      self.logLevel)
+            self.fgcmLog.info('Logging started to %s' % (self.fgcmLog.logFile))
+        else:
+            # Support an external logger such as LSST that has .info() and .debug() calls
+            self.fgcmLog = configDict['logger']
+            try:
+                self.fgcmLog.info('Logging to external logger.')
+            except:
+                raise RuntimeError("Logging to configDict['logger'] failed.")
 
         if (self.experimentalMode) :
-            self.fgcmLog.log('INFO','ExperimentalMode set to True')
+            self.fgcmLog.info('ExperimentalMode set to True')
         if (self.resetParameters) :
             self.fgcmLog.log('INFO','Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
             self.fgcmLog.log('INFO','WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+
+        #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
+        #                                            self.cycleNumber)
+        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
 
         if (not os.path.isdir(self.plotPath)):
             try:
@@ -292,7 +305,7 @@ class FgcmConfig(object):
                 raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
 
         bandString = " ".join(self.bands)
-        self.fgcmLog.log('INFO','Found %d CCDs and %d bands (%s)' %
+        self.fgcmLog.info('Found %d CCDs and %d bands (%s)' %
                          (self.nCCD,self.bands.size,bandString))
 
         # get LUT standard values
@@ -426,7 +439,7 @@ class FgcmConfig(object):
         with open(configFile) as f:
             configDict = yaml.load(f)
 
-        ##self.fgcmLog.log('INFO','Configuration read from %s' % (configFile))
+        ##self.fgcmLog.info('Configuration read from %s' % (configFile))
         print("Configuration read from %s" % (configFile))
 
         return configDict

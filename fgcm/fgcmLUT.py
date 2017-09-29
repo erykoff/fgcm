@@ -11,8 +11,7 @@ from pkg_resources import resource_filename
 from modtranGenerator import ModtranGenerator
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
-## FIXME: add better logging
+from fgcmLogger import FgcmLogger
 
 
 class FgcmLUTMaker(object):
@@ -32,6 +31,11 @@ class FgcmLUTMaker(object):
 
         if (not os.path.isfile(self.stellarTemplateFile)):
             raise IOError("Could not find stellar template file")
+
+        if 'logger' in lutConfig:
+            self.fgcmLog = lutConfig['logger']
+        else:
+            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
 
     def _checkLUTConfig(self,lutConfig):
         """
@@ -116,7 +120,7 @@ class FgcmLUTMaker(object):
             if ('AVG' in throughputDict[filterName]):
                 tput['THROUGHPUT_AVG'][:] = throughputDict[filterName]['AVG']
             else:
-                print("Average throughput not found in throughputDict for filter %s.  Computing now..." % (filterName))
+                self.fgcmLog.info("Average throughput not found in throughputDict for filter %s.  Computing now..." % (filterName))
                 for i in xrange(lam.size):
                     use,=np.where(tput['THROUGHPUT_CCD'][i,:] > 0.0)
                     if (use.size > 0):
@@ -190,8 +194,7 @@ class FgcmLUTMaker(object):
         # run MODTRAN a bunch of times
         # we need for each airmass, to run the array of pwv and o3 and pull these out
 
-        #print("Generating %d*%d=%d PWV atmospheres..." % (self.pwv.size,self.zenith.size,self.pwv.size*self.zenith.size))
-        print("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
+        self.fgcmLog.info("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
         #self.pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
         pwvAtmTable = np.zeros((pwvPlus.size,zenithPlus.size,self.atmLambda.size))
 
@@ -208,7 +211,7 @@ class FgcmLUTMaker(object):
                                 lambdaStep=self.lambdaStep)
                 pwvAtmTable[i,j,:] = atm['H2O']
 
-        print("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
+        self.fgcmLog.info("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
         #self.o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
         o3AtmTable = np.zeros((o3Plus.size, zenithPlus.size, self.atmLambda.size))
 
@@ -223,7 +226,7 @@ class FgcmLUTMaker(object):
                                 lambdaStep=self.lambdaStep)
                 o3AtmTable[i,j,:] = atm['O3']
 
-        print("\nGenerating %d O2/Rayleigh atmospheres..." % (zenithPlus.size))
+        self.fgcmLog.info("\nGenerating %d O2/Rayleigh atmospheres..." % (zenithPlus.size))
         #self.o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
         #self.rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
         o2AtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
@@ -239,7 +242,7 @@ class FgcmLUTMaker(object):
             rayleighAtmTable[j,:] = atm['RAYLEIGH']
 
         # get the filters over the same lambda ranges...
-        print("\nInterpolating filters...")
+        self.fgcmLog.info("\nInterpolating filters...")
         self.throughputs = []
         for i in xrange(len(self.filterNames)):
             inLam = self.inThroughputs[i]['LAMBDA']
@@ -260,24 +263,24 @@ class FgcmLUTMaker(object):
             self.throughputs.append(tput)
 
         # and now we can get the standard atmosphere and lambda_b
-        print("Computing lambdaB")
+        self.fgcmLog.info("Computing lambdaB")
         self.lambdaB = np.zeros(self.filterNames.size)
         for i in xrange(self.filterNames.size):
             num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
             self.lambdaB[i] = num / denom
-            print("Filter: %s, lambdaB = %.3f" % (self.filterNames[i], self.lambdaB[i]))
+            self.fgcmLog.info("Filter: %s, lambdaB = %.3f" % (self.filterNames[i], self.lambdaB[i]))
 
-        print("Computing lambdaStd")
+        self.fgcmLog.info("Computing lambdaStd")
         self.lambdaStd = np.zeros(self.filterNames.size)
         for i in xrange(self.filterNames.size):
             num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             self.lambdaStd[i] = num / denom
-            print("Filter: %s, lambdaStd = %.3f" % (self.filterNames[i],self.lambdaStd[i]))
+            self.fgcmLog.info("Filter: %s, lambdaStd = %.3f" % (self.filterNames[i],self.lambdaStd[i]))
 
 
-        print("Computing I0Std/I1Std")
+        self.fgcmLog.info("Computing I0Std/I1Std")
         self.I0Std = np.zeros(self.filterNames.size)
         self.I1Std = np.zeros(self.filterNames.size)
 
@@ -291,7 +294,7 @@ class FgcmLUTMaker(object):
         ## Make the I0/I1 LUT
         #################################
 
-        print("Building look-up table...")
+        self.fgcmLog.info("Building look-up table...")
         lutPlus = np.zeros((self.filterNames.size,
                             pwvPlus.size,
                             o3Plus.size,
@@ -310,11 +313,11 @@ class FgcmLUTMaker(object):
 
         # this set of nexted for loops could probably be vectorized in some way
         for i in xrange(self.filterNames.size):
-            print("Working on filter %s" % (self.filterNames[i]))
+            self.fgcmLog.info("Working on filter %s" % (self.filterNames[i]))
             for j in xrange(pwvPlus.size):
-                print("  and on pwv #%d" % (j))
+                self.fgcmLog.info("  and on pwv #%d" % (j))
                 for k in xrange(o3Plus.size):
-                    print("   and on o3 #%d" % (k))
+                    self.fgcmLog.info("   and on o3 #%d" % (k))
                     for m in xrange(tauPlus.size):
                         for n in xrange(alphaPlus.size):
                             for o in xrange(zenithPlus.size):
@@ -380,12 +383,12 @@ class FgcmLUTMaker(object):
                                         ('D_ALPHA_I1','f4'),
                                         ('D_SECZENITH_I1','f4')])
 
-        print("Computing derivatives...")
+        self.fgcmLog.info("Computing derivatives...")
 
         ## FIXME: figure out PMB derivative?
 
         for i in xrange(self.filterNames.size):
-            print("Working on filter %s" % (self.filterNames[i]))
+            self.fgcmLog.info("Working on filter %s" % (self.filterNames[i]))
             for j in xrange(self.pwv.size):
                 for k in xrange(self.o3.size):
                     for m in xrange(self.tau.size):
@@ -446,7 +449,7 @@ class FgcmLUTMaker(object):
 
         if (self.makeSeds):
         ## and the SED LUT
-            print("Building SED LUT")
+            self.fgcmLog.info("Building SED LUT")
 
             # arbitrary.  Configure?  Fit?  Seems stable...
             delta = 600.0
@@ -524,10 +527,10 @@ class FgcmLUTMaker(object):
         import fitsio
 
         if (os.path.isfile(lutFile) and not clobber):
-            print("lutFile %s already exists, and clobber is False." % (lutFile))
+            self.fgcmLog.info("lutFile %s already exists, and clobber is False." % (lutFile))
             return
 
-        print("Saving LUT to %s" % (lutFile))
+        self.fgcmLog.info("Saving LUT to %s" % (lutFile))
 
         # first, save the LUT itself
         fitsio.write(lutFile,self.lut.flatten(),extname='LUT',clobber=True)
@@ -595,12 +598,12 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,stdVals,extname='STD')
 
         # and the derivatives
-        print("Writing Derivative LUT")
+        self.fgcmLog.info("Writing Derivative LUT")
         fitsio.write(lutFile,self.lutDeriv.flatten(),extname='DERIV')
 
         # and the SED LUT
         if (self.makeSeds):
-            print("Writing SED LUT")
+            self.fgcmLog.info("Writing SED LUT")
             fitsio.write(lutFile,self.sedLUT,extname='SED')
 
 
@@ -677,7 +680,8 @@ class FgcmLUT(object):
             self.hasI1Derivatives = True
         except:
             # just fill with zeros
-            print("No I1 derivative information")
+            pass
+            #print("No I1 derivative information")
 
         # get the standard values
         #stdVals = fitsio.read(lutFile,ext='STD')

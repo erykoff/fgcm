@@ -20,7 +20,7 @@ class FgcmSuperStarFlat(object):
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
 
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.log('INFO','Initializing FgcmSuperStarFlat')
+        self.fgcmLog.info('Initializing FgcmSuperStarFlat')
 
         self.fgcmPars = fgcmPars
 
@@ -38,7 +38,7 @@ class FgcmSuperStarFlat(object):
         """
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing superstarflats')
+        self.fgcmLog.info('Computing superstarflats')
 
         ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
 
@@ -57,7 +57,7 @@ class FgcmSuperStarFlat(object):
         expIndexUse=expIndexUse[gd]
         ccdIndexUse=ccdIndexUse[gd]
 
-        self.fgcmLog.log('INFO','SuperStarFlats based on %d exposures' % (gd.size))
+        self.fgcmLog.info('SuperStarFlats based on %d exposures' % (gd.size))
 
         # sum up ccdGray values
         #  note that this is done per *filter* not per *band*
@@ -100,21 +100,20 @@ class FgcmSuperStarFlat(object):
                 self.deltaSuperStarFlatSigma[i,j] = np.std(deltaSuperStarFlat[i,j,use])
                 self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use])
                 self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use])
-                self.fgcmLog.log('INFO','Superstar epoch %d filter %s: %.4f +/- %.4f' %
+                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4f' %
                                  (i,self.fgcmPars.lutFilterNames[j],
                                   self.superStarFlatMean[i,j],
                                   self.superStarFlatSigma[i,j]))
-
-                self.fgcmLog.log('INFO','DeltaSuperStar epoch %d filter %s: %.4f +/- %.4f' %
+                self.fgcmLog.info('DeltaSuperStar epoch %d filter %s: %.4f +/- %.4f' %
                                  (i,self.fgcmPars.lutFilterNames[j],
                                   self.deltaSuperStarFlatMean[i,j],
                                   self.deltaSuperStarFlatSigma[i,j]))
 
-        self.fgcmLog.log('INFO','Computed SuperStarFlats in %.2f seconds.' %
+        self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
                          (time.time() - startTime))
 
         if (doPlots):
-            self.fgcmLog.log('INFO','Making SuperStarFlat plots')
+            self.fgcmLog.info('Making SuperStarFlat plots')
             self.plotSuperStarFlats(deltaSuperStarFlat,
                                     self.deltaSuperStarFlatMean,
                                     self.deltaSuperStarFlatSigma,

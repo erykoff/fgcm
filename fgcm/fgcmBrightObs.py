@@ -31,7 +31,7 @@ class FgcmBrightObs(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing FgcmBrightObs')
+        self.fgcmLog.info('Initializing FgcmBrightObs')
 
         # need fgcmPars because it tracks good exposures
         self.fgcmPars = fgcmPars
@@ -58,7 +58,7 @@ class FgcmBrightObs(object):
             raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
 
         startTime=time.time()
-        self.fgcmLog.log('INFO','Selecting good stars from Bright Observations')
+        self.fgcmLog.info('Selecting good stars from Bright Observations')
 
         self.debug = debug
         self.computeSEDSlopes = computeSEDSlopes
@@ -74,7 +74,7 @@ class FgcmBrightObs(object):
         resMask = 255 & ~objFlagDict['RESERVED']
         goodStars,=np.where((snmm.getArray(self.fgcmStars.objFlagHandle) & resMask) == 0)
 
-        self.fgcmLog.log('INFO','Found %d good stars for bright obs' % (goodStars.size))
+        self.fgcmLog.info('Found %d good stars for bright obs' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -87,7 +87,7 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        self.fgcmLog.log('INFO','Pre-matching stars and observations...')
+        self.fgcmLog.info('Pre-matching stars and observations...')
         goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
                                                        obsObjIDIndex,
                                                        presorted=True)
@@ -95,13 +95,13 @@ class FgcmBrightObs(object):
         if (goodStarsSub[0] != 0.0):
             raise ValueError("Very strange that the goodStarsSub first element is non-zero.")
 
-        self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
+        self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
 
         if (self.debug):
             self._worker((goodStars,goodObs))
         else:
-            self.fgcmLog.log('INFO','Running BrightObs on %d cores' % (self.nCore))
+            self.fgcmLog.info('Running BrightObs on %d cores' % (self.nCore))
 
             # split goodStars into a list of arrays of roughly equal size
 
@@ -128,7 +128,7 @@ class FgcmBrightObs(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            self.fgcmLog.log('INFO','Using %d sections (%.1f seconds)' %
+            self.fgcmLog.info('Using %d sections (%.1f seconds)' %
                              (nSections,time.time() - prepStartTime))
 
             # make a pool
@@ -138,7 +138,7 @@ class FgcmBrightObs(object):
             pool.join()
 
 
-        self.fgcmLog.log('INFO','Finished BrightObs in %.2f seconds.' %
+        self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
                          (time.time() - startTime))
 
 
@@ -166,7 +166,7 @@ class FgcmBrightObs(object):
         # and cut to those exposures that are not flagged
         if (self.debug):
             startTime = time.time()
-            self.fgcmLog.log('DEBUG','Cutting to good exposures')
+            self.fgcmLog.debug('Cutting to good exposures')
 
         gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
                      (obsFlag[goodObs] == 0))
@@ -174,14 +174,14 @@ class FgcmBrightObs(object):
 
         if (self.debug):
             startTime=time.time()
-            self.fgcmLog.log('DEBUG','Cutting to sub-indices.')
+            self.fgcmLog.debug('Cutting to sub-indices.')
 
         obsObjIDIndexGO = obsObjIDIndex[goodObs]
         obsBandIndexGO = obsBandIndex[goodObs]
         obsMagStdGO = obsMagStd[goodObs]
 
         if (self.debug):
-            self.fgcmLog.log('DEBUG','Cut to sub-indices in %.1f seconds.' %
+            self.fgcmLog.debug('Cut to sub-indices in %.1f seconds.' %
                              (time.time() - startTime))
 
         obsMagErr2GO = obsMagADUErr[goodObs]**2.
