@@ -104,7 +104,7 @@ class FgcmSuperStarFlat(object):
                                   self.superStarFlatSigma[i,j]))
                 self.fgcmLog.log('INFO','DeltaSuperStar epoch %d band %s: %.4f +/- %.4f' %
                                  (i,self.fgcmPars.bands[j],
-                                  self.deltaSuperStarFlatMean[i,i],
+                                  self.deltaSuperStarFlatMean[i,j],
                                   self.deltaSuperStarFlatSigma[i,j]))
 
         self.fgcmLog.log('INFO','Computed SuperStarFlats in %.2f seconds.' %
