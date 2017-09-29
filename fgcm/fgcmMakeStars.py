@@ -7,6 +7,22 @@ import esutil
 import glob
 import healpy as hp
 
+def resourceUsage(where):
+    status = None
+    result = {'peak':0, 'rss':0}
+    try:
+        status = open('/proc/self/status')
+        for line in status:
+            parts = line.split()
+            key = parts[0][2:-1].lower()
+            if key in result:
+                result[key] = int(parts[1])/1000
+        print('Memory usage at %s:  %d MB current and %d MB peak.'  %(where, result['rss'], result['peak']))
+    except:
+        print('Could not find self status.')
+    return
+
+
 class FgcmMakeStars(object):
     """
     """
@@ -17,7 +33,7 @@ class FgcmMakeStars(object):
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','referenceBand',
-                      'zpDefault','matchNSide']
+                      'zpDefault','matchNSide','coarseNSide']
 
         for key in requiredKeys:
             if (key not in starConfig):
@@ -142,79 +158,137 @@ class FgcmMakeStars(object):
         print("Matching %s observations in the referenceBand catalog to itself" %
               (raArray.size))
 
-        if (hasSmatch):
-            # faster smatch...
-            matches = smatch.match(raArray, decArray, self.starConfig['matchRadius']/3600.0,
-                                   raArray, decArray, nside=self.starConfig['matchNSide'], maxmatch=0)
-
-            i1 = matches['i1']
-            i2 = matches['i2']
-        else:
-            # slower htm matching...
-            htm = esutil.htm.HTM(11)
-
-            matcher = esutil.htm.Matcher(11, raArray, decArray)
-            matches = matcher.match(raArray, decArray,
-                                    self.starConfig['matchRadius']/3600.0,
-                                    maxmatch=0)
-
-            i1 = matches[0]
-            i2 = matches[1]
-
-
-        fakeId = np.arange(raArray.size)
-        hist,rev = esutil.stat.histogram(fakeId[i1],rev=True)
-
-        if (hist.max() == 1):
-            raise ValueError("No matches found!")
-
-        maxObs = hist.max()
-
-        # how many unique objects do we have?
-        histTemp = hist.copy()
-        count=0
-        for j in xrange(histTemp.size):
-            jj = fakeId[j]
-            if (histTemp[jj] >= self.starConfig['minPerBand']):
-                i1a=rev[rev[jj]:rev[jj+1]]
-                histTemp[matches['i2'][i1a]] = 0
-                count=count+1
-
-        print("Found %d unique objects with >= %d observations in %s band." %
-              (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
-
-        # make the object catalog
         dtype=[('FGCM_ID','i4'),
                ('RA','f8'),
                ('DEC','f8')]
 
-        self.objCat = np.zeros(count,dtype=dtype)
+        objCats = []
+
+        # need to split into parts here
+
+        ipring=hp.ang2pix(self.starConfig['coarseNSide'],
+                          (90.0-decArray)*np.pi/180.,
+                          raArray*np.pi/180.)
+        hpix,revpix=esutil.stat.histogram(ipring,rev=True)
+
+        gdpix,=np.where(hpix >= 2)
+        for ii,gpix in enumerate(gdpix):
+            p1a=revpix[revpix[gpix]:revpix[gpix+1]]
+
+            if (hasSmatch):
+                # faster smatch...
+                matches = smatch.match(raArray[p1a], decArray[p1a],
+                                       self.starConfig['matchRadius']/3600.0,
+                                       raArray[p1a], decArray[p1a],
+                                       nside=self.starConfig['matchNSide'], maxmatch=0)
+
+                i1 = matches['i1']
+                i2 = matches['i2']
+            else:
+                # slower htm matching...
+                htm = esutil.htm.HTM(11)
+
+                matcher = esutil.htm.Matcher(11, raArray, decArray)
+                matches = matcher.match(raArray, decArray,
+                                        self.starConfig['matchRadius']/3600.0,
+                                        maxmatch=0)
+
+                i1 = matches[0]
+                i2 = matches[1]
+
+
+            fakeId = np.arange(p1a.size)
+            hist,rev = esutil.stat.histogram(fakeId[i1],rev=True)
+
+            if (hist.max() == 1):
+                #raise ValueError("No matches found!")
+                print("Warning: No matches found!")
+                continue
+
+            maxObs = hist.max()
+
+            # how many unique objects do we have?
+            histTemp = hist.copy()
+            count=0
+            for j in xrange(histTemp.size):
+                jj = fakeId[j]
+                if (histTemp[jj] >= self.starConfig['minPerBand']):
+                    i1a=rev[rev[jj]:rev[jj+1]]
+                    histTemp[i2[i1a]] = 0
+                    count=count+1
+
+            print("Found %d unique objects in pixel %d (%d of %d)." %
+                  (count, ipring[p1a[0]], ii, gdpix.size))
+            #print("Found %d unique objects with >= %d observations in %s band." %
+            #      (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
+
+            # make the object catalog
+
+            #self.objCat = np.zeros(count,dtype=dtype)
+            #self.objCat['FGCM_ID'] = np.arange(count)+1
+            objCatTemp = np.zeros(count,dtype=dtype)
+
+            # rotate.  This works for DES, but we have to think about optimizing this...
+            raTemp = raArray.copy()
+
+            hi,=np.where(raTemp > 180.0)
+            if (hi.size > 0) :
+                raTemp[hi] = raTemp[hi] - 360.0
+
+            # compute mean ra/dec
+            index = 0
+            for j in xrange(hist.size):
+                jj = fakeId[j]
+                if (hist[jj] >= self.starConfig['minPerBand']):
+                    i1a=rev[rev[jj]:rev[jj+1]]
+                    starInd=i2[i1a]
+                    # make sure this doesn't get used again
+                    hist[starInd] = 0
+                    #self.objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
+                    #self.objCat['DEC'][index] = np.sum(decArray[starInd])/starInd.size
+                    objCatTemp['RA'][index] = np.sum(raTemp[p1a[starInd]])/starInd.size
+                    objCatTemp['DEC'][index] = np.sum(decArray[p1a[starInd]])/starInd.size
+                    index = index+1
+
+            # restore negative RAs
+            #lo,=np.where(self.objCat['RA'] < 0.0)
+            #if (lo.size > 0):
+            #    self.objCat['RA'][lo] = self.objCat['RA'][lo] + 360.0
+            lo,=np.where(objCatTemp['RA'] < 0.0)
+            if lo.size > 0:
+                objCatTemp['RA'][lo] = objCatTemp['RA'][lo] + 360.0
+
+            # and append...
+            objCats.append(objCatTemp.copy())
+
+            # clear memory?
+            objCatTemp = None
+            matches = None
+            fakeId = None
+            hist = None
+            rev = None
+            histTemp = None
+            raTemp = None
+            #resourceUsage('pixel %d' % (ipring[p1a[0]]))
+
+        # now assemble into a total objCat
+        count = 0
+        for objCatTemp in objCats:
+            count += objCatTemp.size
+
+        self.objCat = np.zeros(count, dtype=dtype)
+        ctr = 0
+        for objCatTemp in objCats:
+            self.objCat[ctr:ctr+objCatTemp.size] = objCatTemp
+            ctr += objCatTemp.size
+            # and clear memory
+            objCatTemp = None
+
         self.objCat['FGCM_ID'] = np.arange(count)+1
 
-        # rotate.  This works for DES, but we have to think about optimizing this...
-        raTemp = raArray.copy()
+        print("Found %d unique objects with >= %d observations in %s band." %
+              (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
 
-        hi,=np.where(raTemp > 180.0)
-        if (hi.size > 0) :
-            raTemp[hi] = raTemp[hi] - 360.0
-
-        # compute mean ra/dec
-        index = 0
-        for j in xrange(hist.size):
-            jj = fakeId[j]
-            if (hist[jj] >= self.starConfig['minPerBand']):
-                i1a=rev[rev[jj]:rev[jj+1]]
-                starInd=i2[i1a]
-                # make sure this doesn't get used again
-                hist[starInd] = 0
-                self.objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
-                self.objCat['DEC'][index] = np.sum(decArray[starInd])/starInd.size
-                index = index+1
-
-        # restore negative RAs
-        lo,=np.where(self.objCat['RA'] < 0.0)
-        if (lo.size > 0):
-            self.objCat['RA'][lo] = self.objCat['RA'][lo] + 360.0
 
         if (cutBrightStars):
             print("Matching to bright stars for masking...")
@@ -316,7 +390,8 @@ class FgcmMakeStars(object):
         nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
 
         if (nObsPerObj.size != self.objCat.size):
-            raise ValueError("Number of reference stars does not match observations.")
+            raise ValueError("Number of reference stars (%d) does not match observations (%d)." %
+                             (self.objCat.size, nObsPerObj.size))
 
         # which stars have at least minPerBand observations in each required band?
         req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
