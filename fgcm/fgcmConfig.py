@@ -19,7 +19,7 @@ class FgcmConfig(object):
     """
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
-        requiredKeys=['bands','fitBands','extraBands','bandAlias',
+        requiredKeys=['bands','fitBands','extraBands','filterToBand','bandToStdFilter',
                       'exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField',
@@ -51,7 +51,8 @@ class FgcmConfig(object):
         self.bands = np.array(configDict['bands'])
         self.fitBands = np.array(configDict['fitBands'])
         self.extraBands = np.array(configDict['extraBands'])
-        self.bandAlias = np.array(configDict['bandAlias'])
+        self.filterToBand = np.array(configDict['filterToBand'])
+        self.bandToStdFilter = np.array(configDict['bandToStdFilter'])
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
         self.obsFile = configDict['obsFile']
@@ -268,29 +269,30 @@ class FgcmConfig(object):
         if (self.extraBands.size > 0):
             self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
-        # band checks:
-        #  1) check that all the filters in bandAlias are in lutFilterNames
-        #  2) check that all the bands are in bandAlias
-        #  3) check that all the fitBands are in bands
-        #  4) check that all the extraBands are in bands
-        #  5) check that the "Standard" is marked for one and only one filter per band
+        # new band checks:
+        #  1) check that all the filters in filterToBand are in lutFilterNames
+        #  2) check that all the bands in bandToStdFilter are in bands
+        #  3) check that all the bands have a (single) stdFilter
+        #  3) check that all the filters in bandToStdFilter are in lutFilterNames
+        #  4) check that all the fitBands are in bands
+        #  5) check that all the extraBands are in bands
 
         nStandard = np.zeros(self.bands.size,dtype='i4')
-        for filterName in self.bandAlias:
+        for filterName in self.filterToBand:
             test,=np.where(filterName == self.lutFilterNames)
-            if (test.size == 0):
-                raise ValueError("Filter %s from bandAlias not in LUT" % (filterName))
-            if (self.bandAlias[filterName][1] < 0 or
-                self.bandAlias[filterName][1] > 1):
-                raise ValueError("bandAlias %s standard field must be 0 or 1" % (filterName))
-        for i,band in enumerate(self.bands):
-            found = False
-            for filterName in self.bandAlias:
-                if self.bandAlias[filterName][0] == band:
-                    found=True
-                    nStandard[i] += self.bandAlias[filterName][1]
-            if not found:
-                raise ValueError("Band %s from bands not in bandAlias" % (band))
+            if test.size == 0:
+                raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
+            if self.filterToBand[filterName] not in self.bands:
+                raise ValueError("Band %s in filterToBand not in bands" %
+                                 (self.filterToBand[filterName]))
+        for band in self.bandToStdFilter:
+            test,=np.where(self.bands == band)
+            if test.size == 0:
+                raise ValueError("Band %s in bandToStdFilter not in bands" % (band))
+            nStandard[test] += 1
+            if self.bandToStdFilter[band] not in self.lutFilterNames:
+                raise ValueError("FilterName %s in bandToStdFilter not in lutFilterNames" %
+                                 (self.bandToStdFilter[band]))
         if (np.min(nStandard) < 1):
             raise ValueError("Each band must be associated with a standard filter")
         if (np.max(nStandard) > 1):
@@ -318,14 +320,18 @@ class FgcmConfig(object):
         self.lambdaStd = lutStd['LAMBDASTD'][0]
 
         # And the I10Std, for each *band*
+        #self.I10StdBand = np.zeros(self.bands.size)
+        #for i,band in enumerate(self.bands):
+        #    for filterName in self.filterToBand:
+        #        if (self.filterToBand[filterName][0] == band and
+        #            self.filterToBand[filterName][1] == 1):
+        #            # finally we need the LUT index here!
+        #            test,=np.where(filterName == self.lutFilterNames)
+        #            self.I10StdBand[i] = lutStd['I10STD'][0][test]
         self.I10StdBand = np.zeros(self.bands.size)
         for i,band in enumerate(self.bands):
-            for filterName in self.bandAlias:
-                if (self.bandAlias[filterName][0] == band and
-                    self.bandAlias[filterName][1] == 1):
-                    # finally we need the LUT index here!
-                    test,=np.where(filterName == self.lutFilterNames)
-                    self.I10StdBand[i] = lutStd['I10STD'][0][test]
+            test,=np.where(self.bandToStdFilter[band] == self.lutFilterNames)
+            self.I10StdBand[i] = lutStd['I10STD'][0][test]
 
         if (self.expGrayPhotometricCut.size != self.bands.size):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")

@@ -59,7 +59,7 @@ class FgcmStars(object):
         self.bandExtraIndex = np.where(self.bandExtraFlag)[0]
 
         self.lutFilterNames = fgcmConfig.lutFilterNames
-        self.bandAlias = fgcmConfig.bandAlias
+        self.filterToBand = fgcmConfig.filterToBand
 
         #self.expArray = fgcmPars.expArray
 
@@ -239,7 +239,7 @@ class FgcmStars(object):
         # new version for multifilter support
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames.size):
-            bandIndex, = np.where(self.bandAlias[filterName][0] == self.bands)
+            bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
 
             use, = np.where(obsFilterName == filterName)
             if use.size == 0:

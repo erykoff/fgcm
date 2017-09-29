@@ -62,7 +62,7 @@ class FgcmParameters(object):
 
         self.lutFilterNames = fgcmConfig.lutFilterNames
         self.nLUTFilter = self.lutFilterNames.size
-        self.bandAlias = fgcmConfig.bandAlias
+        self.filterToBand = fgcmConfig.filterToBand
 
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
@@ -488,7 +488,7 @@ class FgcmParameters(object):
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
         for filterIndex,filterName in enumerate(self.lutFilterNames):
-            bandIndex, = np.where(self.bandAlias[filterName][0] == self.bands)
+            bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
 
             use,=np.where(expFilterName == filterName)
             if use.size == 0:

@@ -16,7 +16,7 @@ class FgcmMakeStars(object):
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
-        requiredKeys=['bandAlias','requiredBands',
+        requiredKeys=['filterToBand','requiredBands',
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','referenceBand',
@@ -29,17 +29,17 @@ class FgcmMakeStars(object):
         self.objCat = None
 
         # Note that the order doesn't matter for the making of the stars
-        self.filterNames = starConfig['bandAlias'].keys()
+        self.filterNames = starConfig['filterToBand'].keys()
 
         # check that the requiredBands are there...
         for reqBand in starConfig['requiredBands']:
             found=False
             for filterName in self.filterNames:
-                if (starConfig['bandAlias'][filterName][0] == reqBand):
+                if (starConfig['filterToBand'][filterName] == reqBand):
                     found = True
                     break
             if not found:
-                raise ValueError("requiredBand %s not in bandAlias!" % (reqBand))
+                raise ValueError("requiredBand %s not in filterToBand!" % (reqBand))
 
         if 'logger' in starConfig:
             self.fgcmLog = starConfig['logger']
@@ -74,7 +74,7 @@ class FgcmMakeStars(object):
         #w=fits[1].where('band == "%s"' % (self.starConfig['referenceBand']))
         fitsWhere = None
         for filterName in self.filterNames:
-            if (self.starConfig['bandAlias'][filterName][0] == self.starConfig['referenceBand']):
+            if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
                 clause = '(filtername == "%s")' % (filterName)
                 if fitsWhere is None
                     fitsWhere = clause
@@ -135,7 +135,7 @@ class FgcmMakeStars(object):
 
 
     def makeReferenceStars(self, raArray, decArray, bandSelected=False,
-                           filterNameArray=None, bandAlias=None,
+                           filterNameArray=None, filterToBand=None,
                            brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
         """
@@ -168,7 +168,7 @@ class FgcmMakeStars(object):
             # We select based on the aliased *band* not on the filter name
             useFlag = None
             for filterName in self.filterNames:
-                if (self.starConfig['bandAlias'][filterName][0] == self.starConfig['referenceBand']):
+                if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
                     if useFlag is None:
                         useFlag = (filterNameArray == filterName)
                     else:
@@ -401,7 +401,7 @@ class FgcmMakeStars(object):
         bandArray = np.zeros_like(filterNameArray)
         for filterName in self.filterNames:
             use,=np.where(filterNameArray == filterName)
-            bandArray[use] = self.starConfig['bandAlias'][filterName][0]
+            bandArray[use] = self.starConfig['filterToBand'][filterName]
 
 
         self.fgcmLog.info("Matching positions to observations...")

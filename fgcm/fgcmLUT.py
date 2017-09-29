@@ -612,7 +612,7 @@ class FgcmLUT(object):
     """
 
     #def __init__(self,lutFile):
-    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, bandAlias=None):
+    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
         #lutFlat = fitsio.read(self.lutFile,ext='LUT')
         #indexVals = fitsio.read(self.lutFile,ext='INDEX')
 
@@ -706,13 +706,13 @@ class FgcmLUT(object):
 
         self.magConstant = 2.5/np.log(10)
 
-        if (bandAlias is None):
+        if (filterToBand is None):
             # just set up a 1-1 mapping
-            self.bandAlias = {}
+            self.filterToBand = {}
             for filterName in self.filterNames:
-                self.bandAlias[filterName] = [filterName,1]
+                self.filterToBand[filterName] = filterName
         else:
-            self.bandAlias = bandAlias
+            self.filterToBand = filterToBand
 
         # finally, read in the sedLUT
         ## this is experimental
@@ -913,13 +913,13 @@ class FgcmLUT(object):
         # FIXME?
         unitDict['lnTauSlopeUnit'] = unitDict['lnTauUnit'] * meanNightDuration
 
-        # look for first use of 'g' or 'r' band in bandAlias...
+        # look for first use of 'g' or 'r' band in filterToBand...
         #  this is the reference filter for tau/alpha
 
         alphaFilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName][0] == 'g' or
-                self.bandAlias[filterName][0] == 'r'):
+            if (self.filterToBand[filterName] == 'g' or
+                self.filterToBand[filterName] == 'r'):
                 alphaFilterIndex = i
                 break
         if (alphaFilterIndex == -1):
@@ -940,9 +940,9 @@ class FgcmLUT(object):
         #                (fitBands == 'r'))
         alphaNAffectedBands = 0
         for filterName in self.filterNames:
-            if (self.bandAlias[filterName][0] == 'u' or
-                self.bandAlias[filterName][0] == 'g' or
-                self.bandAlias[filterName][0] == 'r'):
+            if (self.filterToBand[filterName] == 'u' or
+                self.filterToBand[filterName] == 'g' or
+                self.filterToBand[filterName] == 'r'):
                 alphaNAffectedBands += 1
 
         #unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
@@ -955,7 +955,7 @@ class FgcmLUT(object):
 
         pwvFilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName][0] == 'z'):
+            if (self.filterToBand[filterName] == 'z'):
                 pwvFilterIndex = i
                 break
         if pwvFilterIndex == -1:
@@ -975,9 +975,9 @@ class FgcmLUT(object):
         #unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
         pwvNAffectedBands = 0
         for filterName in enumerate(self.filterNames):
-            if (self.bandAlias[filterName][0] == 'z' or
-                self.bandAlias[filterName][0] == 'y' or
-                self.bandAlias[filterName][0] == 'Y'):
+            if (self.filterToBand[filterName] == 'z' or
+                self.filterToBand[filterName] == 'y' or
+                self.filterToBand[filterName] == 'Y'):
                 pwvNAffectedBands += 1
         unitDict['pwvUnit'] *= float(pwvNAffectedBands) / float(fitBands.size)
 
@@ -993,7 +993,7 @@ class FgcmLUT(object):
         #    raise ValueError("Require r band for O3...")
         o3FilterIndex = -1
         for i,filterName in enumerate(self.filterNames):
-            if self.bandAlias[filterName][0] == 'r':
+            if self.filterToBand[filterName] == 'r':
                 o3FilterIndex = i
                 break
         if o3FilterIndex == -1:
@@ -1012,7 +1012,7 @@ class FgcmLUT(object):
         #unitDict['o3Unit'] *= float(use.size) / float(fitBands.size)
         o3NAffectedBands = 0
         for filterName in self.filterNames:
-            if self.bandAlias[filterName][0] == 'r':
+            if self.filterToBand[filterName] == 'r':
                 o3NAffectedBands += 1
         unitDict['o3Unit'] *= float(o3NAffectedBands) / float(fitBands.size)
 
