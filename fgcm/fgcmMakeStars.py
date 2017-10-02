@@ -76,7 +76,7 @@ class FgcmMakeStars(object):
         for filterName in self.filterNames:
             if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
                 clause = '(filtername == "%s")' % (filterName)
-                if fitsWhere is None
+                if fitsWhere is None:
                     fitsWhere = clause
                 else:
                     fitsWhere = fitsWhere + ' || ' + clause
