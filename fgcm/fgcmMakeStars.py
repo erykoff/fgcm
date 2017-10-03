@@ -135,7 +135,7 @@ class FgcmMakeStars(object):
 
 
     def makeReferenceStars(self, raArray, decArray, bandSelected=False,
-                           filterNameArray=None, filterToBand=None,
+                           filterNameArray=None,
                            brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
         """
