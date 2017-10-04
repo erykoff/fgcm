@@ -267,6 +267,7 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
 
         # One last run to compute mstd all observations of all exposures
+        #  when allExposures is set, mean mags, etc aren't computed
         self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), allExposures=True, includeReserve=True)
 
