@@ -647,6 +647,8 @@ class FgcmStars(object):
         """
         """
 
+        raise RuntimeError("DO NOT USE???")
+
         thisObjMagStdMean = snmm.getArray(self.objMagStdMeanHandle)[objIndex,:]
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
         #objSEDSlopeOld = snmm.getArray(self.objSEDSlopeOldHandle)
@@ -700,6 +702,7 @@ class FgcmStars(object):
 
             # and the extra bands ... only redward now
             # we stick with the reddest band
+            ## TESTING
             tempIndex = self.bandRequiredIndex[-1]
             extra,=np.where(thisObjMagStdMean[self.bandExtraIndex] < 90.0)
             for i in xrange(extra.size):
@@ -755,12 +758,6 @@ class FgcmStars(object):
         ## FIXME: will have to handle u band "extra"
 
         tempIndex=self.bandRequiredIndex[0]
-        ## HACK
-        #objSEDSlopeOI[goodIndicesOI,tempIndex] = (
-        #    S[:,tempIndex] + self.sedFitBandFudgeFactors[0] * (
-        #        (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
-        #        (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
-        #    (S[:,tempIndex+1] - S[:,tempIndex]))
         objSEDSlopeOI[goodIndicesOI, tempIndex] = (
             S[:, tempIndex] + self.sedFitBandFudgeFactors[0] * (
                 S[:, tempIndex+1] + S[:, tempIndex]))
@@ -781,16 +778,24 @@ class FgcmStars(object):
             (S[:,tempIndex-1] - S[:,tempIndex-2]))
 
         # and the extra bands, only redward now
-        tempIndex = self.bandRequiredIndex[-1]
+        #tempIndex = self.bandRequiredIndex[-1]
+        #for i in xrange(len(self.bandExtraIndex)):
+        #    extraIndex=self.bandExtraIndex[i]
+        #    use,=np.where(objMagStdMeanOI[goodIndicesOI,extraIndex] < 90.0)
+        #    objSEDSlopeOI[goodIndicesOI[use],extraIndex] = (
+        #        S[use,tempIndex-1] + self.sedExtraBandFudgeFactors[i] * (
+        #            (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
+        #            (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+        #        (S[use,tempIndex-1] - S[use,tempIndex-2]))
         for i in xrange(len(self.bandExtraIndex)):
             extraIndex=self.bandExtraIndex[i]
-            #use,=np.where(objMagStdMean[objIndices,extraIndex] < 90.0)
             use,=np.where(objMagStdMeanOI[goodIndicesOI,extraIndex] < 90.0)
             objSEDSlopeOI[goodIndicesOI[use],extraIndex] = (
-                S[use,tempIndex-1] + self.sedExtraBandFudgeFactors[i] * (
-                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
-                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
-                (S[use,tempIndex-1] - S[use,tempIndex-2]))
+                S[use,extraIndex-1] + self.sedExtraBandFudgeFactors[i] * (
+                    (self.lambdaStd[extraIndex] - self.lambdaStd[extraIndex-1]) /
+                    (self.lambdaStd[extraIndex] - self.lambdaStd[extraIndex-2])) *
+                (S[use,extraIndex-1] - S[use,extraIndex-2]))
+
 
         # and save the values, protected
         objSEDSlopeLock.acquire()
