@@ -258,7 +258,8 @@ class FgcmZeropoints(object):
         rejectMask = (expFlagDict['TOO_FEW_EXP_ON_NIGHT'] |
                       expFlagDict['BAND_NOT_IN_LUT'] |
                       expFlagDict['NO_STARS'])
-        acceptMask = (expFlagDict['EXP_GRAY_TOO_LARGE'] |
+        acceptMask = (expFlagDict['EXP_GRAY_TOO_NEGATIVE'] |
+                      expFlagDict['EXP_GRAY_TOO_POSITIVE'] |
                       expFlagDict['VAR_GRAY_TOO_LARGE'] |
                       expFlagDict['TOO_FEW_STARS'])
 
