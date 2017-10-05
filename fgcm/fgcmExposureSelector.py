@@ -24,6 +24,7 @@ class FgcmExposureSelector(object):
         self.minExpPerNight = fgcmConfig.minExpPerNight
         self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
+        self.expGrayHighCut = fgcmConfig.expGrayHighCut
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
 
     def selectGoodExposures(self):
@@ -49,8 +50,14 @@ class FgcmExposureSelector(object):
         bad,=np.where((self.fgcmPars.compExpGray <
                        self.expGrayPhotometricCut[self.fgcmPars.expBandIndex]) &
                       (self.fgcmPars.compNGoodStarPerExp > 0))
-        self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
-        self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY too large.' % (bad.size))
+        self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_NEGATIVE']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY too negative.' % (bad.size))
+
+        bad,=np.where((self.fgcmPars.compExpGray >
+                       self.expGrayHighCut[self.fgcmPars.expBandIndex]) &
+                      (self.fgcmPars.compNGoodStarPerExp > 0))
+        self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_POSITIVE']
+        self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY too positive.' % (bad.size))
 
         bad,=np.where(self.fgcmPars.compVarGray > self.expVarGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
@@ -81,7 +88,7 @@ class FgcmExposureSelector(object):
         self.fgcmLog.log('INFO','Flagged %d bad exposures with too few stars' % (bad.size))
 
         bad,=np.where(expGrayForInitialSelection < self.expGrayInitialCut)
-        self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_LARGE']
+        self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_NEGATIVE']
         self.fgcmLog.log('INFO','Flagged %d bad exposures with EXP_GRAY (initial) too large.' % (bad.size))
 
         good,=np.where(self.fgcmPars.expFlag == 0)
