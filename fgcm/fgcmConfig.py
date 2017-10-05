@@ -32,6 +32,7 @@ class FgcmConfig(object):
                       'expGrayInitialCut','expVarGrayPhotometricCut',
                       'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
                       'expGrayPhotometricCut','expGrayRecoverCut',
+                      'expGrayHighCut',
                       'expGrayErrRecoverCut','sigma0Cal','logLevel',
                       'sigma0Phot','mapLongitudeRef','mapNSide','nStarPerRun',
                       'nExpPerRun','varNSig','varMinBand','useSedLUT',
@@ -66,6 +67,7 @@ class FgcmConfig(object):
         self.minCCDPerExp = int(configDict['minCCDPerExp'])
         self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
         self.expGrayPhotometricCut = np.array(configDict['expGrayPhotometricCut'])
+        self.expGrayHighCut = np.array(configDict['expGrayHighCut'])
         self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
         self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
         self.expGrayErrRecoverCut = float(configDict['expGrayErrRecoverCut'])
@@ -140,6 +142,11 @@ class FgcmConfig(object):
         else:
             self.resetParameters = True
 
+        if 'noChromaticCorrections' in configDict:
+            self.noChromaticCorrections = bool(configDict['noChromaticCorrections'])
+        else:
+            self.noChromaticCorrections = False
+
         if (self.expGrayRecoverCut > self.expGrayPhotometricCut.min()) :
             raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
         if (self.expVarGrayPhotometricCut <= 0.0):
@@ -195,7 +202,8 @@ class FgcmConfig(object):
             self.fgcmLog.log('INFO','ExperimentalMode set to True')
         if (self.resetParameters) :
             self.fgcmLog.log('INFO','Will reset atmosphere parameters')
-
+        if (self.noChromaticCorrections) :
+            self.fgcmLog.log('INFO','WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
         #                                            self.cycleNumber)
@@ -244,8 +252,12 @@ class FgcmConfig(object):
 
         if (self.expGrayPhotometricCut.size != self.bands.size):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
+        if (self.expGrayHighCut.size != self.bands.size):
+            raise ValueError("expGrayHighCut must have same number of elements as bands.")
         if (self.expGrayPhotometricCut.max() >= 0.0):
             raise ValueError("expGrayPhotometricCut must all be negative")
+        if (self.expGrayHighCut.max() <= 0.0):
+            raise ValueError("expGrayHighCut must all be positive")
 
         # and look at the exposure file and grab some stats
         #expInfo = fitsio.read(self.exposureFile,ext=1)
