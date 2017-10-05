@@ -19,12 +19,13 @@ obsFlagDict = {'NO_EXPOSURE':2**0,
                'BAD_ERROR':2**1}
 
 expFlagDict = {'TOO_FEW_STARS':2**0,
-               'EXP_GRAY_TOO_LARGE':2**1,
+               'EXP_GRAY_TOO_NEGATIVE':2**1,
                'VAR_GRAY_TOO_LARGE':2**2,
                'TOO_FEW_EXP_ON_NIGHT':2**3,
                'NO_STARS':2**4,
                'BAND_NOT_IN_LUT':2**5,
-               'TEMPORARY_BAD_EXPOSURE':2**6}
+               'TEMPORARY_BAD_EXPOSURE':2**6,
+               'EXP_GRAY_TOO_POSITIVE':2**7}
 
 
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
@@ -134,8 +135,8 @@ def histoGauss(ax,array):
     hcenter=hist['center']
     hhist=hist['hist']
 
-    rangeLo = -5*coeff[2]
-    rangeHi = 5*coeff[2]
+    rangeLo = coeff[1] - 5*coeff[2]
+    rangeHi = coeff[1] + 5*coeff[2]
 
     lo,=np.where(hcenter < rangeLo)
     ok,=np.where(hcenter > rangeLo)
