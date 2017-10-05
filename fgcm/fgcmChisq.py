@@ -42,6 +42,7 @@ class FgcmChisq(object):
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
 
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
@@ -405,6 +406,10 @@ class FgcmChisq(object):
                                   (1.0 + objSEDSlope[obsObjIDIndexGO,
                                                      obsBandIndexGO] *
                                    self.fgcmLUT.I10Std[obsBandIndexGO]))
+
+        if self.noChromaticCorrections:
+            # NOT RECOMMENDED
+            deltaStdGO *= 0.0
 
         # we can only do this for calibration stars.
         #  must reference the full array to save
