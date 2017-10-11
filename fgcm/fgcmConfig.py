@@ -51,8 +51,8 @@ class FgcmConfig(object):
         self.bands = np.array(configDict['bands'])
         self.fitBands = np.array(configDict['fitBands'])
         self.extraBands = np.array(configDict['extraBands'])
-        self.filterToBand = np.array(configDict['filterToBand'])
-        self.bandToStdFilter = np.array(configDict['bandToStdFilter'])
+        self.filterToBand = configDict['filterToBand']
+        self.bandToStdFilter = configDict['bandToStdFilter']
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
         self.obsFile = configDict['obsFile']
