@@ -397,7 +397,7 @@ class FgcmFitCycle(object):
 
 
         # self.fgcmLog.logMemoryUsage('INFO','FitCycle Completed')
-        self.fgcmLog.info(getMemoryString('FitCycle Completed')
+        self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
     def _doFit(self,doPlots=True):
         """
