@@ -99,7 +99,7 @@ class FgcmZeropoints(object):
                                    ('FGCM_FLAT','f8'), # done
                                    ('FGCM_APERCORR','f8'), # done
                                    ('EXPTIME','f4'), # done
-                                   ('FILTERNAME','a2'), 
+                                   ('FILTERNAME','a2'),
                                    ('BAND','a2')]) # done
 
         atmStruct = np.zeros(self.fgcmPars.nExp,
@@ -373,7 +373,9 @@ class FgcmZeropoints(object):
         ############
         self.fgcmLog.info('Making I1/R1 plots...')
 
-        plotter = FgcmZeropointPlotter(zpStruct, self.fgcmPars.bands,
+        # plotter = FgcmZeropointPlotter(zpStruct, self.fgcmPars.bands,
+        #                               self.plotPath, self.outfileBaseWithCycle)
+        plotter = FgcmZeropointPlotter(zpStruct, self.fgcmPars.lutFilterNames,
                                        self.plotPath, self.outfileBaseWithCycle)
 
         plotter.makeR1I1Plots()
@@ -529,9 +531,9 @@ class FgcmZeropoints(object):
 class FgcmZeropointPlotter(object):
     """
     """
-    def __init__(self, zpStruct, bands, plotPath, outfileBase):
+    def __init__(self, zpStruct, filterNames, plotPath, outfileBase):
         self.zpStruct = zpStruct
-        self.bands = bands
+        self.filterNames = filterNames
         self.plotPath = plotPath
         self.outfileBase = outfileBase
 
@@ -540,8 +542,8 @@ class FgcmZeropointPlotter(object):
         """
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
-        for band in self.bands:
-            use,=np.where((np.core.defchararray.rstrip(self.zpStruct['BAND']) == band) &
+        for filterName in self.filterNames:
+            use,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName) &
                           ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                           (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                           (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
@@ -575,13 +577,13 @@ class FgcmZeropointPlotter(object):
             ax.set_xlabel(r'$I_1$ from FGCM Fit',fontsize=16)
             ax.set_ylabel(r'$R_1$ from Retrieval',fontsize=16)
 
-            text=r'$(%s)$' % (band)
+            text=r'$(%s)$' % (filterName)
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
             fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
                                                self.outfileBase,
-                                               band))
+                                               filterName))
 
     def makeR1I1Maps(self, ccdOffsets, ccdField='CCDNUM'):
         """
@@ -598,11 +600,14 @@ class FgcmZeropointPlotter(object):
         ccdMax = np.max(self.zpStruct[ccdField])
         nCCD = (ccdMax - ccdMin) + 1
 
-        for band in self.bands:
-            use0,=np.where((np.core.defchararray.rstrip(self.zpStruct['BAND']) == band) &
+        for filterName in self.filterNames:
+            use0,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName) &
                            ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                            (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                            (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
+
+            if (use0.size == 0):
+                continue
 
             ccdIndex = np.searchsorted(np.arange(ccdMin,ccdMax+1),
                                        self.zpStruct[ccdField][use0])
@@ -640,7 +645,7 @@ class FgcmZeropointPlotter(object):
                 else:
                     plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], plotType, loHi=[lo,hi])
 
-                text = r'$(%s)$' % (band) + '\n' + \
+                text = r'$(%s)$' % (filterName) + '\n' + \
                     r'%s' % (plotType)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
@@ -649,7 +654,7 @@ class FgcmZeropointPlotter(object):
                 fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
                                                  self.outfileBase,
                                                  plotType.replace(" ",""),
-                                                 band))
+                                                 filterName))
 
         return None
 
