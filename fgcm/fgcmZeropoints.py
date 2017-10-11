@@ -37,10 +37,6 @@ class FgcmZeropoints(object):
         self.zptAB = fgcmConfig.zptAB
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdOffsets = fgcmConfig.ccdOffsets
-        self.bandRequired = fgcmConfig.bandRequired
-        self.bandRequiredIndex = np.where(self.bandRequired)[0]
-        self.bandExtra = fgcmConfig.bandExtra
-        self.bandExtraIndex = np.where(self.bandExtra)[0]
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
