@@ -238,7 +238,7 @@ class FgcmStars(object):
 
         # new version for multifilter support
         # First, we have the filterNames
-        for filterIndex,filterName in enumerate(self.lutFilterNames.size):
+        for filterIndex,filterName in enumerate(self.lutFilterNames):
             bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
 
             use, = np.where(obsFilterName == filterName)
