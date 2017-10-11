@@ -940,9 +940,12 @@ class FgcmLUT(object):
         #                (fitBands == 'r'))
         alphaNAffectedBands = 0
         for filterName in self.filterNames:
-            if (self.filterToBand[filterName] == 'u' or
-                self.filterToBand[filterName] == 'g' or
-                self.filterToBand[filterName] == 'r'):
+            if ((self.filterToBand[filterName] == 'u' and
+                 'u' in fitBands) or
+                (self.filterToBand[filterName] == 'g' and
+                 'g' in fitBands) or
+                (self.filterToBand[filterName] == 'r' and
+                 'r' in fitBands)):
                 alphaNAffectedBands += 1
 
         #unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
@@ -974,10 +977,13 @@ class FgcmLUT(object):
         #              (fitBands == 'Y'))
         #unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
         pwvNAffectedBands = 0
-        for filterName in enumerate(self.filterNames):
-            if (self.filterToBand[filterName] == 'z' or
-                self.filterToBand[filterName] == 'y' or
-                self.filterToBand[filterName] == 'Y'):
+        for filterName in self.filterNames:
+            if ((self.filterToBand[filterName] == 'z' and
+                 'z' in fitBands) or
+                (self.filterToBand[filterName] == 'y' and
+                 'y' in fitBands) or
+                (self.filterToBand[filterName] == 'Y' and
+                 'Y' in fitBands)):
                 pwvNAffectedBands += 1
         unitDict['pwvUnit'] *= float(pwvNAffectedBands) / float(fitBands.size)
 
