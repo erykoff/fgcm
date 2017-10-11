@@ -196,8 +196,10 @@ class FgcmGray(object):
                          (expGrayForInitialSelection > self.expGrayInitialCut))
 
         for i in xrange(self.fgcmPars.nBands):
-            self.fgcmLog.log('DEBUG','Making EXP_GRAY (initial) histogram for %s band' %
-                             (self.fgcmPars.bands[i]))
+            # self.fgcmLog.log('DEBUG','Making EXP_GRAY (initial) histogram for %s band' %
+            #                  (self.fgcmPars.bands[i]))
+            self.fgcmLog.debug('Making EXP_GRAY (initial) histogram for %s band' %
+                               (self.fgcmPars.bands[i]))
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
 
             if (inBand.size == 0) :
