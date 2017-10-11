@@ -255,7 +255,7 @@ class FgcmConfig(object):
 
         self.nCCD = lutIndex['NCCD'][0]
         #self.bands = lutIndex['BANDS'][0]
-        self.lutFilterNames = lutIndex['FILTERNAME'][0]
+        self.lutFilterNames = lutIndex['FILTERNAMES'][0]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
