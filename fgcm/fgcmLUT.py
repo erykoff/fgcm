@@ -932,7 +932,7 @@ class FgcmLUT(object):
 
         deltaMagAlpha = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**self.alphaStd)) -
                          2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**(self.alphaStd+1.0))))
-        unitDict['alphaUnit'] = np.abs(deltaMagAlpha[0]) / stepUnitReference / stepGrain
+        unitDict['alphaUnit'] = np.abs(deltaMagAlpha) / stepUnitReference / stepGrain
 
         # and scale these by fraction of bands affected...
         #use, = np.where((fitBands == 'u') |
@@ -967,7 +967,7 @@ class FgcmLUT(object):
         i0Plus = self.computeI0(self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
         deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
 
-        unitDict['pwvUnit'] = np.abs(deltaMagPWV[0]) / stepUnitReference / stepGrain
+        unitDict['pwvUnit'] = np.abs(deltaMagPWV) / stepUnitReference / stepGrain
 
         # scale by fraction of bands affected
         #use,=np.where((fitBands == 'z') |
@@ -1005,7 +1005,7 @@ class FgcmLUT(object):
         i0Plus = self.computeI0(self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
         deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
 
-        unitDict['o3Unit'] = np.abs(deltaMagO3[0]) / stepUnitReference / stepGrain
+        unitDict['o3Unit'] = np.abs(deltaMagO3) / stepUnitReference / stepGrain
 
         # scale by fraction of bands that are affected
         #use,=np.where((fitBands == 'r'))
