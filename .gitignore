@@ -4,3 +4,4 @@ build
 dist
 fgcm.egg-info
 svn*
+*.pyc
