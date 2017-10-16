@@ -239,7 +239,11 @@ class FgcmStars(object):
         # new version for multifilter support
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames):
-            bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+            try:
+                bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+            except:
+                self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
+                bandIndex = -1
 
             use, = np.where(obsFilterName == filterName)
             if use.size == 0:
@@ -861,7 +865,7 @@ class FgcmStars(object):
         # so we want to add this to the magnitudes
 
         obsMagADU[:] += fgcmPars.expCCDSuperStar[obsExpIndex,
-                                              obsCCDIndex]
+                                                 obsCCDIndex]
 
     def applyApertureCorrection(self,fgcmPars):
         """
