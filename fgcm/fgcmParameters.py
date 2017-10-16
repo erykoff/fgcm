@@ -488,7 +488,11 @@ class FgcmParameters(object):
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
         for filterIndex,filterName in enumerate(self.lutFilterNames):
-            bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+            try:
+                bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+            except:
+                self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
+                continue
 
             use,=np.where(expFilterName == filterName)
             if use.size == 0:
@@ -1186,6 +1190,7 @@ class FgcmParameters(object):
         expApertureCorrection = np.zeros(self.nExp,dtype='f8')
 
         ## FIXME if changing aperture correction
+        # FIXME should filter not band
         expSeeingVariableClipped = np.clip(self.expSeeingVariable,
                                            self.compAperCorrRange[0,self.expBandIndex],
                                            self.compAperCorrRange[1,self.expBandIndex])
