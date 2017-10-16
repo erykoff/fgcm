@@ -49,6 +49,8 @@ class FgcmApertureCorrection(object):
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
         expGrayTemp = expGray.copy()
 
+        # FIXME: this should be per FILTER not per BAND
+
         # first, remove any previous correction if necessary...
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
