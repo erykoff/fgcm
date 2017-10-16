@@ -281,6 +281,7 @@ class FgcmRetrieval(object):
         ### THIS IS NOT USED I THINK
         """
         """
+        raise RuntimeError("This function should not be used...")
 
         if (not self.fgcmStars.magStdComputed):
             raise ValueError("Must run fgcmChisq before fgcmRetrieval.")
