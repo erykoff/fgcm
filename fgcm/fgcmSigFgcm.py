@@ -74,6 +74,7 @@ class FgcmSigFgcm(object):
             # only reserved stars
             goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
                                 ((objFlag & objFlagDict['RESERVED']) > 0))
+            # FIXME need to remove BAD STARS as well
         else:
             # all good stars
             goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
