@@ -31,7 +31,7 @@ class FgcmRetrieveAtmosphere(object):
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.illegalValue = fgcmConfig.illegalValue
 
-    def r0ToPWV(self, fgcmRetrieval):
+    def r1ToPWV(self, fgcmRetrieval):
         """
         """
 
@@ -176,3 +176,4 @@ class FgcmRetrieveAtmosphere(object):
 
         # Unsure what plots to put here...
         # and we're done!  Everything is filled in!
+        self.fgcmLog.log('INFO','Done computing retrieved PWV values')
