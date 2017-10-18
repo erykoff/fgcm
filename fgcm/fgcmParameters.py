@@ -818,7 +818,7 @@ class FgcmParameters(object):
         self.expAlpha = self.parAlpha[self.expNightIndex]
 
         if self.retrievePWV:
-            self.expPWV = (self.compRetrievedPWV * self.parRetreivedPWVScale +
+            self.expPWV = (self.compRetrievedPWV * self.parRetrievedPWVScale +
                            self.parRetrievedPWVOffset)
         else:
             # default to the nightly slope/intercept
