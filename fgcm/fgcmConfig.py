@@ -38,7 +38,7 @@ class FgcmConfig(object):
                       'nExpPerRun','varNSig','varMinBand','useSedLUT',
                       'freezeStdAtmosphere','reserveFraction',
                       'precomputeSuperStarInitialCycle',
-                      'retrievePWV','PWVRetrievalSmoothBlock']
+                      'retrievePWV','pwvRetrievalSmoothBlock']
 
         for key in requiredKeys:
             if (key not in configDict):
