@@ -24,6 +24,7 @@ from fgcmZeropoints import FgcmZeropointPlotter
 from fgcmLogger import FgcmLogger
 from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
+from fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 import fgcmPlotmaps
 
 
