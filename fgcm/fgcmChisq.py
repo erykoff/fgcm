@@ -682,7 +682,7 @@ class FgcmChisq(object):
                         np.sum(deltaMagWeightedGOF[hasRetrievedPWFGOF] * (
                                 dLdPWVGO[obsFitUseGO[hasRetreivedPWVGOF]] -
                                 magDLdPWVRetrievedOffset[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
-                        unitDict['pwvUnit']
+                        unitDict['pwvUnit'])
 
 
             ###########
