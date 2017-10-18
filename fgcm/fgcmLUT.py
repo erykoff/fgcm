@@ -41,7 +41,8 @@ class FgcmLUTMaker(object):
         """
         """
 
-        requiredKeys=['elevation','filterNames','nCCD',
+        requiredKeys=['elevation','filterNames',
+                      'filterNameToStdFilter','nCCD',
                       'pmbRange','pmbSteps',
                       'pwvRange','pwvSteps',
                       'o3Range','o3Steps',
@@ -65,6 +66,14 @@ class FgcmLUTMaker(object):
         self.pmbElevation = self.modGen.pmbElevation
 
         self.filterNames = np.array(self.lutConfig['filterNames'])
+        self.filterNameToStdFilter = np.array(self.lutConfig['filterNameToStdFilter'])
+
+        for filterName in self.filterNames:
+            if filterName not in self.filterNameToStdFilter:
+                raise ValueError("filterName %s not listed in filterNameToStdFilter" % (filterName))
+            if self.filterNameToStdFilter[filterName] not in self.filterNames:
+                raise ValueError("Standard filterName %s ntot listed in filterNames" %
+                                 (self.filterNameToStdFilter[filterName]))
 
         self.nCCD = self.lutConfig['nCCD']
         self.nCCDStep = self.nCCD+1
@@ -271,13 +280,20 @@ class FgcmLUTMaker(object):
             self.lambdaB[i] = num / denom
             self.fgcmLog.info("Filter: %s, lambdaB = %.3f" % (self.filterNames[i], self.lambdaB[i]))
 
-        self.fgcmLog.info("Computing lambdaStd")
-        self.lambdaStd = np.zeros(self.filterNames.size)
+        self.fgcmLog.info("Computing lambdaStdFilter")
+        self.lambdaStdFilter = np.zeros(self.filterNames.size)
         for i in xrange(self.filterNames.size):
             num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            self.lambdaStd[i] = num / denom
-            self.fgcmLog.info("Filter: %s, lambdaStd = %.3f" % (self.filterNames[i],self.lambdaStd[i]))
+            self.lambdaStdFilter[i] = num / denom
+            self.fgcmLog.info("Filter: %s, lambdaStdFilter = %.3f" % (self.filterNames[i],self.lambdaStdFilter[i]))
+
+        # now compute lambdaStd based on the desired standards...
+        self.fgcmLog.info("Calculating lambdaStd")
+        self.lambdaStd = np.zeros(self.filterNames.size)
+        for i, filterName in enumerate(self.filterNames.size):
+            stdFilterName = self.filterNameToStdFilter[filterName]
+            # finish this
 
 
         self.fgcmLog.info("Computing I0Std/I1Std")
