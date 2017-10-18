@@ -680,7 +680,7 @@ class FgcmChisq(object):
                                    objMagStdMeanErr2GO[obsFitUseGO[hasRetrievedPWVGOF]])
                     partialArray[self.fgcmPars.parRetrievedPWVOffsetLoc] = 2.0 * (
                         np.sum(deltaMagWeightedGOF[hasRetrievedPWFGOF] * (
-                                dLdPWVGO[obsFitUseGO[hasRetreivedPWVGOF]] -
+                                dLdPWVGO[obsFitUseGO[hasRetrievedPWVGOF]] -
                                 magDLdPWVRetrievedOffset[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
                         unitDict['pwvUnit'])
 
