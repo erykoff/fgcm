@@ -35,6 +35,10 @@ zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
               'CANNOT_COMPUTE_ZEROPOINT':2**4,
               'TOO_FEW_STARS_ON_CCD':2**5}
 
+retrievalFlagDict = {'EXPOSURE_RETRIEVED':2**0,
+                     'EXPOSURE_INTERPOLATED':2**1,
+                     'EXPOSURE_STANDARD':2**2}
+
 logDict = {'NONE':0,
            'INFO':1,
            'DEBUG':2}
