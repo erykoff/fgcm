@@ -590,6 +590,7 @@ class FgcmLUTMaker(object):
                                     ('LAMBDARANGE','f8',2),
                                     ('LAMBDASTEP','f8'),
                                     ('LAMBDASTD','f8',self.filterNames.size),
+                                    ('LAMBDASTDFILTER','f8',self.filterNames.size),
                                     ('LAMBDANORM','f8'),
                                     ('I0STD','f8',self.filterNames.size),
                                     ('I1STD','f8',self.filterNames.size),
@@ -606,6 +607,7 @@ class FgcmLUTMaker(object):
         stdVals['LAMBDARANGE'] = self.lambdaRange
         stdVals['LAMBDASTEP'] = self.lambdaStep
         stdVals['LAMBDASTD'][:] = self.lambdaStd
+        stdVals['LAMBDASTDFILTER'][:] = self.lambdaStdFilter
         stdVals['LAMBDANORM'][:] = self.lambdaNorm
         stdVals['I0STD'][:] = self.I0Std
         stdVals['I1STD'][:] = self.I1Std
