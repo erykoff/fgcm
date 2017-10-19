@@ -667,7 +667,7 @@ class FgcmChisq(object):
                         np.sum(deltaMagWeightedGOF[hasRetrievedPWVGOF] * (
                                 self.fgcmPars.expPWV[obsExpIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]] *
                                 dLdPWVGO[obsFitUseGO[hasRetrievedPWVGOF]] -
-                                magDLdPWVRetrievedScale[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
+                                magdLdPWVRetrievedScale[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
                         unitDict['pwvUnit'])
 
                     # PWV Retrieved Global Offset
@@ -679,9 +679,9 @@ class FgcmChisq(object):
                                    obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]],
                                    objMagStdMeanErr2GO[obsFitUseGO[hasRetrievedPWVGOF]])
                     partialArray[self.fgcmPars.parRetrievedPWVOffsetLoc] = 2.0 * (
-                        np.sum(deltaMagWeightedGOF[hasRetrievedPWFGOF] * (
+                        np.sum(deltaMagWeightedGOF[hasRetrievedPWVGOF] * (
                                 dLdPWVGO[obsFitUseGO[hasRetrievedPWVGOF]] -
-                                magDLdPWVRetrievedOffset[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
+                                magdLdPWVRetrievedOffset[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
                         unitDict['pwvUnit'])
 
             else:
