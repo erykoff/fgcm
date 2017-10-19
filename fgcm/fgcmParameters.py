@@ -229,6 +229,7 @@ class FgcmParameters(object):
         if (self.retrievePWV):
             # these are set to the standard values to start
             self.compRetrievedPWV = np.zeros(self.nExp,dtype='f8') + self.pwvStd
+            self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
             self.compRetrievedPWVRaw = np.zeros(self.nExp,dtype='f8')
             self.compRetrievedPWVFlag = np.zeros(self.nExp,dtype='i2') + retrievalFlagDict['EXPOSURE_STANDARD']
             self.parRetrievedPWVScale = 1.0
@@ -347,6 +348,7 @@ class FgcmParameters(object):
 
         if self.retrievePWV:
             self.compRetrievedPWV = inParams['COMPRETRIEVEDPWV'][0]
+            self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
             self.compRetrievedPWVRaw = inParams['COMPRETRIEVEDPWVRAW'][0]
             self.compRetrievedPWVFlag = inParams['COMPRETRIEVEDPWVFLAG'][0]
             self.parRetrievedPWVScale = inParams['PARRETRIEVEDPWVSCALE'][0]
@@ -710,7 +712,7 @@ class FgcmParameters(object):
             pars['COMPRETRIEVEDPWVRAW'][:] = self.compRetrievedPWVRaw
             pars['COMPRETRIEVEDPWVFLAG'][:] = self.compRetrievedPWVFlag
             pars['PARRETRIEVEDPWVSCALE'][:] = self.parRetrievedPWVScale
-            pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRtrievedPWVOffset
+            pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRetrievedPWVOffset
 
         return parInfo, pars
 
@@ -804,7 +806,7 @@ class FgcmParameters(object):
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
         # done
 
-    def parsToExposures(self):
+    def parsToExposures(self, retrievedInput=False):
         """
         """
 
@@ -818,8 +820,12 @@ class FgcmParameters(object):
         self.expAlpha = self.parAlpha[self.expNightIndex]
 
         if self.retrievePWV:
-            self.expPWV = (self.compRetrievedPWV * self.parRetrievedPWVScale +
-                           self.parRetrievedPWVOffset)
+            if retrievedInput:
+                self.expPWV = (self.compRetrievedPWVInput * self.parRetrievedPWVScale +
+                               self.parRetrievedPWVOffset)
+            else:
+                self.expPWV = (self.compRetrievedPWV * self.parRetrievedPWVScale +
+                               self.parRetrievedPWVOffset)
         else:
             # default to the nightly slope/intercept
             self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
@@ -1022,10 +1028,10 @@ class FgcmParameters(object):
                             self.parPWVPerSlopeLoc + \
                             self.nCampaignNights] = 0.0
             else:
-                parLow[self.parRetrievedPWVScale] = 1.0
-                parHigh[self.parRetrievedPWVScale] = 1.0
-                parLow[self.parRetrievedPWVOffset] = 0.0
-                parLow[self.parRetrievedPWVScale] = 0.0
+                parLow[self.parRetrievedPWVScaleLoc] = 1.0
+                parHigh[self.parRetrievedPWVScaleLoc] = 1.0
+                parLow[self.parRetrievedPWVOffsetLoc] = 0.0
+                parLow[self.parRetrievedPWVScaleLoc] = 0.0
 
             parLow[self.parO3Loc: \
                    self.parO3Loc + \
