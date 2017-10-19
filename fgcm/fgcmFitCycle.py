@@ -22,6 +22,7 @@ from fgcmBrightObs import FgcmBrightObs
 from fgcmExposureSelector import FgcmExposureSelector
 from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
+from fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 
 from fgcmUtilities import zpFlagDict
 
