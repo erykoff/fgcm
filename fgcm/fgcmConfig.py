@@ -19,7 +19,7 @@ class FgcmConfig(object):
     """
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
-        requiredKeys=['bands','fitBands','extraBands','filterToBand','bandToStdFilter',
+        requiredKeys=['bands','fitBands','extraBands','filterToBand',
                       'exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField',
@@ -52,7 +52,6 @@ class FgcmConfig(object):
         self.fitBands = np.array(configDict['fitBands'])
         self.extraBands = np.array(configDict['extraBands'])
         self.filterToBand = configDict['filterToBand']
-        self.bandToStdFilter = configDict['bandToStdFilter']
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
         self.obsFile = configDict['obsFile']
@@ -254,8 +253,8 @@ class FgcmConfig(object):
         #lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
         self.nCCD = lutIndex['NCCD'][0]
-        #self.bands = lutIndex['BANDS'][0]
         self.lutFilterNames = lutIndex['FILTERNAMES'][0]
+        self.lutStdFilterNames = lutIndex['STDFILTERNAMES'][0]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -269,15 +268,14 @@ class FgcmConfig(object):
         if (self.extraBands.size > 0):
             self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
-        # new band checks:
+        # newer band checks
         #  1) check that all the filters in filterToBand are in lutFilterNames
-        #  2) check that all the bands in bandToStdFilter are in bands
-        #  3) check that all the bands have a (single) stdFilter
-        #  3) check that all the filters in bandToStdFilter are in lutFilterNames
+        #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
+        #  3) check that each band has ONE standard filter
         #  4) check that all the fitBands are in bands
         #  5) check that all the extraBands are in bands
 
-        nStandard = np.zeros(self.bands.size,dtype='i4')
+        #  1) check that all the filters in filterToBand are in lutFilterNames
         for filterName in self.filterToBand:
             test,=np.where(filterName == self.lutFilterNames)
             if test.size == 0:
@@ -285,22 +283,30 @@ class FgcmConfig(object):
             if self.filterToBand[filterName] not in self.bands:
                 raise ValueError("Band %s in filterToBand not in bands" %
                                  (self.filterToBand[filterName]))
-        for band in self.bandToStdFilter:
-            test,=np.where(self.bands == band)
-            if test.size == 0:
-                raise ValueError("Band %s in bandToStdFilter not in bands" % (band))
-            nStandard[test] += 1
-            if self.bandToStdFilter[band] not in self.lutFilterNames:
-                raise ValueError("FilterName %s in bandToStdFilter not in lutFilterNames" %
-                                 (self.bandToStdFilter[band]))
-        if (np.min(nStandard) < 1):
-            raise ValueError("Each band must be associated with a standard filter")
-        if (np.max(nStandard) > 1):
-            raise ValueError("Each band must be associated with only one standard filter")
+        #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
+        for lutStdFilterName in self.lutStdFilterNames:
+            if lutStdFilterName not in self.lutFilterNames:
+                raise ValueError("lutStdFilterName %s not in list of lutFilterNames" % (lutStdFilterName))
+        #  3) check that each band has ONE standard filter
+        bandStdFilterIndex = np.zeros(self.bands.size, dtype=np.int32) - 1
+        for i, band in enumerate(self.bands):
+            for j, filterName in enumerate(self.lutFilterNames):
+                if self.filterToBand[filterName] == band:
+                    # If we haven't found it yet, set the index
+                    ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
+                    if bandStdFilterIndex[i] < 0:
+                        bandStdFilterIndex[i] = ind
+                    else:
+                        if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
+                            raise ValueError("Band %s has multiple standard filters (%s, %s)" %
+                                             (band, self.lutStdFilterNames[ind],
+                                              self.lutStdFilterNames[bandStdFilterIndex[i]]))
+        #  4) check that all the fitBands are in bands
         for fitBand in self.fitBands:
             test,=np.where(fitBand == self.bands)
             if (test.size == 0):
                 raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
+        #  5) check that all the extraBands are in bands
         for extraBand in self.extraBands:
             test,=np.where(extraBand == self.bands)
             if (test.size == 0):
@@ -320,18 +326,7 @@ class FgcmConfig(object):
         self.lambdaStd = lutStd['LAMBDASTD'][0]
 
         # And the I10Std, for each *band*
-        #self.I10StdBand = np.zeros(self.bands.size)
-        #for i,band in enumerate(self.bands):
-        #    for filterName in self.filterToBand:
-        #        if (self.filterToBand[filterName][0] == band and
-        #            self.filterToBand[filterName][1] == 1):
-        #            # finally we need the LUT index here!
-        #            test,=np.where(filterName == self.lutFilterNames)
-        #            self.I10StdBand[i] = lutStd['I10STD'][0][test]
-        self.I10StdBand = np.zeros(self.bands.size)
-        for i,band in enumerate(self.bands):
-            test,=np.where(self.bandToStdFilter[band] == self.lutFilterNames)
-            self.I10StdBand[i] = lutStd['I10STD'][0][test]
+        self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
 
         if (self.expGrayPhotometricCut.size != self.bands.size):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
@@ -343,7 +338,6 @@ class FgcmConfig(object):
             raise ValueError("expGrayHighCut must all be positive")
 
         # and look at the exposure file and grab some stats
-        #expInfo = fitsio.read(self.exposureFile,ext=1)
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
