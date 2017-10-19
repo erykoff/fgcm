@@ -639,6 +639,7 @@ class FgcmLUT(object):
         #indexVals = fitsio.read(self.lutFile,ext='INDEX')
 
         self.filterNames = indexVals['FILTERNAMES'][0]
+        self.stdFilterNames = indexVals['STDFILTERNAMES'][0]
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]
@@ -719,6 +720,7 @@ class FgcmLUT(object):
         self.lambdaRange = stdVals['LAMBDARANGE'][0]
         self.lambdaStep = stdVals['LAMBDASTEP'][0]
         self.lambdaStd = stdVals['LAMBDASTD'][0]
+        self.lambdaStdFilter = stdVals['LAMBDASTDFILTER'][0]
         self.I0Std = stdVals['I0STD'][0]
         self.I1Std = stdVals['I1STD'][0]
         self.I10Std = stdVals['I10STD'][0]
