@@ -34,6 +34,7 @@ class FgcmRetrieveAtmosphere(object):
     def r1ToPWV(self, fgcmRetrieval):
         """
         """
+        self.fgcmLog.log('INFO','Retrieving PWV Values...')
 
         if (not self.retrievePWV):
             raise RuntimeError("Calling r0ToAtmosphere when not using retrieval ... but maybe this should be allowed (later)")
@@ -139,18 +140,18 @@ class FgcmRetrieveAtmosphere(object):
         self.fgcmPars.compRetrievedPWVFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
 
         # Record these values and set a flag...
-        self.fgcmPars.compRetrievedPWVRaw = rPWVStruct['RPWV'][rPWVStruct['EXPINDEX']]
-        self.fgcmPars.compRetrievedPWV = rPWVStruct['RPWV_SMOOTH'][rPWVStruct['EXPINDEX']]
+        self.fgcmPars.compRetrievedPWVRaw[rPWVStruct['EXPINDEX']] = rPWVStruct['RPWV_MED']
+        self.fgcmPars.compRetrievedPWV[rPWVStruct['EXPINDEX']] = rPWVStruct['RPWV_SMOOTH']
         # unset standard and set that it's been retrieved
         self.fgcmPars.compRetrievedPWVFlag[rPWVStruct['EXPINDEX']] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
         self.fgcmPars.compRetrievedPWVFlag[rPWVStruct['EXPINDEX']] |= retrievalFlagDict['EXPOSURE_RETRIEVED']
 
         # and finally we do interpolation to all the exposures...
 
-        nightIndexWithPWV = np.unique(fgcmPars.expNightIndex[rPWVStruct['EXPINDEX']])
+        nightIndexWithPWV = np.unique(self.fgcmPars.expNightIndex[rPWVStruct['EXPINDEX']])
 
-        a, b = esutil.numpy_util.match(nightIndexWithPWV, fgcmPars.expNightIndex)
-        h, rev = esutil.stat.histogram(fgcmPars.expNightIndex[b], rev=True)
+        a, b = esutil.numpy_util.match(nightIndexWithPWV, self.fgcmPars.expNightIndex)
+        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[b], rev=True)
 
         gd, = np.where(h > 0)
 
@@ -158,21 +159,29 @@ class FgcmRetrieveAtmosphere(object):
             i1a = b[rev[rev[gd[i]]:rev[gd[i]+1]]]
 
             # sort by MJD
-            st = np.argsort(fgcmPars.expMJD[i1a])
+            st = np.argsort(self.fgcmPars.expMJD[i1a])
             i1a = i1a[st]
 
             # base interpolation on the ones with RPWV fits
-            hasPWV, = np.where((fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+            hasPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
-            interpolator = scipy.interpolate.interp1d(fgcmPars.expMJD[i1a[hasPWV]],
-                                                      fgcmPars.compRetrievedPWV[i1a[hasPWV]],
-                                                      bounds_error=False,
-                                                      fill_value=(fgcmPars.compRetrievedPWV[i1a[hasPWV[0]]],
-                                                                  fgcmPars.compRetrievedPWV[i1a[hasPWV[-1]]]))
-            noPWV, = np.where((fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) == 0)
-            fgcmPars.compRetrievedPWV[i1a[noPWV]] = interpolator(fgcmPars.expMJD[i1a[noPWV]])
-            fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
-            fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
+            noPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) == 0)
+
+            # if we have < 3, we have a special branch -- night average
+            if hasPWV.size < 3:
+                self.fgcmPars.compRetrievedPWV[i1a[noPWV]] = np.mean(self.fgcmPars.compRetrievedPWV[i1a[hasPWV]])
+            else:
+                # regular interpolation
+
+                interpolator = scipy.interpolate.interp1d(self.fgcmPars.expMJD[i1a[hasPWV]],
+                                                          self.fgcmPars.compRetrievedPWV[i1a[hasPWV]],
+                                                          bounds_error=False,
+                                                          fill_value=(self.fgcmPars.compRetrievedPWV[i1a[hasPWV[0]]],
+                                                                      self.fgcmPars.compRetrievedPWV[i1a[hasPWV[-1]]]))
+                self.fgcmPars.compRetrievedPWV[i1a[noPWV]] = interpolator(self.fgcmPars.expMJD[i1a[noPWV]])
+            # Flagging is the same
+            self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
+            self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
 
         # Unsure what plots to put here...
         # and we're done!  Everything is filled in!
