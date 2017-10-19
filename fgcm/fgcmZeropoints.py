@@ -74,7 +74,8 @@ class FgcmZeropoints(object):
         # and we need to make sure we have the parameters, and
         #  set these to the exposures
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
-        self.fgcmPars.parsToExposures()
+        # Use *input* values for the retrieved atmosphere parameters (if needed)
+        self.fgcmPars.parsToExposures(retrievedInput=True)
 
         # set up output structures
 
