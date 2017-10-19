@@ -293,7 +293,10 @@ class FgcmLUTMaker(object):
         self.lambdaStd = np.zeros(self.filterNames.size)
         for i, filterName in enumerate(self.filterNames.size):
             stdFilterName = self.filterNameToStdFilter[filterName]
-            # finish this
+            ind, = np.where(self.filterNames == stdFilterName)
+            self.lambdaStd[i] = self.lambdaStdFilter[ind[0]]
+            self.fgcmLog.info("Filter: %s (from %s) lambdaStd = %.3f" %
+                              (filterName, stdFilterName, self.lambdaStd[i]))
 
 
         self.fgcmLog.info("Computing I0Std/I1Std")
