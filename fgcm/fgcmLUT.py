@@ -42,7 +42,7 @@ class FgcmLUTMaker(object):
         """
 
         requiredKeys=['elevation','filterNames',
-                      'filterNameToStdFilter','nCCD',
+                      'stdFilterNames','nCCD',
                       'pmbRange','pmbSteps',
                       'pwvRange','pwvSteps',
                       'o3Range','o3Steps',
@@ -66,14 +66,14 @@ class FgcmLUTMaker(object):
         self.pmbElevation = self.modGen.pmbElevation
 
         self.filterNames = np.array(self.lutConfig['filterNames'])
-        self.filterNameToStdFilter = np.array(self.lutConfig['filterNameToStdFilter'])
+        self.stdFilterNames = np.array(self.lutConfig['stdFilterNames'])
 
-        for filterName in self.filterNames:
-            if filterName not in self.filterNameToStdFilter:
-                raise ValueError("filterName %s not listed in filterNameToStdFilter" % (filterName))
-            if self.filterNameToStdFilter[filterName] not in self.filterNames:
-                raise ValueError("Standard filterName %s ntot listed in filterNames" %
-                                 (self.filterNameToStdFilter[filterName]))
+        if self.filterNames.size != self.stdFilterNames.size:
+            raise ValueError("Length of filterNames must be same as stdFilterNames")
+
+        for stdFilterName in self.stdFilterNames:
+            if stdFilterName not in self.filterNames:
+                raise ValueError("stdFilterName %s not in list of filterNames" % (stdFilterName))
 
         self.nCCD = self.lutConfig['nCCD']
         self.nCCDStep = self.nCCD+1
@@ -291,13 +291,12 @@ class FgcmLUTMaker(object):
         # now compute lambdaStd based on the desired standards...
         self.fgcmLog.info("Calculating lambdaStd")
         self.lambdaStd = np.zeros(self.filterNames.size)
-        for i, filterName in enumerate(self.filterNames.size):
-            stdFilterName = self.filterNameToStdFilter[filterName]
-            ind, = np.where(self.filterNames == stdFilterName)
+
+        for i, filterName in enumerate(self.filterNames):
+            ind, = np.where(self.filterNames == self.stdFilterNames[i])
             self.lambdaStd[i] = self.lambdaStdFilter[ind[0]]
             self.fgcmLog.info("Filter: %s (from %s) lambdaStd = %.3f" %
-                              (filterName, stdFilterName, self.lambdaStd[i]))
-
+                              (filterName, self.stdFilterNames[i], self.lambdaStd[i]))
 
         self.fgcmLog.info("Computing I0Std/I1Std")
         self.I0Std = np.zeros(self.filterNames.size)
@@ -555,7 +554,8 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,self.lut.flatten(),extname='LUT',clobber=True)
 
         # and now save the indices
-        indexVals = np.zeros(1,dtype=[('FILTERNAMES','a1',self.filterNames.size),
+        indexVals = np.zeros(1,dtype=[('FILTERNAMES',self.filterNames.dtype.str,self.filterNames.size),
+                                      ('STDFILTERNAMES',self.stdFilterNames.dtype.str,self.stdFilterNames.size),
                                       ('PMB','f8',self.pmb.size),
                                       ('PMBFACTOR','f8',self.pmb.size),
                                       ('PMBELEVATION','f8'),
@@ -567,6 +567,7 @@ class FgcmLUTMaker(object):
                                       ('ZENITH','f8',self.zenith.size),
                                       ('NCCD','i4')])
         indexVals['FILTERNAMES'] = self.filterNames
+        indexVals['STDFILTERNAMES'] = self.stdFilterNames
         indexVals['PMB'] = self.pmb
         indexVals['PMBFACTOR'] = self.pmbFactor
         indexVals['PMBELEVATION'] = self.pmbElevation
