@@ -51,7 +51,7 @@ class FgcmStars(object):
         self.mapLongitudeRef = fgcmConfig.mapLongitudeRef
         self.mapNSide = fgcmConfig.mapNSide
 
-        self.lambdaStd = fgcmConfig.lambdaStd
+        self.lambdaStdBand = fgcmConfig.lambdaStdBand
 
         self.bandRequiredFlag = fgcmConfig.bandRequiredFlag
         self.bandRequiredIndex = np.where(self.bandRequiredFlag)[0]
@@ -653,7 +653,7 @@ class FgcmStars(object):
             # this is the flux "color"
             S=np.zeros(self.nBands-1,dtype='f4')
             for i in xrange(self.nBands-1):
-                S[i] = (-1/self.magConstant) * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStd[i+1] - self.lambdaStd[i])
+                S[i] = (-1/self.magConstant) * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStdBand[i+1] - self.lambdaStdBand[i])
 
             # first, handle the required bands.
             #  edge bands use a second derivative expansion
@@ -667,8 +667,8 @@ class FgcmStars(object):
             # HACK
             #objSEDSlope[objIndex,tempIndex] = (
             #    S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
-            #        (self.lambdaStd[tempIndex+1] - self.lambdaStd[tempIndex]) /
-            #        (self.lambdaStd[tempIndex+2] - self.lambdaStd[tempIndex])) *
+            #        (self.lambdaStdBand[tempIndex+1] - self.lambdaStdBand[tempIndex]) /
+            #        (self.lambdaStdBand[tempIndex+2] - self.lambdaStdBand[tempIndex])) *
             #    (S[tempIndex+1]-S[tempIndex]))
             objSEDSlope[objIndex,tempIndex] = (
                 S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
@@ -684,8 +684,8 @@ class FgcmStars(object):
             tempIndex=self.bandRequiredIndex[-1]
             objSEDSlope[objIndex,tempIndex] = (
                 S[tempIndex-1] + self.sedFitBandFudgeFactors[-1] * (
-                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
-                    (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-1]) /
+                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-2])) *
                 (S[tempIndex-1] - S[tempIndex-2]))
 
             # and the extra bands ... only redward now
@@ -696,8 +696,8 @@ class FgcmStars(object):
             for i in xrange(extra.size):
                 objSEDSlope[objIndex,self.bandExtraIndex[extra[i]]] = (
                     S[tempIndex-1] + self.sedExtraBandFudgeFactors[extra[i]] * (
-                        (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
-                        (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                        (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-1]) /
+                        (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-2])) *
                     (S[tempIndex-1] - S[tempIndex-2]))
 
     def computeObjectSEDSlopes(self,objIndicesIn):
@@ -741,7 +741,7 @@ class FgcmStars(object):
         for i in xrange(self.nBands-1):
             S[:,i] = (-1/self.magConstant) * (objMagStdMeanOI[goodIndicesOI,i+1] -
                                               objMagStdMeanOI[goodIndicesOI,i]) / (
-                (self.lambdaStd[i+1] - self.lambdaStd[i]))
+                (self.lambdaStdBand[i+1] - self.lambdaStdBand[i]))
 
         ## FIXME: will have to handle u band "extra"
 
@@ -761,8 +761,8 @@ class FgcmStars(object):
         tempIndex = self.bandRequiredIndex[-1]
         objSEDSlopeOI[goodIndicesOI,tempIndex] = (
             S[:,tempIndex-1] + self.sedFitBandFudgeFactors[-1] * (
-                (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-1]) /
-                (self.lambdaStd[tempIndex] - self.lambdaStd[tempIndex-2])) *
+                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-1]) /
+                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-2])) *
             (S[:,tempIndex-1] - S[:,tempIndex-2]))
 
         # and the extra bands, only redward now
@@ -780,10 +780,9 @@ class FgcmStars(object):
             use,=np.where(objMagStdMeanOI[goodIndicesOI,extraIndex] < 90.0)
             objSEDSlopeOI[goodIndicesOI[use],extraIndex] = (
                 S[use,extraIndex-1] + self.sedExtraBandFudgeFactors[i] * (
-                    (self.lambdaStd[extraIndex] - self.lambdaStd[extraIndex-1]) /
-                    (self.lambdaStd[extraIndex] - self.lambdaStd[extraIndex-2])) *
+                    (self.lambdaStdBand[extraIndex] - self.lambdaStdBand[extraIndex-1]) /
+                    (self.lambdaStdBand[extraIndex] - self.lambdaStdBand[extraIndex-2])) *
                 (S[use,extraIndex-1] - S[use,extraIndex-2]))
-
 
         # and save the values, protected
         objSEDSlopeLock.acquire()
