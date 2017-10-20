@@ -38,7 +38,7 @@ class FgcmConfig(object):
                       'nExpPerRun','varNSig','varMinBand','useSedLUT',
                       'freezeStdAtmosphere','reserveFraction',
                       'precomputeSuperStarInitialCycle',
-                      'retrievePWV','pwvRetrievalSmoothBlock']
+                      'useRetrievedPWV','pwvRetrievalSmoothBlock']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -103,7 +103,7 @@ class FgcmConfig(object):
         self.freezeStdAtmosphere = configDict['freezeStdAtmosphere']
         self.reserveFraction = configDict['reserveFraction']
         self.precomputeSuperStarInitialCycle = configDict['precomputeSuperStarInitialCycle']
-        self.retrievePWV = configDict['retrievePWV']
+        self.useRetrievedPWV = configDict['useRetrievedPWV']
         self.pwvRetrievalSmoothBlock = configDict['pwvRetrievalSmoothBlock']
 
         if 'pwvFile' in configDict:
