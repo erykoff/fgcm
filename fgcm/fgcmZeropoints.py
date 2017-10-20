@@ -627,7 +627,7 @@ class FgcmZeropointPlotter(object):
             meanI1[use] /= nPerCCD[use]
             meanR1[use] /= nPerCCD[use]
 
-            # use the same scale for all the plots
+            # use the same range scale for all the plots
             st = np.argsort(meanR1[use])
             lo = meanR1[use[st[int(0.02*st.size)]]]
             hi = meanR1[use[st[int(0.98*st.size)]]]
@@ -643,7 +643,9 @@ class FgcmZeropointPlotter(object):
                 elif (plotType == 'I1'):
                     plotCCDMap(ax, ccdOffsets[use], meanI1[use], plotType, loHi=[lo,hi])
                 else:
-                    plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], plotType, loHi=[lo,hi])
+                    # for the residuals, center at zero, but use lo/hi
+                    amp = np.abs((hi - lo)/2.)
+                    plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], plotType, loHi=[-amp, amp])
 
                 text = r'$(%s)$' % (filterName) + '\n' + \
                     r'%s' % (plotType)
