@@ -307,12 +307,11 @@ class FgcmFitCycle(object):
         self.fgcmRetrieval.computeRetrievalIntegrals()
         self.fgcmLog.logMemoryUsage('INFO','After computing retrieved integrals')
 
-        # Compute Retrieved PWV if desired
-        if self.fgcmConfig.retrievePWV:
-            self.fgcmLog.log('DEBUG','FitCycle computing RPWV')
-            self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
-                                                                 self.fgcmPars)
-            self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
+        # Compute Retrieved PWV -- always because why not?
+        self.fgcmLog.log('DEBUG','FitCycle computing RPWV')
+        self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
+                                                             self.fgcmPars)
+        self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
 
 
         # Compute SuperStar Flats
