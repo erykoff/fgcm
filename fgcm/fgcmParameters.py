@@ -98,7 +98,7 @@ class FgcmParameters(object):
         self.tauFile = fgcmConfig.tauFile
         self.externalPWVDeltaT = fgcmConfig.externalPWVDeltaT
         self.externalTauDeltaT = fgcmConfig.externalTauDeltaT
-        self.retrievePWV = fgcmConfig.retrievePWV
+        self.useRetrievedPWV = fgcmConfig.useRetrievedPWV
 
 
         # and the default unit dict
@@ -179,9 +179,9 @@ class FgcmParameters(object):
         self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.o3Std
         self.parTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.tauStd
         self.parTauPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
-        if not self.retrievePWV:
-            self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.pwvStd
-            self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        # these we will always have, won't always fit
+        self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.pwvStd
+        self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
@@ -226,14 +226,13 @@ class FgcmParameters(object):
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
 
         # and the computed retrieved PWV
-        if (self.retrievePWV):
-            # these are set to the standard values to start
-            self.compRetrievedPWV = np.zeros(self.nExp,dtype='f8') + self.pwvStd
-            self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
-            self.compRetrievedPWVRaw = np.zeros(self.nExp,dtype='f8')
-            self.compRetrievedPWVFlag = np.zeros(self.nExp,dtype='i2') + retrievalFlagDict['EXPOSURE_STANDARD']
-            self.parRetrievedPWVScale = 1.0
-            self.parRetrievedPWVOffset = 0.0
+        # these are set to the standard values to start
+        self.compRetrievedPWV = np.zeros(self.nExp,dtype='f8') + self.pwvStd
+        self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
+        self.compRetrievedPWVRaw = np.zeros(self.nExp,dtype='f8')
+        self.compRetrievedPWVFlag = np.zeros(self.nExp,dtype='i2') + retrievalFlagDict['EXPOSURE_STANDARD']
+        self.parRetrievedPWVScale = 1.0
+        self.parRetrievedPWVOffset = 0.0
 
         # compute the units
         self.unitDictSteps = fgcmLUT.computeStepUnits(self.stepUnitReference,
@@ -284,17 +283,13 @@ class FgcmParameters(object):
         self.hasExternalPWV = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
         self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
 
-        if (self.retrievePWV != inParInfo['RETRIEVEPWV'][0].astype(np.bool)):
-            raise ValueError("Config setting for retrievePWV not equal to previous run!")
-
         ## and copy the parameters
         self.parAlpha = inParams['PARALPHA'][0]
         self.parO3 = inParams['PARO3'][0]
         self.parTauIntercept = inParams['PARTAUINTERCEPT'][0]
         self.parTauPerSlope = inParams['PARTAUPERSLOPE'][0]
-        if not self.retrievePWV:
-            self.parPWVIntercept = inParams['PARPWVINTERCEPT'][0]
-            self.parPWVPerSlope = inParams['PARPWVPERSLOPE'][0]
+        self.parPWVIntercept = inParams['PARPWVINTERCEPT'][0]
+        self.parPWVPerSlope = inParams['PARPWVPERSLOPE'][0]
         self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0]
         self.parQESysSlope = inParams['PARQESYSSLOPE'][0]
 
@@ -304,9 +299,8 @@ class FgcmParameters(object):
             self.parO3[:] = self.o3Std
             self.parTauIntercept[:] = self.tauStd
             self.parTauPerSlope[:] = 0.0
-            if not self.retrievePWV:
-                self.parPWVIntercept[:] = self.pwvStd
-                self.parPWVPerSlope[:] = 0.0
+            self.parPWVIntercept[:] = self.pwvStd
+            self.parPWVPerSlope[:] = 0.0
             # leave the QESysIntercept and Slope as previously fit
             # though we want to play with this
 
@@ -346,17 +340,16 @@ class FgcmParameters(object):
 
         self.compSigFgcm = inParams['COMPSIGFGCM'][0]
 
-        if self.retrievePWV:
-            self.compRetrievedPWV = inParams['COMPRETRIEVEDPWV'][0]
-            self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
-            self.compRetrievedPWVRaw = inParams['COMPRETRIEVEDPWVRAW'][0]
-            self.compRetrievedPWVFlag = inParams['COMPRETRIEVEDPWVFLAG'][0]
-            self.parRetrievedPWVScale = inParams['PARRETRIEVEDPWVSCALE'][0]
-            self.parRetrievedPWVOffset = inParams['PARRETRIEVEDPWVOFFSET'][0]
+        self.compRetrievedPWV = inParams['COMPRETRIEVEDPWV'][0]
+        self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
+        self.compRetrievedPWVRaw = inParams['COMPRETRIEVEDPWVRAW'][0]
+        self.compRetrievedPWVFlag = inParams['COMPRETRIEVEDPWVFLAG'][0]
+        self.parRetrievedPWVScale = inParams['PARRETRIEVEDPWVSCALE'][0]
+        self.parRetrievedPWVOffset = inParams['PARRETRIEVEDPWVOFFSET'][0]
 
-            if self.resetParameters:
-                self.parRetrievedPWVScale = 1.0
-                self.parRetrievedPWVOffset = 0.0
+        if self.resetParameters:
+            self.parRetrievedPWVScale = 1.0
+            self.parRetrievedPWVOffset = 0.0
 
         self._arrangeParArray()
 
@@ -535,27 +528,27 @@ class FgcmParameters(object):
         ctr+=self.campaignNights.size
         self.parAlphaLoc = ctr
         ctr+=self.campaignNights.size
-        if not self.retrievePWV:
+        if not self.useRetrievedPWV:
             self.parPWVInterceptLoc = ctr
             ctr+=self.campaignNights.size
             self.parPWVPerSlopeLoc = ctr
             ctr+=self.campaignNights.size
 
-        if (self.hasExternalPWV):
+        if self.hasExternalPWV and not self.useRetrievedPWV:
             self.nFitPars += (1+self.campaignNights.size)
             self.parExternalPWVScaleLoc = ctr
             ctr+=1
             self.parExternalPWVOffsetLoc = ctr
             ctr+=self.campaignNights.size
 
-        if (self.hasExternalTau):
+        if self.hasExternalTau:
             self.nFitPars += (1+self.campaignNights.size)
             self.parExternalTauScaleLoc = ctr
             ctr+=1
             self.parExternalTauOffsetLoc = ctr
             ctr+=self.campaignNights.size
 
-        if self.retrievePWV:
+        if self.useRetrievedPWV:
             self.nFitPars += 2
             self.parRetrievedPWVScaleLoc = ctr
             ctr+=1
@@ -609,8 +602,7 @@ class FgcmParameters(object):
                ('QESYSUNIT','f8'),
                ('QESYSSLOPEUNIT','f8'),
                ('HASEXTERNALPWV','i2'),
-               ('HASEXTERNALTAU','i2'),
-               ('RETRIEVEPWV','i2')]
+               ('HASEXTERNALTAU','i2')]
 
         ## FIXME: change from these files...
         if (self.hasExternalPWV):
@@ -639,10 +631,11 @@ class FgcmParameters(object):
         parInfo['HASEXTERNALTAU'] = self.hasExternalTau
         if (self.hasExternalTau):
             parInfo['TAUFILE'] = self.tauFile
-        parInfo['RETRIEVEPWV'] = self.retrievePWV
 
         dtype=[('PARALPHA','f8',self.parAlpha.size),
                ('PARO3','f8',self.parO3.size),
+               ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
+               ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size),
                ('PARTAUINTERCEPT','f8',self.parTauIntercept.size),
                ('PARTAUPERSLOPE','f8',self.parTauPerSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
@@ -654,7 +647,12 @@ class FgcmParameters(object):
                ('COMPEXPGRAY','f8',self.compExpGray.size),
                ('COMPVARGRAY','f8',self.compVarGray.size),
                ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
-               ('COMPSIGFGCM','f8',self.compSigFgcm.size)]
+               ('COMPSIGFGCM','f8',self.compSigFgcm.size),
+               ('COMPRETRIEVEDPWV','f8',self.compRetrievedPWV.size),
+               ('COMPRETRIEVEDPWVRAW','f8',self.compRetrievedPWVRaw.size),
+               ('COMPRETRIEVEDPWVFLAG','i2',self.compRetrievedPWVFlag.size),
+               ('PARRETRIEVEDPWVSCALE','f8'),
+               ('PARRETRIEVEDPWVOFFSET','f8')]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -664,16 +662,6 @@ class FgcmParameters(object):
             dtype.extend([('PAREXTERNALTAUSCALE','f8'),
                           ('PAREXTERNALTAUOFFSET','f8',self.parExternalTauOffset.size),
                           ('EXTERNALTAU','f8',self.nExp)])
-        if (self.retrievePWV):
-            dtype.extend([('COMPRETRIEVEDPWV','f8',self.compRetrievedPWV.size),
-                          ('COMPRETRIEVEDPWVRAW','f8',self.compRetrievedPWVRaw.size),
-                          ('COMPRETRIEVEDPWVFLAG','i2',self.compRetrievedPWVFlag.size),
-                          ('PARRETRIEVEDPWVSCALE','f8'),
-                          ('PARRETRIEVEDPWVOFFSET','f8')])
-        else:
-            dtype.extend([('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
-                          ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size)])
-
 
         pars=np.zeros(1,dtype=dtype)
 
@@ -681,9 +669,8 @@ class FgcmParameters(object):
         pars['PARO3'][:] = self.parO3
         pars['PARTAUINTERCEPT'][:] = self.parTauIntercept
         pars['PARTAUPERSLOPE'][:] = self.parTauPerSlope
-        if not self.retrievePWV:
-            pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
-            pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
+        pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
+        pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
 
@@ -707,12 +694,11 @@ class FgcmParameters(object):
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
 
-        if self.retrievePWV:
-            pars['COMPRETRIEVEDPWV'][:] = self.compRetrievedPWV
-            pars['COMPRETRIEVEDPWVRAW'][:] = self.compRetrievedPWVRaw
-            pars['COMPRETRIEVEDPWVFLAG'][:] = self.compRetrievedPWVFlag
-            pars['PARRETRIEVEDPWVSCALE'][:] = self.parRetrievedPWVScale
-            pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRetrievedPWVOffset
+        pars['COMPRETRIEVEDPWV'][:] = self.compRetrievedPWV
+        pars['COMPRETRIEVEDPWVRAW'][:] = self.compRetrievedPWVRaw
+        pars['COMPRETRIEVEDPWVFLAG'][:] = self.compRetrievedPWVFlag
+        pars['PARRETRIEVEDPWVSCALE'][:] = self.parRetrievedPWVScale
+        pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRetrievedPWVOffset
 
         return parInfo, pars
 
@@ -768,7 +754,7 @@ class FgcmParameters(object):
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
-        if not self.retrievePWV:
+        if not self.useRetrievedPWV:
             self.parPWVIntercept[:] = parArray[self.parPWVInterceptLoc:
                                                    self.parPWVInterceptLoc+self.nCampaignNights] / unitDict['pwvUnit']
             self.parPWVPerSlope[:] = parArray[self.parPWVPerSlopeLoc:
@@ -784,7 +770,7 @@ class FgcmParameters(object):
 
         self.parAlpha[:] = parArray[self.parAlphaLoc:
                                         self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
-        if (self.hasExternalPWV):
+        if self.hasExternalPWV and not self.useRetrievedPWV:
             self.parExternalPWVScale = parArray[self.parExternalPWVScaleLoc] / unitDict['pwvUnit']
             self.parExternalPWVOffset = parArray[self.parExternalPWVOffsetLoc:
                                                      self.parExternalPWVOffsetLoc+self.nCampaignNights] / unitDict['pwvUnit']
@@ -794,7 +780,7 @@ class FgcmParameters(object):
             self.parExternalTauOffset = parArray[self.parExternalTauOffsetLoc:
                                                      self.parExternalTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
 
-        if self.retrievePWV:
+        if self.useRetrievedPWV:
             self.parRetrievedPWVScale = parArray[self.parRetrievedPWVScaleLoc] / unitDict['pwvUnit']
             self.parRetrievedPWVOffset = parArray[self.parRetrievedPWVOffsetLoc] / unitDict['pwvUnit']
 
@@ -819,7 +805,7 @@ class FgcmParameters(object):
         self.expO3 = self.parO3[self.expNightIndex]
         self.expAlpha = self.parAlpha[self.expNightIndex]
 
-        if self.retrievePWV:
+        if self.useRetrievedPWV:
             if retrievedInput:
                 self.expPWV = (self.compRetrievedPWVInput * self.parRetrievedPWVScale +
                                self.parRetrievedPWVOffset)
@@ -866,7 +852,7 @@ class FgcmParameters(object):
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
-        if not self.retrievePWV:
+        if not self.useRetrievedPWV:
             parArray[self.parPWVInterceptLoc:
                          self.parPWVInterceptLoc+self.nCampaignNights] = self.parPWVIntercept[:] * unitDict['pwvUnit']
             parArray[self.parPWVPerSlopeLoc:
@@ -880,7 +866,7 @@ class FgcmParameters(object):
                      self.parTauPerSlopeLoc + self.nCampaignNights] = self.parTauPerSlope[:] * unitDict['tauPerSlopeUnit']
         parArray[self.parAlphaLoc:
                      self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
-        if (self.hasExternalPWV):
+        if self.hasExternalPWV and not self.useRetrievedPWV:
             parArray[self.parExternalPWVScaleLoc] = self.parExternalPWVScale * unitDict['pwvUnit']
             parArray[self.parExternalPWVOffsetLoc:
                          self.parExternalPWVOffsetLoc+self.nCampaignNights] = self.parExternalPWVOffset * unitDict['pwvUnit']
@@ -888,7 +874,7 @@ class FgcmParameters(object):
             parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['tauUnit']
             parArray[self.parExternalTauOffsetLoc:
                          self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
-        if self.retrievePWV:
+        if self.useRetrievedPWV:
             parArray[self.parRetrievedPWVScaleLoc] = self.parRetrievedPWVScale * unitDict['pwvUnit']
             parArray[self.parRetrievedPWVOffsetLoc] = self.parRetrievedPWVOffset * unitDict['pwvUnit']
 
@@ -910,7 +896,7 @@ class FgcmParameters(object):
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
-        if not self.retrievePWV:
+        if not self.useRetrievedPWV:
             parLow[self.parPWVInterceptLoc: \
                        self.parPWVInterceptLoc + \
                        self.nCampaignNights] = ( \
@@ -965,7 +951,7 @@ class FgcmParameters(object):
                     self.parAlphaLoc + \
                     self.nCampaignNights] = ( \
             1.75 * unitDict['alphaUnit'])
-        if (self.hasExternalPWV):
+        if self.hasExternalPWV and not self.useRetrievedPWV:
             parLow[self.parExternalPWVScaleLoc] = 0.5 * unitDict['pwvUnit']
             parHigh[self.parExternalPWVScaleLoc] = 1.5 * unitDict['pwvUnit']
             parLow[self.parExternalPWVOffsetLoc: \
@@ -1014,7 +1000,7 @@ class FgcmParameters(object):
 
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
-            if not self.retrievePWV:
+            if not self.useRetrievedPWV:
                 parLow[self.parPWVInterceptLoc: \
                            self.parPWVInterceptLoc + \
                            self.nCampaignNights] = self.pwvStd * unitDict['pwvUnit']
