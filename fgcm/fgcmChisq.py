@@ -596,7 +596,7 @@ class FgcmChisq(object):
             ## PWV External
             ###########
 
-            if (self.fgcmPars.hasExternalPWV):
+            if (self.fgcmPars.hasExternalPWV and not self.fgcmPars.useRetrievedPWV):
                 hasExtGOF,=np.where(self.fgcmPars.externalPWVFlag[obsExpIndexGO[obsFitUseGO]])
                 uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
 
@@ -647,7 +647,7 @@ class FgcmChisq(object):
             ## PWV Retrieved
             ################
 
-            if (self.fgcmPars.retrievePWV):
+            if (self.fgcmPars.useRetrievedPWV):
                 hasRetrievedPWVGOF, = np.where((self.fgcmPars.compRetrievedPWVFlag[obsExpIndexGO[obsFitUseGO]] &
                                                 retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
@@ -669,6 +669,8 @@ class FgcmChisq(object):
                                 dLdPWVGO[obsFitUseGO[hasRetrievedPWVGOF]] -
                                 magdLdPWVRetrievedScale[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
                         unitDict['pwvUnit'])
+                    partialArray[self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parRetrievedPWVScaleLoc] += 1
 
                     # PWV Retrieved Global Offset
                     np.add.at(magdLdPWVRetrievedOffset,
@@ -683,6 +685,8 @@ class FgcmChisq(object):
                                 dLdPWVGO[obsFitUseGO[hasRetrievedPWVGOF]] -
                                 magdLdPWVRetrievedOffset[obsBandIndexGO[obsFitUseGO[hasRetrievedPWVGOF]]])) /
                         unitDict['pwvUnit'])
+                    partialArray[self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parRetrievedPWVOffsetLoc] += 1
 
             else:
                 ###########
