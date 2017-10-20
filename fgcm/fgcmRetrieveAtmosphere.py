@@ -25,19 +25,16 @@ class FgcmRetrieveAtmosphere(object):
         self.fgcmLUT = fgcmLUT
         self.fgcmPars = fgcmPars
 
-        self.retrievePWV = fgcmConfig.retrievePWV
         self.pwvRetrievalSmoothBlock = fgcmConfig.pwvRetrievalSmoothBlock
         self.plotPath = fgcmConfig.plotPath
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.illegalValue = fgcmConfig.illegalValue
 
-    def r1ToPWV(self, fgcmRetrieval):
+    def r1ToPWV(self, fgcmRetrieval, doPlots=True):
         """
         """
         self.fgcmLog.log('INFO','Retrieving PWV Values...')
-
-        if (not self.retrievePWV):
-            raise RuntimeError("Calling r0ToAtmosphere when not using retrieval ... but maybe this should be allowed (later)")
 
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         self.fgcmPars.parsToExposures()
@@ -183,6 +180,55 @@ class FgcmRetrieveAtmosphere(object):
             self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
             self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
 
-        # Unsure what plots to put here...
+        if doPlots:
+            # Plot PWV vs R1  -- hard to do at the moment
+            # Plot PWV vs RPWV_RAW
+            # Plot PWV vs RPWV_SMOOTH
+
+            # if there are fewer than ... 3000 do points, more than do hexbin
+
+            hasPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+
+            fig = plt.figure(1, figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            if hasPWV.size >= 3000:
+                # we can use hexbin; this is arbitrary.
+                ax.hexbin(self.fgcmPars.compRetrievedPWVRaw[hasPWV],
+                          self.fgcmPars.expPWV[hasPWV], bins='log')
+            else:
+                ax.plot(self.fgcmPars.compRetrievedPWVRaw[hasPWV],
+                        self.fgcmPars.expPWV[hasPWV], 'b.')
+            plotRange = np.array([self.fgcmPars.compRetrievedPWVRaw[hasPWV].min()+0.001,
+                                  self.fgcmPars.compRetrievedPWVRaw[hasPWV].max()-0.001])
+            ax.plot(plotRange, plotRange, 'r--')
+            ax.set_xlabel('RPWV_RAW')
+            ax.set_ylabel('PWV_MODEL')
+
+            fig.savefig('%s/%s_pwv_vs_rpwv_raw.png' % (self.plotPath,
+                                                 self.outfileBaseWithCycle))
+
+            fig = plt.figure(1, figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            if hasPWV.size >= 3000:
+                # we can use hexbin; this is arbitrary.
+                ax.hexbin(self.fgcmPars.compRetrievedPWV[hasPWV],
+                          self.fgcmPars.expPWV[hasPWV], bins='log')
+            else:
+                ax.plot(self.fgcmPars.compRetrievedPWV[hasPWV],
+                        self.fgcmPars.expPWV[hasPWV], 'b.')
+            plotRange = np.array([self.fgcmPars.compRetrievedPWV[hasPWV].min()+0.001,
+                                  self.fgcmPars.compRetrievedPWV[hasPWV].max()-0.001])
+            ax.plot(plotRange, plotRange, 'r--')
+            ax.set_xlabel('RPWV')
+            ax.set_ylabel('PWV_MODEL')
+
+            fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
+                                                 self.outfileBaseWithCycle))
+
+
         # and we're done!  Everything is filled in!
         self.fgcmLog.log('INFO','Done computing retrieved PWV values')
