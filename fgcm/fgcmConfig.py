@@ -323,9 +323,9 @@ class FgcmConfig(object):
         self.tauStd = lutStd['TAUSTD'][0]
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
-        self.lambdaStd = lutStd['LAMBDASTD'][0]
 
-        # And the I10Std, for each *band*
+        # And the lambdaStd and I10Std, for each *band*
+        self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
 
         if (self.expGrayPhotometricCut.size != self.bands.size):
