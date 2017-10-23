@@ -167,6 +167,7 @@ class FgcmRetrieval(object):
 
         # arrays we need...
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanNoChrom = snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
 
@@ -180,10 +181,15 @@ class FgcmRetrieval(object):
         # deltaMag = m_b^inst(i,j)  - <m_b^std>(j) + QE_sys
         #   we want to take out the gray term from the qe
 
+        #deltaMagGO = (obsMagADUGO -
+        #              objMagStdMeanNoChrom[obsObjIDIndexGO,
+        #                                   obsBandIndexGO] +
+        #              self.fgcmPars.expQESys[obsExpIndexGO])
         deltaMagGO = (obsMagADUGO -
                       objMagStdMean[obsObjIDIndexGO,
                                     obsBandIndexGO] +
                       self.fgcmPars.expQESys[obsExpIndexGO])
+
         deltaMagErr2GO = (obsMagErrGO**2. +
                           objMagStdMeanErr[obsObjIDIndexGO,
                                            obsBandIndexGO]**2.)
