@@ -404,7 +404,8 @@ class FgcmStars(object):
         #  objSEDSlope: linearized approx. of SED slope of each object, per band
         self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4',
                                                   syncAccess=True)
-
+        #  objMagStdMeanNoChrom: mean std mag of each object, no chromatic correction, per band
+        self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
 
         # note: if this takes too long it can be moved to the star computation,
         #       but it seems pretty damn fast (which may raise the question of
