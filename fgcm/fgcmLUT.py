@@ -869,7 +869,7 @@ class FgcmLUT(object):
         return self.sedLUT['FPRIME'][indices,:]
 
     def computeStepUnits(self, stepUnitReference, stepGrain, meanNightDuration,
-                         meanWashIntervalDuration, fitBands):
+                         meanWashIntervalDuration, fitBands, bands, nCampaignNights):
         """
         """
 
@@ -925,6 +925,9 @@ class FgcmLUT(object):
         # PWV percent slope units
         ## FIXME: check these
         unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration / self.pwvStd
+
+        # PWV Global step units
+        unitDict['pwvGlobalUnit'] = unitDict['pwvUnit'] * nCampaignNights
 
         # O3 units -- reference to r
         bandIndex,=np.where(self.bands == 'r')
