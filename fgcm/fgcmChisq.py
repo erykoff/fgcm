@@ -479,11 +479,17 @@ class FgcmChisq(object):
         #deltaMagErr2GO = (obsMagErr2GO + objMagStdMeanErr2GO)
         #deltaMagErr2GO = (obsMagErr2GO - objMagStdMeanErr2GO)
         # I am not happy about any of these options at the moment.
-        deltaMagErr2GO = obsMagErr2GO
-        deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] / deltaMagErr2GO[obsFitUseGO]
+        #deltaMagErr2GO = obsMagErr2GO
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] / deltaMagErr2GO[obsFitUseGO]
 
         # and compute chisq
-        partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2./deltaMagErr2GO[obsFitUseGO])
+        #partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2./deltaMagErr2GO[obsFitUseGO])
+
+        obsWeightGO = 1. / obsMagErr2GO
+
+        deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+        partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2. * obsWeightGO[obsFitUseGO])
 
         partialArray = np.zeros(self.nSums,dtype='f8')
         partialArray[-2] = partialChisq
