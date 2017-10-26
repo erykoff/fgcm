@@ -884,7 +884,7 @@ class FgcmLUT(object):
 
         # tau percent slope units
         ## FIXME: check these
-        unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration /
+        unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration *
                                             self.tauStd)
 
         # alpha units -- reference to g, or r if not available
@@ -924,7 +924,7 @@ class FgcmLUT(object):
 
         # PWV percent slope units
         ## FIXME: check these
-        unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration / self.pwvStd
+        unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration * self.pwvStd
 
         # PWV Global step units
         unitDict['pwvGlobalUnit'] = unitDict['pwvUnit'] * nCampaignNights
