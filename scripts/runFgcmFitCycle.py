@@ -27,5 +27,5 @@ if __name__ == '__main__':
 
     fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=True)
     fgcmFitCycle.runWithFits()
-    
+
 
