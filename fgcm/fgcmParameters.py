@@ -262,10 +262,13 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo()
 
         # set the units from the inParInfo
+        ## DON'T FORGET 24
         self.unitDictSteps = {'tauUnit': inParInfo['TAUUNIT'][0],
+                              #'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0] * (0.03*0.03/24.),
                               'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
                               'alphaUnit': inParInfo['ALPHAUNIT'][0],
                               'pwvUnit': inParInfo['PWVUNIT'][0],
+                              #'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0] * (3.0*3.0/24.),
                               'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0],
                               # FIXME
                               #'pwvGlobalUnit': inParInfo['PWVUNIT'][0] * 500,
@@ -429,9 +432,9 @@ class FgcmParameters(object):
         for i in xrange(self.nCampaignNights):
             use,=np.where(mjdForNight == self.campaignNights[i])
             self.expPerNight[i] = use.size
-            # night duration in hours
-            self.nightDuration[i] = (np.max(self.expMJD[use]) - np.min(self.expMJD[use])) * 24.0
-        self.meanNightDuration = np.mean(self.nightDuration)  # hours
+            # night duration in days
+            self.nightDuration[i] = (np.max(self.expMJD[use]) - np.min(self.expMJD[use]))
+        self.meanNightDuration = np.mean(self.nightDuration)  # days
         self.meanExpPerNight = np.mean(self.expPerNight)
 
         # convert these to radians
@@ -942,11 +945,11 @@ class FgcmParameters(object):
             parLow[self.parPWVPerSlopeLoc: \
                        self.parPWVPerSlopeLoc + \
                        self.nCampaignNights] = ( \
-                -0.05 * unitDict['pwvPerSlopeUnit'])
+                -4.0 * unitDict['pwvPerSlopeUnit'])
             parHigh[self.parPWVPerSlopeLoc: \
                         self.parPWVPerSlopeLoc + \
                         self.nCampaignNights] = ( \
-                0.05 * unitDict['pwvPerSlopeUnit'])
+                4.0 * unitDict['pwvPerSlopeUnit'])
         else:
             parLow[self.parRetrievedPWVScaleLoc] = 0.5 * unitDict['pwvGlobalUnit']
             parHigh[self.parRetrievedPWVScaleLoc] = 1.5 * unitDict['pwvGlobalUnit']
@@ -982,11 +985,11 @@ class FgcmParameters(object):
         parLow[self.parTauPerSlopeLoc: \
                    self.parTauPerSlopeLoc + \
                    self.nCampaignNights] = ( \
-            -0.05 * unitDict['tauPerSlopeUnit'])
+            -4.0 * unitDict['tauPerSlopeUnit'])
         parHigh[self.parTauPerSlopeLoc: \
                     self.parTauPerSlopeLoc + \
                     self.nCampaignNights] = ( \
-            0.05 * unitDict['tauPerSlopeUnit'])
+            4.0 * unitDict['tauPerSlopeUnit'])
         parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
                    self.nCampaignNights] = ( \
