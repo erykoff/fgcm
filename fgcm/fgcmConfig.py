@@ -39,7 +39,8 @@ class FgcmConfig(object):
                       'freezeStdAtmosphere','reserveFraction',
                       'precomputeSuperStarInitialCycle',
                       'useRetrievedPWV','useNightlyRetrievedPWV',
-                      'pwvRetrievalSmoothBlock']
+                      'pwvRetrievalSmoothBlock','clobber','printOnly',
+                      'outputStars']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -107,6 +108,8 @@ class FgcmConfig(object):
         self.useRetrievedPWV = configDict['useRetrievedPWV']
         self.useNightlyRetrievedPWV = configDict['useNightlyRetrievedPWV']
         self.pwvRetrievalSmoothBlock = configDict['pwvRetrievalSmoothBlock']
+        self.clobber = configDict['clobber']
+        self.outputStars = configDict['outputStars']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -196,10 +199,18 @@ class FgcmConfig(object):
 
         self.outfileBaseWithCycle = '%s_cycle%02d' % (self.outfileBase, self.cycleNumber)
 
+        logFile = '%s/%s.log' % (self.outputPath, self.outfileBaseWithCycle)
+        if os.path.isfile(logFile) and not self.clobber:
+            raise RuntimeError("Found logFile %s, but clobber == False." % (logFile))
+
+        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
+        if os.path.isdir(self.plotPath) and not self.clobber:
+            # check if directory is empty
+            if len(os.listdir(self.plotPath) > 0):
+                raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
+
         # set up logger are we get the name...
-        self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
-                                                 self.outfileBaseWithCycle),
-                                  self.logLevel)
+        self.fgcmLog = FgcmLogger(logFile, self.logLevel, printOnly=configDict['printOnly'])
 
         self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
 
@@ -209,10 +220,6 @@ class FgcmConfig(object):
             self.fgcmLog.log('INFO','Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
             self.fgcmLog.log('INFO','WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
-
-        #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
-        #                                            self.cycleNumber)
-        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
 
         if (not os.path.isdir(self.plotPath)):
             try:
@@ -390,6 +397,9 @@ class FgcmConfig(object):
         configDict['outputPath'] = self.outputPath
         # update the cycleNumber
         configDict['cycleNumber'] = self.cycleNumber + 1
+
+        # default to NOT freeze atmosphere
+        configDict['freezeStdAtmosphere'] = False
 
         # do we want to increase maxIter?  Hmmm.
 
