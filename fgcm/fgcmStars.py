@@ -152,44 +152,12 @@ class FgcmStars(object):
         """
         """
 
-
-    #def _loadStars(self,fgcmPars):
-
-        # read in the observational indices
-        #startTime=time.time()
-        #self.fgcmLog.log('INFO','Reading in observation indices...')
-        #index=fitsio.read(self.indexFile,ext='INDEX')
-        #self.fgcmLog.log('INFO','Done reading in %d observation indices in %.1f seconds.' %
-        #                 (index.size,time.time()-startTime))
-
-        # sort them for reference
-        #startTime=time.time()
-
-        # and only read these entries from the obs table
-        #startTime=time.time()
-        #self.fgcmLog.log('INFO','Reading in star observations...')
-        ## new trade-off: read in whole file and cut it down.
-        ##  Much faster overall, I think.
-        #obs=fitsio.read(self.obsFile,ext=1,rows=index['OBSINDEX'][indexSort])
-        #obs=fitsio.read(self.obsFile,ext=1)
-        #obs=obs[index['OBSINDEX']]
-        #self.fgcmLog.log('INFO','Done reading in %d observations in %.1f seconds.' %
-        #                 (obs.size,time.time()-startTime))
-
-        # and fill in new, cut indices
-        #  obsIndex: pointer to a particular row in the obs table
-        #            this is used with objObsIndex to get all the observations
-        #            of an individual object
-
-        #self.obsIndexHandle = snmm.createArray(index.size,dtype='i4')
-        #snmm.getArray(self.obsIndexHandle)[:] = np.arange(index.size)
         self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i4')
         snmm.getArray(self.obsIndexHandle)[:] = np.arange(obsRA.size)
 
 
         # need to stuff into shared memory objects.
         #  nStarObs: total number of observations of all starus
-        #self.nStarObs = obs.size
         self.nStarObs = obsRA.size
 
         #  obsExp: exposure number of individual observation (pointed by obsIndex)
@@ -480,7 +448,8 @@ class FgcmStars(object):
         minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
 
         # reset too few obs flag if it's already set
-        objFlag &= ~objFlagDict['TOO_FEW_OBS']
+        if not temporary:
+            objFlag &= ~objFlagDict['TOO_FEW_OBS']
 
         # choose the bad objects with too few observations
         bad,=np.where(minObs < minPerBand)
@@ -904,24 +873,6 @@ class FgcmStars(object):
 
         import fitsio
 
-        #objID = snmm.getArray(self.objIDHandle)
-        #objFlag = snmm.getArray(self.objFlagHandle)
-
-        # we only store VARIABLE and RESERVED stars
-        # everything else should be recomputed based on the good exposures, calibrations, etc
-        #flagMask = (objFlagDict['VARIABLE'] |
-        #            objFlagDict['RESERVED'])
-
-        #flagged,=np.where((objFlag & flagMask) > 0)
-
-        #self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
-        #                 (flagged.size,flagStarFile))
-
-        #flagObjStruct = np.zeros(flagged.size,dtype=[('OBJID',objID.dtype),
-        #                                             ('OBJFLAG',objFlag.dtype)])
-        #flagObjStruct['OBJID'] = objID[flagged]
-        #flagObjStruct['OBJFLAG'] = objFlag[flagged]
-
         flagObjStruct = self.getFlagStarIndices()
 
         self.fgcmLog.log('INFO','Saving %d flagged star indices to %s' %
@@ -933,7 +884,7 @@ class FgcmStars(object):
     def getFlagStarIndices(self):
         """
         """
-        
+
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
@@ -950,3 +901,54 @@ class FgcmStars(object):
         flagObjStruct['OBJFLAG'] = objFlag[flagged]
 
         return flagObjStruct
+
+    def saveStdStars(self, starFile, fgcmPars):
+        """
+        """
+
+        import fitsio
+
+        self.fgcmLog.log('INFO', 'Saving standard stars to %s' % (starFile))
+
+        objID = snmm.getArray(self.objIDHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+        objRA = snmm.getArray(self.objRAHandle)
+        objDec = snmm.getArray(self.objDecHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+
+        # reset TEMPORARY_BAD_STAR
+        #objFlag &= ~objFlagDict['TEMPORARY_BAD_STAR']
+
+        # only take photometric exposures...
+        #goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
+
+        # this doesn't work because we'd have to recompute all the mags
+        # this is more honest about what stars are actually well measured
+        
+        #self.selectStarsMinObsExpIndex(goodExpsIndex, minPerBand=1, temporary=True)
+
+        rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
+                      objFlagDict['TOO_FEW_OBS'])
+
+        goodStars, = np.where((objFlag & rejectMask) == 0)
+
+        outCat = np.zeros(goodStars.size, dtype=[('FGCM_ID', 'i8'),
+                                                 ('RA', 'f8'),
+                                                 ('DEC', 'f8'),
+                                                 ('NGOOD', 'i4', self.bands.size),
+                                                 ('MAG_STD', 'f4', self.bands.size),
+                                                 ('MAGERR_STD', 'f4', self.bands.size)])
+
+        outCat['FGCM_ID'] = objID[goodStars]
+        outCat['RA'] = objRA[goodStars]
+        outCat['DEC'] = objDec[goodStars]
+        outCat['NGOOD'] = objNGoodObs[goodStars, :]
+        outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
+        outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]
+
+        # reset TEMPORARY_BAD_STAR
+        #objFlag &= ~objFlagDict['TEMPORARY_BAD_STAR']
+
+        fitsio.write(starFile, outCat, clobber=True)
