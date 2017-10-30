@@ -353,7 +353,10 @@ class FgcmFitCycle(object):
             self.fgcmStars.saveFlagStarIndices(outFlagStarFile)
 
             ## FIXME: save standard stars if desired.  (Need code to save std stars)
-
+            if self.fgcmConfig.outputStars:
+                outStarFile = '%s/%s_stdstars.fits' % (self.fgcmConfig.outputPath,
+                                                       self.fgcmConfig.outfileBaseWithCycle)
+                self.fgcmStars.saveStdStars(outStarFile, self.fgcmPars)
 
             # Save yaml for input to next fit cycle
             outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,
