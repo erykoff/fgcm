@@ -363,6 +363,7 @@ class FgcmChisq(object):
                                        self.fgcmPars.expPmb[obsExpIndexGO],
                                        lutIndicesGO) / I0GO
 
+
         qeSysGO = self.fgcmPars.expQESys[obsExpIndexGO]
 
         obsMagGO = obsMagADU[goodObs] + 2.5*np.log10(I0GO) + qeSysGO
