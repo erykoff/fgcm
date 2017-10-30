@@ -31,6 +31,7 @@ class FgcmRetrieveAtmosphere(object):
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.illegalValue = fgcmConfig.illegalValue
         self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
+        self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
 
     def r1ToPWV(self, fgcmRetrieval, doPlots=True):
         """
@@ -293,3 +294,115 @@ class FgcmRetrieveAtmosphere(object):
 
         # and we're done!  Everything is filled in!
         self.fgcmLog.log('INFO','Done computing retrieved PWV values')
+
+    def r0ToNightlyTau(self, fgcmRetrieval, doPlots=True):
+        """
+        """
+        self.fgcmLog.log('INFO','Retrieving Nightly Tau Values...')
+
+        #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
+
+        r0 = snmm.getArray(fgcmRetrieval.r0Handle)
+
+        expIndexArray = np.repeat(np.arange(self.fgcmPars.nExp), self.fgcmPars.nCCD)
+        ccdIndexArray = np.tile(np.arange(self.fgcmPars.nCCD), self.fgcmPars.nExp)
+
+        expSecZenith = 1./(np.sin(self.fgcmPars.expTelDec[expIndexArray]) *
+                           self.fgcmPars.sinLatitude +
+                           np.cos(self.fgcmPars.expTelDec[expIndexArray]) *
+                           self.fgcmPars.cosLatitude *
+                           np.cos(self.fgcmPars.expTelHA[expIndexArray]))
+
+        # FIXME make this configurable?
+        tauBands = np.array(['g', 'r', 'i'])
+        nTauBands = tauBands.size
+
+        tauRetrievedBands = np.zeros((tauBands.size, self.fgcmPars.nCampaignNights)) + self.illegalValue
+
+        for i in xrange(nTauBands):
+            bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
+
+            tauScale = (self.fgcmLUT.lambdaStd[bandIndex] / self.fgcmLUT.lambdaNorm) ** (-self.fgcmLUT.alphaStd)
+
+            use,=np.where((self.fgcmPars.expBandIndex[expIndexArray] == bandIndex) &
+                          (self.fgcmPars.expFlag[expIndexArray] == 0) &
+                          (r0[expIndexArray, ccdIndexArray] > 0.0))
+
+            indices = self.fgcmLUT.getIndices(np.repeat(bandIndex, use.size),
+                                              np.repeat(self.fgcmLUT.pwvStd, use.size),
+                                              np.repeat(self.fgcmLUT.o3Std, use.size),
+                                              np.repeat(np.log(0.00001), use.size),
+                                              np.repeat(self.fgcmLUT.alphaStd, use.size),
+                                              expSecZenith[use],
+                                              ccdIndexArray[use],
+                                              np.repeat(self.fgcmLUT.pmbStd, use.size))
+            I0Ref = self.fgcmLUT.computeI0(np.repeat(self.fgcmLUT.pwvStd, use.size),
+                                           np.repeat(self.fgcmLUT.o3Std, use.size),
+                                           np.repeat(np.log(0.00001), use.size),
+                                           np.repeat(self.fgcmLUT.alphaStd, use.size),
+                                           expSecZenith[use],
+                                           np.repeat(self.fgcmLUT.pmbStd, use.size),
+                                           indices)
+
+            extDelta = (-2.5*np.log10(r0[expIndexArray[use], ccdIndexArray[use]]) +
+                         2.5*np.log10(I0Ref))
+
+            h,rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[expIndexArray[use]],
+                                          rev=True, min=0)
+
+            gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
+            self.fgcmLog.log('INFO', 'Found %d nights to retrieve tau in %s band' %
+                             (gd.size, tauBands[i]))
+
+            for j in xrange(gd.size):
+                i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
+                fit=np.polyfit(expSecZenith[use[i1a]], extDelta[i1a], 1.0)
+
+                tauRetrievedBands[i, gd[j]] = fit[0] / tauScale
+
+        # now loop over nights and take the average of good ones...
+        self.fgcmPars.compRetrievedTauNight[:] = self.fgcmPars.tauStd
+        for i in xrange(self.fgcmPars.nCampaignNights):
+            u, = np.where(tauRetrievedBands[:, i] > self.illegalValue)
+            if u.size > 0:
+                self.fgcmPars.compRetrievedTauNight[i] = np.mean(tauRetrievedBands[u, i])
+
+        # and clip to bounds
+        self.fgcmPars.compRetrievedTauNight[:] = np.clip(self.fgcmPars.compRetrievedTauNight,
+                                                         self.fgcmLUT.tau[0]+0.0001,
+                                                         self.fgcmLUT.tau[-1]-0.0001)
+
+        # And the plots
+        if doPlots:
+            hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
+                               (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
+            fig = plt.figure(1, figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            ax.plot(self.fgcmPars.compRetrievedTauNightInput[hasTau],
+                    self.fgcmPars.compRetrievedTauNight[hasTau], 'b.')
+            plotRange = np.array([self.fgcmPars.compRetrievedTauNight.min() + 0.001,
+                                  self.fgcmPars.compRetrievedTauNight.max() - 0.001])
+            ax.plot(plotRange, plotRange, 'r--')
+            ax.set_xlabel('RTAU_NIGHT_INPUT')
+            ax.set_ylabel('RTAU_NIGHT')
+
+            fig.savefig('%s/%s_rtaunight_vs_rtaunight_in.png' % (self.plotPath,
+                                                                 self.outfileBaseWithCycle))
+
+            hasTau, = np.where(self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd)
+
+            fig = plt.figure(1, figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            ax.plot(self.fgcmPars.parTauIntercept[hasTau],
+                    self.fgcmPars.compRetrievedTauNight[hasTau], 'b.')
+            ax.plot(plotRange, plotRange, 'r--')
+            ax.set_xlabel('TAU_INTERCEPT_MODEL')
+            ax.set_ylabel('RTAU_NIGHT')
+
+            fig.savefig('%s/%s_rtaunight_vs_tauint.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle))
+
