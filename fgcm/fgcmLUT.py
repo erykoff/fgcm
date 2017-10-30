@@ -875,15 +875,19 @@ class FgcmLUT(object):
 
         unitDict = {}
 
+        # bigger unit, smaller step
 
         # compute tau units
+
         deltaMagTau = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd)) -
                        2.5*np.log10(np.exp(-self.secZenithStd*(self.tauStd+1.0))))
 
         unitDict['tauUnit'] = np.abs(deltaMagTau) / stepUnitReference / stepGrain
+        # Experience has shown that this should be divided by ~5, at least for
+        #   DES.  I'm not sure why, though, everything seems correct.
+        unitDict['tauUnit'] /= 5.0
 
         # tau percent slope units
-        ## FIXME: check these
         unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration *
                                             self.tauStd)
 
@@ -923,7 +927,6 @@ class FgcmLUT(object):
         unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
 
         # PWV percent slope units
-        ## FIXME: check these
         unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration * self.pwvStd
 
         # PWV Global step units
