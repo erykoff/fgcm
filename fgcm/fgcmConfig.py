@@ -39,8 +39,9 @@ class FgcmConfig(object):
                       'freezeStdAtmosphere','reserveFraction',
                       'precomputeSuperStarInitialCycle',
                       'useRetrievedPWV','useNightlyRetrievedPWV',
-                      'pwvRetrievalSmoothBlock','clobber','printOnly',
-                      'outputStars']
+                      'pwvRetrievalSmoothBlock','useRetrievedTauInit',
+                      'tauRetrievalMinCCDPerNight',
+                      'clobber','printOnly','outputStars']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -108,6 +109,8 @@ class FgcmConfig(object):
         self.useRetrievedPWV = configDict['useRetrievedPWV']
         self.useNightlyRetrievedPWV = configDict['useNightlyRetrievedPWV']
         self.pwvRetrievalSmoothBlock = configDict['pwvRetrievalSmoothBlock']
+        self.useRetrievedTauInit = configDict['useRetrievedTauInit']
+        self.tauRetrievalMinCCDPerNight = configDict['tauRetrievalMinCCDPerNight']
         self.clobber = configDict['clobber']
         self.outputStars = configDict['outputStars']
 
