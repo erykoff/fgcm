@@ -312,6 +312,7 @@ class FgcmFitCycle(object):
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars)
         self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
+        self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
 
 
         # Compute SuperStar Flats
