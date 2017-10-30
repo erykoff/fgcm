@@ -17,8 +17,6 @@ import copy_reg
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-#from fgcmLUT import FgcmLUT
-
 copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmParameters(object):
@@ -100,7 +98,7 @@ class FgcmParameters(object):
         self.externalTauDeltaT = fgcmConfig.externalTauDeltaT
         self.useRetrievedPWV = fgcmConfig.useRetrievedPWV
         self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
-
+        self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
 
         # and the default unit dict
         self.unitDictOnes = {'pwvUnit':1.0,
@@ -237,6 +235,10 @@ class FgcmParameters(object):
         self.parRetrievedPWVOffset = 0.0
         self.parRetrievedPWVNightlyOffset = np.zeros(self.nCampaignNights,dtype='f8')
 
+        # and retrieved tau nightly start values
+        self.compRetrievedTauNight = np.zeros(self.campaignNights.size,dtype='f8') + self.tauStd
+        self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
+
         # compute the units
         self.unitDictSteps = fgcmLUT.computeStepUnits(self.stepUnitReference,
                                                       self.stepGrain,
@@ -351,6 +353,7 @@ class FgcmParameters(object):
 
         self.compSigFgcm = inParams['COMPSIGFGCM'][0]
 
+        # These are exposure-level properties
         self.compRetrievedPWV = inParams['COMPRETRIEVEDPWV'][0]
         self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
         self.compRetrievedPWVRaw = inParams['COMPRETRIEVEDPWVRAW'][0]
@@ -363,6 +366,15 @@ class FgcmParameters(object):
             self.parRetrievedPWVScale = 1.0
             self.parRetrievedPWVOffset = 0.0
             self.parRetrievedPWVNightlyOffset[:] = 0.0
+
+        # These are nightly properties
+        self.compRetrievedTauNight = inParams['COMPRETRIEVEDTAUNIGHT'][0]
+        self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
+
+        # If we are resetting parameters, and want to use retrieved tau as the initial
+        #  guess, set parTauIntercept to that.
+        if self.resetParameters and self.useRetrievedTauInit:
+            self.parTauIntercept[:] = self.compRetrievedTauNight
 
         self._arrangeParArray()
 
@@ -526,40 +538,40 @@ class FgcmParameters(object):
 
         # make pointers to a fit parameter array...
         #  pwv, O3, lnTau, alpha
-        self.nFitPars = (self.campaignNights.size +  # O3
-                         self.campaignNights.size +  # tauIntercept
-                         self.campaignNights.size +  # tauPerSlope
-                         self.campaignNights.size +  # alpha
-                         self.campaignNights.size +  # pwv Intercept
-                         self.campaignNights.size)   # pwv Slope
+        self.nFitPars = (self.nCampaignNights +  # O3
+                         self.nCampaignNights +  # tauIntercept
+                         self.nCampaignNights +  # tauPerSlope
+                         self.nCampaignNights +  # alpha
+                         self.nCampaignNights +  # pwv Intercept
+                         self.nCampaignNights)   # pwv Slope
         ctr=0
         self.parO3Loc = ctr
-        ctr+=self.campaignNights.size
+        ctr+=self.nCampaignNights
         self.parTauInterceptLoc = ctr
-        ctr+=self.campaignNights.size
+        ctr+=self.nCampaignNights
         self.parTauPerSlopeLoc = ctr
-        ctr+=self.campaignNights.size
+        ctr+=self.nCampaignNights
         self.parAlphaLoc = ctr
-        ctr+=self.campaignNights.size
+        ctr+=self.nCampaignNights
         if not self.useRetrievedPWV:
             self.parPWVInterceptLoc = ctr
-            ctr+=self.campaignNights.size
+            ctr+=self.nCampaignNights
             self.parPWVPerSlopeLoc = ctr
-            ctr+=self.campaignNights.size
+            ctr+=self.nCampaignNights
 
         if self.hasExternalPWV and not self.useRetrievedPWV:
-            self.nFitPars += (1+self.campaignNights.size)
+            self.nFitPars += (1+self.nCampaignNights)
             self.parExternalPWVScaleLoc = ctr
             ctr+=1
             self.parExternalPWVOffsetLoc = ctr
-            ctr+=self.campaignNights.size
+            ctr+=self.nCampaignNights
 
         if self.hasExternalTau:
-            self.nFitPars += (1+self.campaignNights.size)
+            self.nFitPars += (1+self.nCampaignNights)
             self.parExternalTauScaleLoc = ctr
             ctr+=1
             self.parExternalTauOffsetLoc = ctr
-            ctr+=self.campaignNights.size
+            ctr+=self.nCampaignNights
 
         if self.useRetrievedPWV:
             self.nFitPars += 2
@@ -567,7 +579,7 @@ class FgcmParameters(object):
             ctr+=1
             if self.useNightlyRetrievedPWV:
                 self.parRetrievedPWVNightlyOffsetLoc = ctr
-                ctr+=self.campaignNights.size
+                ctr+=self.nCampaignNights
             else:
                 self.parRetrievedPWVOffsetLoc = ctr
                 ctr+=1
@@ -672,7 +684,8 @@ class FgcmParameters(object):
                ('COMPRETRIEVEDPWVFLAG','i2',self.compRetrievedPWVFlag.size),
                ('PARRETRIEVEDPWVSCALE','f8'),
                ('PARRETRIEVEDPWVOFFSET','f8'),
-               ('PARRETRIEVEDPWVNIGHTLYOFFSET','f8',self.parRetrievedPWVNightlyOffset.size)]
+               ('PARRETRIEVEDPWVNIGHTLYOFFSET','f8',self.parRetrievedPWVNightlyOffset.size),
+               ('COMPRETRIEVEDTAUNIGHT','f8',self.compRetrievedTauNight.size)]
 
         if (self.hasExternalPWV):
             dtype.extend([('PAREXTERNALPWVSCALE','f8'),
@@ -720,6 +733,8 @@ class FgcmParameters(object):
         pars['PARRETRIEVEDPWVSCALE'][:] = self.parRetrievedPWVScale
         pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRetrievedPWVOffset
         pars['PARRETRIEVEDPWVNIGHTLYOFFSET'][:] = self.parRetrievedPWVNightlyOffset
+
+        pars['COMPRETRIEVEDTAUNIGHT'][:] = self.compRetrievedTauNight
 
         return parInfo, pars
 
@@ -867,7 +882,7 @@ class FgcmParameters(object):
                                                  self.externalTau[self.externalTauFlag])
 
         # and clip to make sure it doesn't go negative
-        self.expTau = np.clip(self.expTau, 0.001, 10.0)
+        self.expTau = np.clip(self.expTau, self.tauRange[0]+0.0001, self.tauRange[1]-0.0001)
 
         # and QESys
         self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
