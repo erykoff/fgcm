@@ -262,7 +262,6 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo()
 
         # set the units from the inParInfo
-        ## DON'T FORGET 24
         self.unitDictSteps = {'tauUnit': inParInfo['TAUUNIT'][0],
                               #'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0] * (0.03*0.03/24.),
                               'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
@@ -270,7 +269,6 @@ class FgcmParameters(object):
                               'pwvUnit': inParInfo['PWVUNIT'][0],
                               #'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0] * (3.0*3.0/24.),
                               'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0],
-                              # FIXME
                               #'pwvGlobalUnit': inParInfo['PWVUNIT'][0] * 500,
                               'pwvGlobalUnit': inParInfo['PWVGLOBALUNIT'][0],
                               'o3Unit': inParInfo['O3UNIT'][0],
@@ -867,6 +865,9 @@ class FgcmParameters(object):
             self.expTau[self.externalTauFlag] = (self.parExternalTauOffset[self.expNightIndex[self.externalTauFlag]] +
                                                  self.parExternalTauScale *
                                                  self.externalTau[self.externalTauFlag])
+
+        # and clip to make sure it doesn't go negative
+        self.expTau = np.clip(self.expTau, 0.001, 10.0)
 
         # and QESys
         self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
