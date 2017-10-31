@@ -343,21 +343,24 @@ class FgcmChisq(object):
         lutIndicesGO = self.fgcmLUT.getIndices(obsBandIndexGO,
                                                self.fgcmPars.expPWV[obsExpIndexGO],
                                                self.fgcmPars.expO3[obsExpIndexGO],
-                                               np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                               #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                               self.fgcmPars.expLnTau[obsExpIndexGO],
                                                self.fgcmPars.expAlpha[obsExpIndexGO],
                                                obsSecZenithGO,
                                                obsCCDIndexGO,
                                                self.fgcmPars.expPmb[obsExpIndexGO])
         I0GO = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[obsExpIndexGO],
                                       self.fgcmPars.expO3[obsExpIndexGO],
-                                      np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                      #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                      self.fgcmPars.expLnTau[obsExpIndexGO],
                                       self.fgcmPars.expAlpha[obsExpIndexGO],
                                       obsSecZenithGO,
                                       self.fgcmPars.expPmb[obsExpIndexGO],
                                       lutIndicesGO)
         I10GO = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[obsExpIndexGO],
                                        self.fgcmPars.expO3[obsExpIndexGO],
-                                       np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                       #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
+                                       self.fgcmPars.expLnTau[obsExpIndexGO],
                                        self.fgcmPars.expAlpha[obsExpIndexGO],
                                        obsSecZenithGO,
                                        self.fgcmPars.expPmb[obsExpIndexGO],
@@ -505,9 +508,7 @@ class FgcmChisq(object):
 
             (dLdPWVGO,dLdO3GO,dLdTauGO,dLdAlphaGO) = (
                 self.fgcmLUT.computeLogDerivatives(lutIndicesGO,
-                                                   I0GO,
-                                                   self.fgcmPars.expTau[
-                        obsExpIndexGO]))
+                                                   I0GO)
 
             if (self.fgcmLUT.hasI1Derivatives) :
                 (dLdPWVI1GO,dLdO3I1GO,dLdTauI1GO,dLdAlphaI1GO) = (
@@ -515,9 +516,7 @@ class FgcmChisq(object):
                                                          I0GO,
                                                          I10GO,
                                                          objSEDSlope[obsObjIDIndexGO,
-                                                                     obsBandIndexGO],
-                                                         self.fgcmPars.expTau[
-                            obsExpIndexGO]))
+                                                                     obsBandIndexGO])
                 dLdPWVGO += dLdPWVI1GO
                 dLdO3GO += dLdO3I1GO
                 dLdTauGO += dLdTauI1GO
