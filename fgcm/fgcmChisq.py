@@ -508,15 +508,15 @@ class FgcmChisq(object):
 
             (dLdPWVGO,dLdO3GO,dLdTauGO,dLdAlphaGO) = (
                 self.fgcmLUT.computeLogDerivatives(lutIndicesGO,
-                                                   I0GO)
+                                                   I0GO))
 
-            if (self.fgcmLUT.hasI1Derivatives) :
+            if (self.fgcmLUT.hasI1Derivatives):
                 (dLdPWVI1GO,dLdO3I1GO,dLdTauI1GO,dLdAlphaI1GO) = (
                     self.fgcmLUT.computeLogDerivativesI1(lutIndicesGO,
                                                          I0GO,
                                                          I10GO,
                                                          objSEDSlope[obsObjIDIndexGO,
-                                                                     obsBandIndexGO])
+                                                                     obsBandIndexGO]))
                 dLdPWVGO += dLdPWVI1GO
                 dLdO3GO += dLdO3I1GO
                 dLdTauGO += dLdTauI1GO
