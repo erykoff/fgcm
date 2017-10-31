@@ -73,6 +73,7 @@ class FgcmParameters(object):
         self.pwvRange = fgcmConfig.pwvRange
         self.O3Range = fgcmConfig.O3Range
         self.tauRange = fgcmConfig.tauRange
+        self.lnTauRange = np.log(self.tauRange)
         self.alphaRange = fgcmConfig.alphaRange
         self.zenithRange = fgcmConfig.zenithRange
 
@@ -105,7 +106,7 @@ class FgcmParameters(object):
                              'pwvPerSlopeUnit':1.0,
                              'pwvGlobalUnit':1.0,
                              'o3Unit':1.0,
-                             'tauUnit':1.0,
+                             'lnTauUnit':1.0,
                              'tauPerSlopeUnit':1.0,
                              'alphaUnit':1.0,
                              'qeSysUnit':1.0,
@@ -177,8 +178,8 @@ class FgcmParameters(object):
         # and make the new parameter arrays
         self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.alphaStd
         self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.o3Std
-        self.parTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.tauStd
-        self.parTauPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parLnTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.lnTauStd
+        self.parLnTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
         # these we will always have, won't always fit
         self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.pwvStd
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
@@ -264,9 +265,10 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo()
 
         # set the units from the inParInfo
-        self.unitDictSteps = {'tauUnit': inParInfo['TAUUNIT'][0],
-                              #'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0] * (0.03*0.03/24.),
-                              'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
+        self.unitDictSteps = {'lnTauUnit': inParInfo['LNTAUUNIT'][0],
+                              'lnTauSlopeUnit': inParInfo['LNTAUSLOPEUNIT'][0],
+                              #'tauUnit': inParInfo['TAUUNIT'][0],
+                              #'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
                               'alphaUnit': inParInfo['ALPHAUNIT'][0],
                               'pwvUnit': inParInfo['PWVUNIT'][0],
                               #'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0] * (3.0*3.0/24.),
@@ -278,9 +280,9 @@ class FgcmParameters(object):
                               'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0]}
 
         # and log
-        self.fgcmLog.log('INFO','tau step unit set to %f' % (self.unitDictSteps['tauUnit']))
-        self.fgcmLog.log('INFO','tau percent slope step unit set to %f' %
-                         (self.unitDictSteps['tauPerSlopeUnit']))
+        self.fgcmLog.log('INFO','lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
+        self.fgcmLog.log('INFO','lnTau slope step unit set to %f' %
+                         (self.unitDictSteps['lnTauSlopeUnit']))
         self.fgcmLog.log('INFO','alpha step unit set to %f' % (self.unitDictSteps['alphaUnit']))
         self.fgcmLog.log('INFO','pwv step unit set to %f' % (self.unitDictSteps['pwvUnit']))
         self.fgcmLog.log('INFO','pwv percent slope step unit set to %f' %
@@ -299,8 +301,8 @@ class FgcmParameters(object):
         ## and copy the parameters
         self.parAlpha = inParams['PARALPHA'][0]
         self.parO3 = inParams['PARO3'][0]
-        self.parTauIntercept = inParams['PARTAUINTERCEPT'][0]
-        self.parTauPerSlope = inParams['PARTAUPERSLOPE'][0]
+        self.parLnTauIntercept = inParams['PARLNTAUINTERCEPT'][0]
+        self.parLnTauSlope = inParams['PARLNTAUSLOPE'][0]
         self.parPWVIntercept = inParams['PARPWVINTERCEPT'][0]
         self.parPWVPerSlope = inParams['PARPWVPERSLOPE'][0]
         self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0]
@@ -310,8 +312,8 @@ class FgcmParameters(object):
             # reset many of the parameters
             self.parAlpha[:] = self.alphaStd
             self.parO3[:] = self.o3Std
-            self.parTauIntercept[:] = self.tauStd
-            self.parTauPerSlope[:] = 0.0
+            self.parLnTauIntercept[:] = self.lnTauStd
+            self.parLnTauSlope[:] = 0.0
             self.parPWVIntercept[:] = self.pwvStd
             self.parPWVPerSlope[:] = 0.0
             # leave the QESysIntercept and Slope as previously fit
@@ -374,6 +376,7 @@ class FgcmParameters(object):
         # If we are resetting parameters, and want to use retrieved tau as the initial
         #  guess, set parTauIntercept to that.
         if self.resetParameters and self.useRetrievedTauInit:
+            raise RuntimeError("Not implemented yet!")
             self.parTauIntercept[:] = self.compRetrievedTauNight
 
         self._arrangeParArray()
@@ -547,9 +550,9 @@ class FgcmParameters(object):
         ctr=0
         self.parO3Loc = ctr
         ctr+=self.nCampaignNights
-        self.parTauInterceptLoc = ctr
+        self.parLnTauInterceptLoc = ctr
         ctr+=self.nCampaignNights
-        self.parTauPerSlopeLoc = ctr
+        self.parLnTauSlopeLoc = ctr
         ctr+=self.nCampaignNights
         self.parAlphaLoc = ctr
         ctr+=self.nCampaignNights
@@ -622,8 +625,8 @@ class FgcmParameters(object):
                ('BANDS','a2',self.bands.size),
                ('FITBANDS','a2',self.fitBands.size),
                ('EXTRABANDS','a2',self.extraBands.size),
-               ('TAUUNIT','f8'),
-               ('TAUPERSLOPEUNIT','f8'),
+               ('LNTAUUNIT','f8'),
+               ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
                ('PWVUNIT','f8'),
                ('PWVPERSLOPEUNIT','f8'),
@@ -646,8 +649,8 @@ class FgcmParameters(object):
         parInfo['FITBANDS'] = self.fitBands
         parInfo['EXTRABANDS'] = self.extraBands
 
-        parInfo['TAUUNIT'] = self.unitDictSteps['tauUnit']
-        parInfo['TAUPERSLOPEUNIT'] = self.unitDictSteps['tauPerSlopeUnit']
+        parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
+        parInfo['TAUSLOPEUNIT'] = self.unitDictSteps['lnTauPerSlopeUnit']
         parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
         parInfo['PWVUNIT'] = self.unitDictSteps['pwvUnit']
         parInfo['PWVPERSLOPEUNIT'] = self.unitDictSteps['pwvPerSlopeUnit']
@@ -667,8 +670,8 @@ class FgcmParameters(object):
                ('PARO3','f8',self.parO3.size),
                ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
                ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size),
-               ('PARTAUINTERCEPT','f8',self.parTauIntercept.size),
-               ('PARTAUPERSLOPE','f8',self.parTauPerSlope.size),
+               ('PARLNTAUINTERCEPT','f8',self.parLnTauIntercept.size),
+               ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
@@ -700,8 +703,8 @@ class FgcmParameters(object):
 
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3
-        pars['PARTAUINTERCEPT'][:] = self.parTauIntercept
-        pars['PARTAUPERSLOPE'][:] = self.parTauPerSlope
+        pars['PARLNTAUINTERCEPT'][:] = self.parLnTauIntercept
+        pars['PARLNTAUSLOPE'][:] = self.parLnTauSlope
         pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
         pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
@@ -798,11 +801,11 @@ class FgcmParameters(object):
 
         self.parO3[:] = parArray[self.parO3Loc:
                                      self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
-        self.parTauIntercept[:] = parArray[self.parTauInterceptLoc:
-                                               self.parTauInterceptLoc+self.nCampaignNights] / unitDict['tauUnit']
-        self.parTauPerSlope[:] = (parArray[self.parTauPerSlopeLoc:
-                                               self.parTauPerSlopeLoc + self.nCampaignNights] /
-                                  unitDict['tauPerSlopeUnit'])
+        self.parLnTauIntercept[:] = parArray[self.parLnTauInterceptLoc:
+                                                 self.parLnTauInterceptLoc+self.nCampaignNights] / unitDict['lnTauUnit']
+        self.parLnTauSlope[:] = (parArray[self.parLnTauSlopeLoc:
+                                               self.parLnTauSlopeLoc + self.nCampaignNights] /
+                                 unitDict['lnTauSlopeUnit'])
 
         self.parAlpha[:] = parArray[self.parAlphaLoc:
                                         self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
@@ -812,9 +815,10 @@ class FgcmParameters(object):
                                                      self.parExternalPWVOffsetLoc+self.nCampaignNights] / unitDict['pwvUnit']
 
         if (self.hasExternalTau):
-            self.parExternalTauScale = parArray[self.parExternalTauScaleLoc] / unitDict['tauUnit']
-            self.parExternalTauOffset = parArray[self.parExternalTauOffsetLoc:
-                                                     self.parExternalTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
+            raise RuntimeError("Not implemented")
+            #self.parExternalTauScale = parArray[self.parExternalTauScaleLoc] / unitDict['tauUnit']
+            #self.parExternalTauOffset = parArray[self.parExternalTauOffsetLoc:
+            #                                         self.parExternalTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
 
         if self.useRetrievedPWV:
             self.parRetrievedPWVScale = parArray[self.parRetrievedPWVScaleLoc] / unitDict['pwvGlobalUnit']
@@ -871,18 +875,23 @@ class FgcmParameters(object):
                                                      self.externalPWV[self.externalPWVFlag])
 
         # default to nightly slope/intercept
-        self.expTau = (self.parTauIntercept[self.expNightIndex] +
-                       (self.parTauPerSlope[self.expNightIndex] *
-                        self.parTauIntercept[self.expNightIndex]) * self.expDeltaUT)
+        #self.expTau = (self.parTauIntercept[self.expNightIndex] +
+        #               (self.parTauPerSlope[self.expNightIndex] *
+        #                self.parTauIntercept[self.expNightIndex]) * self.expDeltaUT)
+
+        self.expLnTau = (self.parLnTauIntercept[self.expNightIndex] +
+                         self.parLnTauSlope[self.expNightIndex] * self.expDeltaUT)
 
         if (self.hasExternalTau):
+            raise RuntimeError("not implemented")
             # replace where we have these
-            self.expTau[self.externalTauFlag] = (self.parExternalTauOffset[self.expNightIndex[self.externalTauFlag]] +
-                                                 self.parExternalTauScale *
-                                                 self.externalTau[self.externalTauFlag])
+            #self.expTau[self.externalTauFlag] = (self.parExternalTauOffset[self.expNightIndex[self.externalTauFlag]] +
+            #                                     self.parExternalTauScale *
+            #                                     self.externalTau[self.externalTauFlag])
 
         # and clip to make sure it doesn't go negative
-        self.expTau = np.clip(self.expTau, self.tauRange[0]+0.0001, self.tauRange[1]-0.0001)
+        #self.expTau = np.clip(self.expTau, self.tauRange[0]+0.0001, self.tauRange[1]-0.0001)
+        self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
 
         # and QESys
         self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
@@ -909,10 +918,10 @@ class FgcmParameters(object):
 
         parArray[self.parO3Loc:
                      self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
-        parArray[self.parTauInterceptLoc:
-                     self.parTauInterceptLoc+self.nCampaignNights] = self.parTauIntercept[:] * unitDict['tauUnit']
-        parArray[self.parTauPerSlopeLoc:
-                     self.parTauPerSlopeLoc + self.nCampaignNights] = self.parTauPerSlope[:] * unitDict['tauPerSlopeUnit']
+        parArray[self.parLnTauInterceptLoc:
+                     self.parLnTauInterceptLoc+self.nCampaignNights] = self.parLnTauIntercept[:] * unitDict['lnTauUnit']
+        parArray[self.parLnTauSlopeLoc:
+                     self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * unitDict['lnTauSlopeUnit']
         parArray[self.parAlphaLoc:
                      self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
         if self.hasExternalPWV and not self.useRetrievedPWV:
@@ -920,9 +929,10 @@ class FgcmParameters(object):
             parArray[self.parExternalPWVOffsetLoc:
                          self.parExternalPWVOffsetLoc+self.nCampaignNights] = self.parExternalPWVOffset * unitDict['pwvUnit']
         if (self.hasExternalTau):
-            parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['tauUnit']
-            parArray[self.parExternalTauOffsetLoc:
-                         self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
+            raise RuntimeError("not implemented")
+            #parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['lnTauUnit']
+            #parArray[self.parExternalTauOffsetLoc:
+            #             self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
         if self.useRetrievedPWV:
             parArray[self.parRetrievedPWVScaleLoc] = self.parRetrievedPWVScale * unitDict['pwvGlobalUnit']
             if self.useNightlyRetrievedPWV:
@@ -990,22 +1000,22 @@ class FgcmParameters(object):
                     self.parO3Loc + \
                     self.nCampaignNights] = ( \
             self.O3Range[1] * unitDict['o3Unit'])
-        parLow[self.parTauInterceptLoc: \
-                   self.parTauInterceptLoc + \
+        parLow[self.parLnTauInterceptLoc: \
+                   self.parLnTauInterceptLoc + \
                    self.nCampaignNights] = ( \
-            self.tauRange[0] * unitDict['tauUnit'])
-        parHigh[self.parTauInterceptLoc: \
-                    self.parTauInterceptLoc + \
+            self.lnTauRange[0] * unitDict['lnTauUnit'])
+        parHigh[self.parLnTauInterceptLoc: \
+                    self.parLnTauInterceptLoc + \
                 self.nCampaignNights] = ( \
-            self.tauRange[1] * unitDict['tauUnit'])
-        parLow[self.parTauPerSlopeLoc: \
-                   self.parTauPerSlopeLoc + \
+            self.lnTauRange[1] * unitDict['lnTauUnit'])
+        parLow[self.parLnTauSlopeLoc: \
+                   self.parLnTauSlopeLoc + \
                    self.nCampaignNights] = ( \
-            -4.0 * unitDict['tauPerSlopeUnit'])
-        parHigh[self.parTauPerSlopeLoc: \
-                    self.parTauPerSlopeLoc + \
+            -4.0 * unitDict['lnTauSlopeUnit'])
+        parHigh[self.parLnTauSlopeLoc: \
+                    self.parLnTauSlopeLoc + \
                     self.nCampaignNights] = ( \
-            4.0 * unitDict['tauPerSlopeUnit'])
+            4.0 * unitDict['lnTauSlopeUnit'])
         parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
                    self.nCampaignNights] = ( \
@@ -1027,16 +1037,17 @@ class FgcmParameters(object):
                 3.0 * unitDict['pwvUnit'])
             ## FIXME: set bounds per night?  Or clip?
         if (self.hasExternalTau):
-            parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
-            parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
-            parLow[self.parExternalTauOffsetLoc: \
-                       self.parExternalTauOffsetLoc + \
-                   self.nCampaignNights] = ( \
-                0.0 * unitDict['tauUnit'])
-            parHigh[self.parExternalTauOffsetLoc: \
-                        self.parExternalTauOffsetLoc + \
-                        self.nCampaignNights] = ( \
-                0.03 * unitDict['tauUnit'])
+            raise RuntimeError("not implemented")
+            #parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
+            #parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
+            #parLow[self.parExternalTauOffsetLoc: \
+            #           self.parExternalTauOffsetLoc + \
+            #       self.nCampaignNights] = ( \
+            #    0.0 * unitDict['tauUnit'])
+            #parHigh[self.parExternalTauOffsetLoc: \
+            #            self.parExternalTauOffsetLoc + \
+            #            self.nCampaignNights] = ( \
+            #    0.03 * unitDict['tauUnit'])
             ## FIXME: set bounds per night?  Or clip?
 
         parLow[self.parQESysInterceptLoc: \
@@ -1096,17 +1107,17 @@ class FgcmParameters(object):
             parHigh[self.parO3Loc: \
                     self.parO3Loc + \
                     self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
-            parLow[self.parTauInterceptLoc: \
-                   self.parTauInterceptLoc + \
-                   self.nCampaignNights] = self.tauStd * unitDict['tauUnit']
-            parHigh[self.parTauInterceptLoc: \
-                    self.parTauInterceptLoc + \
-                self.nCampaignNights] = self.tauStd * unitDict['tauUnit']
-            parLow[self.parTauPerSlopeLoc: \
-                   self.parTauPerSlopeLoc + \
+            parLow[self.parLnTauInterceptLoc: \
+                   self.parLnTauInterceptLoc + \
+                   self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+            parHigh[self.parLnTauInterceptLoc: \
+                    self.parLnTauInterceptLoc + \
+                self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+            parLow[self.parLnTauSlopeLoc: \
+                   self.parLnTauPerSlopeLoc + \
                    self.nCampaignNights] = 0.0
-            parHigh[self.parTauPerSlopeLoc: \
-                    self.parTauPerSlopeLoc + \
+            parHigh[self.parLnTauSlopeLoc: \
+                    self.parLnTauSlopeLoc + \
                     self.nCampaignNights] = 0.0
             parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
