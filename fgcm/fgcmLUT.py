@@ -71,6 +71,7 @@ class FgcmLUTMaker(object):
         self.pwvStd = self.lutConfig['pwvStd']
         self.o3Std = self.lutConfig['o3Std']
         self.tauStd = self.lutConfig['tauStd']
+        self.lnTauStd = np.log(self.tauStd)
         self.alphaStd = self.lutConfig['alphaStd']
         self.secZenithStd = self.lutConfig['airmassStd']
         self.zenithStd = np.arccos(1./self.secZenithStd)*180./np.pi
@@ -685,6 +686,7 @@ class FgcmLUT(object):
         self.pwvStd = stdVals['PWVSTD'][0]
         self.o3Std = stdVals['O3STD'][0]
         self.tauStd = stdVals['TAUSTD'][0]
+        self.lnTauStd = np.log(self.tauStd)
         self.alphaStd = stdVals['ALPHASTD'][0]
         self.zenithStd = stdVals['ZENITHSTD'][0]
         self.secZenithStd = 1./np.cos(np.radians(self.zenithStd))
@@ -830,16 +832,16 @@ class FgcmLUT(object):
     def computeI1Old(self, indices):
         return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
 
-    def computeLogDerivatives(self, indices, I0, tau):
+    def computeLogDerivatives(self, indices, I0):
         # dL(i,j|p) = d/dp(2.5*log10(LUT(i,j|p)))
         #           = 1.086*(LUT'(i,j|p)/LUT(i,j|p))
         return (self.magConstant*snmm.getArray(self.lutDPWVHandle)[indices[:-1]] / I0,
                 self.magConstant*snmm.getArray(self.lutDO3Handle)[indices[:-1]] / I0,
-                self.magConstant*snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / (I0*tau), # ln space
+                self.magConstant*snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / (I0),
                 self.magConstant*snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] / I0)
 
 
-    def computeLogDerivativesI1(self, indices, I0, I10, sedSlope, tau):
+    def computeLogDerivativesI1(self, indices, I0, I10, sedSlope):
         # dL(i,j|p) += d/dp(2.5*log10((1+F'*I10^obs) / (1+F'*I10^std)))
         #  the std part cancels...
         #            = 1.086*(F'/(1+F'*I10)*((I0*LUT1' - I1*LUT0')/(I0^2))
@@ -851,8 +853,7 @@ class FgcmLUT(object):
                 preFactor * (I0 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] -
                              I10 * I0 * snmm.getArray(self.lutDO3I1Handle)[indices[:-1]]),
                 preFactor * (I0 * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]]) /
-                (tau),
+                             I10 * I0 * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]]),
                 preFactor * (I0 * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] -
                              I10 * I0 * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]]))
 
@@ -879,17 +880,25 @@ class FgcmLUT(object):
 
         # compute tau units
 
-        deltaMagTau = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd)) -
-                       2.5*np.log10(np.exp(-self.secZenithStd*(self.tauStd+1.0))))
+        #deltaMagTau = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd)) -
+        #               2.5*np.log10(np.exp(-self.secZenithStd*(self.tauStd+1.0))))
 
-        unitDict['tauUnit'] = np.abs(deltaMagTau) / stepUnitReference / stepGrain
+        #unitDict['tauUnit'] = np.abs(deltaMagTau) / stepUnitReference / stepGrain
         # Experience has shown that this should be divided by ~5, at least for
         #   DES.  I'm not sure why, though, everything seems correct.
-        unitDict['tauUnit'] /= 5.0
+        #unitDict['tauUnit'] /= 5.0
 
         # tau percent slope units
-        unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration *
-                                            self.tauStd)
+        #unitDict['tauPerSlopeUnit'] = (unitDict['tauUnit'] * meanNightDuration *
+        #                               self.tauStd)
+
+        deltaMagLnTau = (2.5*np.log10(np.exp(-self.secZenithStd*np.exp(self.lnTauStd))) -
+                         2.5*np.log10(np.exp(-self.secZenithStd*np.exp(self.lnTauStd+1.0))))
+
+        unitDict['lnTauUnit'] = np.abs(deltaMagLnTau) / stepUnitReference / stepGrain
+
+        # FIXME?
+        unitDict['lnTauSlopeUnit'] = unitDict['lnTauUnit'] * meanNightDuration
 
         # alpha units -- reference to g, or r if not available
         bandIndex, = np.where(self.bands == 'g')
