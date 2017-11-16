@@ -141,7 +141,7 @@ class FgcmStars(object):
                        pos['OBSARRINDEX'],
                        pos['NOBS'],
                        obsX=None,
-                       obsY=None
+                       obsY=None,
                        flagID=flagID,
                        flagFlag=flagFlag,
                        computeNobs=computeNobs)
