@@ -64,6 +64,7 @@ class FgcmParameters(object):
         self.alphaStd = fgcmConfig.alphaStd
         self.o3Std = fgcmConfig.o3Std
         self.tauStd = fgcmConfig.tauStd
+        self.lnTauStd = np.log(self.tauStd)
         self.pwvStd = fgcmConfig.pwvStd
         self.pmbStd = fgcmConfig.pmbStd
         self.zenithStd = fgcmConfig.zenithStd
@@ -107,7 +108,7 @@ class FgcmParameters(object):
                              'pwvGlobalUnit':1.0,
                              'o3Unit':1.0,
                              'lnTauUnit':1.0,
-                             'tauPerSlopeUnit':1.0,
+                             'lnTauSlopeUnit':1.0,
                              'alphaUnit':1.0,
                              'qeSysUnit':1.0,
                              'qeSysSlopeUnit':1.0}
@@ -313,6 +314,7 @@ class FgcmParameters(object):
             self.parAlpha[:] = self.alphaStd
             self.parO3[:] = self.o3Std
             self.parLnTauIntercept[:] = self.lnTauStd
+            #self.parLnTauIntercept[:] = np.log(0.05)
             self.parLnTauSlope[:] = 0.0
             self.parPWVIntercept[:] = self.pwvStd
             self.parPWVPerSlope[:] = 0.0
@@ -376,8 +378,9 @@ class FgcmParameters(object):
         # If we are resetting parameters, and want to use retrieved tau as the initial
         #  guess, set parTauIntercept to that.
         if self.resetParameters and self.useRetrievedTauInit:
-            raise RuntimeError("Not implemented yet!")
-            self.parTauIntercept[:] = self.compRetrievedTauNight
+            #raise RuntimeError("Not implemented yet!")
+            #self.parTauIntercept[:] = self.compRetrievedTauNight
+            self.parLnTauIntercept[:] = np.log(self.compRetrievedTauNight)
 
         self._arrangeParArray()
 
@@ -650,7 +653,7 @@ class FgcmParameters(object):
         parInfo['EXTRABANDS'] = self.extraBands
 
         parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
-        parInfo['TAUSLOPEUNIT'] = self.unitDictSteps['lnTauPerSlopeUnit']
+        parInfo['LNTAUSLOPEUNIT'] = self.unitDictSteps['lnTauSlopeUnit']
         parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
         parInfo['PWVUNIT'] = self.unitDictSteps['pwvUnit']
         parInfo['PWVPERSLOPEUNIT'] = self.unitDictSteps['pwvPerSlopeUnit']
@@ -1114,7 +1117,7 @@ class FgcmParameters(object):
                     self.parLnTauInterceptLoc + \
                 self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
             parLow[self.parLnTauSlopeLoc: \
-                   self.parLnTauPerSlopeLoc + \
+                   self.parLnTauSlopeLoc + \
                    self.nCampaignNights] = 0.0
             parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
@@ -1205,7 +1208,7 @@ class FgcmParameters(object):
                   self.expAlpha[expUse])
         np.add.at(tauNight,
                   self.expNightIndex[expUse],
-                  self.expTau[expUse])
+                  np.exp(self.expLnTau[expUse]))
         np.add.at(pwvNight,
                   self.expNightIndex[expUse],
                   self.expPWV[expUse])
