@@ -854,7 +854,7 @@ class FgcmChisq(object):
             noExtGOF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
             uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
 
-            # Tau Nightly Intercept
+            # lnTau Nightly Intercept
             np.add.at(magdLdTauIntercept,
                       (expNightIndexGOF[noExtGOF],
                        obsBandIndexGO[obsFitUseGO[noExtGOF]]),
@@ -864,8 +864,8 @@ class FgcmChisq(object):
                            (expNightIndexGOF[noExtGOF],
                             obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                            objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
-            np.add.at(partialArray[self.fgcmPars.parTauInterceptLoc:
-                                       (self.fgcmPars.parTauInterceptLoc+
+            np.add.at(partialArray[self.fgcmPars.parLnTauInterceptLoc:
+                                       (self.fgcmPars.parLnTauInterceptLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       deltaMagWeightedGOF[noExtGOF] * (
@@ -873,39 +873,39 @@ class FgcmChisq(object):
                      magdLdTauOffset[expNightIndexGOF[noExtGOF],
                                      obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
 
-            partialArray[self.fgcmPars.parTauInterceptLoc +
-                         uNightIndexNoExt] *= (2.0 / unitDict['tauUnit'])
+            partialArray[self.fgcmPars.parLnTauInterceptLoc +
+                         uNightIndexNoExt] *= (2.0 / unitDict['lnTauUnit'])
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parTauInterceptLoc +
+                         self.fgcmPars.parLnTauInterceptLoc +
                          uNightIndexNoExt] += 1
 
-            # Tau nightly percent slope
+            # lnTau nightly slope
             np.add.at(magdLdTauPerSlope,
                       (expNightIndexGOF[noExtGOF],
                        obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                       self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
-                      self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                      #self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                       dLdTauGO[obsFitUseGO[noExtGOF]] /
                       obsMagErr2GO[obsFitUseGO[noExtGOF]])
             np.multiply.at(magdLdTauPerSlope,
                            (expNightIndexGOF[noExtGOF],
                             obsBandIndexGO[obsFitUseGO[noExtGOF]]),
                            objMagStdMeanErr2GO[obsFitUseGO[noExtGOF]])
-            np.add.at(partialArray[self.fgcmPars.parTauPerSlopeLoc:
-                                       (self.fgcmPars.parTauPerSlopeLoc+
+            np.add.at(partialArray[self.fgcmPars.parLnTauSlopeLoc:
+                                       (self.fgcmPars.parLnTauSlopeLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       deltaMagWeightedGOF[noExtGOF] * (
                     (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
-                     self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                     #self.fgcmPars.expTau[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                      dLdTauGO[obsFitUseGO[noExtGOF]] -
                      magdLdTauPerSlope[expNightIndexGOF[noExtGOF],
                                        obsBandIndexGO[obsFitUseGO[noExtGOF]]])))
 
-            partialArray[self.fgcmPars.parTauPerSlopeLoc +
-                         uNightIndexNoExt] *= (2.0 / unitDict['tauPerSlopeUnit'])
+            partialArray[self.fgcmPars.parLnTauSlopeLoc +
+                         uNightIndexNoExt] *= (2.0 / unitDict['lnTauSlopeUnit'])
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parTauPerSlopeLoc +
+                         self.fgcmPars.parLnTauSlopeLoc +
                          uNightIndexNoExt] += 1
 
 
