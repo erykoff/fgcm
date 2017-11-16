@@ -896,6 +896,7 @@ class FgcmLUT(object):
                          2.5*np.log10(np.exp(-self.secZenithStd*np.exp(self.lnTauStd+1.0))))
 
         unitDict['lnTauUnit'] = np.abs(deltaMagLnTau) / stepUnitReference / stepGrain
+        unitDict['lnTauUnit'] /= 5.0
 
         # FIXME?
         unitDict['lnTauSlopeUnit'] = unitDict['lnTauUnit'] * meanNightDuration
