@@ -20,7 +20,7 @@ class FgcmFlagVariables(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing fgcmFlagVariables')
+        self.fgcmLog.info('Initializing fgcmFlagVariables')
 
         # need fgcmPars because it has the sigFgcm
         self.fgcmPars = fgcmPars
@@ -39,7 +39,7 @@ class FgcmFlagVariables(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Flagging variables.')
+        self.fgcmLog.info('Flagging variables.')
 
         # input numbers
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -116,8 +116,8 @@ class FgcmFlagVariables(object):
         objFlag[goodStars[varStars]] |= objFlagDict['VARIABLE']
 
         # log this
-        self.fgcmLog.log('INFO','Found %d variable objects' % (varStars.size))
+        self.fgcmLog.info('Found %d variable objects' % (varStars.size))
 
 
-        self.fgcmLog.log('INFO','Done flagging variables in %.2f sec.' %
+        self.fgcmLog.info('Done flagging variables in %.2f sec.' %
                          (time.time() - startTime))

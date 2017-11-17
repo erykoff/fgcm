@@ -21,7 +21,6 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copy_reg.pickle(types.MethodType, _pickle_method)
 
-
 class FgcmRetrieval(object):
     """
     """
@@ -29,14 +28,16 @@ class FgcmRetrieval(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing FgcmRetrieval')
+        self.fgcmLog.info('Initializing FgcmRetrieval')
 
         self.fgcmPars = fgcmPars
 
         self.fgcmStars = fgcmStars
 
-        self.I0Std = fgcmLUT.I0Std
-        self.I10Std = fgcmLUT.I10Std
+        ## FIXME
+        #self.I0Std = fgcmLUT.I0Std
+        #self.I10Std = fgcmLUT.I10Std
+        self.I10StdBand = fgcmConfig.I10StdBand
 
         # and record configuration variables
         self.illegalValue = fgcmConfig.illegalValue
@@ -67,7 +68,7 @@ class FgcmRetrieval(object):
             raise ValueError("Must run fgcmChisq before fgcmRetrieval.")
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing retrieval integrals')
+        self.fgcmLog.info('Computing retrieval integrals')
 
         # reset arrays
         r0 = snmm.getArray(self.r0Handle)
@@ -80,7 +81,7 @@ class FgcmRetrieval(object):
         # select good stars
         goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
-        self.fgcmLog.log('INFO','Found %d good stars for retrieval' % (goodStars.size))
+        self.fgcmLog.info('Found %d good stars for retrieval' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -92,7 +93,7 @@ class FgcmRetrieval(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        self.fgcmLog.log('INFO','Pre-matching stars and observations...')
+        self.fgcmLog.info('Pre-matching stars and observations...')
         goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
                                                        obsObjIDIndex,
                                                        presorted=True)
@@ -111,7 +112,7 @@ class FgcmRetrieval(object):
         self.goodObsHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.goodObsHandle)[:] = goodObs
 
-        self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
+        self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
 
         # which exposures have stars?
@@ -126,7 +127,7 @@ class FgcmRetrieval(object):
 
         else:
             # regular multi-core
-            self.fgcmLog.log('INFO','Running retrieval on %d cores' % (self.nCore))
+            self.fgcmLog.info('Running retrieval on %d cores' % (self.nCore))
 
             # split exposures into a list of arrays of roughly equal size
             #nSections = self.fgcmPars.expArray.size // self.nExpPerRun + 1
@@ -145,7 +146,7 @@ class FgcmRetrieval(object):
         snmm.freeArray(self.goodObsHandle)
 
         # and we're done
-        self.fgcmLog.log('INFO','Computed retrieved integrals in %.2f seconds.' %
+        self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
                          (time.time() - startTime))
 
 
@@ -173,6 +174,7 @@ class FgcmRetrieval(object):
 
         obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
+        #obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
         obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
@@ -199,7 +201,8 @@ class FgcmRetrieval(object):
         fObsErr2GO = deltaMagErr2GO * ((2.5/np.log(10.)) * fObsGO)**2.
         deltaStdGO = (1.0 + objSEDSlope[obsObjIDIndexGO,
                                         obsBandIndexGO] *
-                      self.I10Std[obsBandIndexGO])
+                      self.I10StdBand[obsBandIndexGO])
+
         deltaStdWeightGO = 1./(fObsErr2GO * deltaStdGO * deltaStdGO)
 
         # and compress obsExpIndexGO
@@ -275,14 +278,16 @@ class FgcmRetrieval(object):
 
 
     def computeRetrievedIntegrals(self,debug=False):
+        ### THIS IS NOT USED I THINK
         """
         """
+        raise RuntimeError("This function should not be used...")
 
         if (not self.fgcmStars.magStdComputed):
             raise ValueError("Must run fgcmChisq before fgcmRetrieval.")
 
         startTime = time.time()
-        self.fgcmLog.log('INFO','Computing retrieved integrals')
+        self.fgcmLog.info('Computing retrieved integrals')
 
         # reset arrays
         r0 = snmm.getArray(self.r0Handle)
@@ -298,6 +303,7 @@ class FgcmRetrieval(object):
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        #obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
@@ -325,7 +331,7 @@ class FgcmRetrieval(object):
         gd,=np.where(obsFlag[goodObs] == 0)
         goodObs=goodObs[gd]
 
-        self.fgcmLog.log('INFO','FgcmRetrieval using %d observations from %d good stars.' %
+        self.fgcmLog.info('FgcmRetrieval using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
 
         IMatrix = np.zeros((2,2,self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
@@ -352,7 +358,7 @@ class FgcmRetrieval(object):
         fObsErr2 = deltaMagErr2 * ((2.5/np.log(10.)) * fObs)**2.
         deltaStd = (1.0 + objSEDSlope[obsObjIDIndex[obsIndex],
                                       obsBandIndex[obsIndex]] *
-                    self.I10Std[obsBandIndex[obsIndex]])
+                    self.I10StdBand[obsBandIndex[obsIndex]])
         deltaStdWeight = fObsErr2 * deltaStd * deltaStd
 
         # do all the exp/ccd sums
@@ -402,7 +408,7 @@ class FgcmRetrieval(object):
         # which ones can we compute?
         expIndexUse,ccdIndexUse=np.where(nStar >= self.minStarPerCCD)
 
-        self.fgcmLog.log('INFO','Found %d CCDs to compute retrieved integrals.' %
+        self.fgcmLog.info('Found %d CCDs to compute retrieved integrals.' %
                          (ccdIndexUse.size))
 
         # and loop, to do the linear algebra solution
@@ -413,7 +419,7 @@ class FgcmRetrieval(object):
                                     RHS[:,expIndexUse[i],ccdIndexUse[i]])
             except:
                 ## FIXME: write exposure number, ccd number not index
-                self.fgcmLog.log('DEBUG','Failed to compute R0, R1 for %d/%d'
+                self.fgcmLog.debug('Failed to compute R0, R1 for %d/%d'
                                  % (expIndexUse[i],ccdIndexUse[i]))
                 continue
 
@@ -422,7 +428,7 @@ class FgcmRetrieval(object):
 
 
         # and we're done
-        self.fgcmLog.log('INFO','Computed retrieved integrals in %.2f seconds.' %
+        self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
                          (time.time() - startTime))
 
 

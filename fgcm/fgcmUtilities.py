@@ -58,6 +58,25 @@ logDict = {'NONE':0,
 #        print('Could not find self status.')
 #    return
 
+def getMemoryString(location):
+    status = None
+    result = {'peak':0, 'rss':0}
+    try:
+        status = open('/proc/self/status')
+        for line in status:
+            parts = line.split()
+            key = parts[0][2:-1].lower()
+            if key in result:
+                result[key] = int(parts[1])/1000
+
+        memoryString = 'Memory usage at %s: %d MB current; %d MB peak.' % (
+            location, result['rss'], result['peak'])
+
+    except:
+        memoryString = 'Could not get process status for memory usage at %s!' % (location)
+
+    return memoryString
+
 def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
     """
     """

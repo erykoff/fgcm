@@ -25,6 +25,7 @@ from fgcmFlagVariables import FgcmFlagVariables
 from fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 
 from fgcmUtilities import zpFlagDict
+from fgcmUtilities import getMemoryString
 
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -104,7 +105,7 @@ class FgcmFitCycle(object):
         """
         """
 
-        self.fgcmLog.logMemoryUsage('INFO', 'Setting Up with fits')
+        self.fgcmLog.info(getMemoryString('Setting up with fits'))
 
         # read in the LUT
         #self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
@@ -147,7 +148,7 @@ class FgcmFitCycle(object):
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
         self.setupComplete = True
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Prepared')
+        self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
 
 
 
@@ -160,25 +161,25 @@ class FgcmFitCycle(object):
 
 
         if (self.initialCycle):
-            self.fgcmLog.log('INFO','Fit initial cycle starting...')
+            self.fgcmLog.info('Fit initial cycle starting...')
         else:
-            self.fgcmLog.log('INFO','Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
+            self.fgcmLog.info('Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
 
         # Apply aperture corrections and SuperStar if available
         # select exposures...
         if (not self.initialCycle):
-            self.fgcmLog.log('DEBUG','FitCycle is applying SuperStarFlat')
+            self.fgcmLog.debug('FitCycle is applying SuperStarFlat')
             self.fgcmStars.applySuperStarFlat(self.fgcmPars)
-            self.fgcmLog.log('DEBUG','FitCycle is applying ApertureCorrection')
+            self.fgcmLog.debug('FitCycle is applying ApertureCorrection')
             self.fgcmStars.applyApertureCorrection(self.fgcmPars)
 
             # and flag exposures using quantities computed from previous cycle
-            self.fgcmLog.log('DEBUG','FitCycle is running selectGoodExposures()')
+            self.fgcmLog.debug('FitCycle is running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
 
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-        self.fgcmLog.log('DEBUG','FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
+        self.fgcmLog.debug('FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
         #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='initial')
@@ -203,7 +204,7 @@ class FgcmFitCycle(object):
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
             brightObs.brightestObsMeanMag(computeSEDSlopes=True)
 
-            self.fgcmLog.logMemoryUsage('INFO','FitCycle Post Bright-Obs')
+            self.fgcmLog.info(getMemoryString('FitCycle Post Bright-Obs'))
 
             # flag stars that are outside our color cuts
             self.fgcmStars.performColorCuts()
@@ -221,14 +222,14 @@ class FgcmFitCycle(object):
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
-                self.fgcmLog.log('INFO','Configured to precompute superstar flat on initial cycle')
+                self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
                 # we can compute gray values, but only use obs error (since all the fields aren't filled yet)
                 self.fgcmGray.computeCCDAndExpGray(onlyObsErr=True)
                 # and average them into superstar flats
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False)
 
-                self.fgcmLog.log('DEBUG','FitCycle is applying pre-computed SuperStarFlat')
+                self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
 
             ## EXPERIMENTAL
@@ -251,64 +252,68 @@ class FgcmFitCycle(object):
         #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Pre-Fit')
+        self.fgcmLog.info(getMemoryString('FitCycle Pre-Fit'))
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
             self._doFit()
             self.fgcmPars.plotParameters()
         else:
-            self.fgcmLog.log('INFO','FitCycle skipping fit because maxIter == 0')
+            self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
 
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Post-Fit')
+        self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
 
         # another run to soak up the reserve stars...
         # FIXME: look for more efficient way of doing this
-        self.fgcmLog.log('DEBUG','FitCycle computing FgcmChisq all + reserve stars')
+        self.fgcmLog.debug('FitCycle computing FgcmChisq all + reserve stars')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
 
         # One last run to compute mstd all observations of all exposures
         #  when allExposures is set, mean mags, etc aren't computed
-        self.fgcmLog.log('DEBUG','FitCycle Computing FgcmChisq all exposures')
+        self.fgcmLog.debug('FitCycle Computing FgcmChisq all exposures')
+
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), allExposures=True, includeReserve=True)
 
 
-        self.fgcmLog.logMemoryUsage('INFO','After recomputing chisq for all exposures')
+        self.fgcmLog.info(getMemoryString('After recomputing chisq for all exposures'))
 
         # Compute CCD^gray and EXP^gray
-        self.fgcmLog.log('DEBUG','FitCycle computing Exp and CCD Gray')
+        self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
-        self.fgcmLog.logMemoryUsage('INFO','After computing CCD and Exp Gray')
+        self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
 
         # Compute sigFgcm
-        self.fgcmLog.log('DEBUG','FitCycle computing sigFgcm')
+        self.fgcmLog.debug('FitCycle computing sigFgcm')
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
         # first compute with all...(better stats)
         self.fgcmSigFgcm.computeSigFgcm(reserved=False,doPlots=True,save=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False)
-        self.fgcmLog.logMemoryUsage('INFO','After computing sigFGCM')
+
+        self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
         # Flag variables for next cycle
-        self.fgcmLog.log('DEBUG','FitCycle flagging variables')
+        self.fgcmLog.debug('FitCycle flagging variables')
         self.fgcmFlagVars = FgcmFlagVariables(self.fgcmConfig,self.fgcmPars,
                                               self.fgcmStars)
         self.fgcmFlagVars.flagVariables()
-        self.fgcmLog.logMemoryUsage('INFO','After flagging variables')
+
+        self.fgcmLog.info(getMemoryString('After flagging variables'))
 
         # Re-flag exposures for superstar, aperture, etc.
-        self.fgcmLog.log('DEBUG','FitCycle re-selecting good exposures')
+        self.fgcmLog.debug('FitCycle re-selecting good exposures')
         self.expSelector.selectGoodExposures()
 
         # Compute Retrieved chromatic integrals
-        self.fgcmLog.log('DEBUG','FitCycle computing retrieved R0/R1')
+        self.fgcmLog.debug('FitCycle computing retrieved R0/R1')
         self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,
                                            self.fgcmStars,self.fgcmLUT)
         self.fgcmRetrieval.computeRetrievalIntegrals()
-        self.fgcmLog.logMemoryUsage('INFO','After computing retrieved integrals')
+
+        self.fgcmLog.info(getMemoryString('After computing retrieved integrals'))
 
         # Compute Retrieved PWV -- always because why not?
-        self.fgcmLog.log('DEBUG','FitCycle computing RPWV')
+        self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars)
         self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
@@ -318,28 +323,31 @@ class FgcmFitCycle(object):
 
 
         # Compute SuperStar Flats
-        self.fgcmLog.log('DEBUG','FitCycle computing SuperStarFlats')
+        self.fgcmLog.debug('FitCycle computing SuperStarFlats')
         superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         superStarFlat.computeSuperStarFlats()
-        self.fgcmLog.logMemoryUsage('INFO','After computing superstar flats')
+
+        self.fgcmLog.info(getMemoryString('After computing superstar flats'))
 
         # Compute Aperture Corrections
-        self.fgcmLog.log('DEBUG','FitCycle computing ApertureCorrections')
+        self.fgcmLog.debug('FitCycle computing ApertureCorrections')
         aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         aperCorr.computeApertureCorrections()
-        self.fgcmLog.logMemoryUsage('INFO','After computing aperture corrections')
+
+        self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
         #   if we don't the zeropoints before convergence will be wrong.
 
         # Make Zeropoints -- save also
-        self.fgcmLog.log('DEBUG','FitCycle computing zeropoints.')
+        self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmLUT,self.fgcmGray,
                                        self.fgcmRetrieval)
         self.fgcmZpts.computeZeropoints()
-        self.fgcmLog.logMemoryUsage('INFO','After computing zeropoints')
+
+        self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
         if (self.useFits):
             self.fgcmZpts.saveZptFits()
@@ -369,7 +377,7 @@ class FgcmFitCycle(object):
 
         # and make map of coverage
 
-        self.fgcmLog.log('INFO','Making map of coverage')
+        self.fgcmLog.info('Making map of coverage')
         badZpMask = (zpFlagDict['NOFIT_NIGHT'] |
                      zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
                      zpFlagDict['TOO_FEW_STARS_ON_CCD'])
@@ -379,15 +387,13 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minPerBand=1)
         self.fgcmStars.plotStarMap(mapType='okcoverage')
 
-
-
-        self.fgcmLog.logMemoryUsage('INFO','FitCycle Completed')
+        self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
     def _doFit(self,doPlots=True):
         """
         """
 
-        self.fgcmLog.log('INFO','Performing fit with %d iterations.' %
+        self.fgcmLog.info('Performing fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
 
         # get the initial parameters
@@ -413,7 +419,7 @@ class FgcmFitCycle(object):
                                                    iprint=0,         # only one output
                                                    callback=None)    # no callback
 
-        self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+        self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
         self.fgcmChisq.clearMatchCache()
 
         if (doPlots):
@@ -446,7 +452,7 @@ class FgcmFitCycle(object):
         from fgcmUtilities import expFlagDict
         from fgcmUtilities import objFlagDict
 
-        self.fgcmLog.log('INFO','Performing SOptics fit with %d iterations.' %
+        self.fgcmLog.info('Performing SOptics fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
 
         # get the initial parameters
@@ -526,7 +532,7 @@ class FgcmFitCycle(object):
                                                    callback=None)    # no callback
 
 
-        self.fgcmLog.log('INFO','Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+        self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
 
         if (doPlots):
             fig=plt.figure(1,figsize=(8,6))
@@ -550,7 +556,7 @@ class FgcmFitCycle(object):
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
 
         # compute EXP^gray, and do plots
-        self.fgcmLog.log('INFO','Computing CCD and EXP gray for deep exposures')
+        self.fgcmLog.info('Computing CCD and EXP gray for deep exposures')
         self.fgcmGray.computeCCDAndExpGray()
 
         # reset the exposure flag

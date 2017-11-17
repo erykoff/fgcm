@@ -7,20 +7,7 @@ import esutil
 import glob
 import healpy as hp
 
-def resourceUsage(where):
-    status = None
-    result = {'peak':0, 'rss':0}
-    try:
-        status = open('/proc/self/status')
-        for line in status:
-            parts = line.split()
-            key = parts[0][2:-1].lower()
-            if key in result:
-                result[key] = int(parts[1])/1000
-        print('Memory usage at %s:  %d MB current and %d MB peak.'  %(where, result['rss'], result['peak']))
-    except:
-        print('Could not find self status.')
-    return
+from fgcmLogger import FgcmLogger
 
 
 class FgcmMakeStars(object):
@@ -29,7 +16,7 @@ class FgcmMakeStars(object):
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
-        requiredKeys=['bands','requiredFlag',
+        requiredKeys=['filterToBand','requiredBands',
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','referenceBand',
@@ -40,6 +27,25 @@ class FgcmMakeStars(object):
                 raise ValueError("required %s not in starConfig" % (key))
 
         self.objCat = None
+
+        # Note that the order doesn't matter for the making of the stars
+        self.filterNames = starConfig['filterToBand'].keys()
+
+        # check that the requiredBands are there...
+        for reqBand in starConfig['requiredBands']:
+            found=False
+            for filterName in self.filterNames:
+                if (starConfig['filterToBand'][filterName] == reqBand):
+                    found = True
+                    break
+            if not found:
+                raise ValueError("requiredBand %s not in filterToBand!" % (reqBand))
+
+        if 'logger' in starConfig:
+            self.fgcmLog = starConfig['logger']
+        else:
+            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
+
 
     def runFromFits(self, clobber=False):
         """
@@ -65,7 +71,16 @@ class FgcmMakeStars(object):
         import fitsio
 
         fits = fitsio.FITS(observationFile)
-        w=fits[1].where('band == "%s"' % (self.starConfig['referenceBand']))
+        #w=fits[1].where('band == "%s"' % (self.starConfig['referenceBand']))
+        fitsWhere = None
+        for filterName in self.filterNames:
+            if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
+                clause = '(filtername == "%s")' % (filterName)
+                if fitsWhere is None:
+                    fitsWhere = clause
+                else:
+                    fitsWhere = fitsWhere + ' || ' + clause
+        w=fits[1].where(fitsWhere)
 
         obsCat = fits[1].read(columns=['RA','DEC'],upper=True,rows=w)
 
@@ -97,16 +112,17 @@ class FgcmMakeStars(object):
 
         if (not clobber):
             if (os.path.isfile(obsIndexFile)):
-                print("Found %s " % (obsIndexFile))
+                #print("Found %s " % (obsIndexFile))
+                self.fgcmLog.info("Found %s " % (obsIndexFile))
                 return
 
 
         obsCat = fitsio.read(observationFile, ext=1,
-                             columns=['RA','DEC','BAND'])
+                             columns=['RA','DEC','FILTERNAME'])
 
-        bandArray = np.core.defchararray.strip(obsCat['BAND'])
+        filterNameArray = np.core.defchararray.strip(obsCat['FILTERNAME'])
 
-        self.makeMatchedStars(obsCat['RA'], obsCat['DEC'], bandArray)
+        self.makeMatchedStars(obsCat['RA'], obsCat['DEC'], filterNameArray)
 
         # and save the outputs...
         fits=fitsio.FITS(obsIndexFile, mode='rw', clobber=True)
@@ -118,7 +134,8 @@ class FgcmMakeStars(object):
 
 
 
-    def makeReferenceStars(self, raArray, decArray, bandArray=None, bandSelected=False,
+    def makeReferenceStars(self, raArray, decArray, bandSelected=False,
+                           filterNameArray=None,
                            brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
         """
@@ -127,24 +144,38 @@ class FgcmMakeStars(object):
         try:
             import smatch
             hasSmatch = True
-            print("Good news!  smatch is available.")
+            #print("Good news!  smatch is available.")
+            self.fgcmLog.info("Good news!  smatch is available.")
         except:
             hasSmatch = False
-            print("Bad news.  smatch not found.")
+            #print("Bad news.  smatch not found.")
+            self.fgcmLog.info("Bad news.  smatch not found.")
 
         if (raArray.size != decArray.size):
             raise ValueError("raArray, decArray must be same length.")
 
         if (not bandSelected):
-            if (bandArray is None):
-                raise ValueError("Must provide bandArray if bandSelected == True")
-            if (bandArray.size != raArray.size):
-                raise ValueError("bandArray must be same lenght as raArray")
+            if (filterNameArray is None):
+                raise ValueError("Must provide filterNameArray if bandSelected == False")
+            if (filterNameArray.size != raArray.size):
+                raise ValueError("filterNameArray must be same length as raArray")
 
             # down-select
-            use,=np.where(bandArray == self.starConfig['referenceBand'])
-            raArray = raArray[use]
-            decArray = decArray[use]
+            #use,=np.where(bandArray == self.starConfig['referenceBand'])
+            #raArray = raArray[use]
+            #decArray = decArray[use]
+
+            # We select based on the aliased *band* not on the filter name
+            useFlag = None
+            for filterName in self.filterNames:
+                if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
+                    if useFlag is None:
+                        useFlag = (filterNameArray == filterName)
+                    else:
+                        useFlag |= (filterNameArray == filterName)
+
+            raArray = raArray[useFlag]
+            decArray = decArray[useFlag]
 
         if (brightStarRA is not None and brightStarDec is not None and
             brightStarRadius is not None):
@@ -155,8 +186,10 @@ class FgcmMakeStars(object):
         else:
             cutBrightStars = False
 
-        print("Matching %s observations in the referenceBand catalog to itself" %
-              (raArray.size))
+        #print("Matching %s observations in the referenceBand catalog to itself" %
+        #      (raArray.size))
+        self.fgcmLog.info("Matching %s observations in the referenceBand catalog to itself" %
+                          (raArray.size))
 
         dtype=[('FGCM_ID','i4'),
                ('RA','f8'),
@@ -286,12 +319,12 @@ class FgcmMakeStars(object):
 
         self.objCat['FGCM_ID'] = np.arange(count)+1
 
-        print("Found %d unique objects with >= %d observations in %s band." %
-              (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
+        self.fgcmLog.info("Found %d unique objects with >= %d observations in %s band." %
+                          (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
 
 
         if (cutBrightStars):
-            print("Matching to bright stars for masking...")
+            self.fgcmLog.info("Matching to bright stars for masking...")
             if (hasSmatch):
                 # faster smatch...
 
@@ -310,11 +343,11 @@ class FgcmMakeStars(object):
                 i1=matches[0]
                 i2=matches[1]
 
-            print("Cutting %d objects too near bright stars." % (i2.size))
+            self.fgcmLog.info("Cutting %d objects too near bright stars." % (i2.size))
             self.objCat = np.delete(self.objCat,i2)
 
         # and remove stars with near neighbors
-        print("Matching stars to neighbors...")
+        self.fgcmLog.info("Matching stars to neighbors...")
         if (hasSmatch):
             # faster smatch...
 
@@ -339,13 +372,13 @@ class FgcmMakeStars(object):
 
         if (use.size > 0):
             neighbored = np.unique(i2[use])
-            print("Cutting %d objects within %.2f arcsec of a neighbor" %
+            self.fgcmLog.info("Cutting %d objects within %.2f arcsec of a neighbor" %
                   (neighbored.size, self.starConfig['isolationRadius']))
             self.objCat = np.delete(self.objCat, neighbored)
 
         # and we're done
 
-    def makeMatchedStars(self, raArray, decArray, bandArray):
+    def makeMatchedStars(self, raArray, decArray, filterNameArray):
         """
         """
 
@@ -360,10 +393,18 @@ class FgcmMakeStars(object):
             hasSmatch = False
 
         if (raArray.size != decArray.size or
-            raArray.size != bandArray.size):
-            raise ValueError("raArray, decArray, bandArray must be same length")
+            raArray.size != filterNameArray.size):
+            raise ValueError("raArray, decArray, filterNameArray must be same length")
 
-        print("Matching positions to observations...")
+        # translate filterNameArray to bandArray ... can this be made faster, or
+        #  does it need to be?
+        bandArray = np.zeros_like(filterNameArray)
+        for filterName in self.filterNames:
+            use,=np.where(filterNameArray == filterName)
+            bandArray[use] = self.starConfig['filterToBand'][filterName]
+
+
+        self.fgcmLog.info("Matching positions to observations...")
 
         if (hasSmatch):
             # faster smatch...
@@ -386,7 +427,7 @@ class FgcmMakeStars(object):
             i1 = matches[0]
             i2 = matches[1]
 
-        print("Collating observations")
+        self.fgcmLog.info("Collating observations")
         nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
 
         if (nObsPerObj.size != self.objCat.size):
@@ -394,16 +435,18 @@ class FgcmMakeStars(object):
                              (self.objCat.size, nObsPerObj.size))
 
         # which stars have at least minPerBand observations in each required band?
-        req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
-        reqBands = np.array(self.starConfig['bands'])[req]
+        #req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
+        #reqBands = np.array(self.starConfig['bands'])[req]
+        reqBands = np.array(self.starConfig['requiredBands'])
 
         # this could be made more efficient
-        print("Computing number of observations per band")
+        self.fgcmLog.info("Computing number of observations per band")
         nObs = np.zeros((reqBands.size, self.objCat.size), dtype='i4')
         for i in xrange(reqBands.size):
             use,=np.where(bandArray[i2] == reqBands[i])
             hist = esutil.stat.histogram(i1[use], min=0, max=self.objCat.size-1)
             nObs[i,:] = hist
+
 
         # cut the star list to those with enough per band
         minObs = nObs.min(axis=0)
@@ -415,7 +458,7 @@ class FgcmMakeStars(object):
         # make sure we have enough per band
         gd,=np.where(minObs >= self.starConfig['minPerBand'])
         objClass[gd] = 1
-        print("There are %d stars with at least %d observations in each required band." %
+        self.fgcmLog.info("There are %d stars with at least %d observations in each required band." %
               (gd.size, self.starConfig['minPerBand']))
 
 
@@ -429,7 +472,7 @@ class FgcmMakeStars(object):
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
-        print("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
+        self.fgcmLog.info("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
         for i in xrange(high.size):
             i1a=rev[rev[high[i]]:rev[high[i]+1]]
             cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
@@ -459,223 +502,13 @@ class FgcmMakeStars(object):
         self.obsIndexCat = np.zeros(nTotObs,
                                     dtype=[('OBSINDEX','i4')])
         ctr = 0
-        print("Spooling out %d observation indices." % (nTotObs))
+        self.fgcmLog.info("Spooling out %d observation indices." % (nTotObs))
         for i in gd:
             self.obsIndexCat[ctr:ctr+nObsPerObj[i]] = i2[obsInd[obsInd[i]:obsInd[i+1]]]
             ctr+=nObsPerObj[i]
 
         # and we're done
 
-    def makeReferenceStars0(self,clobber=False):
-        """
-        """
-        import fitsio
-
-        if (not clobber):
-            if (os.path.isfile(self.starConfig['starPrePositionFile'])):
-                print("Found %s" % (self.starConfig['starPrePositionFile']))
-                return
-
-        # currently takes a lot of memory!
-
-        # only read in the reference band objects, we only need the positions
-        # assuming we had a s/n cut on the original query
-
-        fits = fitsio.FITS(self.starConfig['observationFile'])
-        w=fits[1].where('band == "%s"' % (self.starConfig['referenceBand']))
-
-        obsCat = fits[1].read(columns=['RA','DEC'],upper=True,rows=w)
-
-
-        dtype=[('FGCM_ID','i4'),
-               ('RA','f8'),
-               ('DEC','f8')]
-
-        print("Matching referenceBand catalog to itself...")
-        matches=smatch.match(obsCat['RA'],obsCat['DEC'],self.starConfig['matchRadius']/3600.0,obsCat['RA'],obsCat['DEC'],nside=self.nside,maxmatch=0)
-
-        fakeId = np.arange(obsCat.size)
-        hist,rev = esutil.stat.histogram(fakeId[matches['i1']],rev=True)
-
-        if (hist.max() == 1):
-            raise ValueError("Only a single unique list of objects.")
-
-        maxObs = hist.max()
-
-        # how many unique objects?
-        histTemp = hist.copy()
-        count=0
-        for j in xrange(histTemp.size):
-            jj = fakeId[j]
-            if (histTemp[jj] >= self.starConfig['minPerBand']):
-                i1a=rev[rev[jj]:rev[jj+1]]
-                histTemp[matches['i2'][i1a]] = 0
-                count=count+1
-
-        # make the object catalog
-        objCat = np.zeros(count,dtype=dtype)
-        objCat['FGCM_ID'] = np.arange(count)+1
-
-        # rotate.  This works for DES, but we have to think about optimizing this...
-        raTemp = obsCat['RA']
-
-        hi,=np.where(raTemp > 180.0)
-        if (hi.size > 0) :
-            raTemp[hi] = raTemp[hi] - 360.0
-
-        # get mean ra/dec
-        index = 0
-        for j in xrange(hist.size):
-            jj = fakeId[j]
-            if (hist[jj] >= self.starConfig['minPerBand']):
-                i1a=rev[rev[jj]:rev[jj+1]]
-                starInd=matches['i2'][i1a]
-                # make sure this doesn't get used again
-                hist[starInd] = 0
-                objCat['RA'][index] = np.sum(raTemp[starInd])/starInd.size
-                objCat['DEC'][index] = np.sum(obsCat['DEC'][starInd])/starInd.size
-                index = index+1
-
-        # restore negative RAs
-        lo,=np.where(objCat['RA'] < 0.0)
-        if (lo.size > 0):
-            objCat['RA'][lo] = objCat['RA'][lo] + 360.0
-
-        # here we crop out stars near very bright stars...
-        if (self.starConfig['brightStarFile'] is not None):
-            brightStars = fitsio.read(self.starConfig['brightStarFile'],ext=1,upper=True)
-
-            matches=smatch.match(brightStars['RA'],brightStars['DEC'],brightStars['RADIUS'],objCat['RA'],objCat['DEC'],nside=self.nside,maxmatch=0)
-
-            objCat = np.delete(objCat,matches['i2'])
-
-        # and we get rid of stars with near neighbors
-        matches=smatch.match(objCat['RA'],objCat['DEC'],self.starConfig['isolationRadius']/3600.0,objCat['RA'],objCat['DEC'],nside=self.nside,maxmatch=0)
-
-        use,=np.where(matches['i1'] != matches['i2'])
-        if (use.size > 0):
-            neighbored = np.unique(matches['i2'][use])
-
-            objCat = np.delete(objCat,neighbored)
-
-        # and save the catalog...
-        fitsio.write(self.starConfig['starPrePositionFile'],objCat)
-
-    def makeMatchedStars0(self,clobber=False):
-        """
-        """
-
-        import fitsio
-
-        if (not clobber):
-            if (os.path.isfile(self.starConfig['obsIndexFile'])):
-                print("Found %s" % (self.starConfig['obsIndexFile']))
-                return
-
-        # we need the star list...
-
-        print("Reading in reference positions...")
-        objCat = fitsio.read(self.starConfig['starPrePositionFile'],ext=1)
-        print("There are %d reference stars." % (objCat.size))
-
-        # and the full observation list...
-
-        print("Reading in observation file...")
-        obsCat = fitsio.read(self.starConfig['observationFile'],ext=1,columns=['RA','DEC','BAND'])
-        obsBand = np.core.defchararray.strip(obsCat['BAND'])
-
-        print("Matching positions to observations...")
-        m=smatch.match(objCat['RA'],objCat['DEC'],self.starConfig['matchRadius']/3600.0,obsCat['RA'],obsCat['DEC'],nside=self.nside,maxmatch=0)
-
-        print("Collating observations...")
-        nObsPerObj, obsInd = esutil.stat.histogram(m['i1'], rev=True)
-
-        if (nObsPerObj.size != objCat.size):
-            raise ValueError("Number of reference stars does not match observation file.")
-
-        # which stars have at least minPerBand observations in each of the required bands?
-        req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
-        reqBands = np.array(self.starConfig['bands'])[req]
-
-        print("Computing number of observations per band...")
-        nobs = np.zeros((reqBands.size, objCat.size),dtype='i4')
-        for i in xrange(reqBands.size):
-            use,=np.where(obsBand[m['i2']] == reqBands[i])
-            # need to make sure it's aligned
-            hist = esutil.stat.histogram(m['i1'][use],min=0,max=objCat.size-1)
-            nobs[i,:] = hist
-
-        # cut the star list to those with enough per band
-        minObs = nobs.min(axis=0)
-
-        # this is our classifier...
-        #   1 is a good star, 0 is bad.
-        objClass = np.zeros(objCat.size,dtype='i2')
-
-        gd,=np.where(minObs >= self.starConfig['minPerBand'])
-        objClass[gd] = 1
-        print("There are %d stars with at least %d observations in each required band." % (gd.size, self.starConfig['minPerBand']))
-
-        # cut the density of stars down with sampling...only the good ones
-
-        theta = (90.0 - objCat['DEC'][gd])*np.pi/180.
-        phi = objCat['RA'][gd]*np.pi/180.
-
-        ipring = hp.ang2pix(self.starConfig['nside'],theta,phi)
-        hist,rev=esutil.stat.histogram(ipring,rev=True)
-
-        high,=np.where(hist > self.starConfig['maxPerPixel'])
-        ok,=np.where(hist > 0)
-        print("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
-        for i in xrange(high.size):
-            i1a=rev[rev[high[i]]:rev[high[i]+1]]
-            cut=np.random.choice(i1a,size=i1a.size-self.starConfig['maxPerPixel'],replace=False)
-            objClass[gd[cut]] = 0
-
-        # save the star positions
-        # redo the gd selection
-        gd,=np.where(objClass == 1)
-
-        print("Writing out %d potential calibration stars." % (gd.size))
-
-        fits = fitsio.FITS(self.starConfig['obsIndexFile'],mode='rw',clobber=True)
-
-        # note that these are 4-byte integers.
-        #  to handle more than 2 billion observations will require a restructure of the code
-        objCatIndex = np.zeros(gd.size,dtype=[('FGCM_ID','i4'),
-                                              ('RA','f8'),
-                                              ('DEC','f8'),
-                                              ('OBSARRINDEX','i4'),
-                                              ('NOBS','i4')])
-        objCatIndex['FGCM_ID'][:] = objCat['FGCM_ID'][gd]
-        objCatIndex['RA'][:] = objCat['RA'][gd]
-        objCatIndex['DEC'][:] = objCat['DEC'][gd]
-        # this is definitely the number of observations
-        objCatIndex['NOBS'][:] = nObsPerObj[gd]
-        # and the index is the cumulative sum...
-        objCatIndex['OBSARRINDEX'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
-
-        # first extension is the positions
-        fits.create_table_hdu(data=objCatIndex,extname='POS')
-        fits[1].write(objCatIndex)
-
-        # next extension is the obsCat indices...
-        dtype=[('OBSINDEX','i4')]
-        fits.create_table_hdu(dtype=dtype,extname='INDEX')
-
-        print("Spooling out %d observation indices." % (np.sum(objCatIndex['NOBS'])))
-        for i in gd:
-            tempIndices = np.zeros(nObsPerObj[i],dtype=dtype)
-            tempIndices['OBSINDEX'][:] = m['i2'][obsInd[obsInd[i]:obsInd[i+1]]]
-            fits[2].append(tempIndices)
-
-        fits.close()
-
-        # note that we're not updating the total observation table, though this
-        # could be done to save some speed on reading it in later on
-        #  (or just grab the rows from the index...need to check on fitsio there.)
-
-        # and we're done
 
 
 

@@ -11,8 +11,7 @@ from pkg_resources import resource_filename
 from modtranGenerator import ModtranGenerator
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
-## FIXME: add better logging
+from fgcmLogger import FgcmLogger
 
 
 class FgcmLUTMaker(object):
@@ -33,11 +32,17 @@ class FgcmLUTMaker(object):
         if (not os.path.isfile(self.stellarTemplateFile)):
             raise IOError("Could not find stellar template file")
 
+        if 'logger' in lutConfig:
+            self.fgcmLog = lutConfig['logger']
+        else:
+            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
+
     def _checkLUTConfig(self,lutConfig):
         """
         """
 
-        requiredKeys=['elevation','bands','nCCD',
+        requiredKeys=['elevation','filterNames',
+                      'stdFilterNames','nCCD',
                       'pmbRange','pmbSteps',
                       'pwvRange','pwvSteps',
                       'o3Range','o3Steps',
@@ -60,7 +65,15 @@ class FgcmLUTMaker(object):
         self.modGen = ModtranGenerator(self.lutConfig['elevation'])
         self.pmbElevation = self.modGen.pmbElevation
 
-        self.bands = np.array(self.lutConfig['bands'])
+        self.filterNames = np.array(self.lutConfig['filterNames'])
+        self.stdFilterNames = np.array(self.lutConfig['stdFilterNames'])
+
+        if self.filterNames.size != self.stdFilterNames.size:
+            raise ValueError("Length of filterNames must be same as stdFilterNames")
+
+        for stdFilterName in self.stdFilterNames:
+            if stdFilterName not in self.filterNames:
+                raise ValueError("stdFilterName %s not in list of filterNames" % (stdFilterName))
 
         self.nCCD = self.lutConfig['nCCD']
         self.nCCDStep = self.nCCD+1
@@ -96,11 +109,11 @@ class FgcmLUTMaker(object):
         """
 
         self.inThroughputs=[]
-        for b in self.bands:
+        for filterName in self.filterNames:
             try:
-                lam = throughputDict[b]['LAMBDA']
+                lam = throughputDict[filterName]['LAMBDA']
             except:
-                raise ValueError("Wavelength LAMBDA not found for band %s in throughputDict!" % (b))
+                raise ValueError("Wavelength LAMBDA not found for filter %s in throughputDict!" % (filterName))
 
             tput = np.zeros(lam.size, dtype=[('LAMBDA','f4'),
                                              ('THROUGHPUT_AVG','f4'),
@@ -108,15 +121,15 @@ class FgcmLUTMaker(object):
             tput['LAMBDA'][:] = lam
             for ccdIndex in xrange(self.nCCD):
                 try:
-                    tput['THROUGHPUT_CCD'][:,ccdIndex] = throughputDict[b][ccdIndex]
+                    tput['THROUGHPUT_CCD'][:,ccdIndex] = throughputDict[filterName][ccdIndex]
                 except:
-                    raise ValueError("CCD Index %d not found for band %s in throughputDict!" % (ccdIndex,b))
+                    raise ValueError("CCD Index %d not found for filter %s in throughputDict!" % (ccdIndex,filterName))
 
             # check if the average is there, if not compute it
-            if ('AVG' in throughputDict[b]):
-                tput['THROUGHPUT_AVG'][:] = throughputDict[b]['AVG']
+            if ('AVG' in throughputDict[filterName]):
+                tput['THROUGHPUT_AVG'][:] = throughputDict[filterName]['AVG']
             else:
-                print("Average throughput not found in throughputDict for band %s.  Computing now..." % (b))
+                self.fgcmLog.info("Average throughput not found in throughputDict for filter %s.  Computing now..." % (filterName))
                 for i in xrange(lam.size):
                     use,=np.where(tput['THROUGHPUT_CCD'][i,:] > 0.0)
                     if (use.size > 0):
@@ -190,8 +203,7 @@ class FgcmLUTMaker(object):
         # run MODTRAN a bunch of times
         # we need for each airmass, to run the array of pwv and o3 and pull these out
 
-        #print("Generating %d*%d=%d PWV atmospheres..." % (self.pwv.size,self.zenith.size,self.pwv.size*self.zenith.size))
-        print("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
+        self.fgcmLog.info("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
         #self.pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
         pwvAtmTable = np.zeros((pwvPlus.size,zenithPlus.size,self.atmLambda.size))
 
@@ -208,7 +220,7 @@ class FgcmLUTMaker(object):
                                 lambdaStep=self.lambdaStep)
                 pwvAtmTable[i,j,:] = atm['H2O']
 
-        print("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
+        self.fgcmLog.info("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
         #self.o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
         o3AtmTable = np.zeros((o3Plus.size, zenithPlus.size, self.atmLambda.size))
 
@@ -223,7 +235,7 @@ class FgcmLUTMaker(object):
                                 lambdaStep=self.lambdaStep)
                 o3AtmTable[i,j,:] = atm['O3']
 
-        print("\nGenerating %d O2/Rayleigh atmospheres..." % (zenithPlus.size))
+        self.fgcmLog.info("\nGenerating %d O2/Rayleigh atmospheres..." % (zenithPlus.size))
         #self.o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
         #self.rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
         o2AtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
@@ -239,9 +251,9 @@ class FgcmLUTMaker(object):
             rayleighAtmTable[j,:] = atm['RAYLEIGH']
 
         # get the filters over the same lambda ranges...
-        print("\nInterpolating filters...")
+        self.fgcmLog.info("\nInterpolating filters...")
         self.throughputs = []
-        for i in xrange(len(self.bands)):
+        for i in xrange(len(self.filterNames)):
             inLam = self.inThroughputs[i]['LAMBDA']
 
             tput = np.zeros(self.atmLambda.size, dtype=[('LAMBDA','f4'),
@@ -260,28 +272,37 @@ class FgcmLUTMaker(object):
             self.throughputs.append(tput)
 
         # and now we can get the standard atmosphere and lambda_b
-        print("Computing lambdaB")
-        self.lambdaB = np.zeros(self.bands.size)
-        for i in xrange(self.bands.size):
+        self.fgcmLog.info("Computing lambdaB")
+        self.lambdaB = np.zeros(self.filterNames.size)
+        for i in xrange(self.filterNames.size):
             num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
             self.lambdaB[i] = num / denom
-            print("Band: %s, lambdaB = %.3f" % (self.bands[i], self.lambdaB[i]))
+            self.fgcmLog.info("Filter: %s, lambdaB = %.3f" % (self.filterNames[i], self.lambdaB[i]))
 
-        print("Computing lambdaStd")
-        self.lambdaStd = np.zeros(self.bands.size)
-        for i in xrange(self.bands.size):
+        self.fgcmLog.info("Computing lambdaStdFilter")
+        self.lambdaStdFilter = np.zeros(self.filterNames.size)
+        for i in xrange(self.filterNames.size):
             num = integrate.simps(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             denom = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            self.lambdaStd[i] = num / denom
-            print("Band: %s, lambdaStd = %.3f" % (self.bands[i],self.lambdaStd[i]))
+            self.lambdaStdFilter[i] = num / denom
+            self.fgcmLog.info("Filter: %s, lambdaStdFilter = %.3f" % (self.filterNames[i],self.lambdaStdFilter[i]))
 
+        # now compute lambdaStd based on the desired standards...
+        self.fgcmLog.info("Calculating lambdaStd")
+        self.lambdaStd = np.zeros(self.filterNames.size)
 
-        print("Computing I0Std/I1Std")
-        self.I0Std = np.zeros(self.bands.size)
-        self.I1Std = np.zeros(self.bands.size)
+        for i, filterName in enumerate(self.filterNames):
+            ind, = np.where(self.filterNames == self.stdFilterNames[i])
+            self.lambdaStd[i] = self.lambdaStdFilter[ind[0]]
+            self.fgcmLog.info("Filter: %s (from %s) lambdaStd = %.3f" %
+                              (filterName, self.stdFilterNames[i], self.lambdaStd[i]))
 
-        for i in xrange(self.bands.size):
+        self.fgcmLog.info("Computing I0Std/I1Std")
+        self.I0Std = np.zeros(self.filterNames.size)
+        self.I1Std = np.zeros(self.filterNames.size)
+
+        for i in xrange(self.filterNames.size):
             self.I0Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             self.I1Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
 
@@ -291,8 +312,8 @@ class FgcmLUTMaker(object):
         ## Make the I0/I1 LUT
         #################################
 
-        print("Building look-up table...")
-        lutPlus = np.zeros((self.bands.size,
+        self.fgcmLog.info("Building look-up table...")
+        lutPlus = np.zeros((self.filterNames.size,
                             pwvPlus.size,
                             o3Plus.size,
                             tauPlus.size,
@@ -309,12 +330,12 @@ class FgcmLUTMaker(object):
         self.pmbFactor = pmbFactorPlus[:-1]
 
         # this set of nexted for loops could probably be vectorized in some way
-        for i in xrange(self.bands.size):
-            print("Working on band %s" % (self.bands[i]))
+        for i in xrange(self.filterNames.size):
+            self.fgcmLog.info("Working on filter %s" % (self.filterNames[i]))
             for j in xrange(pwvPlus.size):
-                print("  and on pwv #%d" % (j))
+                self.fgcmLog.info("  and on pwv #%d" % (j))
                 for k in xrange(o3Plus.size):
-                    print("   and on o3 #%d" % (k))
+                    self.fgcmLog.info("   and on o3 #%d" % (k))
                     for m in xrange(tauPlus.size):
                         for n in xrange(alphaPlus.size):
                             for o in xrange(zenithPlus.size):
@@ -329,7 +350,7 @@ class FgcmLUTMaker(object):
                                     lutPlus['I1'][i,j,k,m,n,o,p] = integrate.simps(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
 
         # and create the LUT (not plus)
-        self.lut = np.zeros((self.bands.size,
+        self.lut = np.zeros((self.filterNames.size,
                              self.pwv.size,
                              self.o3.size,
                              self.tau.size,
@@ -360,7 +381,7 @@ class FgcmLUTMaker(object):
 
         # This is *not* done plus-size
 
-        self.lutDeriv = np.zeros((self.bands.size,
+        self.lutDeriv = np.zeros((self.filterNames.size,
                                   self.pwv.size,
                                   self.o3.size,
                                   self.tau.size,
@@ -380,12 +401,12 @@ class FgcmLUTMaker(object):
                                         ('D_ALPHA_I1','f4'),
                                         ('D_SECZENITH_I1','f4')])
 
-        print("Computing derivatives...")
+        self.fgcmLog.info("Computing derivatives...")
 
         ## FIXME: figure out PMB derivative?
 
-        for i in xrange(self.bands.size):
-            print("Working on band %s" % (self.bands[i]))
+        for i in xrange(self.filterNames.size):
+            self.fgcmLog.info("Working on filter %s" % (self.filterNames[i]))
             for j in xrange(self.pwv.size):
                 for k in xrange(self.o3.size):
                     for m in xrange(self.tau.size):
@@ -446,7 +467,7 @@ class FgcmLUTMaker(object):
 
         if (self.makeSeds):
         ## and the SED LUT
-            print("Building SED LUT")
+            self.fgcmLog.info("Building SED LUT")
 
             # arbitrary.  Configure?  Fit?  Seems stable...
             delta = 600.0
@@ -467,8 +488,8 @@ class FgcmLUTMaker(object):
             nTemplates = len(extNames)
 
             self.sedLUT = np.zeros(nTemplates, dtype=[('TEMPLATE','i4'),
-                                                      ('SYNTHMAG','f4',self.bands.size),
-                                                      ('FPRIME','f4',self.bands.size)])
+                                                      ('SYNTHMAG','f4',self.filterNames.size),
+                                                      ('FPRIME','f4',self.filterNames.size)])
 
             # now do it...looping is no problem since there aren't that many.
 
@@ -498,14 +519,14 @@ class FgcmLUTMaker(object):
                     fnu[hi] = intFunc(self.atmLambda[good[-1]])
 
                 # compute synthetic mags
-                for j in xrange(self.bands.size):
+                for j in xrange(self.filterNames.size):
                     num = integrate.simps(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
                     denom = integrate.simps(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
 
                     self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
 
                 # and compute fprimes
-                for j in xrange(self.bands.size):
+                for j in xrange(self.filterNames.size):
                     use,=np.where((templateLambda >= (self.lambdaStd[j]-delta)) &
                                   (templateLambda <= (self.lambdaStd[j]+delta)))
 
@@ -524,16 +545,17 @@ class FgcmLUTMaker(object):
         import fitsio
 
         if (os.path.isfile(lutFile) and not clobber):
-            print("lutFile %s already exists, and clobber is False." % (lutFile))
+            self.fgcmLog.info("lutFile %s already exists, and clobber is False." % (lutFile))
             return
 
-        print("Saving LUT to %s" % (lutFile))
+        self.fgcmLog.info("Saving LUT to %s" % (lutFile))
 
         # first, save the LUT itself
         fitsio.write(lutFile,self.lut.flatten(),extname='LUT',clobber=True)
 
         # and now save the indices
-        indexVals = np.zeros(1,dtype=[('BANDS','a1',self.bands.size),
+        indexVals = np.zeros(1,dtype=[('FILTERNAMES',self.filterNames.dtype.str,self.filterNames.size),
+                                      ('STDFILTERNAMES',self.stdFilterNames.dtype.str,self.stdFilterNames.size),
                                       ('PMB','f8',self.pmb.size),
                                       ('PMBFACTOR','f8',self.pmb.size),
                                       ('PMBELEVATION','f8'),
@@ -544,7 +566,8 @@ class FgcmLUTMaker(object):
                                       ('ALPHA','f8',self.alpha.size),
                                       ('ZENITH','f8',self.zenith.size),
                                       ('NCCD','i4')])
-        indexVals['BANDS'] = self.bands
+        indexVals['FILTERNAMES'] = self.filterNames
+        indexVals['STDFILTERNAMES'] = self.stdFilterNames
         indexVals['PMB'] = self.pmb
         indexVals['PMBFACTOR'] = self.pmbFactor
         indexVals['PMBELEVATION'] = self.pmbElevation
@@ -567,12 +590,13 @@ class FgcmLUTMaker(object):
                                     ('ZENITHSTD','f8'),
                                     ('LAMBDARANGE','f8',2),
                                     ('LAMBDASTEP','f8'),
-                                    ('LAMBDASTD','f8',self.bands.size),
+                                    ('LAMBDASTD','f8',self.filterNames.size),
+                                    ('LAMBDASTDFILTER','f8',self.filterNames.size),
                                     ('LAMBDANORM','f8'),
-                                    ('I0STD','f8',self.bands.size),
-                                    ('I1STD','f8',self.bands.size),
-                                    ('I10STD','f8',self.bands.size),
-                                    ('LAMBDAB','f8',self.bands.size),
+                                    ('I0STD','f8',self.filterNames.size),
+                                    ('I1STD','f8',self.filterNames.size),
+                                    ('I10STD','f8',self.filterNames.size),
+                                    ('LAMBDAB','f8',self.filterNames.size),
                                     ('ATMLAMBDA','f8',self.atmLambda.size),
                                     ('ATMSTDTRANS','f8',self.atmStd.size)])
         stdVals['PMBSTD'] = self.pmbStd
@@ -584,6 +608,7 @@ class FgcmLUTMaker(object):
         stdVals['LAMBDARANGE'] = self.lambdaRange
         stdVals['LAMBDASTEP'] = self.lambdaStep
         stdVals['LAMBDASTD'][:] = self.lambdaStd
+        stdVals['LAMBDASTDFILTER'][:] = self.lambdaStdFilter
         stdVals['LAMBDANORM'][:] = self.lambdaNorm
         stdVals['I0STD'][:] = self.I0Std
         stdVals['I1STD'][:] = self.I1Std
@@ -595,12 +620,12 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,stdVals,extname='STD')
 
         # and the derivatives
-        print("Writing Derivative LUT")
+        self.fgcmLog.info("Writing Derivative LUT")
         fitsio.write(lutFile,self.lutDeriv.flatten(),extname='DERIV')
 
         # and the SED LUT
         if (self.makeSeds):
-            print("Writing SED LUT")
+            self.fgcmLog.info("Writing SED LUT")
             fitsio.write(lutFile,self.sedLUT,extname='SED')
 
 
@@ -609,11 +634,12 @@ class FgcmLUT(object):
     """
 
     #def __init__(self,lutFile):
-    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None):
+    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
         #lutFlat = fitsio.read(self.lutFile,ext='LUT')
         #indexVals = fitsio.read(self.lutFile,ext='INDEX')
 
-        self.bands = indexVals['BANDS'][0]
+        self.filterNames = indexVals['FILTERNAMES'][0]
+        self.stdFilterNames = indexVals['STDFILTERNAMES'][0]
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]
@@ -636,7 +662,7 @@ class FgcmLUT(object):
         self.nCCDStep = self.nCCD+1
 
         # make shared memory arrays for LUTs
-        sizeTuple = (self.bands.size,self.pwv.size,self.o3.size,
+        sizeTuple = (self.filterNames.size,self.pwv.size,self.o3.size,
                      self.tau.size,self.alpha.size,self.zenith.size,self.nCCDStep)
 
         self.lutI0Handle = snmm.createArray(sizeTuple,dtype='f4')
@@ -677,7 +703,8 @@ class FgcmLUT(object):
             self.hasI1Derivatives = True
         except:
             # just fill with zeros
-            print("No I1 derivative information")
+            pass
+            #print("No I1 derivative information")
 
         # get the standard values
         #stdVals = fitsio.read(lutFile,ext='STD')
@@ -693,6 +720,7 @@ class FgcmLUT(object):
         self.lambdaRange = stdVals['LAMBDARANGE'][0]
         self.lambdaStep = stdVals['LAMBDASTEP'][0]
         self.lambdaStd = stdVals['LAMBDASTD'][0]
+        self.lambdaStdFilter = stdVals['LAMBDASTDFILTER'][0]
         self.I0Std = stdVals['I0STD'][0]
         self.I1Std = stdVals['I1STD'][0]
         self.I10Std = stdVals['I10STD'][0]
@@ -701,6 +729,14 @@ class FgcmLUT(object):
         self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
 
         self.magConstant = 2.5/np.log(10)
+
+        if (filterToBand is None):
+            # just set up a 1-1 mapping
+            self.filterToBand = {}
+            for filterName in self.filterNames:
+                self.filterToBand[filterName] = filterName
+        else:
+            self.filterToBand = filterToBand
 
         # finally, read in the sedLUT
         ## this is experimental
@@ -744,11 +780,11 @@ class FgcmLUT(object):
         return cls(indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=sedLUT)
 
 
-    def getIndices(self, bandIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
+    def getIndices(self, filterIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         """
         """
 
-        return (bandIndex,
+        return (filterIndex,
                 np.clip(((pwv - self.pwv[0])/self.pwvDelta).astype(np.int32), 0,
                         self.pwv.size-1),
                 np.clip(((o3 - self.o3[0])/self.o3Delta).astype(np.int32), 0,
@@ -901,40 +937,79 @@ class FgcmLUT(object):
         # FIXME?
         unitDict['lnTauSlopeUnit'] = unitDict['lnTauUnit'] * meanNightDuration
 
-        # alpha units -- reference to g, or r if not available
-        bandIndex, = np.where(self.bands == 'g')
-        if bandIndex.size == 0:
-            bandIndex, = np.where(self.bands == 'r')
-            if bandIndex.size == 0:
-                raise ValueError("Must have either g or r band...")
+        # look for first use of 'g' or 'r' band in filterToBand...
+        #  this is the reference filter for tau/alpha
 
-        deltaMagAlpha = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[bandIndex]/self.lambdaNorm)**self.alphaStd)) -
-                         2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[bandIndex]/self.lambdaNorm)**(self.alphaStd+1.0))))
-        unitDict['alphaUnit'] = np.abs(deltaMagAlpha[0]) / stepUnitReference / stepGrain
+        alphaFilterIndex = -1
+        for i,filterName in enumerate(self.filterNames):
+            if (self.filterToBand[filterName] == 'g' or
+                self.filterToBand[filterName] == 'r'):
+                alphaFilterIndex = i
+                break
+        if (alphaFilterIndex == -1):
+            raise ValueError("Must have either g or r band...")
+
+        #if bandIndex.size == 0:
+        #    bandIndex, = np.where(self.bands == 'r')
+        #    if bandIndex.size == 0:
+        #        raise ValueError("Must have either g or r band...")
+
+        deltaMagAlpha = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**self.alphaStd)) -
+                         2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**(self.alphaStd+1.0))))
+        unitDict['alphaUnit'] = np.abs(deltaMagAlpha) / stepUnitReference / stepGrain
 
         # and scale these by fraction of bands affected...
-        use, = np.where((fitBands == 'u') |
-                        (fitBands == 'g') |
-                        (fitBands == 'r'))
-        unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
+        #use, = np.where((fitBands == 'u') |
+        #                (fitBands == 'g') |
+        #                (fitBands == 'r'))
+        alphaNAffectedBands = 0
+        for filterName in self.filterNames:
+            if ((self.filterToBand[filterName] == 'u' and
+                 'u' in fitBands) or
+                (self.filterToBand[filterName] == 'g' and
+                 'g' in fitBands) or
+                (self.filterToBand[filterName] == 'r' and
+                 'r' in fitBands)):
+                alphaNAffectedBands += 1
+
+        #unitDict['alphaUnit'] *= float(use.size) / float(fitBands.size)
+        unitDict['alphaUnit'] *= float(alphaNAffectedBands) / float(fitBands.size)
 
         # pwv units -- reference to z
-        bandIndex, = np.where(self.bands == 'z')
-        if bandIndex.size == 0:
-            raise ValueError("Require z band for PWV...")
+        #bandIndex, = np.where(self.bands == 'z')
+        #if bandIndex.size == 0:
+        #    raise ValueError("Require z band for PWV...")
 
-        indicesStd = self.getIndices(bandIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        pwvFilterIndex = -1
+        for i,filterName in enumerate(self.filterNames):
+            if (self.filterToBand[filterName] == 'z'):
+                pwvFilterIndex = i
+                break
+        if pwvFilterIndex == -1:
+            raise ValueError("Must have z band for PWV...")
+
+        indicesStd = self.getIndices(pwvFilterIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
         i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-        indicesPlus = self.getIndices(bandIndex,self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        indicesPlus = self.getIndices(pwvFilterIndex,self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
         i0Plus = self.computeI0(self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
         deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
 
-        unitDict['pwvUnit'] = np.abs(deltaMagPWV[0]) / stepUnitReference / stepGrain
+        unitDict['pwvUnit'] = np.abs(deltaMagPWV) / stepUnitReference / stepGrain
 
         # scale by fraction of bands affected
-        use,=np.where((fitBands == 'z') |
-                      (fitBands == 'Y'))
-        unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
+        #use,=np.where((fitBands == 'z') |
+        #              (fitBands == 'Y'))
+        #unitDict['pwvUnit'] *= float(use.size) / float(fitBands.size)
+        pwvNAffectedBands = 0
+        for filterName in self.filterNames:
+            if ((self.filterToBand[filterName] == 'z' and
+                 'z' in fitBands) or
+                (self.filterToBand[filterName] == 'y' and
+                 'y' in fitBands) or
+                (self.filterToBand[filterName] == 'Y' and
+                 'Y' in fitBands)):
+                pwvNAffectedBands += 1
+        unitDict['pwvUnit'] *= float(pwvNAffectedBands) / float(fitBands.size)
 
         # PWV percent slope units
         unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration * self.pwvStd
@@ -943,21 +1018,33 @@ class FgcmLUT(object):
         unitDict['pwvGlobalUnit'] = unitDict['pwvUnit'] * nCampaignNights
 
         # O3 units -- reference to r
-        bandIndex,=np.where(self.bands == 'r')
-        if bandIndex.size == 0:
-            raise ValueError("Require r band for O3...")
+        #bandIndex,=np.where(self.bands == 'r')
+        #if bandIndex.size == 0:
+        #    raise ValueError("Require r band for O3...")
+        o3FilterIndex = -1
+        for i,filterName in enumerate(self.filterNames):
+            if self.filterToBand[filterName] == 'r':
+                o3FilterIndex = i
+                break
+        if o3FilterIndex == -1:
+            raise ValueError("Must have r band for o3...")
 
-        indicesStd = self.getIndices(bandIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        indicesStd = self.getIndices(o3FilterIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
         i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-        indicesPlus = self.getIndices(bandIndex,self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+        indicesPlus = self.getIndices(o3FilterIndex,self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
         i0Plus = self.computeI0(self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
         deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
 
-        unitDict['o3Unit'] = np.abs(deltaMagO3[0]) / stepUnitReference / stepGrain
+        unitDict['o3Unit'] = np.abs(deltaMagO3) / stepUnitReference / stepGrain
 
         # scale by fraction of bands that are affected
-        use,=np.where((fitBands == 'r'))
-        unitDict['o3Unit'] *= float(use.size) / float(fitBands.size)
+        #use,=np.where((fitBands == 'r'))
+        #unitDict['o3Unit'] *= float(use.size) / float(fitBands.size)
+        o3NAffectedBands = 0
+        for filterName in self.filterNames:
+            if self.filterToBand[filterName] == 'r':
+                o3NAffectedBands += 1
+        unitDict['o3Unit'] *= float(o3NAffectedBands) / float(fitBands.size)
 
         # wash parameters units...
         unitDict['qeSysUnit'] = 1.0 / stepUnitReference / stepGrain

@@ -19,9 +19,10 @@ class FgcmConfig(object):
     """
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
-        requiredKeys=['exposureFile','ccdOffsetFile','obsFile','indexFile',
+        requiredKeys=['bands','fitBands','extraBands','filterToBand',
+                      'exposureFile','ccdOffsetFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
-                      'ccdField','latitude','seeingField','fitBands','extraBands',
+                      'ccdField','latitude','seeingField',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
                       'minStarPerCCD','minCCDPerExp','maxCCDGrayErr',
                       'aperCorrFitNBins','illegalValue','sedFitBandFudgeFactors',
@@ -47,6 +48,10 @@ class FgcmConfig(object):
             if (key not in configDict):
                 raise ValueError("required %s not in configFile" % (key))
 
+        self.bands = np.array(configDict['bands'])
+        self.fitBands = np.array(configDict['fitBands'])
+        self.extraBands = np.array(configDict['extraBands'])
+        self.filterToBand = configDict['filterToBand']
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
         self.obsFile = configDict['obsFile']
@@ -62,8 +67,6 @@ class FgcmConfig(object):
         self.deepFlag = configDict['deepFlag']
         self.cosLatitude = np.cos(np.radians(self.latitude))
         self.sinLatitude = np.sin(np.radians(self.latitude))
-        self.fitBands = np.array(configDict['fitBands'])
-        self.extraBands = np.array(configDict['extraBands'])
         self.nCore = int(configDict['nCore'])
         self.brightObsGrayMax = float(configDict['brightObsGrayMax'])
         self.minStarPerCCD = int(configDict['minStarPerCCD'])
@@ -213,16 +216,29 @@ class FgcmConfig(object):
                 raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
 
         # set up logger are we get the name...
-        self.fgcmLog = FgcmLogger(logFile, self.logLevel, printOnly=configDict['printOnly'])
-
-        self.fgcmLog.log('INFO','Logging started to %s' % (self.fgcmLog.logFile))
+        if ('logger' not in configDict):
+            self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
+                                                     self.outfileBaseWithCycle),
+                                      self.logLevel)
+            self.fgcmLog.info('Logging started to %s' % (self.fgcmLog.logFile))
+        else:
+            # Support an external logger such as LSST that has .info() and .debug() calls
+            self.fgcmLog = configDict['logger']
+            try:
+                self.fgcmLog.info('Logging to external logger.')
+            except:
+                raise RuntimeError("Logging to configDict['logger'] failed.")
 
         if (self.experimentalMode) :
-            self.fgcmLog.log('INFO','ExperimentalMode set to True')
+            self.fgcmLog.info('ExperimentalMode set to True')
         if (self.resetParameters) :
-            self.fgcmLog.log('INFO','Will reset atmosphere parameters')
+            self.fgcmLog.info('Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
-            self.fgcmLog.log('INFO','WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+            self.fgcmLog.info('WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+
+        #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
+        #                                            self.cycleNumber)
+        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
 
         if (not os.path.isdir(self.plotPath)):
             try:
@@ -237,7 +253,8 @@ class FgcmConfig(object):
         #lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
         self.nCCD = lutIndex['NCCD'][0]
-        self.bands = lutIndex['BANDS'][0]
+        self.lutFilterNames = lutIndex['FILTERNAMES'][0]
+        self.lutStdFilterNames = lutIndex['STDFILTERNAMES'][0]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -251,19 +268,65 @@ class FgcmConfig(object):
         if (self.extraBands.size > 0):
             self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
-        bandString = ''
-        for b in self.bands: bandString += b + ' '
-        self.fgcmLog.log('INFO','Found %d CCDs and %d bands (%s)' %
+        # newer band checks
+        #  1) check that all the filters in filterToBand are in lutFilterNames
+        #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
+        #  3) check that each band has ONE standard filter
+        #  4) check that all the fitBands are in bands
+        #  5) check that all the extraBands are in bands
+
+        #  1) check that all the filters in filterToBand are in lutFilterNames
+        for filterName in self.filterToBand:
+            test,=np.where(filterName == self.lutFilterNames)
+            if test.size == 0:
+                raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
+            if self.filterToBand[filterName] not in self.bands:
+                raise ValueError("Band %s in filterToBand not in bands" %
+                                 (self.filterToBand[filterName]))
+        #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
+        for lutStdFilterName in self.lutStdFilterNames:
+            if lutStdFilterName not in self.lutFilterNames:
+                raise ValueError("lutStdFilterName %s not in list of lutFilterNames" % (lutStdFilterName))
+        #  3) check that each band has ONE standard filter
+        bandStdFilterIndex = np.zeros(self.bands.size, dtype=np.int32) - 1
+        for i, band in enumerate(self.bands):
+            for j, filterName in enumerate(self.lutFilterNames):
+                if self.filterToBand[filterName] == band:
+                    # If we haven't found it yet, set the index
+                    ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
+                    if bandStdFilterIndex[i] < 0:
+                        bandStdFilterIndex[i] = ind
+                    else:
+                        if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
+                            raise ValueError("Band %s has multiple standard filters (%s, %s)" %
+                                             (band, self.lutStdFilterNames[ind],
+                                              self.lutStdFilterNames[bandStdFilterIndex[i]]))
+        #  4) check that all the fitBands are in bands
+        for fitBand in self.fitBands:
+            test,=np.where(fitBand == self.bands)
+            if (test.size == 0):
+                raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
+        #  5) check that all the extraBands are in bands
+        for extraBand in self.extraBands:
+            test,=np.where(extraBand == self.bands)
+            if (test.size == 0):
+                raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
+
+        bandString = " ".join(self.bands)
+        self.fgcmLog.info('Found %d CCDs and %d bands (%s)' %
                          (self.nCCD,self.bands.size,bandString))
 
-        #lutStd = fitsio.read(self.lutFile,ext='STD')
+        # get LUT standard values
         self.pmbStd = lutStd['PMBSTD'][0]
         self.pwvStd = lutStd['PWVSTD'][0]
         self.o3Std = lutStd['O3STD'][0]
         self.tauStd = lutStd['TAUSTD'][0]
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
-        self.lambdaStd = lutStd['LAMBDASTD'][0]
+
+        # And the lambdaStd and I10Std, for each *band*
+        self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
+        self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
 
         if (self.expGrayPhotometricCut.size != self.bands.size):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
@@ -275,7 +338,6 @@ class FgcmConfig(object):
             raise ValueError("expGrayHighCut must all be positive")
 
         # and look at the exposure file and grab some stats
-        #expInfo = fitsio.read(self.exposureFile,ext=1)
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
@@ -321,17 +383,29 @@ class FgcmConfig(object):
         self.washMJDs = self.washMJDs[gd]
 
         # and deal with fit band indices and extra band indices
-        self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
-        self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
+        #self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
+        #self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
+        #for i in xrange(self.bands.size):
+        #    if (self.bands[i] in self.fitBands):
+        #        self.bandRequired[i] = True
+        #    if (self.extraBands.size > 0):
+        #        if (self.bands[i] in self.extraBands):
+        #            self.bandExtra[i] = True
+        #        if (self.bands[i] in self.fitBands and
+        #            self.bands[i] in self.extraBands):
+        #            raise ValueError("Cannot have the same band as fit and extra")
+        self.bandRequiredFlag = np.zeros(self.bands.size, dtype=np.bool)
+        self.bandExtraFlag = np.zeros(self.bands.size, dtype=np.bool)
         for i in xrange(self.bands.size):
             if (self.bands[i] in self.fitBands):
-                self.bandRequired[i] = True
+                self.bandRequiredFlag[i] = True
             if (self.extraBands.size > 0):
                 if (self.bands[i] in self.extraBands):
-                    self.bandExtra[i] = True
+                    self.bandExtraFlag[i] = True
                 if (self.bands[i] in self.fitBands and
                     self.bands[i] in self.extraBands):
                     raise ValueError("Cannot have the same band as fit and extra")
+
 
         # and check the star color cuts and replace with indices...
         #  note that self.starColorCuts is a copy so that we don't overwrite.
@@ -365,7 +439,7 @@ class FgcmConfig(object):
         with open(configFile) as f:
             configDict = yaml.load(f)
 
-        ##self.fgcmLog.log('INFO','Configuration read from %s' % (configFile))
+        ##self.fgcmLog.info('Configuration read from %s' % (configFile))
         print("Configuration read from %s" % (configFile))
 
         return configDict

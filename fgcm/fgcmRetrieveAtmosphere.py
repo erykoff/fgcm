@@ -21,7 +21,7 @@ class FgcmRetrieveAtmosphere(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing fgcmRetrieveAtmosphere')
+        self.fgcmLog.info('Initializing fgcmRetrieveAtmosphere')
 
         self.fgcmLUT = fgcmLUT
         self.fgcmPars = fgcmPars
@@ -38,7 +38,7 @@ class FgcmRetrieveAtmosphere(object):
     def r1ToPWV(self, fgcmRetrieval, doPlots=True):
         """
         """
-        self.fgcmLog.log('INFO','Retrieving PWV Values...')
+        self.fgcmLog.info('Retrieving PWV Values...')
 
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         # Note that at this point it doesn't matter if we use the input or not
@@ -296,12 +296,12 @@ class FgcmRetrieveAtmosphere(object):
 
 
         # and we're done!  Everything is filled in!
-        self.fgcmLog.log('INFO','Done computing retrieved PWV values')
+        self.fgcmLog.info('Done computing retrieved PWV values')
 
     def r0ToNightlyTau(self, fgcmRetrieval, doPlots=True):
         """
         """
-        self.fgcmLog.log('INFO','Retrieving Nightly Tau Values...')
+        self.fgcmLog.info('Retrieving Nightly Tau Values...')
 
         #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
 
@@ -354,7 +354,7 @@ class FgcmRetrieveAtmosphere(object):
                                           rev=True, min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
-            self.fgcmLog.log('INFO', 'Found %d nights to retrieve tau in %s band' %
+            self.fgcmLog.info( 'Found %d nights to retrieve tau in %s band' %
                              (gd.size, tauBands[i]))
 
             for j in xrange(gd.size):
@@ -414,7 +414,7 @@ class FgcmRetrieveAtmosphere(object):
         """
         """
 
-        self.fgcmLog.log('INFO', 'Retrieving nightly Tau values...')
+        self.fgcmLog.info( 'Retrieving nightly Tau values...')
 
         expGray = snmm.getArray(fgcmGray.expGrayHandle)
 
@@ -494,7 +494,7 @@ class FgcmRetrieveAtmosphere(object):
                                           rev=True, min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
-            self.fgcmLog.log('INFO', 'Found %d nights to retrieve tau in %s band' %
+            self.fgcmLog.info( 'Found %d nights to retrieve tau in %s band' %
                              (gd.size, tauBands[i]))
 
             for j in xrange(gd.size):

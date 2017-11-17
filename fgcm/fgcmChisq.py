@@ -28,7 +28,8 @@ class FgcmChisq(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.log('INFO','Initializing FgcmChisq')
+        #self.fgcmLog.log('INFO','Initializing FgcmChisq')
+        self.fgcmLog.info('Initializing FgcmChisq')
 
         # does this need to be shm'd?
         self.fgcmPars = fgcmPars
@@ -45,6 +46,9 @@ class FgcmChisq(object):
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
 
+        # these are the standard *band* I10s
+        self.I10StdBand = fgcmConfig.I10StdBand
+
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
         else:
@@ -54,7 +58,8 @@ class FgcmChisq(object):
 
         # this is the default number of parameters
         self.nActualFitPars = self.fgcmPars.nFitPars
-        self.fgcmLog.log('INFO','Default: fit %d parameters.' % (self.nActualFitPars))
+        #self.fgcmLog.log('INFO','Default: fit %d parameters.' % (self.nActualFitPars))
+        self.fgcmLog.info('Default: fit %d parameters.' % (self.nActualFitPars))
 
         self.clearMatchCache()
 
@@ -82,15 +87,15 @@ class FgcmChisq(object):
         self.useMatchCache = useMatchCache
         self.includeReserve = includeReserve
 
-        self.fgcmLog.log('DEBUG','FgcmChisq: computeDerivatives = %d' %
+        self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
-        self.fgcmLog.log('DEBUG','FgcmChisq: computeSEDSlopes = %d' %
+        self.fgcmLog.debug('FgcmChisq: computeSEDSlopes = %d' %
                          (int(computeSEDSlopes)))
-        self.fgcmLog.log('DEBUG','FgcmChisq: fitterUnits = %d' %
+        self.fgcmLog.debug('FgcmChisq: fitterUnits = %d' %
                          (int(fitterUnits)))
-        self.fgcmLog.log('DEBUG','FgcmChisq: allExposures = %d' %
+        self.fgcmLog.debug('FgcmChisq: allExposures = %d' %
                          (int(allExposures)))
-        self.fgcmLog.log('DEBUG','FgcmChisq: includeReserve = %d' %
+        self.fgcmLog.debug('FgcmChisq: includeReserve = %d' %
                          (int(includeReserve)))
 
         startTime = time.time()
@@ -116,7 +121,7 @@ class FgcmChisq(object):
         else:
             goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
 
-        self.fgcmLog.log('INFO','Found %d good stars for chisq' % (goodStars.size))
+        self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -130,13 +135,13 @@ class FgcmChisq(object):
 
         if (self.useMatchCache and self.matchesCached) :
             # we have already done the matching
-            self.fgcmLog.log('INFO','Retrieving cached matches')
+            self.fgcmLog.info('Retrieving cached matches')
             goodObs = self.goodObs
             goodStarsSub = self.goodStarsSub
         else:
             # we need to do matching
             preStartTime=time.time()
-            self.fgcmLog.log('INFO','Pre-matching stars and observations...')
+            self.fgcmLog.info('Pre-matching stars and observations...')
             goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
                                                            obsObjIDIndex,
                                                            presorted=True)
@@ -156,11 +161,11 @@ class FgcmChisq(object):
             goodObs=goodObs[gd]
             goodStarsSub=goodStarsSub[gd]
 
-            self.fgcmLog.log('INFO','Pre-matching done in %.1f sec.' %
+            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                              (time.time() - preStartTime))
 
             if (self.useMatchCache) :
-                self.fgcmLog.log('INFO','Caching matches for next iteration')
+                self.fgcmLog.info('Caching matches for next iteration')
                 self.matchesCached = True
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
@@ -220,10 +225,10 @@ class FgcmChisq(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            self.fgcmLog.log('INFO','Using %d sections (%.1f seconds)' %
+            self.fgcmLog.info('Using %d sections (%.1f seconds)' %
                              (nSections,time.time()-prepStartTime))
 
-            self.fgcmLog.log('INFO','Running chisq on %d cores' % (self.nCore))
+            self.fgcmLog.info('Running chisq on %d cores' % (self.nCore))
 
             # make a pool
             pool = Pool(processes=self.nCore)
@@ -246,7 +251,7 @@ class FgcmChisq(object):
                 nonZero, = np.where(partialSums[self.fgcmPars.nFitPars:
                                                     2*self.fgcmPars.nFitPars] > 0)
                 self.nActualFitPars = nonZero.size
-                self.fgcmLog.log('INFO','Actually fit %d parameters.' % (self.nActualFitPars))
+                self.fgcmLog.info('Actually fit %d parameters.' % (self.nActualFitPars))
 
             fitDOF = partialSums[-1] - float(self.nActualFitPars)
 
@@ -260,7 +265,7 @@ class FgcmChisq(object):
             # want to append this...
             self.fitChisqs.append(fitChisq)
 
-            self.fgcmLog.log('INFO','Chisq/dof = %.2f (%d iterations)' %
+            self.fgcmLog.info('Chisq/dof = %.2f (%d iterations)' %
                              (fitChisq, len(self.fitChisqs)))
 
         else:
@@ -273,7 +278,7 @@ class FgcmChisq(object):
         for key in self.totalHandleDict.keys():
             snmm.freeArray(self.totalHandleDict[key])
 
-        self.fgcmLog.log('INFO','Chisq computation took %.2f seconds.' %
+        self.fgcmLog.info('Chisq computation took %.2f seconds.' %
                          (time.time() - startTime))
 
         self.fgcmStars.magStdComputed = True
@@ -300,9 +305,6 @@ class FgcmChisq(object):
         else:
             thisCore = multiprocessing.current_process()._identity[0]
 
-        self.fgcmLog.log('DEBUG','chisq %d: running with %d observations of %d stars' %
-                         (thisCore,goodObs.size,goodStars.size),printOnly=True)
-
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanNoChrom = snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
@@ -313,6 +315,7 @@ class FgcmChisq(object):
 
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
         obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
@@ -328,6 +331,7 @@ class FgcmChisq(object):
         # cut these down now, faster later
         obsObjIDIndexGO = obsObjIDIndex[goodObs]
         obsBandIndexGO = obsBandIndex[goodObs]
+        obsLUTFilterIndexGO = obsLUTFilterIndex[goodObs]
         obsExpIndexGO = obsExpIndex[goodObs]
         obsSecZenithGO = obsSecZenith[goodObs]
         obsCCDIndexGO = obsCCDIndex[goodObs]
@@ -340,7 +344,7 @@ class FgcmChisq(object):
         # add GO to index names that are cut to goodObs
         # add GOF to index names that are cut to goodObs[obsFitUseGO]
 
-        lutIndicesGO = self.fgcmLUT.getIndices(obsBandIndexGO,
+        lutIndicesGO = self.fgcmLUT.getIndices(obsLUTFilterIndexGO,
                                                self.fgcmPars.expPWV[obsExpIndexGO],
                                                self.fgcmPars.expO3[obsExpIndexGO],
                                                #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
@@ -412,7 +416,7 @@ class FgcmChisq(object):
                                                obsBandIndexGO] * I10GO) /
                                   (1.0 + objSEDSlope[obsObjIDIndexGO,
                                                      obsBandIndexGO] *
-                                   self.fgcmLUT.I10Std[obsBandIndexGO]))
+                                   self.I10StdBand[obsBandIndexGO]))
 
         if self.noChromaticCorrections:
             # NOT RECOMMENDED
@@ -967,10 +971,6 @@ class FgcmChisq(object):
 
         totalArr = snmm.getArray(self.totalHandleDict[thisCore])
         totalArr[:] = totalArr[:] + partialArray
-
-        self.fgcmLog.log('DEBUG','chisq %d: done in %.1f seconds.' %
-                         (thisCore,time.time() - workerStartTime),printOnly=True)
-
 
         # and we're done
         return None
