@@ -942,7 +942,7 @@ class FgcmStars(object):
 
         import fitsio
 
-        self.fgcmLog.log('INFO', 'Saving standard stars to %s' % (starFile))
+        self.fgcmLog.info( 'Saving standard stars to %s' % (starFile))
 
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
@@ -960,7 +960,7 @@ class FgcmStars(object):
 
         # this doesn't work because we'd have to recompute all the mags
         # this is more honest about what stars are actually well measured
-        
+
         #self.selectStarsMinObsExpIndex(goodExpsIndex, minPerBand=1, temporary=True)
 
         rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
