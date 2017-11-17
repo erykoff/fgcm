@@ -305,9 +305,6 @@ class FgcmChisq(object):
         else:
             thisCore = multiprocessing.current_process()._identity[0]
 
-        #self.fgcmLog.log('DEBUG','chisq %d: running with %d observations of %d stars' %
-        #                 (thisCore,goodObs.size,goodStars.size),printOnly=True)
-
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanNoChrom = snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
@@ -974,10 +971,6 @@ class FgcmChisq(object):
 
         totalArr = snmm.getArray(self.totalHandleDict[thisCore])
         totalArr[:] = totalArr[:] + partialArray
-
-        #self.fgcmLog.log('DEBUG','chisq %d: done in %.1f seconds.' %
-        #                 (thisCore,time.time() - workerStartTime),printOnly=True)
-
 
         # and we're done
         return None
