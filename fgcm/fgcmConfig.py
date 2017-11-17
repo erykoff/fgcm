@@ -232,9 +232,9 @@ class FgcmConfig(object):
         if (self.experimentalMode) :
             self.fgcmLog.info('ExperimentalMode set to True')
         if (self.resetParameters) :
-            self.fgcmLog.log('INFO','Will reset atmosphere parameters')
+            self.fgcmLog.info('Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
-            self.fgcmLog.log('INFO','WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+            self.fgcmLog.info('WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
         #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
         #                                            self.cycleNumber)
