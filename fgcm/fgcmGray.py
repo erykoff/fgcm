@@ -314,6 +314,37 @@ class FgcmGray(object):
         self.fgcmLog.info('FgcmGray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
 
+        # HACK THIS TEMPORARILY
+        if (1 == 0):
+            import fitsio
+
+            # we need to have an exposure cut!  Aieee!
+            gdTemp,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
+                             (obsFlag[goodObs] == 0))
+
+
+            tempCat = np.zeros(gdTemp.size, dtype=[('EGRAY','f4'),
+                                                   ('EGRAYERR2','f4'),
+                                                   ('BANDINDEX','i2'),
+                                                   ('CCDINDEX','i2'),
+                                                   ('EXPINDEX','i4'),
+                                                   ('EPOCHINDEX','i2'),
+                                                   ('X','f4'),
+                                                   ('Y','f4')])
+            tempCat['EGRAY'][:] = EGrayGO[gdTemp]
+            tempCat['EGRAYERR2'][:] = EGrayErr2GO[gdTemp]
+            tempCat['BANDINDEX'][:] = obsBandIndex[goodObs[gdTemp]]
+            tempCat['CCDINDEX'][:] = obsCCDIndex[goodObs[gdTemp]]
+            tempCat['EXPINDEX'][:] = obsExpIndex[goodObs[gdTemp]]
+
+            tempCat['EPOCHINDEX'][:] = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[gdTemp]]]
+
+            obsX = snmm.getArray(self.fgcmStars.obsXHandle)
+            obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+            tempCat['X'][:] = obsX[goodObs[gdTemp]]
+            tempCat['Y'][:] = obsY[goodObs[gdTemp]]
+
+            fitsio.write('temporary_egray_xy.fits', tempCat, clobber=True)
 
 
 
@@ -402,6 +433,7 @@ class FgcmGray(object):
 
 
         # need at least 3 or else computation can blow up
+        # FIXME: pay attention to negatives here!
         gd = np.where(ccdNGoodStars > 2)
         ccdGray[gd] /= ccdGrayWt[gd]
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
@@ -410,7 +442,7 @@ class FgcmGray(object):
         self.fgcmLog.info('Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
-        bad = np.where(ccdNGoodStars < 2)
+        bad = np.where(ccdNGoodStars <= 2)
         ccdGray[bad] = self.illegalValue
         ccdGrayRMS[bad] = self.illegalValue
         ccdGrayErr[bad] = self.illegalValue
