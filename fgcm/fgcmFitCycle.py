@@ -347,6 +347,13 @@ class FgcmFitCycle(object):
                                        self.fgcmRetrieval)
         self.fgcmZpts.computeZeropoints()
 
+        # And finally compute the stars and test repeatability *after* the crunch
+        self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch')
+        _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
+                           fgcmGray=self.fgcmGray)
+
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False,crunch=True)
+
         self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
         if (self.useFits):
@@ -374,6 +381,7 @@ class FgcmFitCycle(object):
                                                           self.fgcmConfig.outfileBase,
                                                           self.fgcmConfig.cycleNumber+1)
             self.fgcmConfig.saveConfigForNextCycle(outConfFile,outParFile,outFlagStarFile)
+
 
         # and make map of coverage
 
