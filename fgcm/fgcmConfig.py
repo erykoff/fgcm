@@ -161,6 +161,11 @@ class FgcmConfig(object):
         else:
             self.noChromaticCorrections = False
 
+        if 'expGrayCheckDeltaT' in configDict:
+            self.expGrayCheckDeltaT = configDict['expGrayCheckDeltaT']
+        else:
+            self.expGrayCheckDeltaT = 10./(24.*60.)
+
         if (self.expGrayRecoverCut > self.expGrayPhotometricCut.min()) :
             raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
         if (self.expVarGrayPhotometricCut <= 0.0):
