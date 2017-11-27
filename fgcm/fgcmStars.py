@@ -113,7 +113,7 @@ class FgcmStars(object):
         obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
 
         if (self.inFlagStarFile is not None):
-            self.fgcmLog.info( 'Reading in list of previous flagged stars from %s' %
+            self.fgcmLog.info('Reading in list of previous flagged stars from %s' %
                              (self.inFlagStarFile))
 
             inFlagStars = fitsio.read(self.inFlagStarFile, ext=1)
@@ -125,6 +125,13 @@ class FgcmStars(object):
             flagFlag = None
 
         # FIXME: add support to x/y from fits files
+        if ('X' in obs.dtype.names and 'Y' in obs.dtype.names):
+            self.fgcmLog.info('Found X/Y in input observations')
+            obsX = obs['X']
+            obsY = obs['Y']
+        else:
+            obsX = None
+            obsY = None
 
         # process
         self.loadStars(fgcmPars,
@@ -140,8 +147,8 @@ class FgcmStars(object):
                        pos['DEC'],
                        pos['OBSARRINDEX'],
                        pos['NOBS'],
-                       obsX=None,
-                       obsY=None,
+                       obsX=obsX,
+                       obsY=obsY,
                        flagID=flagID,
                        flagFlag=flagFlag,
                        computeNobs=computeNobs)
