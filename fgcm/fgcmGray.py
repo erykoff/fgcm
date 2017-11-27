@@ -505,7 +505,7 @@ class FgcmGray(object):
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
 
         # set illegal value for non-measurements
-        bad, = np.where(expNGoodCCDs < 2)
+        bad, = np.where(expNGoodCCDs <= 2)
         expGray[bad] = self.illegalValue
         expGrayRMS[bad] = self.illegalValue
         expGrayErr[bad] = self.illegalValue
