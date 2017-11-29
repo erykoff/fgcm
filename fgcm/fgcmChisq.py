@@ -49,6 +49,8 @@ class FgcmChisq(object):
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
 
+        self.illegalValue = fgcmConfig.illegalValue
+
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
         else:
@@ -72,7 +74,7 @@ class FgcmChisq(object):
         self.goodObs = None
         self.goodStarsSub = None
 
-    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,debug=False,allExposures=False,includeReserve=False):
+    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
         """
         """
 
@@ -86,6 +88,7 @@ class FgcmChisq(object):
         self.allExposures = allExposures
         self.useMatchCache = useMatchCache
         self.includeReserve = includeReserve
+        self.fgcmGray = fgcmGray    # may be None
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -323,6 +326,13 @@ class FgcmChisq(object):
         obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
+        # and fgcmGray stuff (if desired)
+        if (self.fgcmGray is not None):
+            ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
+            # this is ccdGray[expIndex, ccdIndex]
+            # and we only apply when > self.illegalValue
+            # same sign as FGCM_DUST (QESys)
+
         # and the arrays for locking access
         objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
         obsMagStdLock = snmm.getArrayBase(self.fgcmStars.obsMagStdHandle).get_lock()
@@ -374,6 +384,13 @@ class FgcmChisq(object):
         qeSysGO = self.fgcmPars.expQESys[obsExpIndexGO]
 
         obsMagGO = obsMagADU[goodObs] + 2.5*np.log10(I0GO) + qeSysGO
+
+        if (self.fgcmGray is not None):
+            # We want to apply the "CCD Gray Crunch"
+            # make sure we aren't adding something crazy, but this shouldn't happen
+            # because we're filtering good observations (I hope!)
+            ok,=np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
+            obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
 
         # this is annoying that we have to do this.
         obsMagErr2GO = obsMagADUErr[goodObs]**2.

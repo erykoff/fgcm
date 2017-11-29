@@ -40,7 +40,7 @@ class FgcmSigFgcm(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
 
-    def computeSigFgcm(self,reserved=False,doPlots=True,save=True):
+    def computeSigFgcm(self,reserved=False,doPlots=True,save=True,crunch=False):
         """
         """
 
@@ -119,6 +119,7 @@ class FgcmSigFgcm(object):
         gmiCutNames = ['All','Blue25','Middle50','Red25']
 
         for bandIndex in xrange(self.fgcmStars.nBands):
+            started=False
             for c in xrange(gmiCutLow.size):
                 if (bandIndex in self.fgcmStars.bandRequiredIndex):
                     sigUse,=np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray) &
@@ -187,6 +188,17 @@ class FgcmSigFgcm(object):
                     extraName = 'reserved'
                 else:
                     extraName = 'all'
+
+                if crunch:
+                    extraName += '_crunched'
+
+                ax.set_title(extraName)
+
+                if (not started):
+                    started=True
+                    plotXRange = ax.get_xlim()
+                else:
+                    ax.set_xlim(plotXRange)
 
                 fig.savefig('%s/%s_sigfgcm_%s_%s_%s.png' % (self.plotPath,
                                                             self.outfileBaseWithCycle,

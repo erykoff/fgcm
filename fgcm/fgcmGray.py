@@ -46,6 +46,7 @@ class FgcmGray(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
+        self.expGrayCheckDeltaT = fgcmConfig.expGrayCheckDeltaT
         #self.varNSig = fgcmConfig.varNSig
         #self.varMinBand = fgcmConfig.varMinBand
 
@@ -504,7 +505,7 @@ class FgcmGray(object):
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
 
         # set illegal value for non-measurements
-        bad, = np.where(expNGoodCCDs < 2)
+        bad, = np.where(expNGoodCCDs <= 2)
         expGray[bad] = self.illegalValue
         expGrayRMS[bad] = self.illegalValue
         expGrayErr[bad] = self.illegalValue
@@ -635,3 +636,47 @@ class FgcmGray(object):
         fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle))
 
+        # And plot correlations of EXP^gray between pairs of bands
+        for ind in xrange(self.fgcmStars.bandRequiredIndex.size-1):
+            bandIndex0 = self.fgcmStars.bandRequiredIndex[ind]
+            bandIndex1 = self.fgcmStars.bandRequiredIndex[ind+1]
+
+            use0, = np.where((self.fgcmPars.expBandIndex == bandIndex0) &
+                             (self.fgcmPars.expFlag == 0))
+            use1, = np.where((self.fgcmPars.expBandIndex == bandIndex1) &
+                             (self.fgcmPars.expFlag == 0))
+
+            if use0.size == 0 or use1.size == 0:
+                self.fgcmLog.info('Could not find photometric exposures in bands %d or %d' % (bandIndex0, bandIndex1))
+                continue
+
+            matchInd = np.clip(np.searchsorted(self.fgcmPars.expMJD[use0],
+                                               self.fgcmPars.expMJD[use1]),
+                               0,
+                               use0.size-1)
+
+            ok,=np.where(np.abs(self.fgcmPars.expMJD[use0[matchInd]] -
+                                self.fgcmPars.expMJD[use1]) < self.expGrayCheckDeltaT)
+
+            if ok.size == 0:
+                self.fgcmLog.info('Could not find any matched exposures between bands %s and %s within %.2f minutes' %
+                                  self.fgcmPars.bands[bandIndex0],
+                                  self.fgcmPars.bands[bandIndex1],
+                                  self.expGrayCheckDeltaT * 24 * 60)
+                continue
+
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+
+            ax=fig.add_subplot(111)
+
+            ax.hexbin(expGray[use0[matchInd[ok]]],
+                      expGray[use1[ok]], bins='log')
+            ax.set_xlabel('EXP_GRAY (%s)' % (self.fgcmPars.bands[bandIndex0]))
+            ax.set_ylabel('EXP_GRAY (%s)' % (self.fgcmPars.bands[bandIndex1]))
+            ax.plot([-0.01,0.01],[-0.01,0.01],'r--')
+
+            fig.savefig('%s/%s_expgray_compare_%s_%s.png' % (self.plotPath,
+                                                             self.outfileBaseWithCycle,
+                                                             self.fgcmPars.bands[bandIndex0],
+                                                             self.fgcmPars.bands[bandIndex1]))
