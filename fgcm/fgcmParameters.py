@@ -106,6 +106,9 @@ class FgcmParameters(object):
         self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
 
+        # this is a constant for now (a,x,y,x**2,y**2,xy)
+        self.superStarNPar = 6
+
         # and the default unit dict
         self.unitDictOnes = {'pwvUnit':1.0,
                              'pwvPerSlopeUnit':1.0,
@@ -190,8 +193,7 @@ class FgcmParameters(object):
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
-        #self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
-        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD),dtype=np.float32)
+        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -1170,6 +1172,7 @@ class FgcmParameters(object):
         else:
             return self.unitDictOnes
 
+    # FIXME....
     @property
     def expCCDSuperStar(self):
         """
