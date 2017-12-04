@@ -5,25 +5,27 @@ import os
 import sys
 import esutil
 import time
+import scipy.optimize
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
-
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from fgcmUtilities import poly2dFunc
 
 class FgcmSuperStarFlat(object):
     """
     """
-    def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
+    def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmGray):
 
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.info('Initializing FgcmSuperStarFlat')
 
         self.fgcmPars = fgcmPars
 
+        self.fgcmStars = fgcmStars
         self.fgcmGray = fgcmGray
 
         self.illegalValue = fgcmConfig.illegalValue
@@ -33,7 +35,312 @@ class FgcmSuperStarFlat(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.epochNames = fgcmConfig.epochNames
 
-    def computeSuperStarFlats(self,doPlots=True):
+        self.superStarSubCCD = fgcmConfig.superStarSubCCD
+
+    def computeSuperStarFlats(self, doPlots=True):
+        """
+        """
+
+        startTime = time.time()
+        self.fgcmLog.info('Computing superstarflats')
+
+        # New version, use the stars directly
+        objID = snmm.getArray(self.fgcmStars.objIDHandle)
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+
+        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+
+        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+
+        # make sure we have enough obervations per band
+        #  (this may be redundant)
+        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
+
+        # select good stars...
+        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+                              (objFlag == 0))
+
+        # match the good stars to the observations
+        _,goodObs = esutil.numpy_util.match(goodStars,
+                                            obsObjIDIndex,
+                                            presorted=True)
+
+        # and filter out bad observations, non-photometric, etc
+        gd,=np.where((obsFlag[goodObs] == 0) &
+                     (self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0))
+        goodObs = goodObs[gd]
+
+        # we need to compute E_gray == <mstd> - mstd for each observation
+        # compute EGray, GO for Good Obs
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        if (onlyObsErr):
+            # only obs error ... use this option when doing initial guess at superstarflat
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            # take into account correlated average mag error
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+
+        # one more cut on the maximum error
+        gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
+        goodObs=goodObs[gd]
+        EGrayGO=EGrayGO[gd]
+        EGrayErr2GO=EGrayErr2GO[gd]
+
+        # We need to unapply the input superstar correction!
+
+        # and record the deltas (per ccd)
+        prevSuperStarFlatCenter = np.zeros((self.fgcmPars.nEpochs,
+                                            self.fgcmPars.nLUTFilter,
+                                            self.fgcmPars.nCCD))
+        superStarFlatCenter = np.zeros_like(prevSuperStarFlatCenter)
+        superStarNGoodStars = np.zeros_like(prevSuperStarFlatCenter, dtype=np.int32)
+
+        # and the mean and sigma over the focal plane for reference
+        superStarFlatFPMean = np.zeros((self.fgcmPars.nEpochs,
+                                        self.fgcmPars.nLUTFilter))
+        superStarFlatFPSigma = np.zeros_like(superStarFlatFPMean)
+        deltaSuperStarFlatFPMean = np.zeros_like(superStarFlatFPMean)
+        deltaSuperStarFlatFPSigma = np.zeros_like(superStarFlatFPMean)
+
+
+        # Note that we use the poly2dFunc even when the previous numbers
+        #  were just an offset, because the other terms are zeros
+        for e in xrange(self.fgcmPars.nEpochs):
+            for f in xrange(self.fgcmPars.nLUTFilter):
+                for c in xrange(self.fgcmPars.nCCD):
+                    xy = np.vstack(self.ccdOffsets['X_SIZE'][c]/2.,
+                                   self.ccdOffsets['Y_SIZE'][c]/2.)
+                    prevSuperStarFlatCenter[e, f, c] = poly2dFunc(xy,
+                                                                *self.fgcmPars.parSuperStarFlat[e, f, c, :])
+
+        if not self.superStarSubCCD:
+            # no x/y sub-ccd info
+
+            # Next, we sort by epoch, band
+            superStarWt = np.zeros_like(superStarFlatCenter)
+            superStarOffset = np.zeros_like(superStarWt)
+
+            # need separate for required bands and extra bands for which stars to use
+            _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
+                                                   obsBandIndex[goodObs])
+
+            np.add.at(superStarWt,
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       obsCCDIndex[goodObs[reqBandUse]]),
+                      1./EGrayErr2GO[reqBandUse])
+            np.add.at(superStarOffset,
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       obsCCDIndex[goodObs[reqBandUse]]),
+                      EGrayGO[reqBandUse]/EGrayErr2GO[reqBandUse])
+            np.add.at(superStarNGoodStars,
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
+                       obsCCDIndex[goodObs[reqBandUse]]),
+                      1)
+
+            for extraBandIndex in self.fgcmStars.bandExtraIndex:
+                extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
+                                         (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
+                                          self.fgcmStars.minPerBand))
+                np.add.at(superStarWt,
+                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           obsCCDIndex[goodObs[extraBandUse]]),
+                          1./EGrayErr2GO[extraBandUse])
+                np.add.at(superStarOffset,
+                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           obsCCDIndex[goodObs[extraBandUse]]),
+                          EGrayGO[extraBandUse]/EGrayErr2GO[extraBandUse])
+                np.add.at(superStarNGoodStars,
+                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
+                           obsCCDIndex[goodObs[extraBandUse]]),
+                      1)
+
+            gd = np.where(superStarNGoodStars > 2)
+            superStarOffset[gd] /= superStarOffset[wt]
+
+            # and this is the same as the numbers for the center
+            superStarFlatCenter[:,:,:] = superStarOffset[:,:,:]
+
+            # and record...
+
+            self.fgcmPars.parSuperStarFlat[:,:,:,0] = superStarOffset
+
+        else:
+            # with x/y, new sub-ccd
+            obsX = snmm.getArray(self.fgcmStars.obsXHandle)
+            obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+
+            obsXGO = obsX[goodObs]
+            obsYGO = obsY[goodObs]
+
+            # need to histogram this all up.  Watch for extra bands
+
+            epochFilterHash = (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]]*
+                               (self.fgcmPars.nLUTFilter+1)*(self.fgcmPars.nCCD+1) +
+                               self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]]*
+                               (self.fgcmPars.nCCD+1) +
+                               obsCCDIndex[goodObs])
+
+            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+            for i in xrange(h.size):
+                if h[i] == 0: continue
+
+                i1a = rev[rev[i]:rev[i+1]]
+
+                # get the indices for this epoch/filter/ccd
+                epInd = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[i1a[0]]]]
+                fiInd = self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[i1a[0]]]]
+                cInd = obsCCDIndex[goodObs[i1a[0]]]
+
+                # check if this is an extra band and needs caution
+                bInd = obsBandIndex[goodObs[i1a[0]]]
+                if bInd in self.fgcmStars.bandExtraIndex:
+                    extraBandUse, = np.where(objNGoodObs[obsObjIDIndex[goodObs[i1a]], bInd] >=
+                                             self.fgcmStars.minPerBand)
+                    if extraBandUse.size == 0:
+                        continue
+
+                    i1a = i1a[extraBandUse]
+
+                try:
+                    fit, cov = scipy.optimize.curve_fit(poly2dFunc,
+                                                        np.vstack((obsXGO[i1a],
+                                                                   obsYGO[i1a])),
+                                                        EGrayGO[i1a],
+                                                        p0=[0.0,0.0,0.0,0.0,0.0,0.0],
+                                                        sigma=np.sqrt(EGrayErr2GO[i1a]))
+                except:
+                    print("Warning: fit failed to converge (%d, %d, %d), setting to mean"
+                          % (epInd, fiInd, cInd))
+                    fit = np.zeros(6)
+                    fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
+                              np.sum(1./EGrayErr2GO[i1a]))
+
+                superStarNGoodStars[epInd, fiInd, cInd] = i1a.size
+
+
+                # compute the central value for use with the delta
+                xy = np.vstack(self.ccdOffsets['X_SIZE'][cInd]/2.,
+                               self.ccdOffsets['Y_SIZE'][cInd]/2.)
+                superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
+                                                                     *fit)
+
+                # and record the fit
+
+                self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = fit
+
+        # compute the delta...
+        deltaSuperStarFlatCenter = superStarFlatCenter - prevSuperStarFlatCenter
+
+        # and the overall stats...
+        for e in xrange(self.fgcmPars.nEpochs):
+            for f in xrange(self.fgcmPars.nLUTFilter):
+                use,=np.where(superStarNGoodStars[e, f, :] > 0)
+
+                if use.size < 3:
+                    continue
+
+                superStarFlatFPMean[e, f] = np.mean(superStarFlatCenter[e, f, use])
+                superStarFlatFPSigma[e, f] = np.std(superStarFlatCenter[e, f, use])
+                deltaSuperStarFlatFPMean[e, f] = np.mean(deltaSuperStarFlatCenter[e, f, use])
+                deltaSuperStarFlatFPSigma[e, f] = np.std(deltaSuperStarFlatCenter[e, f, use])
+
+                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4  Delta: %.4f +/- %.4' %
+                                  (e, self.fgcmPars.lutFilterNames[f],
+                                   superStarFlatFPMean[e, f], superStarFlatFPSigma[e, f],
+                                   deltaSuperStarFlatFPMean[e, f], deltaSuperStarFlatFPSigma[e, f]))
+
+        self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
+                          (time.time() - startTime))
+
+        if doPlots:
+            self.fgcmLog.info('Making SuperStarFlat plots')
+
+            # can we do a combined plot?  Two panel?  I think that would be
+            #  better, but I'm worried about the figure sizes
+            self.plotSuperStarFlatsAndDelta(self.fgcmPars.parSuperStarFlat,
+                                            deltaSuperStarFlat,
+                                            superStarNGoodStars,
+                                            superStarFlatFPMean, superStarFlatFPSigma,
+                                            deltaSuperStarFlatFPMean, deltaSuperStarFlatFPSigma)
+
+    def plotSuperStarFlatsAndDelta(self, superStarPars, deltaSuperStar, superStarNGoodStars,
+                                   superStarFlatFPMean, superStarFlatFPSigma,
+                                   deltaSuperStarFlatFPMean, deltaSuperStarFlatFPSigma):
+        """
+        """
+
+        from fgcmUtilities import plotCCDMap
+
+        for e in xrange(self.fgcmPars.nEpochs):
+            for f in xrange(self.fgcmPars.nLUTFilter):
+                use, = np.where(superStarNGoodStars[e, f, :] > 0)
+
+                if use.size == 0:
+                    continue
+
+                # double-wide.  Don't give number because that was dumb
+                fig=plt.figure(figsize=(16,6))
+                fig.clf()
+
+                # left side plot the map with x/y
+                ax=fig.add_subplot(121)
+
+
+                # and annotate
+
+                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
+                    r'%.4f +/- %.4f' % (superStarFlatFPMean[e,f],
+                                        superStarFlatFPSigma[e,f])
+                ax.annotate(text,
+                            (0.1,0.93),xycoords='axes fraction',
+                            ha='left',va='top',fontsize=18)
+
+                # right side plot the deltas
+                ax=fig.add_subplot(122)
+
+                plotCCDMap(ax, self.ccdOffsets[use], deltaSuperStar[e,f,use],
+                           'Central Delta-SuperStar (mag)')
+
+                # and annotate
+                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
+                    r'%.4f +/- %.4f' % (deltaSuperStarFlatFPMean[e,f],
+                                        deltaSuperStarFlatFPSigma[e,f])
+                ax.annotate(text,
+                            (0.1,0.93),xycoords='axes fraction',
+                            ha='left',va='top',fontsize=18)
+
+                fig.tight_layout()
+
+                fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
+                                                    self.outfileBaseWithCycle,
+                                                    'superstar',
+                                                    self.fgcmPars.lutFilterNames[f],
+                                                    self.epochNames[e]))
+
+
+
+
+    def computeSuperStarFlatsOrig(self,doPlots=True):
         """
         """
 
