@@ -61,6 +61,8 @@ class FgcmStars(object):
         self.lutFilterNames = fgcmConfig.lutFilterNames
         self.filterToBand = fgcmConfig.filterToBand
 
+        self.superStarSubCCD = fgcmConfig.superStarSubCCD
+
         #self.expArray = fgcmPars.expArray
 
         #self._loadStars(fgcmPars)
@@ -207,6 +209,10 @@ class FgcmStars(object):
             self.obsXHandle = snmm.createArray(self.nStarObs,dtype='f4')
             #  obsY: y position on the CCD of the given observation
             self.obsYHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        else:
+            # hasXY = False
+            if self.superStarSubCCD:
+                raise ValueError("Input stars do not have x/y but superStarSubCCD is set.")
 
         snmm.getArray(self.obsExpHandle)[:] = obsExp
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
@@ -869,6 +875,8 @@ class FgcmStars(object):
             objFlag[bad] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
+
+    # FIXME
 
     def applySuperStarFlat(self,fgcmPars):
         """
