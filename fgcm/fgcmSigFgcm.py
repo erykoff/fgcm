@@ -152,13 +152,17 @@ class FgcmSigFgcm(object):
 
                 coeff = histoGauss(ax, EGrayGO[sigUse])
 
-                sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
-                                             np.median(EGrayErr2GO[sigUse]))
-
-                if (not np.isfinite(sigFgcm[bandIndex])):
-                    self.fgcmLog.info("Failed to compute sigFgcm (%s) (%s).  Setting to 0.05?" %
+                if not np.isfinite(coeff[2]):
+                    self.fgcmLog.info("Failed to compute sigFgcm (%s) (%s).  Setting to 0.05" %
                                      (self.fgcmPars.bands[bandIndex],gmiCutNames[c]))
                     sigFgcm[bandIndex] = 0.05
+                elif (np.median(EGrayErr2GO[sigUse]) > coeff[2]**2.):
+                    self.fgcmLog.info("Typical error is larger than width (%s) (%s).  Setting to 0.001" %
+                                      (self.fgcmPars.bands[bandIndex],gmiCutNames[c]))
+                    sigFgcm[bandIndex] = 0.001
+                else:
+                    sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
+                                                 np.median(EGrayErr2GO[sigUse]))
 
                 self.fgcmLog.info("sigFgcm (%s) (%s) = %.4f" % (
                         self.fgcmPars.bands[bandIndex],
