@@ -323,22 +323,32 @@ class FgcmGray(object):
             gdTemp,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
                              (obsFlag[goodObs] == 0))
 
-
             tempCat = np.zeros(gdTemp.size, dtype=[('EGRAY','f4'),
+                                                   ('EGRAYRAW','f4'),
                                                    ('EGRAYERR2','f4'),
                                                    ('BANDINDEX','i2'),
                                                    ('CCDINDEX','i2'),
                                                    ('EXPINDEX','i4'),
                                                    ('EPOCHINDEX','i2'),
+                                                   ('RA','f8'),
+                                                   ('DEC','f8'),
                                                    ('X','f4'),
                                                    ('Y','f4')])
+
             tempCat['EGRAY'][:] = EGrayGO[gdTemp]
             tempCat['EGRAYERR2'][:] = EGrayErr2GO[gdTemp]
             tempCat['BANDINDEX'][:] = obsBandIndex[goodObs[gdTemp]]
             tempCat['CCDINDEX'][:] = obsCCDIndex[goodObs[gdTemp]]
             tempCat['EXPINDEX'][:] = obsExpIndex[goodObs[gdTemp]]
 
+            # remove the superstar
+            tempCat['EGRAYRAW'][:] = tempCat['EGRAY'][:] + self.fgcmPars.expCCDSuperStar[obsExpIndex[goodObs[gdTemp]],obsCCDIndex[goodObs[gdTemp]]]
             tempCat['EPOCHINDEX'][:] = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[gdTemp]]]
+
+            objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+            objDec = snmm.getArray(self.fgcmStars.objDecHandle)
+            tempCat['RA'][:] = objRA[obsObjIDIndex[goodObs[gdTemp]]]
+            tempCat['DEC'][:] = objDec[obsObjIDIndex[goodObs[gdTemp]]]
 
             obsX = snmm.getArray(self.fgcmStars.obsXHandle)
             obsY = snmm.getArray(self.fgcmStars.obsYHandle)
@@ -346,8 +356,6 @@ class FgcmGray(object):
             tempCat['Y'][:] = obsY[goodObs[gdTemp]]
 
             fitsio.write('temporary_egray_xy.fits', tempCat, clobber=True)
-
-
 
         #for bandIndex in xrange(self.fgcmPars.fitBandIndex):
             # which observations are considered for variability checks
@@ -642,9 +650,11 @@ class FgcmGray(object):
             bandIndex1 = self.fgcmStars.bandRequiredIndex[ind+1]
 
             use0, = np.where((self.fgcmPars.expBandIndex == bandIndex0) &
-                             (self.fgcmPars.expFlag == 0))
+                             (self.fgcmPars.expFlag == 0) &
+                             (expGray > self.illegalValue))
             use1, = np.where((self.fgcmPars.expBandIndex == bandIndex1) &
-                             (self.fgcmPars.expFlag == 0))
+                             (self.fgcmPars.expFlag == 0) &
+                             (expGray > self.illegalValue))
 
             if use0.size == 0 or use1.size == 0:
                 self.fgcmLog.info('Could not find photometric exposures in bands %d or %d' % (bandIndex0, bandIndex1))
