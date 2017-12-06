@@ -243,6 +243,7 @@ def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
     return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
 
 def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
+    import matplotlib.pyplot as plt
     import matplotlib.colors as colors
     import matplotlib.cm as cmx
 
@@ -299,11 +300,25 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
                            *parArray[k, :])
 
-        # THIS NEEDS TO BE FIXED FOR BOTH CAMERAS
-        extent = [ccdOffsets['DELTA_RA'][k] + ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_RA'][k] - ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] + ccdOffsets['DEC_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] - ccdOffsets['DEC_SIZE'][k]/2.]
+        if ccdOffsets['XRA'][k]:
+            # x/y reversed on plotting
+            extent = [ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
+        else:
+            extent = [ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
 
         plt.imshow(zGrid.reshape(xValues.size, yValues.size),
                    interpolation='bilinear',
