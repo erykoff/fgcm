@@ -115,6 +115,7 @@ class FgcmConfig(object):
         self.tauRetrievalMinCCDPerNight = configDict['tauRetrievalMinCCDPerNight']
         self.clobber = configDict['clobber']
         self.outputStars = configDict['outputStars']
+        self.superStarSubCCD = configDict['superStarSubCCD']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -346,8 +347,15 @@ class FgcmConfig(object):
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
 
-        # read in the ccd offset file
-        self.ccdOffsets = ccdOffsets
+        # read in the ccd offset file...also append a place to store sign/rotation
+        dtype = ccdOffsets.dtype.descr
+        dtype.extend([('XRA', np.bool),
+                      ('RASIGN', 'i2'),
+                      ('DECSIGN', 'i2')])
+
+        self.ccdOffsets = np.zeros(ccdOffsets.size, dtype=dtype)
+        for name in ccdOffsets.dtype.names:
+            self.ccdOffsets[name][:] = ccdOffsets[name][:]
 
         # FIXME: check that ccdOffsets has the required information!
 
