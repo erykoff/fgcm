@@ -227,7 +227,7 @@ class FgcmFitCycle(object):
                 self.fgcmGray.computeCCDAndExpGray(onlyObsErr=True)
                 # and average them into superstar flats
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
-                preSuperStarFlat.computeSuperStarFlats(doPlots=False)
+                preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
@@ -324,7 +324,7 @@ class FgcmFitCycle(object):
 
         # Compute SuperStar Flats
         self.fgcmLog.debug('FitCycle computing SuperStarFlats')
-        superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+        superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmGray)
         superStarFlat.computeSuperStarFlats()
 
         self.fgcmLog.info(getMemoryString('After computing superstar flats'))
