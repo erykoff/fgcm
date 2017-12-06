@@ -34,6 +34,9 @@ class FgcmSuperStarFlat(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.epochNames = fgcmConfig.epochNames
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
+        self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
+
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
@@ -53,6 +56,7 @@ class FgcmSuperStarFlat(object):
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsSuperStarApplied = snmm.getArray(self.fgcmStars.obsSuperStarAppliedHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
@@ -85,21 +89,16 @@ class FgcmSuperStarFlat(object):
         EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
                    obsMagStd[goodObs])
 
-        if (onlyObsErr):
-            # only obs error ... use this option when doing initial guess at superstarflat
-            EGrayErr2GO = obsMagErr[goodObs]**2.
-        else:
-            # take into account correlated average mag error
-            EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                           objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        # take into account correlated average mag error
+        EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
         gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
         goodObs=goodObs[gd]
-        EGrayGO=EGrayGO[gd]
+        # unapply input superstar correction here (note opposite sign)
+        EGrayGO=EGrayGO[gd] + obsSuperStarApplied[goodObs]
         EGrayErr2GO=EGrayErr2GO[gd]
-
-        # We need to unapply the input superstar correction!
 
         # and record the deltas (per ccd)
         prevSuperStarFlatCenter = np.zeros((self.fgcmPars.nEpochs,
@@ -118,13 +117,7 @@ class FgcmSuperStarFlat(object):
 
         # Note that we use the poly2dFunc even when the previous numbers
         #  were just an offset, because the other terms are zeros
-        for e in xrange(self.fgcmPars.nEpochs):
-            for f in xrange(self.fgcmPars.nLUTFilter):
-                for c in xrange(self.fgcmPars.nCCD):
-                    xy = np.vstack(self.ccdOffsets['X_SIZE'][c]/2.,
-                                   self.ccdOffsets['Y_SIZE'][c]/2.)
-                    prevSuperStarFlatCenter[e, f, c] = poly2dFunc(xy,
-                                                                *self.fgcmPars.parSuperStarFlat[e, f, c, :])
+        prevSuperStarFlatCenter[:,:,:] = self.fgcmPars.superStarFlatCenter
 
         if not self.superStarSubCCD:
             # no x/y sub-ccd info
@@ -174,7 +167,7 @@ class FgcmSuperStarFlat(object):
                       1)
 
             gd = np.where(superStarNGoodStars > 2)
-            superStarOffset[gd] /= superStarOffset[wt]
+            superStarOffset[gd] /= superStarWt[gd]
 
             # and this is the same as the numbers for the center
             superStarFlatCenter[:,:,:] = superStarOffset[:,:,:]
@@ -185,6 +178,10 @@ class FgcmSuperStarFlat(object):
 
         else:
             # with x/y, new sub-ccd
+
+            # we will need the ccd offset signs
+            self._computeCCDOffsetSigns(goodObs)
+
             obsX = snmm.getArray(self.fgcmStars.obsXHandle)
             obsY = snmm.getArray(self.fgcmStars.obsYHandle)
 
@@ -239,8 +236,8 @@ class FgcmSuperStarFlat(object):
 
 
                 # compute the central value for use with the delta
-                xy = np.vstack(self.ccdOffsets['X_SIZE'][cInd]/2.,
-                               self.ccdOffsets['Y_SIZE'][cInd]/2.)
+                xy = np.vstack((self.ccdOffsets['X_SIZE'][cInd]/2.,
+                               self.ccdOffsets['Y_SIZE'][cInd]/2.))
                 superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
                                                                      *fit)
 
@@ -264,7 +261,7 @@ class FgcmSuperStarFlat(object):
                 deltaSuperStarFlatFPMean[e, f] = np.mean(deltaSuperStarFlatCenter[e, f, use])
                 deltaSuperStarFlatFPSigma[e, f] = np.std(deltaSuperStarFlatCenter[e, f, use])
 
-                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4  Delta: %.4f +/- %.4' %
+                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4f  Delta: %.4f +/- %.4f' %
                                   (e, self.fgcmPars.lutFilterNames[f],
                                    superStarFlatFPMean[e, f], superStarFlatFPSigma[e, f],
                                    deltaSuperStarFlatFPMean[e, f], deltaSuperStarFlatFPSigma[e, f]))
@@ -278,7 +275,7 @@ class FgcmSuperStarFlat(object):
             # can we do a combined plot?  Two panel?  I think that would be
             #  better, but I'm worried about the figure sizes
             self.plotSuperStarFlatsAndDelta(self.fgcmPars.parSuperStarFlat,
-                                            deltaSuperStarFlat,
+                                            deltaSuperStarFlatCenter,
                                             superStarNGoodStars,
                                             superStarFlatFPMean, superStarFlatFPSigma,
                                             deltaSuperStarFlatFPMean, deltaSuperStarFlatFPSigma)
@@ -290,6 +287,7 @@ class FgcmSuperStarFlat(object):
         """
 
         from fgcmUtilities import plotCCDMap
+        from fgcmUtilities import plotCCDMapPoly2d
 
         for e in xrange(self.fgcmPars.nEpochs):
             for f in xrange(self.fgcmPars.nLUTFilter):
@@ -305,6 +303,12 @@ class FgcmSuperStarFlat(object):
                 # left side plot the map with x/y
                 ax=fig.add_subplot(121)
 
+                if not self.superStarSubCCD:
+                    plotCCDMap(ax, self.ccdOffsets[use], superStarPars[e, f, use, 0],
+                               'SuperStar (mag)')
+                else:
+                    plotCCDMapPoly2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
+                                     'SuperStar (mag)')
 
                 # and annotate
 
@@ -336,9 +340,74 @@ class FgcmSuperStarFlat(object):
                                                     'superstar',
                                                     self.fgcmPars.lutFilterNames[f],
                                                     self.epochNames[e]))
+                plt.close()
 
 
+    def _computeCCDOffsetSigns(self, goodObs):
 
+        import scipy.stats
+
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+
+        obsX = snmm.getArray(self.fgcmStars.obsXHandle)
+        obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
+
+        h, rev = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
+
+        for i in xrange(h.size):
+            if h[i] == 0: continue
+
+            i1a = rev[rev[i]:rev[i+1]]
+
+            cInd = obsCCDIndex[goodObs[i1a[0]]]
+
+            if self.ccdOffsets['RASIGN'][cInd] == 0:
+                # choose a good exposure to work with
+                hTest, revTest = esutil.stat.histogram(obsExpIndex[goodObs[i1a]], rev=True)
+                maxInd = np.argmax(hTest)
+                testStars = revTest[revTest[maxInd]:revTest[maxInd+1]]
+
+                testRA = objRA[obsObjIDIndex[goodObs[i1a[testStars]]]]
+                testDec = objDec[obsObjIDIndex[goodObs[i1a[testStars]]]]
+                testX = obsX[goodObs[i1a[testStars]]]
+                testY = obsY[goodObs[i1a[testStars]]]
+
+                corrXRA,_ = scipy.stats.pearsonr(testX,testRA)
+                corrYRA,_ = scipy.stats.pearsonr(testY,testRA)
+
+                if (corrXRA > corrYRA):
+                    self.ccdOffsets['XRA'][cInd] = True
+                else:
+                    self.ccdOffsets['XRA'][cInd] = False
+
+                if self.ccdOffsets['XRA'][cInd]:
+                    # x is correlated with RA
+                    if corrXRA < 0:
+                        self.ccdOffsets['RASIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['RASIGN'][cInd] = 1
+
+                    corrYDec,_ = scipy.stats.pearsonr(testY,testDec)
+                    if corrYRA < 0:
+                        self.ccdOffsets['DECSIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['DECSIGN'][cInd] = 1
+                else:
+                    # y is correlated with RA
+                    if corrYRA < 0:
+                        self.ccdOffsets['RASIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['RASIGN'][cInd] = 1
+
+                    corrXDec,_ = scipy.stats.pearsonr(testX,testDec)
+                    if corrXDec < 0:
+                        self.ccdOffsets['DECSIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['DECSIGN'][cInd] = 1
 
     def computeSuperStarFlatsOrig(self,doPlots=True):
         """
@@ -349,8 +418,12 @@ class FgcmSuperStarFlat(object):
 
         ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
 
-        deltaSuperStarFlat = np.zeros_like(self.fgcmPars.parSuperStarFlat)
-        deltaSuperStarFlatNCCD = np.zeros_like(self.fgcmPars.parSuperStarFlat,dtype='i4')
+        #deltaSuperStarFlat = np.zeros_like(self.fgcmPars.parSuperStarFlat)
+        #deltaSuperStarFlatNCCD = np.zeros_like(self.fgcmPars.parSuperStarFlat,dtype='i4')
+        deltaSuperStarFlat = np.zeros((self.fgcmPars.nEpochs,
+                                       self.fgcmPars.nLUTFilter,
+                                       self.fgcmPars.nCCD))
+        deltaSuperStarFlatNCCD = np.zeros_like(deltaSuperStarFlat, dtype='i4')
 
         ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
         ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
@@ -384,7 +457,8 @@ class FgcmSuperStarFlat(object):
         deltaSuperStarFlat[gd] /= deltaSuperStarFlatNCCD[gd]
 
         # this accumulates onto the input parameters
-        self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
+        # self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
+        self.fgcmPars.parSuperStarFlat[:,:,:,0] += deltaSuperStarFlat
 
         ## MAYBE: change fgcmGray to remove the deltaSuperStarFlat?
         ##  or we can rely on the iterations.  Try that first.
@@ -405,8 +479,8 @@ class FgcmSuperStarFlat(object):
 
                 self.deltaSuperStarFlatMean[i,j] = np.mean(deltaSuperStarFlat[i,j,use])
                 self.deltaSuperStarFlatSigma[i,j] = np.std(deltaSuperStarFlat[i,j,use])
-                self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use])
-                self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use])
+                self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use,0])
+                self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use,0])
                 self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4f' %
                                  (i,self.fgcmPars.lutFilterNames[j],
                                   self.superStarFlatMean[i,j],
@@ -426,7 +500,7 @@ class FgcmSuperStarFlat(object):
                                     self.deltaSuperStarFlatSigma,
                                     nCCDArray=deltaSuperStarFlatNCCD,
                                     name='deltasuperstar')
-            self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat,
+            self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat[:,:,:,0],
                                     self.superStarFlatMean,
                                     self.superStarFlatSigma,
                                     nCCDArray=deltaSuperStarFlatNCCD,
