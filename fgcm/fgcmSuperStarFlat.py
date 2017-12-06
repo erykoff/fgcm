@@ -40,7 +40,7 @@ class FgcmSuperStarFlat(object):
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
-    def computeSuperStarFlats(self, doPlots=True):
+    def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False):
         """
         """
 
@@ -119,8 +119,8 @@ class FgcmSuperStarFlat(object):
         #  were just an offset, because the other terms are zeros
         prevSuperStarFlatCenter[:,:,:] = self.fgcmPars.superStarFlatCenter
 
-        if not self.superStarSubCCD:
-            # no x/y sub-ccd info
+        if not self.superStarSubCCD or doNotUseSubCCD:
+            # do not use subCCD x/y information (or x/y not available)
 
             # Next, we sort by epoch, band
             superStarWt = np.zeros_like(superStarFlatCenter)
