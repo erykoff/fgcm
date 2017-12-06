@@ -118,7 +118,12 @@ class FgcmSigFgcm(object):
                                gmiGO[st[-1]]])
         gmiCutNames = ['All','Blue25','Middle50','Red25']
 
+
         for bandIndex in xrange(self.fgcmStars.nBands):
+            # start the figure which will have 4 panels
+            fig = plt.figure(figsize=(9,6))
+            fig.clf()
+
             started=False
             for c in xrange(gmiCutLow.size):
                 if (bandIndex in self.fgcmStars.bandRequiredIndex):
@@ -145,10 +150,11 @@ class FgcmSigFgcm(object):
                                      (self.fgcmPars.bands[bandIndex],c))
                     continue
 
-                fig = plt.figure(1,figsize=(8,6))
-                fig.clf()
+                #fig = plt.figure(1,figsize=(8,6))
+                #fig.clf()
 
-                ax=fig.add_subplot(111)
+                #ax=fig.add_subplot(111)
+                ax=fig.add_subplot(2,2,c+1)
 
                 coeff = histoGauss(ax, EGrayGO[sigUse])
 
@@ -185,8 +191,8 @@ class FgcmSigFgcm(object):
                     r'$\sigma_\mathrm{FGCM} = %.4f$' % (sigFgcm[bandIndex]) + '\n' + \
                     gmiCutNames[c]
 
-                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
-                ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=16)
+                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=14)
+                ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=14)
 
                 if (reserved):
                     extraName = 'reserved'
@@ -204,11 +210,18 @@ class FgcmSigFgcm(object):
                 else:
                     ax.set_xlim(plotXRange)
 
-                fig.savefig('%s/%s_sigfgcm_%s_%s_%s.png' % (self.plotPath,
-                                                            self.outfileBaseWithCycle,
-                                                            extraName,
-                                                            self.fgcmPars.bands[bandIndex],
-                                                            gmiCutNames[c]))
+                #fig.savefig('%s/%s_sigfgcm_%s_%s_%s.png' % (self.plotPath,
+                #                                            self.outfileBaseWithCycle,
+                #                                            extraName,
+                #                                            self.fgcmPars.bands[bandIndex],
+                #                                            gmiCutNames[c]))
+
+            fig.tight_layout()
+            fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle,
+                                                     extraName,
+                                                     self.fgcmPars.bands[bandIndex]))
+            plt.close()
 
         self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
                          (time.time() - startTime))
