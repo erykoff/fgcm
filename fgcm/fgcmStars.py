@@ -200,6 +200,8 @@ class FgcmStars(object):
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagADUErr: raw ADU counts error of individual observation
         self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        #  obsSuperStarApplied: SuperStar correction that was applied
+        self.obsSuperStarAppliedHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagStd: corrected (to standard passband) mag of individual observation
         self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4',syncAccess=True)
         if (obsX is not None and obsY is not None):
@@ -221,6 +223,7 @@ class FgcmStars(object):
         snmm.getArray(self.obsMagADUHandle)[:] = obsMag
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
         snmm.getArray(self.obsMagStdHandle)[:] = obsMag   # same as raw at first
+        snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
             snmm.getArray(self.obsYHandle)[:] = obsY
@@ -884,19 +887,50 @@ class FgcmStars(object):
 
         self.fgcmLog.info('Applying SuperStarFlat to raw magnitudes')
 
-        # note: in the case of bad observations, these will still get something
-        #  applied, but we need to make sure we filter it out before using it
-
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        obsSuperStarApplied = snmm.getArray(self.obsSuperStarAppliedHandle)
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
 
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        # two different tracks, if x/y available or not.
 
-        # The superstarflat is the mean ccd offset in an epoch
-        # so we want to add this to the magnitudes
+        if self.hasXY:
+            # new style
 
-        obsMagADU[:] += fgcmPars.expCCDSuperStar[obsExpIndex,
-                                                 obsCCDIndex]
+            from fgcmUtilities import poly2dFunc
+
+            obsX = snmm.getArray(self.obsXHandle)
+            obsY = snmm.getArray(self.obsYHandle)
+
+            epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex]*
+                               (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
+                               fgcmPars.expLUTFilterIndex[obsExpIndex]*
+                               (fgcmPars.nCCD+1) +
+                               obsCCDIndex)
+
+            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+            for i in xrange(h.size):
+                if h[i] == 0: continue
+
+                i1a = rev[rev[i]:rev[i+1]]
+
+                # get the indices for this epoch/filter/ccd
+                epInd = fgcmPars.expEpochIndex[obsExpIndex[i1a[0]]]
+                fiInd = fgcmPars.expLUTFilterIndex[obsExpIndex[i1a[0]]]
+                cInd = obsCCDIndex[i1a[0]]
+
+                obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsX[i1a],
+                                                        obsY[i1a])),
+                                                       *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+        else:
+            # old style
+
+            obsSuperStarApplied[:] = fgcmPars.expCCDSuperStar[obsExpIndex,
+                                                              obsCCDIndex]
+
+        # And finally apply the superstar correction
+        obsMagADU[:] += obsSuperStarApplied[:]
 
     def applyApertureCorrection(self,fgcmPars):
         """
