@@ -442,8 +442,7 @@ class FgcmGray(object):
 
 
         # need at least 3 or else computation can blow up
-        # FIXME: pay attention to negatives here!
-        gd = np.where(ccdNGoodStars > 2)
+        gd = np.where((ccdNGoodStars > 2) & (ccdGrayWt > 0.0))
         ccdGray[gd] /= ccdGrayWt[gd]
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
@@ -451,14 +450,16 @@ class FgcmGray(object):
         self.fgcmLog.info('Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
-        bad = np.where(ccdNGoodStars <= 2)
+        bad = np.where((ccdNGoodStars <= 2) | (ccdGrayWt <= 0.0))
         ccdGray[bad] = self.illegalValue
         ccdGrayRMS[bad] = self.illegalValue
         ccdGrayErr[bad] = self.illegalValue
 
-        # check for infinities
+        # check for infinities -- these should not be here now that I fixed the weight check
         bad=np.where(~np.isfinite(ccdGrayRMS))
         ccdGrayRMS[bad] = self.illegalValue
+        bad=np.where(~np.isfinite(ccdGrayErr))
+        ccdGrayErr[bad] = self.illegalValue
 
         # and the ccdNGoodTilings...
         ccdNGoodTilings[gd] = (ccdNGoodObs[gd].astype(np.float64) /
