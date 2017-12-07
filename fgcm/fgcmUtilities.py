@@ -320,6 +320,9 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
                   ccdOffsets['DELTA_DEC'][k] +
                   ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
 
+        # FIXME: probably for a rotated camera, we need to transpose the zGrid?
+        # To be confirmed
+
         plt.imshow(zGrid.reshape(xValues.size, yValues.size),
                    interpolation='bilinear',
                    origin='lower',
