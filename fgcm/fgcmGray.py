@@ -670,9 +670,9 @@ class FgcmGray(object):
 
             if ok.size == 0:
                 self.fgcmLog.info('Could not find any matched exposures between bands %s and %s within %.2f minutes' %
-                                  self.fgcmPars.bands[bandIndex0],
+                                  (self.fgcmPars.bands[bandIndex0],
                                   self.fgcmPars.bands[bandIndex1],
-                                  self.expGrayCheckDeltaT * 24 * 60)
+                                  self.expGrayCheckDeltaT * 24 * 60))
                 continue
 
             fig=plt.figure(1,figsize=(8,6))
