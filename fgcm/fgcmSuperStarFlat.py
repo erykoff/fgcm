@@ -18,7 +18,7 @@ from fgcmUtilities import poly2dFunc
 class FgcmSuperStarFlat(object):
     """
     """
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmGray):
+    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.info('Initializing FgcmSuperStarFlat')
@@ -26,7 +26,6 @@ class FgcmSuperStarFlat(object):
         self.fgcmPars = fgcmPars
 
         self.fgcmStars = fgcmStars
-        self.fgcmGray = fgcmGray
 
         self.illegalValue = fgcmConfig.illegalValue
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
@@ -40,7 +39,7 @@ class FgcmSuperStarFlat(object):
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
-    def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False):
+    def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
         """
         """
 
@@ -89,9 +88,13 @@ class FgcmSuperStarFlat(object):
         EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
                    obsMagStd[goodObs])
 
-        # take into account correlated average mag error
-        EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        if onlyObsErr:
+            # only observational error.  Use this option when doing initial guess at superstarFlat
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            # take into account correlated average mag error
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
         gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
@@ -409,7 +412,7 @@ class FgcmSuperStarFlat(object):
                     else:
                         self.ccdOffsets['DECSIGN'][cInd] = 1
 
-    def computeSuperStarFlatsOrig(self,doPlots=True):
+    def computeSuperStarFlatsOrig(self,fgcmGray,doPlots=True):
         """
         """
 
@@ -425,9 +428,9 @@ class FgcmSuperStarFlat(object):
                                        self.fgcmPars.nCCD))
         deltaSuperStarFlatNCCD = np.zeros_like(deltaSuperStarFlat, dtype='i4')
 
-        ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
-        ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
-        ccdNGoodStars = snmm.getArray(self.fgcmGray.ccdNGoodStarsHandle)
+        ccdGray = snmm.getArray(fgcmGray.ccdGrayHandle)
+        ccdGrayErr = snmm.getArray(fgcmGray.ccdGrayErrHandle)
+        ccdNGoodStars = snmm.getArray(fgcmGray.ccdNGoodStarsHandle)
 
         # only select those CCDs that we have an adequate gray calculation
         expIndexUse,ccdIndexUse=np.where((ccdNGoodStars >= self.minStarPerCCD))
@@ -460,10 +463,6 @@ class FgcmSuperStarFlat(object):
         # self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
         self.fgcmPars.parSuperStarFlat[:,:,:,0] += deltaSuperStarFlat
 
-        ## MAYBE: change fgcmGray to remove the deltaSuperStarFlat?
-        ##  or we can rely on the iterations.  Try that first.
-
-        ## FIXME
         self.deltaSuperStarFlatMean = np.zeros((self.fgcmPars.nEpochs,
                                                 self.fgcmPars.nLUTFilter),dtype='f8')
         self.deltaSuperStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
