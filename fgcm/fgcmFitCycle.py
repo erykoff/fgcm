@@ -226,7 +226,7 @@ class FgcmFitCycle(object):
                 # we can compute gray values, but only use obs error (since all the fields aren't filled yet)
                 self.fgcmGray.computeCCDAndExpGray(onlyObsErr=True)
                 # and average them into superstar flats
-                preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+                preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmGray)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
