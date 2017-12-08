@@ -20,7 +20,7 @@ class FgcmConfig(object):
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
         requiredKeys=['bands','fitBands','extraBands','filterToBand',
-                      'exposureFile','ccdOffsetFile','obsFile','indexFile',
+                      'exposureFile','obsFile','indexFile',
                       'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
                       'ccdField','latitude','seeingField',
                       'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
@@ -41,7 +41,7 @@ class FgcmConfig(object):
                       'precomputeSuperStarInitialCycle',
                       'useRetrievedPWV','useNightlyRetrievedPWV',
                       'pwvRetrievalSmoothBlock','useRetrievedTauInit',
-                      'tauRetrievalMinCCDPerNight',
+                      'tauRetrievalMinCCDPerNight','superStarSubCCD',
                       'clobber','printOnly','outputStars']
 
         for key in requiredKeys:
@@ -92,7 +92,6 @@ class FgcmConfig(object):
         self.cameraGain = float(configDict['cameraGain'])
         self.approxThroughput = float(configDict['approxThroughput'])
         self.ccdStartIndex = int(configDict['ccdStartIndex'])
-        self.ccdOffsetFile = configDict['ccdOffsetFile']
         self.sigFgcmMaxErr = float(configDict['sigFgcmMaxErr'])
         self.sigFgcmMaxEGray = float(configDict['sigFgcmMaxEGray'])
         self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
@@ -116,6 +115,7 @@ class FgcmConfig(object):
         self.tauRetrievalMinCCDPerNight = configDict['tauRetrievalMinCCDPerNight']
         self.clobber = configDict['clobber']
         self.outputStars = configDict['outputStars']
+        self.superStarSubCCD = configDict['superStarSubCCD']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -347,9 +347,17 @@ class FgcmConfig(object):
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
 
-        # read in the ccd offset file
-        #self.ccdOffsets = fitsio.read(self.ccdOffsetFile,ext=1)
-        self.ccdOffsets = ccdOffsets
+        # read in the ccd offset file...also append a place to store sign/rotation
+        dtype = ccdOffsets.dtype.descr
+        dtype.extend([('XRA', np.bool),
+                      ('RASIGN', 'i2'),
+                      ('DECSIGN', 'i2')])
+
+        self.ccdOffsets = np.zeros(ccdOffsets.size, dtype=dtype)
+        for name in ccdOffsets.dtype.names:
+            self.ccdOffsets[name][:] = ccdOffsets[name][:]
+
+        # FIXME: check that ccdOffsets has the required information!
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs

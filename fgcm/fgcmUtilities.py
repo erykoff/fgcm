@@ -239,4 +239,99 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
 
     return None
 
+def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
+    return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
 
+def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+    plt.set_cmap('rainbow')
+
+    plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
+                   ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
+    plotDecRange = [ccdOffsets['DELTA_DEC'].min() - ccdOffsets['DEC_SIZE'].max()/2.,
+                    ccdOffsets['DELTA_DEC'].max() + ccdOffsets['DEC_SIZE'].max()/2.]
+
+    # compute central values...
+    centralValues = np.zeros(ccdOffsets.size)
+
+    for i in xrange(ccdOffsets.size):
+        xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
+                        ccdOffsets['Y_SIZE'][i]/2.))
+        centralValues[i] = poly2dFunc(xy, *parArray[i,:])
+
+    if (loHi is None):
+        st=np.argsort(centralValues)
+
+        lo = centralValues[st[int(0.02*st.size)]]
+        hi = centralValues[st[int(0.98*st.size)]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z=[[0,0],[0,0]]
+    levels=np.linspace(lo,hi,num=150)
+    CS3=plt.contourf(Z,levels,cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
+    ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
+    ax.tick_params(axis='both',which='major',labelsize=14)
+
+    for k in xrange(ccdOffsets.size):
+        xRange = np.array([0, ccdOffsets['X_SIZE'][k]])
+        yRange = np.array([0, ccdOffsets['Y_SIZE'][k]])
+
+        xValues = np.arange(xRange[0], xRange[1], 50)
+        yValues = np.arange(yRange[0], yRange[1], 50)
+
+        xGrid = np.repeat(xValues, yValues.size)
+        yGrid = np.tile(yValues, xValues.size)
+
+        zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
+                           *parArray[k, :])
+
+        if ccdOffsets['XRA'][k]:
+            # x/y reversed on plotting
+            extent = [ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
+        else:
+            extent = [ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
+
+        # FIXME: probably for a rotated camera, we need to transpose the zGrid?
+        # To be confirmed
+
+        plt.imshow(zGrid.reshape(xValues.size, yValues.size),
+                   interpolation='bilinear',
+                   origin='lower',
+                   extent=extent,
+                   norm=cNorm)
+
+    cb=None
+    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
+
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None

@@ -114,11 +114,18 @@ class FgcmApertureCorrection(object):
             # this helps in debugging?
             binStruct['Y_ERR'] = np.sqrt(binStruct['Y_ERR']**2. + 0.001**2.)
 
-            fit,cov = np.polyfit(binStruct['X_BIN'] - self.fgcmPars.compAperCorrPivot[i],
-                                 binStruct['Y'],
-                                 1.0,
-                                 w=(1./binStruct['Y_ERR'])**2.,
-                                 cov=True)
+            try:
+                fit,cov = np.polyfit(binStruct['X_BIN'] - self.fgcmPars.compAperCorrPivot[i],
+                                     binStruct['Y'],
+                                     1.0,
+                                     w=(1./binStruct['Y_ERR'])**2.,
+                                     cov=True)
+            except:
+                self.fgcmLog.info('aperture correction completely failed for band %s' %
+                                  (self.fgcmPars.bands[i]))
+                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
+                continue
 
             if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
                 self.fgcmLog.info('Warning: Aperture correction computation failed for band %s' %

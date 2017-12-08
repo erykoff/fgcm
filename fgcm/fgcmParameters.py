@@ -106,6 +106,10 @@ class FgcmParameters(object):
         self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
 
+        # this is a constant for now (a,x,y,x**2,y**2,xy)
+        self.superStarNPar = 6
+        self.ccdOffsets = fgcmConfig.ccdOffsets
+
         # and the default unit dict
         self.unitDictOnes = {'pwvUnit':1.0,
                              'pwvPerSlopeUnit':1.0,
@@ -190,8 +194,7 @@ class FgcmParameters(object):
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
-        #self.parSuperStarFlat = np.zeros((self.nEpochs,self.nBands,self.nCCD),dtype=np.float32)
-        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD),dtype=np.float32)
+        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -1171,14 +1174,40 @@ class FgcmParameters(object):
             return self.unitDictOnes
 
     @property
+    def superStarFlatCenter(self):
+        """
+        """
+
+        # This bit of code simply returns the superStarFlat computed at the center
+        # of each CCD
+
+        from fgcmUtilities import poly2dFunc
+
+        # this is the version that does the center of the CCD
+        # because it is operating on the whole CCD!
+
+        superStarFlatCenter = np.zeros((self.nEpochs,
+                                        self.nLUTFilter,
+                                        self.nCCD))
+        for e in xrange(self.nEpochs):
+            for f in xrange(self.nLUTFilter):
+                for c in xrange(self.nCCD):
+                    xy = np.vstack((self.ccdOffsets['X_SIZE'][c]/2.,
+                                    self.ccdOffsets['Y_SIZE'][c]/2.))
+                    superStarFlatCenter[e, f, c] = poly2dFunc(xy,
+                                                              *self.parSuperStarFlat[e, f, c, :])
+        return superStarFlatCenter
+
+    @property
     def expCCDSuperStar(self):
         """
         """
-        expCCDSuperStar = np.zeros((self.nExp,self.nCCD),dtype='f8')
 
-        expCCDSuperStar[:,:] = self.parSuperStarFlat[self.expEpochIndex,
-                                                     self.expLUTFilterIndex,
-                                                     :]
+        expCCDSuperStar = np.zeros((self.nExp, self.nCCD), dtype='f8')
+
+        expCCDSuperStar[:, :] = self.superStarFlatCenter[self.expEpochIndex,
+                                                         self.expLUTFilterIndex,
+                                                         :]
 
         return expCCDSuperStar
 
