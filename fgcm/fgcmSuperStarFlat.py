@@ -382,7 +382,7 @@ class FgcmSuperStarFlat(object):
                 corrXRA,_ = scipy.stats.pearsonr(testX,testRA)
                 corrYRA,_ = scipy.stats.pearsonr(testY,testRA)
 
-                if (corrXRA > corrYRA):
+                if (np.abs(corrXRA) > np.abs(corrYRA)):
                     self.ccdOffsets['XRA'][cInd] = True
                 else:
                     self.ccdOffsets['XRA'][cInd] = False
