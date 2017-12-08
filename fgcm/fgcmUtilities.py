@@ -300,25 +300,25 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
                            *parArray[k, :])
 
-        #if ccdOffsets['XRA'][k]:
+        if ccdOffsets['XRA'][k]:
             # x/y reversed on plotting
-        #    extent = [ccdOffsets['DELTA_DEC'][k] -
-        #              ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-        #              ccdOffsets['DELTA_DEC'][k] +
-        #              ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-        #              ccdOffsets['DELTA_RA'][k] -
-        #              ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-        #              ccdOffsets['DELTA_RA'][k] +
-        #              ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
-        #else:
-        extent = [ccdOffsets['DELTA_RA'][k] -
-                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_RA'][k] +
-                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] -
-                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] +
-                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
+            extent = [ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
+        else:
+            extent = [ccdOffsets['DELTA_RA'][k] -
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_RA'][k] +
+                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] -
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                      ccdOffsets['DELTA_DEC'][k] +
+                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
 
         # FIXME: probably for a rotated camera, we need to transpose the zGrid?
         # To be confirmed
