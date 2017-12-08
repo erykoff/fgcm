@@ -442,7 +442,7 @@ class FgcmGray(object):
 
 
         # need at least 3 or else computation can blow up
-        gd = np.where((ccdNGoodStars > 2) & (ccdGrayWt > 0.0))
+        gd = np.where((ccdNGoodStars > 2) & (ccdGrayWt > 0.0) & (ccdGrayRMS > 0.0))
         ccdGray[gd] /= ccdGrayWt[gd]
         ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
