@@ -394,7 +394,15 @@ class FgcmParameters(object):
         self._arrangeParArray()
 
         # need to load the superstarflats
-        self.parSuperStarFlat = inSuperStar
+        # check if we have an "old-style" superstar for compatibility
+        if (len(inSuperStar.shape) == 3):
+            # we have an old-style superstar
+            self.fgcmLog.info("Reading old-style superStarFlat")
+            self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
+            self.parSuperStarFlat[:,:,:,0] = inSuperStar
+        else:
+            # new-style superstar, use raw
+            self.parSuperStarFlat = inSuperStar
 
     def _makeBandIndices(self):
         """
