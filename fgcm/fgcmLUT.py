@@ -9,6 +9,9 @@ from pkg_resources import resource_filename
 
 
 from modtranGenerator import ModtranGenerator
+from fgcmAtmosphereTable import FgcmAtmosphereTable
+from fgcmAtmosphereTable import FgcmAtmosphereTableGenerator
+
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from fgcmLogger import FgcmLogger
@@ -41,16 +44,30 @@ class FgcmLUTMaker(object):
         """
         """
 
-        requiredKeys=['elevation','filterNames',
-                      'stdFilterNames','nCCD',
-                      'pmbRange','pmbSteps',
-                      'pwvRange','pwvSteps',
-                      'o3Range','o3Steps',
-                      'tauRange','tauSteps',
-                      'alphaRange','alphaSteps',
-                      'zenithRange','zenithSteps',
-                      'pmbStd','pwvStd','o3Std',
-                      'tauStd','alphaStd','airmassStd']
+        runModtran = False
+
+        requiredKeys = ['elevation', 'filterNames',
+                        'stdFilterNames', 'nCCD',
+                        'pmbRange','pmbSteps',
+                        'pwvRange','pwvSteps',
+                        'o3Range','o3Steps',
+                        'tauRange','tauSteps',
+                        'alphaRange','alphaSteps',
+                        'zenithRange','zenithSteps',
+                        'pmbStd','pwvStd','o3Std',
+                        'tauStd','alphaStd','airmassStd']
+
+
+        # first: check if there is a tableName here!
+        if 'atmosphereTableName' in lutConfig:
+            # Can we find this table?
+
+            # load parameters from it and stuff into config dict
+            self.atmosphereTable = FgcmAtmosphereTable(lutConfig['atmosphereTableName'])
+
+        else:
+            # regular config with parameters
+            runModtran = True
 
         for key in requiredKeys:
             if (key not in lutConfig):
@@ -61,9 +78,10 @@ class FgcmLUTMaker(object):
 
         self.lutConfig = lutConfig
 
-        # this will generate an exception if things aren't set up properly
-        self.modGen = ModtranGenerator(self.lutConfig['elevation'])
-        self.pmbElevation = self.modGen.pmbElevation
+        if runModtran:
+            # this will generate an exception if things aren't set up properly
+            self.modGen = ModtranGenerator(self.lutConfig['elevation'])
+            self.pmbElevation = self.modGen.pmbElevation
 
         self.filterNames = np.array(self.lutConfig['filterNames'])
         self.stdFilterNames = np.array(self.lutConfig['stdFilterNames'])
@@ -145,6 +163,8 @@ class FgcmLUTMaker(object):
 
         if not self._setThroughput:
             raise ValueError("Must set the throughput before running makeLUT")
+
+        # FIXME: load table if necessary!
 
         # we need a standard atmosphere and lambdas...
         self.atmStd = self.modGen(pmb=self.pmbStd,pwv=self.pwvStd,
