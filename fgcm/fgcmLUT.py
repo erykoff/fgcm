@@ -10,7 +10,6 @@ from pkg_resources import resource_filename
 
 from modtranGenerator import ModtranGenerator
 from fgcmAtmosphereTable import FgcmAtmosphereTable
-from fgcmAtmosphereTable import FgcmAtmosphereTableGenerator
 
 
 from sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -44,7 +43,7 @@ class FgcmLUTMaker(object):
         """
         """
 
-        runModtran = False
+        self.runModtran = False
 
         requiredKeys = ['elevation', 'filterNames',
                         'stdFilterNames', 'nCCD',
@@ -63,11 +62,13 @@ class FgcmLUTMaker(object):
             # Can we find this table?
 
             # load parameters from it and stuff into config dict
-            self.atmosphereTable = FgcmAtmosphereTable(lutConfig['atmosphereTableName'])
+            #self.atmosphereTable = FgcmAtmosphereTable(lutConfig['atmosphereTableName'])
+            self.atmosphereTable = FgcmAtmosphereTable.initWithTableName(lutConfig['atmosphereTableName'])
+            lutConfig = self.atmosphereTable.lutConfig
 
         else:
             # regular config with parameters
-            runModtran = True
+            self.runModtran = True
 
         for key in requiredKeys:
             if (key not in lutConfig):
@@ -77,11 +78,6 @@ class FgcmLUTMaker(object):
                     raise ValueError("%s must have 2 elements" % (key))
 
         self.lutConfig = lutConfig
-
-        if runModtran:
-            # this will generate an exception if things aren't set up properly
-            self.modGen = ModtranGenerator(self.lutConfig['elevation'])
-            self.pmbElevation = self.modGen.pmbElevation
 
         self.filterNames = np.array(self.lutConfig['filterNames'])
         self.stdFilterNames = np.array(self.lutConfig['stdFilterNames'])
@@ -165,53 +161,42 @@ class FgcmLUTMaker(object):
             raise ValueError("Must set the throughput before running makeLUT")
 
         # FIXME: load table if necessary!
+        if self.runModtran:
+            # need to build the table
+            self.atmosphereTable.generateTable()
+        else:
+            # load from data
+            self.atmosphereTable.loadTable()
 
-        # we need a standard atmosphere and lambdas...
-        self.atmStd = self.modGen(pmb=self.pmbStd,pwv=self.pwvStd,
-                                  o3=self.o3Std,tau=self.tauStd,
-                                  alpha=self.alphaStd,zenith=self.zenithStd,
-                                  lambdaRange=self.lambdaRange/10.0,
-                                  lambdaStep=self.lambdaStep)
-        self.atmLambda = self.atmStd['LAMBDA']
-        self.atmStdTrans = self.atmStd['COMBINED']
+        # and grab from the table
+        self.atmStd = self.atmosphereTable.atmStd
+        self.atmLambda = self.atmosphereTable.atmLambda
+        self.atmStdTrans = self.atmosphereTable.atmStdTrans
 
-        # get all the steps
-        self.pmb = np.linspace(self.lutConfig['pmbRange'][0],
-                               self.lutConfig['pmbRange'][1],
-                               num=self.lutConfig['pmbSteps'])
-        self.pmbDelta = self.pmb[1] - self.pmb[0]
+        self.pmb = self.atmosphereTable.pmb
+        self.pmbDelta = self.atmosphereTable.pmbDelta
         pmbPlus = np.append(self.pmb, self.pmb[-1] + self.pmbDelta)
 
-        self.pwv = np.linspace(self.lutConfig['pwvRange'][0],
-                               self.lutConfig['pwvRange'][1],
-                               num=self.lutConfig['pwvSteps'])
-        self.pwvDelta = self.pwv[1] - self.pwv[0]
+        self.pwv = self.atmosphereTable.pwv
+        self.pwvDelta = self.atmosphereTable.pwvDelta
         pwvPlus = np.append(self.pwv, self.pwv[-1] + self.pwvDelta)
 
-        self.o3 = np.linspace(self.lutConfig['o3Range'][0],
-                               self.lutConfig['o3Range'][1],
-                               num=self.lutConfig['o3Steps'])
-        self.o3Delta = self.o3[1] - self.o3[0]
+        self.o3 = self.atmosphereTable.o3
+        self.o3Delta = self.atmosphereTable.o3Delta
         o3Plus = np.append(self.o3, self.o3[-1] + self.o3Delta)
 
-        self.lnTau = np.linspace(np.log(self.lutConfig['tauRange'][0]),
-                                 np.log(self.lutConfig['tauRange'][1]),
-                                 num=self.lutConfig['tauSteps'])
-        self.lnTauDelta = self.lnTau[1] - self.lnTau[0]
+        self.lnTau = self.atmosphereTable.lnTau
+        self.lnTauDelta = self.atnosphereTable.lnTauDelta
         self.tau = np.exp(self.lnTau)
         lnTauPlus = np.append(self.lnTau, self.lnTau[-1] + self.lnTauDelta)
         tauPlus = np.exp(lnTauPlus)
 
-        self.alpha = np.linspace(self.lutConfig['alphaRange'][0],
-                               self.lutConfig['alphaRange'][1],
-                               num=self.lutConfig['alphaSteps'])
-        self.alphaDelta = self.alpha[1] - self.alpha[0]
+        self.alpha = self.atmosphereTable.alpha
+        self.alphaDelta = self.atmosphereTable.alphaDelta
         alphaPlus = np.append(self.alpha, self.alpha[-1] + self.alphaDelta)
 
-        self.secZenith = np.linspace(1./np.cos(self.lutConfig['zenithRange'][0]*np.pi/180.),
-                                     1./np.cos(self.lutConfig['zenithRange'][1]*np.pi/180.),
-                                     num=self.lutConfig['zenithSteps'])
-        self.secZenithDelta = self.secZenith[1]-self.secZenith[0]
+        self.secZenith = self.atmosphereTable.secZenith
+        self.secZenithDelta = self.atmosphereTable.secZenithDelta
         self.zenith = np.arccos(1./self.secZenith)*180./np.pi
         secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
         zenithPlus = np.arccos(1./secZenithPlus)*180./np.pi
@@ -220,55 +205,10 @@ class FgcmLUTMaker(object):
         self.airmass = self.secZenith - 0.0018167*(self.secZenith-1.0) - 0.002875*(self.secZenith-1.0)**2.0 - 0.0008083*(self.secZenith-1.0)**3.0
         airmassPlus = secZenithPlus - 0.0018167*(secZenithPlus-1.0) - 0.002875*(secZenithPlus-1.0)**2.0 - 0.0008083*(secZenithPlus-1.0)**3.0
 
-        # run MODTRAN a bunch of times
-        # we need for each airmass, to run the array of pwv and o3 and pull these out
-
-        self.fgcmLog.info("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
-        #self.pwvAtmTable = np.zeros((self.pwv.size,self.zenith.size,self.atmLambda.size))
-        pwvAtmTable = np.zeros((pwvPlus.size,zenithPlus.size,self.atmLambda.size))
-
-        #for i in xrange(self.pwv.size):
-        for i in xrange(pwvPlus.size):
-            sys.stdout.write('%d' % (i))
-            sys.stdout.flush()
-            #for j in xrange(self.zenith.size):
-            for j in xrange(zenithPlus.size):
-                sys.stdout.write('.')
-                sys.stdout.flush()
-                atm=self.modGen(pwv=pwvPlus[i],zenith=zenithPlus[j],
-                                lambdaRange=self.lambdaRange/10.0,
-                                lambdaStep=self.lambdaStep)
-                pwvAtmTable[i,j,:] = atm['H2O']
-
-        self.fgcmLog.info("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
-        #self.o3AtmTable = np.zeros((self.o3.size,self.zenith.size,self.atmLambda.size))
-        o3AtmTable = np.zeros((o3Plus.size, zenithPlus.size, self.atmLambda.size))
-
-        for i in xrange(o3Plus.size):
-            sys.stdout.write('%d' % (i))
-            sys.stdout.flush()
-            for j in xrange(zenithPlus.size):
-                sys.stdout.write('.')
-                sys.stdout.flush()
-                atm=self.modGen(o3=o3Plus[i],zenith=zenithPlus[j],
-                                lambdaRange=self.lambdaRange/10.0,
-                                lambdaStep=self.lambdaStep)
-                o3AtmTable[i,j,:] = atm['O3']
-
-        self.fgcmLog.info("\nGenerating %d O2/Rayleigh atmospheres..." % (zenithPlus.size))
-        #self.o2AtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
-        #self.rayleighAtmTable = np.zeros((self.zenith.size,self.atmLambda.size))
-        o2AtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
-        rayleighAtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
-
-        for j in xrange(zenithPlus.size):
-            sys.stdout.write('.')
-            sys.stdout.flush()
-            atm=self.modGen(zenith=zenithPlus[j],
-                            lambdaRange=self.lambdaRange/10.0,
-                            lambdaStep=self.lambdaStep)
-            o2AtmTable[j,:] = atm['O2']
-            rayleighAtmTable[j,:] = atm['RAYLEIGH']
+        pwvAtmTable = self.atmosphereTable.pwvAtmTable
+        o3AtmTable = self.atmosphereTable.o3AtmTable
+        o2AtmTable = self.atmosphereTable.o2AtmTable
+        rayleighAtmTable = self.atmosphereTable.rayleightAtmTable
 
         # get the filters over the same lambda ranges...
         self.fgcmLog.info("\nInterpolating filters...")
