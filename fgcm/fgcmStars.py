@@ -634,7 +634,11 @@ class FgcmStars(object):
         """
         """
         import healpy as hp
-        from fgcmPlotmaps import plot_hpxmap
+        try:
+            from fgcmPlotmaps import plot_hpxmap
+        except:
+            self.fgcmLog.info("Map plotting not available.  Sorry!")
+            return
 
         goodStars,=np.where(snmm.getArray(self.objFlagHandle)[:] == 0.0)
 
