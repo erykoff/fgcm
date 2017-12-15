@@ -24,13 +24,13 @@ class FgcmParameters(object):
     """
 
     def __init__(self, fgcmConfig, expInfo=None, fgcmLUT=None,
-                 inParInfo=None, inParams=None, inSuperStar=None):
+                 inParInfo=None, inParams=None, inSuperStar=None, inI1SuperStar=None):
 
         initNew = False
         loadOld = False
         if (expInfo is not None and fgcmLUT is not None):
             initNew = True
-        if (inParInfo is not None and inParams is not None and inSuperStar is not None):
+        if (inParInfo is not None and inParams is not None and inSuperStar is not None and inI1SuperStar is not None):
             loadOld = True
 
         if (initNew and loadOld):
@@ -124,7 +124,7 @@ class FgcmParameters(object):
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
         else:
-            self._loadOldParameters(expInfo, inParInfo, inParams, inSuperStar)
+            self._loadOldParameters(expInfo, inParInfo, inParams, inSuperStar, inI1SuperStar)
 
     @classmethod
     def newParsWithFits(cls, fgcmConfig, fgcmLUT):
@@ -159,9 +159,11 @@ class FgcmParameters(object):
         inParInfo = fitsio.read(inParFile, ext='PARINFO')
         inParams = fitsio.read(inParFile, ext='PARAMS')
         inSuperStar = fitsio.read(inParFile, ext='SUPER')
+        inI1SuperStar = fitsio.read(inParFile, ext='I1SUPER')
 
         return cls(fgcmConfig, expInfo=expInfo,
-                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
+                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar,
+                   inI1SuperStar=inI1SuperStar)
 
     @classmethod
     def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar):
@@ -195,6 +197,7 @@ class FgcmParameters(object):
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
+        self.parI1SuperStarFlat = np.zeros((self.nLUTFilter,self.nCCD), dtype=np.float32)
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -264,7 +267,7 @@ class FgcmParameters(object):
 
         # and we're done
 
-    def _loadOldParameters(self, expInfo, inParInfo, inParams, inSuperStar):
+    def _loadOldParameters(self, expInfo, inParInfo, inParams, inSuperStar, inI1SuperStar):
         """
         """
 
@@ -403,6 +406,8 @@ class FgcmParameters(object):
         else:
             # new-style superstar, use raw
             self.parSuperStarFlat = inSuperStar
+
+        self.parI1SuperStarFlat = inI1SuperStar
 
     def _makeBandIndices(self):
         """
@@ -656,6 +661,8 @@ class FgcmParameters(object):
 
         # and need to record the superstar flats
         fitsio.write(parFile,self.parSuperStarFlat,extname='SUPER')
+        fitsio.write(parFile,self.parI1SuperStarFlat, extname='I1SUPER')
+
 
     def parsToArrays(self):
         """
@@ -1218,6 +1225,16 @@ class FgcmParameters(object):
                                                          :]
 
         return expCCDSuperStar
+
+    @property
+    def expCCDI1SuperStar(self):
+        """
+        """
+
+        expCCDI1SuperStar = np.zeros((self.nExp, self.nCCD), dtype='f8')
+        expCCDI1SuperStar[:, :] = self.parI1SuperStarFlat[self.expLUTFilterIndex,
+                                                          :]
+        return expCCDI1SuperStar
 
     @property
     def expApertureCorrection(self):
