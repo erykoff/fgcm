@@ -326,6 +326,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing SuperStarFlats')
         superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
         superStarFlat.computeSuperStarFlats()
+        superStarFlat.computeI1SuperStarFlats(self.fgcmLUT, self.fgcmRetrieval)
 
         self.fgcmLog.info(getMemoryString('After computing superstar flats'))
 
