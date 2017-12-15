@@ -45,6 +45,7 @@ class FgcmChisq(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
+        self.applyI1Super = fgcmConfig.applyI1Super
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -357,7 +358,6 @@ class FgcmChisq(object):
         lutIndicesGO = self.fgcmLUT.getIndices(obsLUTFilterIndexGO,
                                                self.fgcmPars.expPWV[obsExpIndexGO],
                                                self.fgcmPars.expO3[obsExpIndexGO],
-                                               #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
                                                self.fgcmPars.expLnTau[obsExpIndexGO],
                                                self.fgcmPars.expAlpha[obsExpIndexGO],
                                                obsSecZenithGO,
@@ -365,20 +365,25 @@ class FgcmChisq(object):
                                                self.fgcmPars.expPmb[obsExpIndexGO])
         I0GO = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[obsExpIndexGO],
                                       self.fgcmPars.expO3[obsExpIndexGO],
-                                      #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
                                       self.fgcmPars.expLnTau[obsExpIndexGO],
                                       self.fgcmPars.expAlpha[obsExpIndexGO],
                                       obsSecZenithGO,
                                       self.fgcmPars.expPmb[obsExpIndexGO],
                                       lutIndicesGO)
-        I10GO = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[obsExpIndexGO],
-                                       self.fgcmPars.expO3[obsExpIndexGO],
-                                       #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
-                                       self.fgcmPars.expLnTau[obsExpIndexGO],
-                                       self.fgcmPars.expAlpha[obsExpIndexGO],
-                                       obsSecZenithGO,
-                                       self.fgcmPars.expPmb[obsExpIndexGO],
-                                       lutIndicesGO) / I0GO
+        #if self.applyI1Super:
+        #    I1Offset = self.fgcmPars.expCCDI1SuperStar[obsExpIndexGO, obsCCDIndexGO]/2.0
+        #else:
+        #    I1Offset = np.zeros(I0GO.size)
+
+        I10GO = (self.fgcmLUT.computeI1(self.fgcmPars.expPWV[obsExpIndexGO],
+                                        self.fgcmPars.expO3[obsExpIndexGO],
+                                        self.fgcmPars.expLnTau[obsExpIndexGO],
+                                        self.fgcmPars.expAlpha[obsExpIndexGO],
+                                        obsSecZenithGO,
+                                        self.fgcmPars.expPmb[obsExpIndexGO],
+                                        lutIndicesGO)) / I0GO
+        if self.applyI1Super:
+            I10GO += self.fgcmPars.expCCDI1SuperStar[obsExpIndexGO, obsCCDIndexGO]
 
 
         qeSysGO = self.fgcmPars.expQESys[obsExpIndexGO]
