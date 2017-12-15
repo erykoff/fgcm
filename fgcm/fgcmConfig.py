@@ -42,7 +42,7 @@ class FgcmConfig(object):
                       'useRetrievedPWV','useNightlyRetrievedPWV',
                       'pwvRetrievalSmoothBlock','useRetrievedTauInit',
                       'tauRetrievalMinCCDPerNight','superStarSubCCD',
-                      'clobber','printOnly','outputStars']
+                      'clobber','printOnly','outputStars','applyI1Super']
 
         for key in requiredKeys:
             if (key not in configDict):
@@ -116,6 +116,7 @@ class FgcmConfig(object):
         self.clobber = configDict['clobber']
         self.outputStars = configDict['outputStars']
         self.superStarSubCCD = configDict['superStarSubCCD']
+        self.applyI1Super = configDict['applyI1Super']
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
