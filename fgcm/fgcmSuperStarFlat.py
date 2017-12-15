@@ -35,7 +35,7 @@ class FgcmSuperStarFlat(object):
         self.epochNames = fgcmConfig.epochNames
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
-
+        self.applyI1Super = fgcmConfig.applyI1Super
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
@@ -411,6 +411,89 @@ class FgcmSuperStarFlat(object):
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:
                         self.ccdOffsets['DECSIGN'][cInd] = 1
+
+    def computeI1SuperStarFlats(self, fgcmLUT, fgcmRetrieval, doPlots=True):
+        """
+        """
+
+        startTime = time.time()
+        self.fgcmLog.info('Computing I1SuperStarFlats')
+
+        deltaI1SuperStarFlat = np.zeros((self.fgcmPars.nLUTFilter,
+                                         self.fgcmPars.nCCD))
+        deltaI1SuperStarFlatNCCD = np.zeros_like(deltaI1SuperStarFlat, dtype='i4')
+
+        r0 = snmm.getArray(fgcmRetrieval.r0Handle)
+        r10 = snmm.getArray(fgcmRetrieval.r10Handle)
+
+        expIndexUse,ccdIndexUse = np.where((np.abs(r0) < 1000.0) &
+                                           (np.abs(r10) < 1000.0))
+
+        gd,=np.where(self.fgcmPars.expFlag[expIndexUse] == 0)
+        expIndexUse=expIndexUse[gd]
+        ccdIndexUse=ccdIndexUse[gd]
+
+        # and we need the I0/I1
+        ccdHAUse = (self.fgcmPars.expTelHA[expIndexUse] -
+                    np.radians(self.ccdOffsets['DELTA_RA'][ccdIndexUse]))
+        ccdDecUse = (self.fgcmPars.expTelDec[expIndexUse] +
+                     np.radians(self.ccdOffsets['DELTA_DEC'][ccdIndexUse]))
+        ccdSecZenithUse = 1./(np.sin(ccdDecUse) * self.fgcmPars.sinLatitude +
+                              np.cos(ccdDecUse) * self.fgcmPars.cosLatitude * np.cos(ccdHAUse))
+
+        lutIndicesUse = fgcmLUT.getIndices(self.fgcmPars.expLUTFilterIndex[expIndexUse],
+                                           self.fgcmPars.expPWV[expIndexUse],
+                                           self.fgcmPars.expO3[expIndexUse],
+                                           self.fgcmPars.expLnTau[expIndexUse],
+                                           self.fgcmPars.expAlpha[expIndexUse],
+                                           ccdSecZenithUse,
+                                           ccdIndexUse,
+                                           self.fgcmPars.expPmb[expIndexUse])
+        i0Use = fgcmLUT.computeI0(self.fgcmPars.expPWV[expIndexUse],
+                                  self.fgcmPars.expO3[expIndexUse],
+                                  self.fgcmPars.expLnTau[expIndexUse],
+                                  self.fgcmPars.expAlpha[expIndexUse],
+                                  ccdSecZenithUse,
+                                  self.fgcmPars.expPmb[expIndexUse],
+                                  lutIndicesUse)
+        i1Use = fgcmLUT.computeI1(self.fgcmPars.expPWV[expIndexUse],
+                                  self.fgcmPars.expO3[expIndexUse],
+                                  self.fgcmPars.expLnTau[expIndexUse],
+                                  self.fgcmPars.expAlpha[expIndexUse],
+                                  ccdSecZenithUse,
+                                  self.fgcmPars.expPmb[expIndexUse],
+                                  lutIndicesUse)
+
+        np.add.at(deltaI1SuperStarFlat,
+                  (self.fgcmPars.expLUTFilterIndex[expIndexUse],
+                   ccdIndexUse),
+                  r10[expIndexUse,ccdIndexUse] - (i1Use/i0Use))
+                  #r10[expIndexUse,ccdIndexUse] * r0[expIndexUse,ccdIndexUse] -
+                  #i1Use)
+        np.add.at(deltaI1SuperStarFlatNCCD,
+                  (self.fgcmPars.expLUTFilterIndex[expIndexUse],
+                   ccdIndexUse),
+                  1)
+
+        gd=np.where(deltaI1SuperStarFlatNCCD > 0)
+        deltaI1SuperStarFlat[gd] /= deltaI1SuperStarFlatNCCD[gd]
+
+        #self.fgcmPars.parI1SuperStarFlat += deltaI1SuperStarFlat
+        #if self.applyI1Super:
+        #    # we need to add on
+        #    self.fgcmPars.parI1SuperStarFlat += deltaI1SuperStarFlat
+        #else:
+        #    # it's the same
+        # THIS IS NOT A DELTA!  i'm not actually applying it.  Oops!
+        self.fgcmPars.parI1SuperStarFlat = deltaI1SuperStarFlat
+
+        self.fgcmLog.info('Computed I1SuperSTarFlats in %.2f seconds.' %
+                          (time.time() - startTime))
+
+        if doPlots:
+            self.fgcmLog.info('Making I1SuperStarFlat Plots')
+            self.fgcmLog.info(' (not implemented yet)')
+
 
     def computeSuperStarFlatsOrig(self,fgcmGray,doPlots=True):
         """
