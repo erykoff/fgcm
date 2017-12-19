@@ -45,16 +45,7 @@ class FgcmLUTMaker(object):
 
         self.runModtran = False
 
-        requiredKeys = ['elevation', 'filterNames',
-                        'stdFilterNames', 'nCCD',
-                        'pmbRange','pmbSteps',
-                        'pwvRange','pwvSteps',
-                        'o3Range','o3Steps',
-                        'tauRange','tauSteps',
-                        'alphaRange','alphaSteps',
-                        'zenithRange','zenithSteps',
-                        'pmbStd','pwvStd','o3Std',
-                        'tauStd','alphaStd','airmassStd']
+        requiredKeys = ['filterNames', 'stdFilterNames', 'nCCD']
 
 
         # first: check if there is a tableName here!
@@ -62,13 +53,29 @@ class FgcmLUTMaker(object):
             # Can we find this table?
 
             # load parameters from it and stuff into config dict
-            #self.atmosphereTable = FgcmAtmosphereTable(lutConfig['atmosphereTableName'])
             self.atmosphereTable = FgcmAtmosphereTable.initWithTableName(lutConfig['atmosphereTableName'])
-            lutConfig = self.atmosphereTable.lutConfig
+
+            # look for consistency between configs?
+            # Note that we're assuming if somebody asked for a table they wanted
+            # what was in the table
+            for key in self.atmosphereTable.atmConfig:
+                if key in lutConfig:
+                    if 'Range' in key:
+                        if (not np.isclose(lutConfig[key][0], self.atmosphereTable.atmConfig[key][0]) or
+                            not np.isclose(lutConfig[key][1], self.atmosphereTable.atmConfig[key][1])):
+                            print("Warning: input config %s is %.5f-%.5f but precomputed table is %.5f-%.5f" %
+                                  (key, lutConfig[key][0], lutConfig[key][1],
+                                   self.atmosphereTable.atmConfig[key][0],
+                                   self.atmosphereTable.atmConfig[key][1]))
+                    else:
+                        if not np.isclose(lutConfig[key], self.atmosphereTable.atmConfig[key]):
+                            print("Warning: input config %s is %.5f but precomputed table is %.5f" %
+                                  (key, lutConfig[key], self.atmosphereTable.atmConfig[key]))
 
         else:
             # regular config with parameters
             self.runModtran = True
+            self.atmosphereTable = FgcmAtmosphereTable(lutConfig)
 
         for key in requiredKeys:
             if (key not in lutConfig):
@@ -94,27 +101,28 @@ class FgcmLUTMaker(object):
 
         # and record the standard values out of the config
         #  (these will also come out of the save file)
-        self.pmbStd = self.lutConfig['pmbStd']
-        self.pwvStd = self.lutConfig['pwvStd']
-        self.o3Std = self.lutConfig['o3Std']
-        self.tauStd = self.lutConfig['tauStd']
+
+        self.pmbStd = self.atmosphereTable.atmConfig['pmbStd']
+        self.pwvStd = self.atmosphereTable.atmConfig['pwvStd']
+        self.o3Std = self.atmosphereTable.atmConfig['o3Std']
+        self.tauStd = self.atmosphereTable.atmConfig['tauStd']
         self.lnTauStd = np.log(self.tauStd)
-        self.alphaStd = self.lutConfig['alphaStd']
-        self.secZenithStd = self.lutConfig['airmassStd']
+        self.alphaStd = self.atmosphereTable.atmConfig['alphaStd']
+        self.secZenithStd = self.atmosphereTable.atmConfig['airmassStd']
         self.zenithStd = np.arccos(1./self.secZenithStd)*180./np.pi
 
-        if ('lambdaRange' in self.lutConfig):
-            self.lambdaRange = np.array(self.lutConfig['lambdaRange'])
+        if ('lambdaRange' in self.atmosphereTable.atmConfig):
+            self.lambdaRange = np.array(self.atmosphereTable.atmConfig['lambdaRange'])
         else:
             self.lambdaRange = np.array([3000.0,11000.0])
 
-        if ('lambdaStep' in self.lutConfig):
-            self.lambdaStep = self.lutConfig['lambdaStep']
+        if ('lambdaStep' in self.atmosphereTable.atmConfig):
+            self.lambdaStep = self.atmosphereTable.atmConfig['lambdaStep']
         else:
             self.lambdaStep = 0.5
 
-        if ('lambdaNorm' in self.lutConfig):
-            self.lambdaNorm = self.lutConfig['lambdaNorm']
+        if ('lambdaNorm' in self.atmosphereTable.atmConfig):
+            self.lambdaNorm = self.atmosphereTable.atmConfig['lambdaNorm']
         else:
             self.lambdaNorm = 7750.0
 
@@ -160,7 +168,6 @@ class FgcmLUTMaker(object):
         if not self._setThroughput:
             raise ValueError("Must set the throughput before running makeLUT")
 
-        # FIXME: load table if necessary!
         if self.runModtran:
             # need to build the table
             self.atmosphereTable.generateTable()
@@ -169,9 +176,10 @@ class FgcmLUTMaker(object):
             self.atmosphereTable.loadTable()
 
         # and grab from the table
-        self.atmStd = self.atmosphereTable.atmStd
         self.atmLambda = self.atmosphereTable.atmLambda
         self.atmStdTrans = self.atmosphereTable.atmStdTrans
+
+        self.pmbElevation = self.atmosphereTable.pmbElevation
 
         self.pmb = self.atmosphereTable.pmb
         self.pmbDelta = self.atmosphereTable.pmbDelta
@@ -186,7 +194,7 @@ class FgcmLUTMaker(object):
         o3Plus = np.append(self.o3, self.o3[-1] + self.o3Delta)
 
         self.lnTau = self.atmosphereTable.lnTau
-        self.lnTauDelta = self.atnosphereTable.lnTauDelta
+        self.lnTauDelta = self.atmosphereTable.lnTauDelta
         self.tau = np.exp(self.lnTau)
         lnTauPlus = np.append(self.lnTau, self.lnTau[-1] + self.lnTauDelta)
         tauPlus = np.exp(lnTauPlus)
@@ -208,7 +216,7 @@ class FgcmLUTMaker(object):
         pwvAtmTable = self.atmosphereTable.pwvAtmTable
         o3AtmTable = self.atmosphereTable.o3AtmTable
         o2AtmTable = self.atmosphereTable.o2AtmTable
-        rayleighAtmTable = self.atmosphereTable.rayleightAtmTable
+        rayleighAtmTable = self.atmosphereTable.rayleighAtmTable
 
         # get the filters over the same lambda ranges...
         self.fgcmLog.info("\nInterpolating filters...")
@@ -426,7 +434,7 @@ class FgcmLUTMaker(object):
 
 
         if (self.makeSeds):
-        ## and the SED LUT
+            # and the SED LUT
             self.fgcmLog.info("Building SED LUT")
 
             # arbitrary.  Configure?  Fit?  Seems stable...
@@ -558,7 +566,7 @@ class FgcmLUTMaker(object):
                                     ('I10STD','f8',self.filterNames.size),
                                     ('LAMBDAB','f8',self.filterNames.size),
                                     ('ATMLAMBDA','f8',self.atmLambda.size),
-                                    ('ATMSTDTRANS','f8',self.atmStd.size)])
+                                    ('ATMSTDTRANS','f8',self.atmStdTrans.size)])
         stdVals['PMBSTD'] = self.pmbStd
         stdVals['PWVSTD'] = self.pwvStd
         stdVals['O3STD'] = self.o3Std
@@ -593,10 +601,7 @@ class FgcmLUT(object):
     """
     """
 
-    #def __init__(self,lutFile):
     def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
-        #lutFlat = fitsio.read(self.lutFile,ext='LUT')
-        #indexVals = fitsio.read(self.lutFile,ext='INDEX')
 
         self.filterNames = indexVals['FILTERNAMES'][0]
         self.stdFilterNames = indexVals['STDFILTERNAMES'][0]
@@ -632,7 +637,6 @@ class FgcmLUT(object):
         snmm.getArray(self.lutI1Handle)[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
 
         # and read in the derivatives
-        #lutDerivFlat = fitsio.read(self.lutFile,ext='DERIV')
 
         # create shared memory
         self.lutDPWVHandle = snmm.createArray(sizeTuple,dtype='f4')
@@ -667,7 +671,6 @@ class FgcmLUT(object):
             #print("No I1 derivative information")
 
         # get the standard values
-        #stdVals = fitsio.read(lutFile,ext='STD')
 
         self.pmbStd = stdVals['PMBSTD'][0]
         self.pwvStd = stdVals['PWVSTD'][0]
@@ -705,14 +708,7 @@ class FgcmLUT(object):
             self.sedLUT = sedLUT
 
             self.hasSedLUT = True
-        #try:
-        #    self.sedLUT = fitsio.read(lutFile,ext='SED')
-        #    self.hasSedLUT = True
-        #except:
-        #    print("Warning: Could not find SED LUT in lutfile.")
 
-        #if (self.hasSedLUT):
-            # this is currently *not* general, but quick
             ## FIXME: make general
             self.sedColor = self.sedLUT['SYNTHMAG'][:,0] - self.sedLUT['SYNTHMAG'][:,2]
             st = np.argsort(self.sedColor)
@@ -773,8 +769,6 @@ class FgcmLUT(object):
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
         indicesPWVPlus = np.array(indices[:-1])
-        #if (indicesPWVPlus[1] < self.pwv.size):
-        #    indicesPWVPlus[1] += 1
         indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
 
         # also include cross-terms for tau and pwv
@@ -806,7 +800,6 @@ class FgcmLUT(object):
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
         indicesPWVPlus = np.array(indices[:-1])
-        #indicesPWVPlus[1] += 1
         indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
 
         # also include a cross-term for tau
