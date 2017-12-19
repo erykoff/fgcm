@@ -6,3 +6,13 @@ general code improvements and streamlining, which are a given.
 - LUTs now include a dI1 term for smoother interpolation in the I1 LUT
 - g band SED approx formula updated
 - aperture corrections included
+- Y band SED approx formula updated
+- Tau is fit in log-steps instead of linear steps
+- Tau and PWV slopes are done in percentage terms.  Bounds allow significant
+  variation through the night.
+- PWV retrieval can be turned on.  (experimental)
+- Tau nightly retrieval can be turned on.  (very experimental)
+- Exposure gray can be smoothed through the night. (experimental)
+- sub-ccd superstar flats can be turned on (if x/y provided).
+- Multiple filters per band supported (e.g., HSC I->I2 change).
+- Atmosphere tables can be precomputed and distributed with code.
