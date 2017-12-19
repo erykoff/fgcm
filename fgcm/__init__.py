@@ -26,5 +26,6 @@ from fgcmSigFgcm import FgcmSigFgcm
 from fgcmFlagVariables import FgcmFlagVariables
 from fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 # import fgcmPlotmaps
+from fgcmAtmosphereTable import FgcmAtmosphereTable
 
 
