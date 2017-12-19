@@ -1,0 +1,31 @@
+# default Subaru (HSC) Atmosphere File
+
+atmosphereTableFile: fgcm_atm_subaru1.fits
+
+elevation: 4139.0
+
+pmbRange: [820.0,835.0]
+pmbSteps: 5
+
+pwvRange: [0.1,3.6]
+pwvSteps: 11
+
+o3Range: [220.0,310.0]
+o3Steps: 3
+
+tauRange: [0.002,0.35]
+tauSteps: 11
+
+alphaRange: [0.0,2.0]
+alphaSteps: 9
+
+zenithRange: [0.0,70.0]
+zenithSteps: 21
+
+pmbStd: 828.0
+pwvStd: 1.5
+o3Std: 263.0
+tauStd: 0.030
+alphaStd: 1.0
+airmassStd: 1.1
+
