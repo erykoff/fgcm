@@ -7,7 +7,8 @@ import fnmatch
 exec(open('fgcm/_version.py').read())
 
 scripts = ['scripts/runFgcmFitCycle.py',
-           'scripts/makeFgcmLUT.py']
+           'scripts/makeFgcmAtmosphereTable.py',
+           'scripts/listFgcmAtmosphereTables.py']
 
 name='fgcm'
 
@@ -16,6 +17,7 @@ def fileList(name, relpath, globstr):
             fnmatch.filter(os.listdir(name+'/'+relpath+'/'),globstr)]
 
 datafiles = fileList(name,'data/templates/','*.fits')
+datafiles.extend(fileList(name,'data/tables/','*.fits'))
 
 setup(
     name='fgcm',
