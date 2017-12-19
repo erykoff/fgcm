@@ -1,0 +1,235 @@
+# This is a sample config file that describes the config variables
+
+# logLevel: INFO or DEBUG, how much logging.  (INFO recommended)
+logLevel: INFO
+
+# nCore: Number of cores to run on (via multiprocessing)
+nCore: 4
+# outfileBase: Base string for output file
+outfileBase: fgcm_sample
+# cycleNumber: Fit cycle number.  Automatically incremented.
+cycleNumber: 0
+# maxIter: maximum number of fit iterations.
+#  Cycle 0 should be a number closer to 15-20, later cycles ~50
+maxIter: 20
+# outputStars: output calibrated stars?
+outputStars: False
+
+
+# Input Files:
+# exposureFile: Exposure info.
+#   Required: EXPTIME, seeingField, deepFlag, MJD, TELHA (degrees),
+#             TELRA (degrees), TELDEC (degrees), PMB (millibars),
+#             FILTERNAME
+exposureFile: /path/to/exposurefile.fits
+
+# ccdOffsetFile: CCD offset info.
+#   Required: ccdField, DELTA_RA (degrees), DELTA_DEC (degrees),
+#             RA_SIZE (degrees), DEC_SIZE (degrees),
+#             X_SIZE (pixels, optional), Y_SIZE (pixels, optional)
+ccdOffsetFile: /path/to/ccdoffsetfile.fits
+
+# lutFile: Look-up table, built with FgcmLUTMaker
+lutFile: /path/to/lutFile.fits
+
+# obsFile: Individual observation file, built with FgcmMakeStars
+obsFile: /path/to/obsFile.fits
+
+# indexFile: Observation/Object Index file, built with FgcmMakeStars
+indexFile: /path/to/indexFile.fits
+
+# bands: list of bands for calibration
+bands: ['g','r','i','z','Y']
+# filterToBand: dictionary that translates "filterName" into "band"
+#  which allows replacement filters to be cross-calibrated
+filterToBand: {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'Y':'Y'}
+# fitBands: list of bands to use in atmosphere fit
+fitBands: ['g','r','i','z']
+# extraBands: list of bands that are along for the ride
+extraBands: ['Y']
+
+# ccdStartIndex: Starting index for ccdField
+#  (DECam starts at 1, HSC starts at 0)
+ccdStartIndex: 1
+
+# UTBoundary: when this is added to the exposure MJD we get observations
+#  split into days.  This avoids midnight-UT-crossing problems
+UTBoundary: 0.2
+
+# washMJDs: MJDs where the mirror was washed.
+#  Example is Blanco telescope during DES
+washMJDs: [56267.5, 56419.5, 56631.5, 56811.5, 56974.5, 57105.5, 57288.5, 57372.5, 57448.5]
+
+# epochMJDs: MJDs where there were changes to define a new epoch
+#  e.g., focal plane warm-up, different seasons, etc.
+epochMJDs: [56345.5, 56624.5, 56700.5, 56991.5, 57160.5, 57441.5]
+
+# expField: name of field in exposureFile that describes the
+#  exposure number/visit/etc
+expField: 'EXPNUM'
+# ccdField: name of field in exposureFile that describes the ccd
+ccdField: 'CCDNUM'
+# seeingField: name of field in exposureFile that describes the seeing
+#  or equivalent.  This could be set to all zeros.
+seeingField: 'FWHM'
+# deepFlag: name of field in exposureFile that flags extra-deep repeat
+#  exposures for deep-drilling.  Used for extra QA plots.
+#  This could be set to all zeros.
+deepFlag: 'DEEPFLAG'
+
+# illegalValue: Sentinal value for bad numbers
+illegalValue: -9999.0
+
+
+
+# minObsPerBand: minimum number of good observations per fit band for a star
+#  to be selected as a calibration star.
+minObsPerBand: 2
+# varNSig: Number of sigma for a star to be considered variable
+#  This code isn't working so set to 100
+varNSig: 100.0
+# varMinBand: Number of bands for a star to be an outlier to be considered variable
+varMinBand: 2
+# starColorCuts: List of lists.
+#  each list has band0, band0, low, high such that stars with color
+#  band0-band1 outside the range lo-hi are rejected
+starColorCuts: [['g','r',-0.25,2.25],['r','i',-0.50,2.25],['i','z',-0.50,1.00],['g','i',0.0,3.5]]
+# reserveFraction: Fraction of stars to hold for testing
+reserveFraction: 0.10
+
+# latitude: Observatory latitude (degrees)
+latitude: -30.170
+# mirrorArea: Mirror area in degrees**2
+#  Used to guess absolute calibration
+mirrorArea: 9.70e4
+# cameraGain: Camera gain
+#  Used to guess absolute calibration
+cameraGain: 1.0
+# approxThroughput: Overall throughput scaling
+#  Used to guess absolute calibration
+approxThroughput: 0.55
+
+# resetParameters: Should we reset the atmosphere fit parameters
+#  at the beginning of the cycle?  Recommended "True".
+resetParameters: True
+# precomputeSuperStarInitialCycle: Should we precompute the superStarFlat
+#  before doing any fitting?  Only turn on if there is large vignetting/etc
+precomputeSuperStarInitialCycle: False
+# freezeStdAtmosphere: Should we freeze the atmosphere parameters to their
+#  standard values during fit?  Useful to turn on for first fit cycle.
+#  note that output config file will turn this off (allow atmosphere fitting)
+#  by default
+freezeStdAtmosphere: True
+
+# Photometric selections
+# minExpPerNight: Minimum number of photometric exposures on a night to
+#  consider it "calibratable"
+minExpPerNight: 10
+# brightObsGrayMax: Initial bright observation maximum gray to use in mean
+brightObsGrayMax: 0.15
+# expGrayInitialCut: Minimum (negative) gray to consider exposure calibratable
+#  after bright observation selection
+expGrayInitialCut: -0.25
+# expGrayPhotometricCut: Minimum (negative) gray to consider exposure
+#  photometric.  Start this at ~-0.05 and then go tighter as calibration
+#  improves
+expGrayPhotometricCut: [-0.05,-0.05,-0.05,-0.05,-0.05]
+# expGrayHighCut: Maximum (positive) gray to consider exposure photometric.
+#  Start this at ~0.25 and then get tighter as calibration improves.
+expGrayHighCut: [0.25, 0.25, 0.25, 0.25, 0.25]
+# minStarPerExp: Minimum number of stars per exposure to be considered
+#  possibly photometric
+minStarPerExp: 600
+# expGrayRecoverCut: Minimum (negative!) exposure gray to consider
+#  recovering via focal-plane average
+expGrayRecoverCut: -1.0
+# expVarGrayPhotometricCut: Max exposure gray variance to consider
+#  recovering via focal-plane average
+expVarGrayPhotometricCut: 0.0005
+# expGrayErrRecoverCut: Maximum exposure gray error to consider
+#  recovering via focal-plane average
+expGrayErrRecoverCut: 0.05
+# ccdGrayMaxStarErr: Maximum error for any star observation to be
+#  used to compute CCD Gray
+ccdGrayMaxStarErr: 0.10
+
+# Zeropoint computations
+# minStarPerCCD: Minimum number of stars on a CCD to recover zeropoint
+#  through matching
+minStarPerCCD: 5
+# minCCDPerExp: Minimum number of CCDs on an exposure to recover bad ccds
+minCCDPerExp: 5
+# maxCCDGrayErr: Maximum CCD Gray error to recover zeropoint through matching
+maxCCDGrayErr: 0.05
+
+# aperCorrFitNBins: Aperture correction fit number of bins
+#  set to 0 to turn off aperture corrections
+aperCorrFitNBins: 5
+
+# sedFitBandFudgeFactors: For each fit band, the fudge factor to compute
+#  fnuprime
+sedFitBandFudgeFactors: [0.25, 1.0, 1.0, 0.25]
+# sedExtraBandFudgeFactors: For each extra band, the fudge factor to
+#  compute fnuprime
+sedExtraBandFudgeFactors: [0.25]
+# useSedLUT: Use look-up table fnprime from SED fits? (experimental)
+useSedLUT: False
+
+# sigFgcmMaxErr: Maxmimum error on m_std - <m_std> to consider
+#  to compute sigFgcm
+sigFgcmMaxErr: 0.01
+# sigFgcmMaxEGray: Maxmimum m_std - <m_std> to consider to compute sigFgcm
+sigFgcmMaxEGray: 0.05
+
+# superStarSubCCD: Compute superStar flats on sub-ccd scale.  Requires x/y
+superStarSubCCD: False
+
+
+# Memory usage configs
+# nStarPerRun: Number of stars per chi-squared run.  Too big, use more
+#  memory and less efficient.  Too small, there's also overhead.
+nStarPerRun: 200000
+# nExpPerRun: Number of exposures per retrieval run.  Too big, use more
+#  memory and less efficient use of cores.  Too small, overhead.
+nExpPerRun: 1000
+
+# sigma0Phot: Minimum error (added in quadrature) to individual observations
+sigma0Phot: 0.003
+# sigma0Cal: Minimum error (added in quadrature) to zeropoint errors
+sigma0Cal: 0.003
+
+
+
+# mapLongitudeRef: Reference longitude for map projection
+mapLongitudeRef: 0.0
+# mapNSide: healpix nside for map plotting
+mapNSide: 256
+
+
+########################
+# Experimental configs #
+########################
+
+# useRetrievedPWV: Use the PWV retrieved from star colors rather than
+#  standard linear model?
+useRetrievedPWV: False
+# useNightlyRetrievedPWV: If useRetrievedPWV, allow offsets per night?
+#  (recommended to be True)
+useNightlyRetrievedPWV: True
+# pwvRetrievalSmoothBlock: How many exposures to filter to retrieve PWV?
+pwvRetrievalSmoothBlock: 25
+
+# useRetrievedTauInit: Use nightly tau (from airmass) as initial tau guess
+useRetrievedTauInit: False
+# tauRetrievalMinCCDPerNight: Minimum number of good CCDs on a night to
+#  retrieve tau (from airmass)
+tauRetrievalMinCCDPerNight: 100
+
+# expGraySmoothDeltaT: Time delta (days) to smooth exposure gray term
+expGraySmoothDeltaT: 0.01
+# applyExpGraySmooth: Apply exposure gray smooth from previous fit cycle
+applyExpGraySmooth: False
+
+# applyI1Super: Apply I10 superStarFlat (testing only)
+applyI1Super: False
+
