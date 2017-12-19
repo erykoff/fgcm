@@ -22,13 +22,12 @@ if __name__ == '__main__':
     with open(args.config,'r') as f:
         lutConfig = yaml.load(f)
 
+    if 'lutFile' not in lutConfig:
+        raise ValueError("Must include lutFile in config to run makeFgcmLUT.py")
+
     if ((not args.clobber) and os.path.isfile(lutConfig['lutFile'])):
         print("LUT file %s already found, and clobber set to False." % (lutConfig['lutFile']))
         sys.exit(0)
-
-    #fgcmLUT = fgcm.FgcmLUT(lutConfig=lutConfig)
-    #fgcmLUT.makeLUT(lutConfig['lutFile'],clobber=True)
-    #fgcmLUT.makeLUTDerivatives(lutConfig['lutFile'])
 
     fgcmLUTMaker = fgcm.FgcmLUTMaker(lutConfig)
     fgcmLUTMaker.makeLUT()
