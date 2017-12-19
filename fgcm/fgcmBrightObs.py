@@ -26,6 +26,28 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmBrightObs(object):
     """
+    Class to compute approximate photometric magnitudes using a
+      brightest-observation algorithm
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+       Config object
+    fgcmPars: FgcmParameters
+       Parameter object
+    fgcmStars: FgcmStars
+       Star object
+    fgcmLUT: FgcmLUT
+       LUT object
+
+    Config variables
+    ----------------
+    brightObsGrayMax: float
+       Maximum gray compared to mean to consider averaging
+    nCore: int
+       Number of cores to run on (via multiprocessing)
+    nStarPerRun: int
+       Number of stars per run (too many uses more memory)
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
@@ -52,6 +74,14 @@ class FgcmBrightObs(object):
 
     def brightestObsMeanMag(self,debug=False,computeSEDSlopes=False):
         """
+        Compute the mean magnitude of every object/band from the brightest observations.
+
+        Parameters
+        ----------
+        debug: bool, default=False
+           Debug mode, no multiprocessing
+        computeSEDSlopes: bool, default=False
+           Compute first-order SED slopes from mean magnitudes
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -144,6 +174,12 @@ class FgcmBrightObs(object):
 
     def _worker(self,goodStarsAndObs):
         """
+        Multiprocessing worker for FgcmBrightObs.  Not to be called on its own.
+
+        parameters
+        ----------
+        goodStarsAndObs: tuple[2]
+           (goodStars, goodObs)
         """
 
         goodStars = goodStarsAndObs[0]

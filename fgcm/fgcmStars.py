@@ -17,6 +17,39 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmStars(object):
     """
+    Class to describe the stars and observations of the stars.  Note that
+     after initialization you must call loadStarsFromFits() or loadStars()
+     to load the star information.  This allows an external caller to clear
+     out memory after it has been copied to the shared memory buffers.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+
+    Config variables
+    ----------------
+    minPerBand: int
+       Minumum number of observations per band to be "good"
+    sedFitBandFudgeFactors: float array
+       Fudge factors for computing fnuprime for the fit bands
+    sedExtraBandFudgeFactors: float array
+       Fudge factors for computing fnuprime for the extra bands
+    starColorCuts: list
+       List that contains lists of [bandIndex0, bandIndex1, minColor, maxColor]
+    sigma0Phot: float
+       Floor on photometric error to add to every observation
+    reserveFraction: float
+       Fraction of stars to hold in reserve
+    mapLongitudeRef: float
+       Reference longitude for plotting maps of stars
+    mapNSide: int
+       Healpix nside of map plotting.
+    superStarSubCCD: bool
+       Use sub-ccd info to make superstar flats?
+    obsFile: string, only if using fits mode
+       Star observation file
+    indexFile: string, only if using fits mode
+       Star index file
     """
 
     def __init__(self,fgcmConfig):
@@ -84,6 +117,22 @@ class FgcmStars(object):
 
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
+        Load stars from fits files.
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
+        computeNobs: bool, default=True
+           Compute number of observations of each star/band
+
+        Config variables
+        ----------------
+        indexFile: string
+           Star index file
+        obsFile: string
+           Star observation file
+        inFlagStarFile: string, optional
+           Flagged star file
         """
 
         import fitsio
@@ -165,6 +214,45 @@ class FgcmStars(object):
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
+        Load stars from arrays
+
+        parameters
+        ----------
+        fgcmPars: fgcmParameters
+        obsExp: int array
+           Exposure number (or equivalent) for each observation
+        obsCCD: int array
+           CCD number (or equivalent) for each observation
+        obsRA: double array
+           RA for each observation (degrees)
+        obsDec: double array
+           Dec for each observation (degrees)
+        obsMag: float array
+           Raw ADU magnitude for each observation
+        obsMagErr: float array
+           Raw ADU magnitude error for each observation
+        obsFilterName: string array
+           Filter name for each observation
+        objID: int array
+           Unique ID number for each object
+        objRA: double array
+           RA for each object (degrees)
+        objDec: double array
+           Dec for each object (degrees)
+        objObsIndex: int array
+           For each object, where in the obs table to look
+        objNobs: int array
+           number of observations of this object (all bands)
+        obsX: float array, optional
+           x position for each observation
+        obsY: float array, optional
+           y position for each observation
+        flagID: int array, optional
+           ID of each object that is flagged from previous cycle
+        flagFlag: int array, optional
+           Flag value from previous cycle
+        computeNobs: bool, default=True
+           Compute number of good observations of each object?
         """
 
         # FIXME: check that these are all the same length!
@@ -466,7 +554,19 @@ class FgcmStars(object):
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minPerBand=None):
         """
+        Select stars that have at least the minimum number of observations per band,
+         using a list of good exposures
+
+        parameters
+        ----------
+        goodExpsIndex: int array
+           Array of good (photometric) exposure indices
+        temporary: bool, default=False
+           Only flag bad objects temporarily
+        minPerBand: int
+           Specify the min obs per band, or use self.minPerBand
         """
+
         if (minPerBand is None):
             minPerBand = self.minPerBand
 
@@ -517,6 +617,17 @@ class FgcmStars(object):
 
     def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minPerBand=None):
         """
+        Select stars that have at least the minimum number of observations per band,
+         using a list of good exposures and ccds.
+
+        parameters
+        ----------
+        goodExps: int array
+           Array of good (photometric) exposure numbers
+        goodCCDs: int array
+           Array of good (photometric) ccd numbers
+        minPerBand: int
+           Specify the min obs per band, or use self.minPerBand
         """
 
         if (minPerBand is None):
@@ -567,72 +678,16 @@ class FgcmStars(object):
         self.fgcmLog.info('Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
 
 
-    def selectStarsMinObs(self, goodExps=None, goodExpsIndex=None,
-                          doPlots=False, temporary=False):
-        """
-        """
-
-        if (goodExps is None and goodExpsIndex is None):
-            raise ValueError("Must supply *one* of goodExps or goodExpsIndex")
-        if (goodExps is not None and goodExpsIndex is not None):
-            raise ValueError("Must supply one of goodExps *or* goodExpsIndex")
-
-        # Given a list of good exposures, which stars have at least minObs observations
-        #  in each required band?
-
-        obsExp = snmm.getArray(self.obsExpHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        objID = snmm.getArray(self.objIDHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
-
-        # new simpler version
-        #  want to think if there's an even faster version.
-        if (goodExps is not None):
-            self.fgcmLog.info('Selecting good stars from %d exposures.' %
-                             (goodExps.size))
-            _,goodObs=esutil.numpy_util.match(goodExps,obsExp)
-        else:
-            self.fgcmLog.info('Selecting good stars from %d exposures.' %
-                             (goodExpsIndex.size))
-            _,goodObs=esutil.numpy_util.match(goodExpsIndex,obsExpIndex)
-
-        gd, = np.where(obsFlag[goodObs] == 0)
-        goodObs = goodObs[gd]
-
-        objNGoodObs[:,:] = 0
-        np.add.at(objNGoodObs,
-                  (obsObjIDIndex[goodObs],
-                   obsBandIndex[goodObs]),
-                  1)
-
-        minObs = objNGoodObs[:,self.bandRequiredIndex].min(axis=1)
-
-        objFlag = snmm.getArray(self.objFlagHandle)
-
-        # reset too few obs flag if it's already set
-        objFlag &= ~objFlagDict['TOO_FEW_OBS']
-
-        bad,=np.where(minObs < self.minPerBand)
-
-        if (not temporary) :
-            objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
-
-            self.fgcmLog.info('Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
-        else:
-            objFlag[bad] |= objFlagDict['TEMPORARY_BAD_STAR']
-
-            self.fgcmLog.info('Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
-
-
-        #if (doPlots):
-        #    self.plotStarMap()
-
     def plotStarMap(self,mapType='initial'):
         """
+        Plot star map.
+
+        parameters
+        ----------
+        mapType: string, default='initial'
+           A key for labeling the map.
         """
+
         import healpy as hp
         try:
             from fgcmPlotmaps import plot_hpxmap
@@ -667,79 +722,17 @@ class FgcmStars(object):
         fig.savefig('%s/%s_%sGoodStars.png' % (self.plotPath, self.outfileBaseWithCycle,
                                                mapType))
 
-
-    def computeObjectSEDSlope(self,objIndex):
-        """
-        """
-
-        raise RuntimeError("DO NOT USE???")
-
-        thisObjMagStdMean = snmm.getArray(self.objMagStdMeanHandle)[objIndex,:]
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
-        #objSEDSlopeOld = snmm.getArray(self.objSEDSlopeOldHandle)
-
-
-        # check that we have valid mags for all the required bands
-        if (np.max(thisObjMagStdMean[self.bandRequiredIndex]) > 90.0):
-            # cannot compute
-            objSEDSlope[objIndex,:] = 0.0
-        else:
-            # we can compute S for everything, even if we don't use it.
-            #  makes the indexing simpler
-
-            # this is the flux "color"
-            S=np.zeros(self.nBands-1,dtype='f4')
-            for i in xrange(self.nBands-1):
-                S[i] = (-1/self.magConstant) * (thisObjMagStdMean[i+1] - thisObjMagStdMean[i])/(self.lambdaStdBand[i+1] - self.lambdaStdBand[i])
-
-            # first, handle the required bands.
-            #  edge bands use a second derivative expansion
-            #  central bands use a straight mean
-            #  all have the possibility for a fudge factor
-
-            ## FIXME: will have to handle u band "extra band"
-
-            # handle the first required one...
-            tempIndex=self.bandRequiredIndex[0]
-            # HACK
-            #objSEDSlope[objIndex,tempIndex] = (
-            #    S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
-            #        (self.lambdaStdBand[tempIndex+1] - self.lambdaStdBand[tempIndex]) /
-            #        (self.lambdaStdBand[tempIndex+2] - self.lambdaStdBand[tempIndex])) *
-            #    (S[tempIndex+1]-S[tempIndex]))
-            objSEDSlope[objIndex,tempIndex] = (
-                S[tempIndex] + self.sedFitBandFudgeFactors[0] * (
-                    S[tempIndex+1] + S[tempIndex]))
-
-            # and the middle ones...
-            #  these are straight averages
-            ## FIXME: include Fudge factors!!!!!
-            for tempIndex in self.bandRequiredIndex[1:-1]:
-                objSEDSlope[objIndex,tempIndex] = (S[tempIndex-1] + S[tempIndex]) / 2.0
-
-            # and the last one...
-            tempIndex=self.bandRequiredIndex[-1]
-            objSEDSlope[objIndex,tempIndex] = (
-                S[tempIndex-1] + self.sedFitBandFudgeFactors[-1] * (
-                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-1]) /
-                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-2])) *
-                (S[tempIndex-1] - S[tempIndex-2]))
-
-            # and the extra bands ... only redward now
-            # we stick with the reddest band
-            ## TESTING
-            tempIndex = self.bandRequiredIndex[-1]
-            extra,=np.where(thisObjMagStdMean[self.bandExtraIndex] < 90.0)
-            for i in xrange(extra.size):
-                objSEDSlope[objIndex,self.bandExtraIndex[extra[i]]] = (
-                    S[tempIndex-1] + self.sedExtraBandFudgeFactors[extra[i]] * (
-                        (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-1]) /
-                        (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex-2])) *
-                    (S[tempIndex-1] - S[tempIndex-2]))
-
     def computeObjectSEDSlopes(self,objIndicesIn):
         """
+        Compute fnuprime (object SED slopes) for a list of objects.
+        Output is saved in objSEDSlope.
+
+        parameters
+        ----------
+        objIndicesIn: int array
+           Array of object indices to do computation
         """
+
         # work on multiple indices
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
@@ -830,6 +823,15 @@ class FgcmStars(object):
 
     def computeObjectSEDSlopesLUT(self, objIndicesIn, fgcmLUT):
         """
+        Compute fnuprime (object SED slopes) for a list of objects, from the SED fit
+          in the look-up table.  Experimental.
+        Output is saved in objSEDSlope.
+
+        parameters
+        ----------
+        objIndicesIn: int array
+           Array of object indices to do computation
+        fgcmLUT: FgcmLUT
         """
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
@@ -867,6 +869,7 @@ class FgcmStars(object):
 
     def performColorCuts(self):
         """
+        Make the color cuts that are specified in the config.
         """
 
         if (not self.magStdComputed):
@@ -883,10 +886,13 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
-    # FIXME
-
     def applySuperStarFlat(self,fgcmPars):
         """
+        Apply superStarFlat to raw magnitudes.
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
         """
 
         self.fgcmLog.info('Applying SuperStarFlat to raw magnitudes')
@@ -938,6 +944,11 @@ class FgcmStars(object):
 
     def applyApertureCorrection(self,fgcmPars):
         """
+        Apply aperture corrections to raw magnitudes.
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
         """
 
         self.fgcmLog.info('Applying ApertureCorrections to raw magnitudes')
@@ -956,6 +967,12 @@ class FgcmStars(object):
 
     def saveFlagStarIndices(self,flagStarFile):
         """
+        Save flagged stars to fits.
+
+        parameters
+        ----------
+        flagStarFile: string
+           Filename to output.
         """
 
         import fitsio
@@ -970,6 +987,7 @@ class FgcmStars(object):
 
     def getFlagStarIndices(self):
         """
+        Retrieve flagged star indices.
         """
 
         objID = snmm.getArray(self.objIDHandle)
@@ -991,6 +1009,13 @@ class FgcmStars(object):
 
     def saveStdStars(self, starFile, fgcmPars):
         """
+        Save standard stars.  Note that this does not fill in holes.
+
+        parameters
+        ----------
+        starFile: string
+           Output star file
+        fgcmPars: FgcmParameters
         """
 
         import fitsio

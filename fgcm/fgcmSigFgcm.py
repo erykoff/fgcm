@@ -19,6 +19,20 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmSigFgcm(object):
     """
+    Class to compute repeatability statistics for stars.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+    fgcmPars: FgcmParameters
+    fgcmStars: FgcmStars
+
+    Config variables
+    ----------------
+    sigFgcmMaxEGray: float
+       Maxmimum m_std - <m_std> to consider to compute sigFgcm
+    sigFgcmMaxErr: float
+       Maxmimum error on m_std - <m_std> to consider to compute sigFgcm
     """
 
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
@@ -42,6 +56,17 @@ class FgcmSigFgcm(object):
 
     def computeSigFgcm(self,reserved=False,doPlots=True,save=True,crunch=False):
         """
+        Compute sigFgcm for all bands
+
+        parameters
+        ----------
+        reserved: bool, default=False
+           Use reserved stars instead of fit stars?
+        doPlots: bool, default=True
+        save: bool, default=True
+           Save computed values to fgcmPars?
+        crunch: bool, default=False
+           Compute based on ccd-crunched values?
         """
 
         if (not self.fgcmStars.magStdComputed):

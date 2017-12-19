@@ -17,7 +17,34 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmZeropoints(object):
     """
+    Class to compute final zeropoints
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+    fgcmPars: FgcmParameters
+    fgcmLUT: FgcmLUT
+    fgcmGray: FgcmGray
+    fgcmRetrieval: FgcmRetrieval
+
+    Config variables
+    ----------------
+    minCCDPerExp: int
+       Minimum number of CCDs on an exposure to recover bad ccds
+    minStarPerCCD: int
+       Minimum number of stars to recover zeropoint through matching
+    maxCCDGrayErr: float
+       Maximum CCD Gray error to recover zeropoint through matching
+    sigma0Cal: float
+       Minimum error on zeropoint allowed
+    expGrayRecoverCut: float
+       Minimum (negative!) exposure gray to consider recovering via focal-plane average
+    expGrayErrRecoverCut: float
+       Maximum exposure gray error to consider recovering via focal-plane average
+    expVarGrayPhotometricCut: float
+       Exposure gray variance to consider recovering via focal-plane average
     """
+
     def __init__(self,fgcmConfig,fgcmPars,fgcmLUT,fgcmGray,fgcmRetrieval):
 
         self.fgcmPars = fgcmPars
@@ -50,6 +77,38 @@ class FgcmZeropoints(object):
 
     def computeZeropoints(self):
         """
+        Compute the zeropoints from all the fits that have been performed.
+
+        Output attributes
+        -----------------
+        zpStruct: Zero point recarray (nExp * nCCD)
+           expField: Exposure field name
+           ccdField: CCD field name
+           'FGCM_FLAG': Quality flag value
+           'FGCM_ZPT': Zeropoint
+           'FGCM_ZPTERR': Error on zeropoint
+           'FGCM_I0': I0 for exp/ccd (throughput)
+           'FGCM_I10': I10 for exp/ccd (chromatic)
+           'FGCM_R0': Retrieved throughput integral
+           'FGCM_R10': Retrieved chromatic integral
+           'FGCM_GRY': Delta-zeropoint due to CCD gray
+           'FGCM_ZPTVAR': Variance of zeropoint as estimated from gray corrections
+           'FGCM_TILINGS': Average number of observations of calib stars on CCD
+           'FGCM_FPGRY': Average focal-plane gray (exp_gray)
+           'FGCM_FPVAR': Focal-plane variance
+           'FGCM_DUST': Delta-zeropoint due to mirror/corrector dust buildup
+           'FGCM_FLAT': Delta-zeropoint due to superStarFlat
+           'FGCM_APERCORR': Delta-zeropoint due to aperture correction
+           'EXPTIME': Exposure time (seconds)
+           'FILTERNAME': Filter name
+           'BAND': band name
+        atmStruct: Atmosphere parameter recarray (nExp)
+           'PMB': Barometric pressure (mb)
+           'PWV': preciptable water vapor (mm)
+           'TAU': aerosol optical index
+           'ALPHA': Aerosol slope
+           'O3': Ozone (dob)
+           'SECZENITH': secant(zenith angle)
         """
 
         # first, we need to get relevant quantities from shared memory.
@@ -381,62 +440,6 @@ class FgcmZeropoints(object):
         plotter.makeR1I1Plots()
         plotter.makeR1I1Maps(self.ccdOffsets, ccdField=self.ccdField)
 
-        #self.fgcmLog.info('Making zeropoint summary plots...')
-        #plotter.makeZpPlots()
-
-
-        ## compare I0 and R0, I1 and R1
-
-        #self.fgcmLog.info('Making I1/R1 plots...')
-        #acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
-        #              zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
-        #for i in xrange(self.fgcmPars.nBands):
-        #    use,=np.where((np.core.defchararray.rstrip(zpStruct['BAND']) ==
-        #                   self.fgcmPars.bands[i]) &
-        #                  ((zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
-        #                  (np.abs(zpStruct['FGCM_R10']) < 1000.0) &
-        #                  (np.abs(zpStruct['FGCM_R0']) < 1000.0))
-
-        #    if (use.size == 0):
-        #        continue
-
-        #    i1 = zpStruct['FGCM_I10'][use]*zpStruct['FGCM_I0'][use]
-        #    r1 = zpStruct['FGCM_R10'][use]*zpStruct['FGCM_R0'][use]
-
-            # and limit to a reasonable range
-        #    ok, = np.where((r1 > (i1.min()-2.0)) &
-        #                   (r1 < (i1.max()+2.0)))
-
-        #    i1=i1[ok]
-        #    r1=r1[ok]
-
-        #    fig = plt.figure(1,figsize=(8,6))
-        #    fig.clf()
-
-        #    ax=fig.add_subplot(111)
-
-        #    ax.hexbin(i1,r1,cmap=plt.get_cmap('gray_r'),rasterized=True)
-            # and overplot a 1-1 line that best covers the range of the data
-       #     xlim = ax.get_xlim()
-            #ylim = ax.get_ylim()
-            #range0 = np.min([xlim[0],ylim[0]])+0.0001
-            #range1 = np.max([xlim[1],ylim[1]])-0.0001
-        #    range0 = xlim[0]+0.001
-        #    range1 = xlim[1]-0.001
-        #    ax.plot([range0,range1],[range0,range1],'b--',linewidth=2)
-
-        #    ax.set_xlabel(r'$I_1$ from FGCM Fit',fontsize=16)
-        #    ax.set_ylabel(r'$R_1$ from Retrieval',fontsize=16)
-
-        #    text=r'$(%s)$' % (self.fgcmPars.bands[i])
-        #    ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
-        #                ha='left',va='top',fontsize=16)#
-
-        #    fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
-        #                                       self.outfileBaseWithCycle,
-        #                                       self.fgcmPars.bands[i]))#
-
-        # need to know the mean zeropoint per exposure
         self.fgcmLog.info('Making zeropoint summary plots...')
 
         expZpMean = np.zeros(self.fgcmPars.nExp,dtype='f4')
@@ -486,6 +489,14 @@ class FgcmZeropoints(object):
 
     def _computeZpt(self,zpStruct,zpIndex):
         """
+        Internal method to compute the zeropoint from constituents
+
+        parameters
+        ----------
+        zpStruct: recarray
+           Zero point structure
+        zpIndex: int array
+           Array of indices to compute zeropoints
         """
 
         zpStruct['FGCM_ZPT'][zpIndex] = (2.5*np.log10(zpStruct['FGCM_I0'][zpIndex]) +
@@ -498,6 +509,16 @@ class FgcmZeropoints(object):
 
     def _computeZptErr(self,zpStruct,zpExpIndex,zpIndex):
         """
+        Internal method to compute zeropoint error from constituents
+
+        parameters
+        ----------
+        zpStruct: recarray
+           Zero point structure
+        zpExpIndex: int array
+           Index to go from zeropoint structure to exposures
+        zpIndex: int array
+           Array of indices to compute zeropoint errors
         """
 
         # sigFgcm is computed per *band* not per *filter*
@@ -510,6 +531,7 @@ class FgcmZeropoints(object):
 
     def saveZptFits(self):
         """
+        Save zeropoint to fits file
         """
 
         import fitsio
@@ -520,6 +542,7 @@ class FgcmZeropoints(object):
 
     def saveAtmFits(self):
         """
+        Save atmosphere parameters to fits file
         """
 
         import fitsio
@@ -530,7 +553,20 @@ class FgcmZeropoints(object):
 
 class FgcmZeropointPlotter(object):
     """
+    Class to make zeropoint plots
+
+    parameters
+    ----------
+    zpStruct: recarray
+       Zero point structure
+    filterNames: string array
+       Names of filters
+    plotPath: string
+       Directory to make plots
+    outfileBase: string
+       Output file base string
     """
+
     def __init__(self, zpStruct, filterNames, plotPath, outfileBase):
         self.zpStruct = zpStruct
         self.filterNames = filterNames
@@ -539,7 +575,9 @@ class FgcmZeropointPlotter(object):
 
     def makeR1I1Plots(self):
         """
+        Make R1 vs I1 plots.
         """
+
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
         for filterName in self.filterNames:
@@ -587,6 +625,12 @@ class FgcmZeropointPlotter(object):
 
     def makeR1I1Maps(self, ccdOffsets, ccdField='CCDNUM'):
         """
+        Make R1, I1, and R1-I1 maps.
+
+        parameters
+        ----------
+        ccdOffsets: ccd offset struct
+        ccdField: string, default='CCDNUM'
         """
 
         from fgcmUtilities import plotCCDMap

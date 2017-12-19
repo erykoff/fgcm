@@ -18,7 +18,33 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmGray(object):
     """
+    Class which computes ccd and exposure gray residuals.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+       Config object
+    fgcmPars: FgcmParameters
+       Parameter object
+    fgcmStars: FgcmStars
+       Star object
+
+    Config variables
+    ----------------
+    minStarPerCCD: int
+       Minimum number of stars on a CCD to compute CCD Gray
+    minStarPerExp: int
+       Minumum number of stars per exposure for *initial* exposure gray
+    maxCCDGrayErr: float
+       Maximum CCD gray error to be considered "good" to use in exposure gray
+    ccdGrayMaxStarErr: float
+       Maximum error for any star observation to be used to compute CCD Gray
+    expGrayInitialCut: float
+       Maximum initial exp gray to be used in plotting
+    expGrayCheckDeltaT: float
+       Time difference between exposures to check for correlated residuals (plots only)
     """
+
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
         self.fgcmLog = fgcmConfig.fgcmLog
@@ -35,10 +61,7 @@ class FgcmGray(object):
         # and record configuration variables...
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.minStarPerExp = fgcmConfig.minStarPerExp
-        self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
-        #self.sigFgcmMaxErr = fgcmConfig.sigFgcmMaxErr
-        #self.sigFgcmMaxEGray = fgcmConfig.sigFgcmMaxEGray
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
@@ -47,13 +70,12 @@ class FgcmGray(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
         self.expGrayCheckDeltaT = fgcmConfig.expGrayCheckDeltaT
-        #self.varNSig = fgcmConfig.varNSig
-        #self.varMinBand = fgcmConfig.varMinBand
 
         self._prepareGrayArrays()
 
     def _prepareGrayArrays(self):
         """
+        Internal method to create shared-memory arrays.
         """
 
         # we have expGray for Selection
@@ -81,9 +103,16 @@ class FgcmGray(object):
 
     def computeExpGrayForInitialSelection(self,doPlots=True):
         """
+        Compute exposure gray using bright star magnitudes to get initial estimates.
+
+        parameters
+        ----------
+        doPlots: bool, default=True
+           Make check plots
         """
+
         if (not self.fgcmStars.magStdComputed):
-            raise ValueError("Must run FgcmChisq to compute magStd before computeExpGrayForInitialSelection")
+            raise RuntimeError("Must run FgcmChisq to compute magStd before computeExpGrayForInitialSelection")
 
         # Note this computes ExpGray for all exposures, good and bad
 
@@ -230,6 +259,14 @@ class FgcmGray(object):
 
     def computeCCDAndExpGray(self,doPlots=True,onlyObsErr=False):
         """
+        Compute CCD and exposure gray using calibrated magnitudes.
+
+        parameters
+        ----------
+        doPlots: bool, default=True
+           Make check plots
+        onlyObsErr: bool, default=False
+           Only use observational error.  Used when making initial superstarflat estimate.
         """
 
         if (not self.fgcmStars.allMagStdComputed):
@@ -543,6 +580,7 @@ class FgcmGray(object):
 
     def makeExpGrayPlots(self):
         """
+        Make exposure gray plots.
         """
 
         # arrays we need

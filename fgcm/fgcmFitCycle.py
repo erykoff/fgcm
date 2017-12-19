@@ -32,6 +32,18 @@ from sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmFitCycle(object):
     """
+    Class which runs the main FGCM fitter.
+
+    parameters
+    ----------
+    configDict: dict
+       dictionary with config variables
+    useFits: bool, optional
+       Read in files using fitsio?
+    noFitsDict: dict, optional
+       Dict with lutIndox/lutStd/expInfo/ccdOffsets if useFits == False
+
+    Note that at least one of useFits or noFitsDict must be supplied.
     """
 
     def __init__(self, configDict, useFits=False, noFitsDict=None):
@@ -75,6 +87,11 @@ class FgcmFitCycle(object):
 
     def runWithFits(self):
         """
+        Read in files and run, reading data from fits tables.
+
+        parameters
+        ----------
+        None
         """
 
         self._setupWithFits()
@@ -82,6 +99,13 @@ class FgcmFitCycle(object):
 
     def setStars(self, fgcmStars):
         """
+        Record the star information.  This is a separate method to allow
+         for memory to be cleared.
+
+        parameters
+        ----------
+        fgcmStars: FgcmStars
+           Object with star information
         """
         # this has to be done outside for memory issues
 
@@ -89,6 +113,13 @@ class FgcmFitCycle(object):
 
     def setLUT(self, fgcmLUT):
         """
+        Record the look-up table information.  This is a separate method
+         for memory to be cleared.
+
+        parameters
+        ----------
+        fgcmLUT: FgcmLUT
+           Object with LUT information
         """
         # this has to be done outside for memory issues
 
@@ -96,6 +127,13 @@ class FgcmFitCycle(object):
 
     def setPars(self, fgcmPars):
         """
+        Record the parameter information.  This is a separate method
+         for memory to be cleared.
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
+           Object with parameter information
         """
         # this has to be done outside for memory issues
 
@@ -103,12 +141,12 @@ class FgcmFitCycle(object):
 
     def _setupWithFits(self):
         """
+        Set up with fits files.
         """
 
         self.fgcmLog.info(getMemoryString('Setting up with fits'))
 
         # read in the LUT
-        #self.fgcmLUT = FgcmLUT(self.fgcmConfig.lutFile)
         self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile)
 
         # Generate or Read Parameters
@@ -126,6 +164,12 @@ class FgcmFitCycle(object):
 
     def finishSetup(self):
         """
+        Finish fit cycle setup.  Check that all the essential objects have been set.
+
+        parameters
+        ----------
+        None
+
         """
 
         if (self.fgcmLUT is None):
@@ -154,6 +198,23 @@ class FgcmFitCycle(object):
 
     def run(self):
         """
+        Run the FGCM Fit Cycle.  If setup with useFits==True then files for the
+          parameters, zeropoints, flagged stars, and atmosphere will be created.
+          Otherwise, these can be accessed as attributes as noted.  In addition,
+          a new config file for the next file will be created if useFits==True.
+          In all cases a suite of plots will be created in a subdirectory or in
+          the path specified by outputPath.
+
+        parameters
+        ----------
+        None
+
+        output attributes
+        ----------
+        fgcmZpts: FgcmZeropoints
+           Contains zeropoints for exposure/ccd pairs and exposure atmosphere parameters
+        fgcmPars: FgcmParameters
+           Contains fit parameters
         """
 
         if (not self.setupComplete):
@@ -399,6 +460,7 @@ class FgcmFitCycle(object):
 
     def _doFit(self,doPlots=True):
         """
+        Internal method to do the fit using fmin_l_bfgs_b
         """
 
         self.fgcmLog.info('Performing fit with %d iterations.' %
@@ -453,6 +515,7 @@ class FgcmFitCycle(object):
 
     def _doSOpticsFit(self,doPlots=True):
         """
+        Internal method to only do the optics fit.  Not recommended.
         """
 
         ## FIXME: remove this method, it's not useful

@@ -21,6 +21,41 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmParameters(object):
     """
+    Class to contain FGCM parameters.  Initialization should be done via:
+      newParsWithFits()
+      newParsWithArrays()
+      loadParsWithFits()
+      loadParsWithArrays()
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+       Config object
+    expInfo: numpy recarray, required if New parameters
+       Exposure info table
+    fgcmLUT: FgcmLUT, required if New parameters
+    inParInfo: numpy recarray, required if loading parameters
+    inParams: numpy recarray, required if loading parameters
+    inSuperStar: numpy array, required if loading parameters
+
+    Config variables
+    ----------------
+    minExpPerNight: int
+       Minumum number of exposures in a night for plotting
+    freezeStdAtmosphere: bool
+       Fit atmosphere parameters or freeze at standard values? (good for 0th cycle)
+    epochMJDs: double array
+       MJDs which divide observing epochs
+    washMJDs: double array
+       MJDs which denote mirror washing dates
+    resetParameters: bool
+       Reset atmosphere fit parameters from previous cycle?
+    useRetrievedPWV: bool
+       Use PWV retrieved from colors from previous cycle?
+    useNightlyRetrievedPWV: bool
+       Re-fit offsets for each night PWV variation (if useRetrievedPWV==True)?
+    useRetrievedTauInit: bool
+       Use nightly retrieved tau from previous cycle as initial guess? (experimental)
     """
 
     def __init__(self, fgcmConfig, expInfo=None, fgcmLUT=None,
@@ -129,6 +164,17 @@ class FgcmParameters(object):
     @classmethod
     def newParsWithFits(cls, fgcmConfig, fgcmLUT):
         """
+        Make a new FgcmParameters object, loading from fits.
+
+        parameters
+        ----------
+        fgcmConfig: FgcmConfig
+        fgcmLUT: fgcmLUT
+
+        Config variables
+        ----------------
+        exposureFile: string
+           File with exposure information
         """
 
         import fitsio
@@ -141,6 +187,14 @@ class FgcmParameters(object):
     @classmethod
     def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo):
         """
+        Make a new FgcmParameters object, with input arrays
+
+        parameters
+        ----------
+        fgcmConfig: FgcmConfig
+        fgcmLUT: FgcmLUT
+        expInfo: numpy recarray
+           Exposure info
         """
 
         return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
@@ -148,6 +202,18 @@ class FgcmParameters(object):
     @classmethod
     def loadParsWithFits(cls, fgcmConfig):
         """
+        Make an FgcmParameters object, loading from old parameters in fits
+
+        parameters
+        ----------
+        fgcmConfig: FgcmConfig
+
+        Config variables
+        ----------------
+        exposureFile: string
+           File with exposure information
+        inParameterFile: string
+           File with input parameters (from previous cycle)
         """
 
         import fitsio
@@ -166,6 +232,19 @@ class FgcmParameters(object):
     @classmethod
     def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar):
         """
+        Make an FgcmParameters object, loading from old parameters in arrays.
+
+        parameters
+        ----------
+        fgcmConfig: FgcmConfig
+        expInfo: numpy recarray
+           Exposure info
+        inParInfo: numpy recarray
+           Input parameter information array
+        inParams: numpy recarray
+           Input parameters
+        inSuperStar: numpy array
+           Input superstar
         """
 
         return cls(fgcmConfig, expInfo=expInfo,
@@ -173,6 +252,12 @@ class FgcmParameters(object):
 
     def _initializeNewParameters(self, expInfo, fgcmLUT):
         """
+        Internal method to initialize new parameters
+
+        parameters
+        ----------
+        expInfo: numpy recarrat
+        fgcmLUT: FgcmLUT
         """
 
         # link band indices
@@ -266,6 +351,14 @@ class FgcmParameters(object):
 
     def _loadOldParameters(self, expInfo, inParInfo, inParams, inSuperStar):
         """
+        Internal method to load old parameters
+
+        parameters
+        ----------
+        expInfo: numpy recarray
+        inParInfo: numpy recarray
+        inParams: numpy recarray
+        inSuperStar: numpy recarray
         """
 
         # link band indices
@@ -406,12 +499,9 @@ class FgcmParameters(object):
 
     def _makeBandIndices(self):
         """
+        Internal method to make the band indices
         """
 
-        ## FIXME
-
-        #self.bandIndex = np.arange(self.nBands,dtype='i2')
-        #self.lutFilterIndex = np.arange(self.nBands,dtype='i2')
         self.fitBandIndex = np.zeros(self.nFitBands,dtype='i2')
         self.extraBandIndex = np.zeros(self.nExtraBands,dtype='i2')
 
@@ -430,6 +520,11 @@ class FgcmParameters(object):
 
     def _loadExposureInfo(self, expInfo):
         """
+        Internal method to load exposure info into variables.
+
+        parameters
+        ----------
+        expInfo: numpy recarray
         """
 
         # ensure sorted by exposure number
@@ -537,6 +632,7 @@ class FgcmParameters(object):
 
     def _loadEpochAndWashInfo(self):
         """
+        Internal method to reformat epoch and wash info.
         """
 
         # the epochs should contain all the MJDs.
@@ -578,6 +674,7 @@ class FgcmParameters(object):
 
     def _arrangeParArray(self):
         """
+        Internal method to make the full fit array
         """
 
         # make pointers to a fit parameter array...
@@ -638,6 +735,12 @@ class FgcmParameters(object):
 
     def saveParsFits(self, parFile):
         """
+        Save parameters to fits file
+
+        parameters
+        ----------
+        parFile: string
+           Output file
         """
 
         import fitsio
@@ -659,6 +762,16 @@ class FgcmParameters(object):
 
     def parsToArrays(self):
         """
+        Convert parameters into recarrays for export
+
+        parameters
+        ----------
+        None
+
+        returns
+        -------
+        parInfo, pars: tuple
+           Parameter information and parameters.
         """
         # this can be run without fits
 
@@ -786,6 +899,12 @@ class FgcmParameters(object):
 
     def loadExternalPWV(self, externalPWVDeltaT):
         """
+        Load external PWV measurements, from fits table.
+
+        parameters
+        ----------
+        externalPWVDeltaT: float
+           Maximum delta-T (days) for external PWV measurement to match exposure MJD.
         """
 
         import fitsio
@@ -817,7 +936,9 @@ class FgcmParameters(object):
 
     def loadExternalTau(self, withAlpha=False):
         """
+        Not Supported.
         """
+
         # load a file with Tau values
         ## not supported yet
         raise ValueError("externalTau Not supported yet")
@@ -827,7 +948,16 @@ class FgcmParameters(object):
 
     def reloadParArray(self, parArray, fitterUnits=False):
         """
+        Take parameter array and stuff into individual parameter attributes.
+
+        parameters
+        ----------
+        parArray: float array
+           Array with all fit parameters
+        fitterUnits: bool, default=False
+           Is the parArray in normalized fitter units?
         """
+
         # takes in a parameter array and loads the local split copies?
         self.fgcmLog.debug('Reloading parameter array')
 
@@ -881,6 +1011,20 @@ class FgcmParameters(object):
 
     def parsToExposures(self, retrievedInput=False):
         """
+        Associate parameters with exposures.
+
+        parameters
+        ----------
+        retrievedInput: bool, default=False
+           When useRetrievedPWV, do we use the input or final values as the basis for the conversion?
+
+        Output attributes
+        -----------------
+        expO3: float array
+        expAlpha: float array
+        expPWV: float array
+        expLnTau: float array
+        expQESys: float array
         """
 
         self.fgcmLog.debug('Computing exposure values from parameters')
@@ -944,6 +1088,17 @@ class FgcmParameters(object):
     # cannot be a property because of the keywords
     def getParArray(self,fitterUnits=False):
         """
+        Take individual parameter attributes and build a parameter array.
+
+        parameters
+        ----------
+        fitterUnits: bool, default=False
+           Will the parArray be in normalized fitter units?
+
+        returns
+        -------
+        parArray: float array
+           Array with all fit parameters
         """
 
         self.fgcmLog.debug('Retrieving parameter array')
@@ -994,7 +1149,19 @@ class FgcmParameters(object):
     # this cannot be a property because it takes units
     def getParBounds(self,fitterUnits=False):
         """
+        Create parameter fit bounds
+
+        parameters
+        ----------
+        fitterUnits: bool, default=False
+           Will the parArray be in normalized fitter units?
+
+        returns
+        -------
+        parBounds: zip(parLow, parHigh)
+
         """
+
         self.fgcmLog.debug('Retrieving parameter bounds')
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
@@ -1176,6 +1343,15 @@ class FgcmParameters(object):
         return parBounds
 
     def getUnitDict(self,fitterUnits=False):
+        """
+        Get dictionary of unit conversions.
+
+        parameters
+        ----------
+        fitterUnits: bool, default=False
+           Return with normalized fitter units or just 1.0s?
+        """
+
         if (fitterUnits):
             return self.unitDictSteps
         else:
@@ -1184,6 +1360,11 @@ class FgcmParameters(object):
     @property
     def superStarFlatCenter(self):
         """
+        SuperStarFlat at the center of each CCD
+
+        returns
+        -------
+        superStarFlatCenter: float array (nEpochs, nLUTFilter, nCCD)
         """
 
         # This bit of code simply returns the superStarFlat computed at the center
@@ -1209,6 +1390,11 @@ class FgcmParameters(object):
     @property
     def expCCDSuperStar(self):
         """
+        SuperStarFlat for each Exposure/CCD
+
+        returns
+        -------
+        expCCDSuperStar: float array (nExp, nCCD)
         """
 
         expCCDSuperStar = np.zeros((self.nExp, self.nCCD), dtype='f8')
@@ -1222,6 +1408,11 @@ class FgcmParameters(object):
     @property
     def expApertureCorrection(self):
         """
+        Exposure aperture correction
+
+        returns
+        -------
+        expApertureCorrection: float array (nExp)
         """
 
         expApertureCorrection = np.zeros(self.nExp,dtype='f8')
@@ -1241,6 +1432,7 @@ class FgcmParameters(object):
 
     def plotParameters(self):
         """
+        Plot nightly average parameters
         """
 
         # want nightly averages, on calibratable nights (duh)

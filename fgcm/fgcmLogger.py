@@ -7,7 +7,19 @@ from fgcmUtilities import logDict
 
 class FgcmLogger(object):
     """
+    Class to do logging for FGCM.  The interface here is the same as the LSST DM
+     logger so that logger can be dropped right in and used instead.
+
+    parameters
+    ----------
+    logFile: string
+       File to write log to
+    logLevel: string
+       Set to 'INFO' or 'DEBUG'
+    printLogger: bool, default=False
+       Only print log messages to stdout, and do not open logFile
     """
+
     def __init__(self,logFile,logLevel,printLogger=False):
 
         self.logFile = logFile
@@ -24,16 +36,38 @@ class FgcmLogger(object):
 
     def info(self,logString):
         """
+        Log at info level.
+
+        parameters
+        ----------
+        logString: string
+           String to write to log
         """
+
         self.log('INFO', logString)
 
     def debug(self,logString):
         """
+        Log at debug level.
+
+        parameters
+        ----------
+        logString: string
+           String to write to log
         """
+
         self.log('DEBUG', logString)
 
     def log(self,logType,logString):
         """
+        Log at any level.
+
+        parameters
+        ----------
+        logType: string
+           Level at which to log.  'INFO' or 'DEBUG'
+        logString: string
+           String to write to log
         """
 
         if (logDict[logType] <= logDict[self.logLevel]):
@@ -48,31 +82,11 @@ class FgcmLogger(object):
                 # sometimes it just fails...let it go.
                 pass
 
-    def logMemoryUsage(self,logType,location):
-        """
-        """
-        status = None
-        result = {'peak':0, 'rss':0}
-        try:
-            status = open('/proc/self/status')
-            for line in status:
-                parts = line.split()
-                key = parts[0][2:-1].lower()
-                if key in result:
-                    result[key] = int(parts[1])/1000
-
-            logString = 'Memory usage at %s: %d MB current; %d MB peak.' % (
-                location, result['rss'], result['peak'])
-
-            self.log(logType,logString)
-        except:
-            self.log(logType,'Could not get process status for resource usage!')
-
-        return
-
     def stopLogging(self):
         """
+        Stop logging and close the file.
         """
+
         if not self.printLogger:
             self.logF.close()
 

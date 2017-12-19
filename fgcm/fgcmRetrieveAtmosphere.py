@@ -15,6 +15,13 @@ from fgcmUtilities import retrievalFlagDict
 
 class FgcmRetrieveAtmosphere(object):
     """
+    Class to convert retrieved integrals into atmosphere parameters.  Experimental.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+    fgcmLUT: FgcmLUT
+    fgcmPars: FgcmPars
     """
 
     def __init__(self, fgcmConfig, fgcmLUT, fgcmPars):
@@ -37,7 +44,14 @@ class FgcmRetrieveAtmosphere(object):
 
     def r1ToPWV(self, fgcmRetrieval, doPlots=True):
         """
+        Convert R1 values to PWV.  Experimental.
+
+        parameters
+        ----------
+        fgcmRetrieval: FgcmRetrieval
+        doPlots: bool, default=True
         """
+
         self.fgcmLog.info('Retrieving PWV Values...')
 
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
@@ -300,7 +314,14 @@ class FgcmRetrieveAtmosphere(object):
 
     def r0ToNightlyTau(self, fgcmRetrieval, doPlots=True):
         """
+        Convert R0 values to nightly Tau, using airmass.  Experimental.
+
+        parameters
+        ----------
+        fgcmRetrieval: FgcmRetrieval
+        doPlots: bool, default=True
         """
+
         self.fgcmLog.info('Retrieving Nightly Tau Values...')
 
         #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
@@ -412,6 +433,12 @@ class FgcmRetrieveAtmosphere(object):
 
     def expGrayToNightlyTau(self, fgcmGray, doPlots=True):
         """
+        Convert exposure gray to nightly Tau, using airmass.  Experimental.
+
+        parameters
+        ----------
+        fgcmGray: FgcmGray
+        doPlots: bool, defaults=True
         """
 
         self.fgcmLog.info( 'Retrieving nightly Tau values...')

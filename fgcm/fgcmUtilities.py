@@ -9,15 +9,18 @@ def _pickle_method(m):
     else:
         return getattr, (m.im_self, m.im_func.func_name)
 
+# Dictionary of object flags
 objFlagDict = {'TOO_FEW_OBS':2**0,
                'BAD_COLOR':2**1,
                'VARIABLE':2**2,
                'TEMPORARY_BAD_STAR':2**3,
                'RESERVED':2**4}
 
+# Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE':2**0,
                'BAD_ERROR':2**1}
 
+# Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,
                'EXP_GRAY_TOO_NEGATIVE':2**1,
                'VAR_GRAY_TOO_LARGE':2**2,
@@ -27,7 +30,7 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
                'TEMPORARY_BAD_EXPOSURE':2**6,
                'EXP_GRAY_TOO_POSITIVE':2**7}
 
-
+# Dictionary of zeropoint flags
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
               'PHOTOMETRIC_EXTRA_EXPOSURE':2**1,
               'NONPHOTOMETRIC_FIT_NIGHT':2**2,
@@ -35,6 +38,7 @@ zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
               'CANNOT_COMPUTE_ZEROPOINT':2**4,
               'TOO_FEW_STARS_ON_CCD':2**5}
 
+# Dictionary of retrieval flags
 retrievalFlagDict = {'EXPOSURE_RETRIEVED':2**0,
                      'EXPOSURE_INTERPOLATED':2**1,
                      'EXPOSURE_STANDARD':2**2}
@@ -43,22 +47,17 @@ logDict = {'NONE':0,
            'INFO':1,
            'DEBUG':2}
 
-#def resourceUsage(where):
-#    status = None
-#    result = {'peak':0, 'rss':0}
-#    try:
-#        status = open('/proc/self/status')
-#        for line in status:
-#            parts = line.split()
-#            key = parts[0][2:-1].lower()
-#            if key in result:
-#                result[key] = int(parts[1])/1000
-#        print('Memory usage at %s:  %d MB current and %d MB peak.'  %(where, result['rss'], result['peak']))
-#    except:
-#        print('Could not find self status.')
-#    return
 
 def getMemoryString(location):
+    """
+    Get a string for memory usage (current and peak) for logging.
+
+    parameters
+    ----------
+    location: string
+       A short string which denotes where in the code the memory was recorded.
+    """
+
     status = None
     result = {'peak':0, 'rss':0}
     try:
@@ -79,6 +78,36 @@ def getMemoryString(location):
 
 def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
     """
+    Bin data and compute errors via bootstrap resampling.  All median statistics.
+
+    parameters
+    ----------
+    x: float array
+       x values
+    y: float array
+       y values
+    binSize: float
+       Bin size
+    xRange: float array [2]
+       x limits for binning
+    nTrial: float, optional, default=100
+       Number of bootstraps
+    xNorm: float, optional, default=-1
+       Set the y value == 0 when x is equan to xNorm.  if -1.0 then no norm.
+    minPerBin: int, optional, default=5
+       Minimum number of points per bin
+
+    returns
+    -------
+    binStruct: recarray, length nbins
+       'X_BIN': Left edge of each bin
+       'X': median x in bin
+       'X_ERR': width of x distribution in bin
+       'X_ERR_MEAN': error on the mean of the x's in bin
+       'Y': mean y in bin
+       'Y_WIDTH': width of y distribution in bin
+       'Y_ERR': error on the mean of the y's in the bin
+
     """
 
 
@@ -129,12 +158,33 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
     return binStruct
 
 def gaussFunction(x, *p):
+    """
+    A gaussian function for fitting
+
+    parameters
+    ----------
+    x: float array
+       x values
+    *p: Tuple (A, mu, sigma)
+    """
+
     A, mu, sigma = p
     return A*np.exp(-(x-mu)**2./(2.*sigma**2))
 
 def histoGauss(ax,array):
     """
+    Plot a histogram and fit a Gaussian to it.  Modeled after IDL histogauss.pro.
+
+    parameters
+    ----------
+    ax: Plot axis object
+    array: float array to plot
+
+    returns
+    -------
+    coeff: tuple (A, mu, sigma)
     """
+
     import scipy.optimize
     import matplotlib.pyplot as plt
     import esutil
@@ -181,6 +231,21 @@ def histoGauss(ax,array):
     return coeff
 
 def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
+    """
+    Plot the map of CCDs.
+
+    parameters
+    ----------
+    ax: plot axis object
+    ccdOffsets: ccdOffset recarray
+    values: float array
+       Values for each ccd
+    cbLabel: string
+       Color bar label
+    loHi: tuple [2], optional
+       (lo, hi) or else scaling is computed from data.
+    """
+
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.colors as colors
@@ -240,9 +305,37 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
     return None
 
 def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
+    """
+    2d polynomial fitting function.  Up to 2nd order, higher orders dropped.
+
+    parameters
+    ----------
+    xy: numpy vstack (2,nvalues)
+    p0: Const
+    p1: x term
+    p2: y term
+    p3: x**2 term
+    p4: y**2 term
+    p5: x*y term
+    """
+
     return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
 
 def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
+    """
+    Plot CCD map with polynomial fits for each CCD
+
+    parameters
+    ----------
+    ax: plot axis object
+    ccdOffsets: ccdOffset recarray
+    parArray: float array (nCCD, nPars)
+    cbLabel: string
+       Color bar label
+    loHi: tuple [2], optional
+       (lo, hi) or else scaling is computed from data.
+    """
+
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
     import matplotlib.cm as cmx

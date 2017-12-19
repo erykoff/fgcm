@@ -12,7 +12,42 @@ from fgcmLogger import FgcmLogger
 
 class FgcmMakeStars(object):
     """
+    Class to match and build star inputs for FGCM.
+
+    parameters
+    ----------
+    starConfig: dict
+       Dictionary with config values
+
+    Config variables (in starConfig)
+    ----------------
+    filterToBand: dict
+       Dictionary with one entry per filter (string) pointing to a band (string)
+       e.g. {'g':'g', 'r':'r', 'i':'i', 'i2':'i'}
+    requiredBands: string list
+       List of required bands
+    minPerBand: int
+       Minimum number of observations per required band for a star to be considered
+    matchRadius: float
+       Match radius in arcseconds
+    isolationRadius: float
+       Distance to nearest star to reject both, in arcseconds
+    densNSide: int
+       Healpix nside for computing density
+    densMaxPerPixel: int
+       Maximum number of stars in each healpix.  Will randomly sample down to this density.
+    referenceBand: string
+       Name of reference band
+    zpDefault: float
+       Zeropoint to apply to fluxes get numbers to be normal-ish.
+    matchNSide: int
+       Healpix nside to do smatch matching.  Should just be 4096.
+    coarseNSide: int
+       Healpix nside to break down into coarse pixels (save memory)
+    brightStarFile: string, optional
+       File with (very) bright stars (RA/DEC/RADIUS) for masking
     """
+
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
@@ -49,6 +84,12 @@ class FgcmMakeStars(object):
 
     def runFromFits(self, clobber=False):
         """
+        Do the star matching, loading observations from fits files.
+
+        parameters
+        ----------
+        clobber: bool, default=False
+           Should existing files be clobbered?
         """
 
         if 'starfileBase' not in self.starConfig:
@@ -66,6 +107,23 @@ class FgcmMakeStars(object):
 
     def makeReferenceStarsFromFits(self, observationFile):
         """
+        Make reference stars, loading observations from fits.
+
+        parameters
+        ----------
+        observationFile: string
+
+        Observation file is a fits table with the following fields:
+           'FILTERNAME': Name of the filter used
+           'RA': RA
+           'DEC': Dec
+        In addition, the FGCM run will require:
+           'MAG': raw magnitude computed from ADU
+           'MAGERR': raw magnitude error computed from ADU
+           expField: a field name which specifies the exposure
+           ccdField: a field name which specifies the ccd
+           'X': x-position on CCD (optional)
+           'Y': y-position on CCD (optional)
         """
 
         import fitsio
@@ -106,13 +164,19 @@ class FgcmMakeStars(object):
 
     def makeMatchedStarsFromFits(self, observationFile, obsIndexFile, clobber=False):
         """
+        Make matched stars, loading observations from fits.
+
+        parameters
+        ----------
+        observationFile: string
+        obsIndexFile: string
+           File output from makeReferenceStarsFromFits
         """
 
         import fitsio
 
         if (not clobber):
             if (os.path.isfile(obsIndexFile)):
-                #print("Found %s " % (obsIndexFile))
                 self.fgcmLog.info("Found %s " % (obsIndexFile))
                 return
 
@@ -138,17 +202,38 @@ class FgcmMakeStars(object):
                            filterNameArray=None,
                            brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
+        Make reference stars, from pre-loaded arrays
+
+        parameters
+        ----------
+        raArray: double array
+           RA for each observation
+        decArray: double array
+           Dec for each observation
+        bandSelected: bool, default=False
+           Has the input raArray/decArray been pre-selected by band?
+        filterNameArray: string array
+           Array of filterNames.  Required if bandSelected==False
+        brightStarRA: double array, optional
+           RA for bright stars for mask
+        brightStarDec: double array, optional
+           Dec for bright stars for mask
+        brightStarRadius: float array, optional
+           Radius for bright stars for mask
+
+        Output attributes
+        -----------------
+        objCat: numpy recarray
+           Catalog of unique objects selected from reference band
         """
 
         # can we use the better smatch code?
         try:
             import smatch
             hasSmatch = True
-            #print("Good news!  smatch is available.")
             self.fgcmLog.info("Good news!  smatch is available.")
         except:
             hasSmatch = False
-            #print("Bad news.  smatch not found.")
             self.fgcmLog.info("Bad news.  smatch not found.")
 
         if (raArray.size != decArray.size):
@@ -186,8 +271,6 @@ class FgcmMakeStars(object):
         else:
             cutBrightStars = False
 
-        #print("Matching %s observations in the referenceBand catalog to itself" %
-        #      (raArray.size))
         self.fgcmLog.info("Matching %s observations in the referenceBand catalog to itself" %
                           (raArray.size))
 
@@ -234,8 +317,7 @@ class FgcmMakeStars(object):
             hist,rev = esutil.stat.histogram(fakeId[i1],rev=True)
 
             if (hist.max() == 1):
-                #raise ValueError("No matches found!")
-                print("Warning: No matches found!")
+                self.fgcmLog.info("Warning: No matches found!")
                 continue
 
             maxObs = hist.max()
@@ -250,10 +332,8 @@ class FgcmMakeStars(object):
                     histTemp[i2[i1a]] = 0
                     count=count+1
 
-            print("Found %d unique objects in pixel %d (%d of %d)." %
-                  (count, ipring[p1a[0]], ii, gdpix.size))
-            #print("Found %d unique objects with >= %d observations in %s band." %
-            #      (count, self.starConfig['minPerBand'], self.starConfig['referenceBand']))
+            self.fgcmLog.info("Found %d unique objects in pixel %d (%d of %d)." %
+                              (count, ipring[p1a[0]], ii, gdpix.size))
 
             # make the object catalog
 
@@ -380,6 +460,17 @@ class FgcmMakeStars(object):
 
     def makeMatchedStars(self, raArray, decArray, filterNameArray):
         """
+        Make matched stars, from pre-loaded arrays.  Requires self.objCat was
+         generated from makeReferenceStars().
+
+        parameters
+        ----------
+        raArray: double array
+           RA for each observation
+        decArray: double array
+           Dec for each observation
+        filterNameArray: string array
+           filterName for each array
         """
 
         if (self.objCat is None):

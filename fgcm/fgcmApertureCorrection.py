@@ -14,6 +14,24 @@ from fgcmUtilities import dataBinner
 
 class FgcmApertureCorrection(object):
     """
+    Class which computes aperture corrections.  Note that this will only
+      be run if aperCorrFitNBins > 0 and expSeeingVariable is set in the
+      exposure info.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+       Config object
+    fgcmPars: FgcmParameters
+       Parameter object
+    fgcmGray: FgcmGray
+       Gray residual object
+
+    Config variables
+    ----------------
+    aperCorrFitNBins: int
+       Number of expSeeingVariable bins to use for computing correction slope
+
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
         self.fgcmLog = fgcmConfig.fgcmLog
@@ -32,6 +50,12 @@ class FgcmApertureCorrection(object):
 
     def computeApertureCorrections(self,doPlots=True):
         """
+        Compute aperture corrections if aperCorrFitNBins > 0
+
+        parameters
+        ----------
+        doPlots: bool, default=True
+           Make output plots
         """
 
         if (self.aperCorrFitNBins == 0):

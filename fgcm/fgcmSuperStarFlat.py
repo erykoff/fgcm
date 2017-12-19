@@ -17,7 +17,22 @@ from fgcmUtilities import poly2dFunc
 
 class FgcmSuperStarFlat(object):
     """
+    Class to compute the SuperStarFlat.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+    fgcmPars: FgcmParameters
+    fgcmStars: FgcmStars
+
+    Config variables
+    ----------------
+    ccdGrayMaxStarErr: float
+       Maximum error for any star observation to be used to compute superStar
+    superStarSubCCD: bool, default=False
+       Compute superStar flats on sub-ccd scale?
     """
+
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
         self.fgcmLog = fgcmConfig.fgcmLog
@@ -41,6 +56,15 @@ class FgcmSuperStarFlat(object):
 
     def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
         """
+        Compute the SuperStar Flats
+
+        parameters
+        ----------
+        doPlots: bool, default=True
+        doNotUseSubCCD: bool, default=False
+           Override any setting of superStarSubCCD (used for initial guess)
+        onlyObsErr: bool, default=False
+           Only use observation error (used for initial guess)
         """
 
         startTime = time.time()
@@ -287,6 +311,24 @@ class FgcmSuperStarFlat(object):
                                    superStarFlatFPMean, superStarFlatFPSigma,
                                    deltaSuperStarFlatFPMean, deltaSuperStarFlatFPSigma):
         """
+        Plot SuperStar flats and deltas
+
+        parameters
+        ----------
+        superStarPars: float array (nEpochs, nLUTFilter, nCCD, superStarNPar)
+           Parameters per epoch, filter, ccd
+        deltaSuperStar: float array (nEpochs, nLUTFilter, nCCD)
+           Central superstar offset
+        superStarNGoodStars: int array (nEpochs, nLUTFilter, nCCD)
+           Number of good stars per superstar
+        superStarFlatFPMean: float array (nEpochs, nLUTFilter)
+           Focal plane mean for plot scaling
+        superStarFlatFPSigma: float array (nEpochs, nLUTFilter)
+           Focal plane sigma for plot scaling
+        deltaSuperStarFlatFPMean: float array (nEpochs, nLUTFilter)
+           Focal plane mean of delta for plot scaling
+        deltaSuperStarFlatFPSigma: float array (nEpochs, nLUTFilter)
+           Focal plane sigma of delta for plot scaling
         """
 
         from fgcmUtilities import plotCCDMap
@@ -347,6 +389,14 @@ class FgcmSuperStarFlat(object):
 
 
     def _computeCCDOffsetSigns(self, goodObs):
+        """
+        Internal method to figure out plotting signs
+
+        parameters
+        ----------
+        goodObs: int array
+           Array of good observations
+        """
 
         import scipy.stats
 
@@ -414,6 +464,12 @@ class FgcmSuperStarFlat(object):
 
     def computeSuperStarFlatsOrig(self,fgcmGray,doPlots=True):
         """
+        Old-school superStarFlat computed from CCDGray
+
+        parameters
+        ----------
+        fgcmGray: FgcmGray
+        doPlots: bool, default=True
         """
 
         startTime = time.time()
@@ -510,7 +566,21 @@ class FgcmSuperStarFlat(object):
     def plotSuperStarFlats(self, superStarArray, superStarMean, superStarSigma,
                             nCCDArray=None, name='superstar'):
         """
+        Old-school plotting of superStarFlats
+
+        parameters
+        ----------
+        superStarArray: float array (nEpochs, nLUTFilter, nCCD)
+        superStarMean: float array (nEpochs, nLUTFilter)
+           Focal plane average for plot scaling
+        superStarSigma: float array (nEpochs, nLUTFilter)
+           Focal plane sigma for plot scaling
+        nCCDArray: float array, optional (nEpochs, nLUTFilter, nCCD)
+           Number of good CCDs per superstar
+        name: string, default='superstar'
+           What name to put on the files/plots
         """
+
         from fgcmUtilities import plotCCDMap
 
         for i in xrange(self.fgcmPars.nEpochs):

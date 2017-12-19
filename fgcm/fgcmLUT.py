@@ -18,7 +18,16 @@ from fgcmLogger import FgcmLogger
 
 class FgcmLUTMaker(object):
     """
+    Class to make a look-up table.
+
+    parameters
+    ----------
+    lutConfig: dict
+       Dictionary with LUT config variables
+    makeSeds: bool, default=False
+       Make a SED-table in the look-up table (experimental)
     """
+
     def __init__(self,lutConfig,makeSeds=False):
         self._checkLUTConfig(lutConfig)
 
@@ -41,6 +50,11 @@ class FgcmLUTMaker(object):
 
     def _checkLUTConfig(self,lutConfig):
         """
+        Internal method to check the lutConfig dictionary
+
+        parameters
+        ----------
+        lutConfig: dict
         """
 
         self.runModtran = False
@@ -128,6 +142,18 @@ class FgcmLUTMaker(object):
 
     def setThroughputs(self, throughputDict):
         """
+        Set the throughputs per CCD
+
+        parameters
+        ----------
+        throughputDict: dict
+           Dict with throughput information
+
+        The throughput dict should have one entry for each filterName.
+        Each of these elements should be a dictionary with the following keys:
+           'LAMBDA': numpy float array with wavelength values
+           ccd_index: numpy float array with throughput values for the ccd_index
+        There should be one entry for each CCD.
         """
 
         self.inThroughputs=[]
@@ -163,6 +189,83 @@ class FgcmLUTMaker(object):
 
     def makeLUT(self):
         """
+        Make the look-up table.  This can either be saved with saveLUT or accessed via
+         attributes.
+
+        parameters
+        ----------
+        None
+
+        output attributes
+        -----------------
+        pmb: float array
+           Pressure (millibars)
+        pmbFactor: float array
+           Pressure factor
+        pmbElevation: float
+           Standard PMB at elevation
+        pwv: float array
+           Water vapor array
+        o3: float array
+           Ozone array
+        tau: float array
+           Aerosol optical index array
+        lambdaNorm: float
+           Aerosol normalization wavelength
+        alpha: float array
+           Aerosol slope array
+        zenith: float array
+           Zenith angle array
+        nccd: int
+           Number of CCDs in table
+        pmbStd: float
+           Standard PMB
+        pwvStd: float
+           Standard PWV
+        o3Std: float
+           Standard O3
+        tauStd: float
+           Standard tau
+        alphaStd: float
+           Standard alpha
+        zenithStd: float
+           Standard zenith angle (deg)
+        lambdaRange: numpy float array
+           Wavelength range (A)
+        lambdaStep: float
+           Wavelength step (A)
+        lambdaStd: numpy float array
+           Standard wavelength for each filterName (A) at each standard band
+        lambdaStdRaw: numpy float array
+           Standard wavelength for each filterName (A)
+        I0Std: numpy float array
+           Standard value for I0 for each filterName
+        I1Std: numpy float array
+           Standard value for I1 for each filterName
+        I10Std: numpy float array
+           Standard value for I10 for each filterName
+        lambdaB: numpy float array
+           Standard wavelength for each filterName (A) assuming no atmosphere
+        atmLambda: numpy float array
+           Standard atmosphere wavelength array (A)
+        atmStdTrans: numpy float array
+           Standard atmosphere transmission array
+        lut: Look-up table recarray
+           lut['I0']: I0 LUT (multi-dimensional)
+           lut['I1']: I1 LUT (multi-dimensional)
+        lutDeriv: Derivative recarray
+           lutDeriv['D_PMB']: I0 PMB derivative
+           lutDeriv['D_PWV']: I0 PWV derivative
+           lutDeriv['D_O3']: I0 O3 derivative
+           lutDeriv['D_LNTAU']: I0 log(tau) derivative
+           lutDeriv['D_ALPHA']: I0 alpha derivative
+           lutDeriv['D_SECZENITH']: I0 sec(zenith) derivative
+           lutDeriv['D_PMB_I1']: I1 PMB derivative
+           lutDeriv['D_PWV_I1']: I1 PWV derivative
+           lutDeriv['D_O3_I1']: I1 O3 derivative
+           lutDeriv['D_LNTAU_I1']: I1 log(tau) derivative
+           lutDeriv['D_ALPHA_I1']: I1 alpha derivative
+           lutDeriv['D_SECZENITH_I1']: I0 sec(zenith) derivative
         """
 
         if not self._setThroughput:
@@ -599,6 +702,23 @@ class FgcmLUTMaker(object):
 
 class FgcmLUT(object):
     """
+    Class to hold the main throughput look-up table and apply it.  If loading from
+     a fits table, initialize with initFromFits(lutFile).
+
+    parameters
+    ----------
+    indexVals: numpy recarray
+       With LUT index values
+    lutFlat: numpy recarray
+       Flattened I0/I1 arrays
+    lutDerivFlat: numpy recarray
+       Flattened I0/I1 derivative arrays
+    stdVals: numpy recarray
+       Standard atmosphere and associated values
+    sedLUT: bool, default=False
+       Use SED look-up table instead of colors (experimental).
+    filterToBand: dict, optional
+       Dictionary to map filterNames to bands if not unique
     """
 
     def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
@@ -719,6 +839,12 @@ class FgcmLUT(object):
     @classmethod
     def initFromFits(cls, lutFile):
         """
+        Initials FgcmLUT using fits file.
+
+        parameters
+        ----------
+        lutFile: string
+           Name of the LUT file
         """
 
         import fitsio
@@ -738,6 +864,20 @@ class FgcmLUT(object):
 
     def getIndices(self, filterIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         """
+        Compute indices in the look-up table.  These are in regular (non-normalized) units.
+
+        parameters
+        ----------
+        filterIndex: int array
+           Array with values pointing to the filterName index
+        pwv: float array
+        o3: float array
+        lnTau: float array
+        alpha: float array
+        secZenith: float array
+        ccdIndex: int array
+           Array with values point to the ccd index
+        pmb: float array
         """
 
         return (filterIndex,
@@ -757,6 +897,17 @@ class FgcmLUT(object):
 
     def computeI0(self, pwv, o3, lnTau, alpha, secZenith, pmb, indices):
         """
+        Compute I0 from the look-up table.
+
+        parameters
+        ----------
+        pwv: float array
+        o3: float array
+        lnTau: float array
+        alpha: float array
+        secZenith: float array
+        pmb: float array
+        indices: tuple, from getIndices()
         """
 
         # do a simple linear interpolation
@@ -790,6 +941,20 @@ class FgcmLUT(object):
 
 
     def computeI1(self, pwv, o3, lnTau, alpha, secZenith, pmb, indices):
+        """
+        Compute I1 from the look-up table.
+
+        parameters
+        ----------
+        pwv: float array
+        o3: float array
+        lnTau: float array
+        alpha: float array
+        secZenith: float array
+        pmb: float array
+        indices: tuple, from getIndices()
+        """
+
         # do a simple linear interpolation
         dPWV = pwv - (self.pwv[0] + indices[1] * self.pwvDelta)
         dO3 = o3 - (self.o3[0] + indices[2] * self.o3Delta)
@@ -819,9 +984,21 @@ class FgcmLUT(object):
                                                              snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]]))
 
     def computeI1Old(self, indices):
+        """
+        Unused
+        """
         return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
 
     def computeLogDerivatives(self, indices, I0):
+        """
+        Compute log derivatives.  Used in FgcmChisq.
+
+        parameters
+        ----------
+        indices: tuple, from getIndices()
+        I0: float array, from computeI0()
+        """
+
         # dL(i,j|p) = d/dp(2.5*log10(LUT(i,j|p)))
         #           = 1.086*(LUT'(i,j|p)/LUT(i,j|p))
         return (self.magConstant*snmm.getArray(self.lutDPWVHandle)[indices[:-1]] / I0,
@@ -831,6 +1008,17 @@ class FgcmLUT(object):
 
 
     def computeLogDerivativesI1(self, indices, I0, I10, sedSlope):
+        """
+        Compute log derivatives for I1.  Used in FgcmChisq.
+
+        parameters
+        ----------
+        indices: tuple, from getIndices()
+        I0: float array, from computeI0()
+        I10: float array, from computeI1()/computeI0()
+        sedSlope: float array, fnuprime
+        """
+
         # dL(i,j|p) += d/dp(2.5*log10((1+F'*I10^obs) / (1+F'*I10^std)))
         #  the std part cancels...
         #            = 1.086*(F'/(1+F'*I10)*((I0*LUT1' - I1*LUT0')/(I0^2))
@@ -848,6 +1036,12 @@ class FgcmLUT(object):
 
     def computeSEDSlopes(self, objectSedColor):
         """
+        Compute SED slopes using the SED look-up table.  Experimental.
+
+        parameters
+        ----------
+        objectSedColor: float array
+           Color used for SED look-up (typically g-i)
         """
 
         indices = np.clip(np.searchsorted(self.sedColor, objectSedColor),0,self.sedColor.size-2)
@@ -861,6 +1055,25 @@ class FgcmLUT(object):
     def computeStepUnits(self, stepUnitReference, stepGrain, meanNightDuration,
                          meanWashIntervalDuration, fitBands, bands, nCampaignNights):
         """
+        Compute normalization factors for fit step units.  Note that this might need
+         to be tweaked.
+
+        parameters
+        ----------
+        stepUnitReference: float
+           How much should a typical step move things?  0.001 mag is default.
+        stepGrain: float
+           Additional fudge factor to apply to all steps.
+        meanNightDuration: float
+           Mean duration of a night (days).
+        meanWashIntervalDuration: float
+           Mean duration between washes (days).
+        fitBands: string array
+           Which bands are used for the fit?
+        bands: string array
+           What are all the bands?
+        nCampaignNights: int
+           Total number of nights in observing campaign to be calibrated.
         """
 
         unitDict = {}

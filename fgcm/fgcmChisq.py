@@ -23,7 +23,29 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmChisq(object):
     """
+    Class which computes the chi-squared for the fit.
+
+    parameters
+    ----------
+    fgcmConfig: FgcmConfig
+       Config object
+    fgcmPars: FgcmParameters
+       Parameter object
+    fgcmStars: FgcmStars
+       Stars object
+    fgcmLUT: FgcmLUT
+       LUT object
+
+    Config variables
+    ----------------
+    nCore: int
+       Number of cores to run in multiprocessing
+    nStarPerRun: int
+       Number of stars per run.  More can use more memory.
+    noChromaticCorrections: bool
+       If set to True, then no chromatic corrections are applied.  (bad idea).
     """
+
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
         self.fgcmLog = fgcmConfig.fgcmLog
@@ -67,15 +89,44 @@ class FgcmChisq(object):
 
 
     def resetFitChisqList(self):
+        """
+        Reset the recorded list of chi-squared values.
+        """
+
         self.fitChisqs = []
 
     def clearMatchCache(self):
+        """
+        Clear the pre-match cache.  Note that this isn't working right.
+        """
         self.matchesCached = False
         self.goodObs = None
         self.goodStarsSub = None
 
     def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
         """
+        Compute the chi-squared for a given set of parameters.
+
+        parameters
+        ----------
+        fitParams: numpy array of floats
+           Array with the numerical values of the parameters (properly formatted).
+        fitterUnits: bool, default=False
+           Are the units of fitParams normalized for the minimizer?
+        computeDerivatives: bool, default=False
+           Compute fit derivatives?
+        computeSEDSlopes: bool, default=False
+           Compute SED slopes from magnitudes?
+        useMatchCache: bool, default=False
+           Cache observation matches.  Do not use!
+        debug: bool, default=False
+           Debug mode with no multiprocessing
+        allExposures: bool, default=False
+           Compute using all exposures, including flagged/non-photometric
+        includeReserve: bool, default=False
+           Compute using all objects, including those put in reserve.
+        fgcmGray: FgcmGray, default=None
+           CCD Gray information for computing with "ccd crunch"
         """
 
         # computeDerivatives: do we want to compute the derivatives?
@@ -293,9 +344,14 @@ class FgcmChisq(object):
         else:
             return fitChisq
 
-    #def _worker(self,goodStars):
     def _worker(self,goodStarsAndObs):
         """
+        Multiprocessing worker for FgcmChisq.  Not to be called on its own.
+
+        parameters
+        ----------
+        goodStarsAndObs: tuple[2]
+           (goodStars, goodObs)
         """
 
         workerStartTime = time.time()

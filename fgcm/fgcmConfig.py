@@ -16,6 +16,23 @@ copy_reg.pickle(types.MethodType, _pickle_method)
 
 class FgcmConfig(object):
     """
+    Class which contains the FGCM Configuration.  Note that if you have fits files
+     as input, use configWithFits(configDict) to initialize.
+
+    parameters
+    ----------
+    configDict: dict
+       Dictionary with configuration values
+    lutIndex: numpy recarray
+       All the information from the LUT index values
+    lutStd: numpy recarray
+       All the information from the LUT standard values
+    expInfo: numpy recarray
+       Info about each exposure
+    ccdOffsets: numpy recarray
+       Info about CCD positional offsets and sizes
+    checkFiles: bool, default=False
+       Check that all fits files exist
     """
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
@@ -447,6 +464,7 @@ class FgcmConfig(object):
     @staticmethod
     def _readConfigDict(configFile):
         """
+        Internal method to read a configuration dictionary from a yaml file.
         """
 
         with open(configFile) as f:
@@ -459,13 +477,16 @@ class FgcmConfig(object):
 
     @classmethod
     def configWithFits(cls, configDict):
-    #def configWithFits(cls, configFile):
         """
+        Initialize FgcmConfig object and read in fits files.
+
+        parameters
+        ----------
+        configDict: dict
+           Dictionary with config variables.
         """
 
         import fitsio
-
-        #configDict = cls._readConfigDict(configFile)
 
         expInfo = fitsio.read(configDict['exposureFile'], ext=1)
 
@@ -481,6 +502,19 @@ class FgcmConfig(object):
 
 
     def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
+        """
+        Save a yaml configuration file for the next fit cycle (using fits files).
+
+        Parameters
+        ----------
+        fileName: string
+           Config file filename
+        parFile: string
+           File with saved parameters from previous cycle
+        flagStarFile: string
+           File with flagged stars from previous cycle
+        """
+
         configDict = self.configDictSaved.copy()
 
         # save the outputPath
