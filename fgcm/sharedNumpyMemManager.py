@@ -1,21 +1,17 @@
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
+
 import numpy as np
 import multiprocessing
 
 import ctypes
-
-from fgcmUtilities import _pickle_method
-import types
-import copy_reg
-
-
-copy_reg.pickle(types.MethodType, _pickle_method)
 
 # Adapted from http://stackoverflow.com/questions/10721915/shared-memory-objects-in-python-multiprocessing
 
 '''
 Singleton Pattern
 '''
-class SharedNumpyMemManager:
+class SharedNumpyMemManager(object):
 
     _initSize = 1024
 
@@ -75,10 +71,12 @@ class SharedNumpyMemManager:
 
         # create array in shared memory segment
         if (syncAccess):
-            self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype, np.prod(dimensions))
+            self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype,
+                                                                    int(np.prod(dimensions)))
             self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur].get_obj(),dtype=dtype)
         else:
-            self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype, np.prod(dimensions))
+            self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype,
+                                                                       int(np.prod(dimensions)))
             self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur],dtype=dtype)
 
         # do a reshape for correct dimensions

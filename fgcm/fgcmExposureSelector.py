@@ -1,13 +1,15 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
+
 
 import numpy as np
 import os
 import sys
 import esutil
 
-from fgcmUtilities import expFlagDict
+from .fgcmUtilities import expFlagDict
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmExposureSelector(object):
     """

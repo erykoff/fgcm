@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -9,9 +10,9 @@ import scipy.optimize
 
 import matplotlib.pyplot as plt
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-from fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import retrievalFlagDict
 
 class FgcmRetrieveAtmosphere(object):
     """
@@ -65,7 +66,9 @@ class FgcmRetrieveAtmosphere(object):
         r10 = snmm.getArray(fgcmRetrieval.r10Handle)
 
         # FIXME: check that there are actually z-band images...etc.
-        zBandIndex, = np.where(self.fgcmPars.bands == 'z')[0]
+        #zBandIndex, = np.where(self.fgcmPars.bands == 'z')[0]
+        zBandIndex = self.fgcmPars.bands.index('z')
+
         zUse,=np.where((self.fgcmPars.expBandIndex[expIndexArray] == zBandIndex) &
                        (self.fgcmPars.expFlag[expIndexArray] == 0) &
                        (np.abs(r0[expIndexArray, ccdIndexArray]) < 1000.0) &
@@ -338,13 +341,16 @@ class FgcmRetrieveAtmosphere(object):
                            np.cos(self.fgcmPars.expTelHA[expIndexArray]))
 
         # FIXME make this configurable?
-        tauBands = np.array(['g', 'r', 'i'])
-        nTauBands = tauBands.size
+        #tauBands = np.array(['g', 'r', 'i'])
+        #nTauBands = tauBands.size
+        tauBands = ['g', 'r', 'i']
+        nTauBands = len(tauBands)
 
-        tauRetrievedBands = np.zeros((tauBands.size, self.fgcmPars.nCampaignNights)) + self.illegalValue
+        tauRetrievedBands = np.zeros((nTauBands, self.fgcmPars.nCampaignNights)) + self.illegalValue
 
         for i in xrange(nTauBands):
-            bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
+            #bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
+            bandIndex = self.fgcmPars.bands.index(tauBands[i])
 
             tauScale = (self.fgcmLUT.lambdaStd[bandIndex] / self.fgcmLUT.lambdaNorm) ** (-self.fgcmLUT.alphaStd)
 
@@ -487,7 +493,8 @@ class FgcmRetrieveAtmosphere(object):
         tauModelBands = np.zeros_like(tauRetrievedBands)
 
         for i in xrange(nTauBands):
-            bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
+            #bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
+            bandIndex = self.fgcmPars.bands.index(tauBands[i])
 
             # investigate
             tauScale = (self.fgcmLUT.lambdaStd[bandIndex] / self.fgcmLUT.lambdaNorm) ** (-self.fgcmLUT.alphaStd)

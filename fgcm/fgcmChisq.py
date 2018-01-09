@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -6,18 +7,22 @@ import sys
 import esutil
 import time
 
-from fgcmUtilities import _pickle_method
-from fgcmUtilities import objFlagDict
-from fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import _pickle_method
+from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import retrievalFlagDict
 
 import types
-import copy_reg
+try:
+    import copy_reg as copyreg
+except ImportError:
+    import copyreg
+
 import multiprocessing
 from multiprocessing import Pool
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-copy_reg.pickle(types.MethodType, _pickle_method)
+copyreg.pickle(types.MethodType, _pickle_method)
 
 ## FIXME: derivatives should not be zero when hitting the boundary (check)
 
@@ -274,7 +279,7 @@ class FgcmChisq(object):
             # and split along the indices
             goodObsList = np.split(goodObs,splitIndices)
 
-            workerList = zip(goodStarsList,goodObsList)
+            workerList = list(zip(goodStarsList,goodObsList))
 
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
@@ -284,11 +289,21 @@ class FgcmChisq(object):
 
             self.fgcmLog.info('Running chisq on %d cores' % (self.nCore))
 
+            try:
+                self.fgcmLog.pause()
+            except:
+                pass
+
             # make a pool
             pool = Pool(processes=self.nCore)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
+
+            try:
+                self.fgcmLog.resume()
+            except:
+                pass
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
@@ -353,6 +368,8 @@ class FgcmChisq(object):
         goodStarsAndObs: tuple[2]
            (goodStars, goodObs)
         """
+
+        # NOTE: No logging is allowed in the _worker method
 
         workerStartTime = time.time()
 

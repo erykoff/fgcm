@@ -1,18 +1,12 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
-#import fitsio
 import os
 import sys
 import yaml
 
-from fgcmUtilities import _pickle_method
-from fgcmLogger import FgcmLogger
-
-import types
-import copy_reg
-
-copy_reg.pickle(types.MethodType, _pickle_method)
+from .fgcmLogger import FgcmLogger
 
 class FgcmConfig(object):
     """
@@ -65,9 +59,13 @@ class FgcmConfig(object):
             if (key not in configDict):
                 raise ValueError("required %s not in configFile" % (key))
 
-        self.bands = np.array(configDict['bands'])
-        self.fitBands = np.array(configDict['fitBands'])
-        self.extraBands = np.array(configDict['extraBands'])
+        #self.bands = np.array(configDict['bands'])
+        #self.fitBands = np.array(configDict['fitBands'])
+        #self.extraBands = np.array(configDict['extraBands'])
+        #self.filterToBand = configDict['filterToBand']
+        self.bands = configDict['bands']
+        self.fitBands = configDict['fitBands']
+        self.extraBands = configDict['extraBands']
         self.filterToBand = configDict['filterToBand']
         self.exposureFile = configDict['exposureFile']
         self.minObsPerBand = configDict['minObsPerBand']
@@ -133,6 +131,11 @@ class FgcmConfig(object):
         self.clobber = configDict['clobber']
         self.outputStars = configDict['outputStars']
         self.superStarSubCCD = configDict['superStarSubCCD']
+
+        # Encode filterToBand for easy use with numpy in both py2/3 (sorry)
+        #self.filterToBand = {}
+        #for key in configDict['filterToBand']:
+        #    self.filterToBand[key.encode('utf-8')] = configDict['filterToBand'][key].encode('utf-8')
 
         if 'pwvFile' in configDict:
             self.pwvFile = configDict['pwvFile']
@@ -217,10 +220,12 @@ class FgcmConfig(object):
             self.inFlagStarFile = configDict['inFlagStarFile']
 
 
-        if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
+        #if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
+        if (self.sedFitBandFudgeFactors.size != len(self.fitBands)):
             raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
 
-        if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
+        #if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
+        if (self.sedExtraBandFudgeFactors.size != len(self.extraBands)):
             raise ValueError("sedExtraBandFudgeFactors must have same length as extraBands")
 
         # check the cut values
@@ -241,8 +246,11 @@ class FgcmConfig(object):
         if ('logger' not in configDict):
             self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
                                                      self.outfileBaseWithCycle),
-                                      self.logLevel)
-            self.fgcmLog.info('Logging started to %s' % (self.fgcmLog.logFile))
+                                      self.logLevel, printLogger=configDict['printOnly'])
+            if configDict['printOnly']:
+                self.fgcmLog.info('Logging to console')
+            else:
+                self.fgcmLog.info('Logging started to %s' % (self.fgcmLog.logFile))
         else:
             # Support an external logger such as LSST that has .info() and .debug() calls
             self.fgcmLog = configDict['logger']
@@ -275,8 +283,11 @@ class FgcmConfig(object):
         #lutStats=fitsio.read(self.lutFile,ext='INDEX')
 
         self.nCCD = lutIndex['NCCD'][0]
-        self.lutFilterNames = lutIndex['FILTERNAMES'][0]
-        self.lutStdFilterNames = lutIndex['STDFILTERNAMES'][0]
+        # these are np arrays and encoded as such
+        #self.lutFilterNames = lutIndex['FILTERNAMES'][0]
+        #self.lutStdFilterNames = lutIndex['STDFILTERNAMES'][0]
+        self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
+        self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -285,10 +296,10 @@ class FgcmConfig(object):
         self.zenithRange = np.array([np.min(lutIndex['ZENITH']),np.max(lutIndex['ZENITH'])])
 
         # make sure we drop trailing spaces
-        self.bands = np.core.defchararray.strip(self.bands[:])
-        self.fitBands = np.core.defchararray.strip(self.fitBands[:])
-        if (self.extraBands.size > 0):
-            self.extraBands = np.core.defchararray.strip(self.extraBands[:])
+        #self.bands = np.core.defchararray.strip(self.bands[:])
+        #self.fitBands = np.core.defchararray.strip(self.fitBands[:])
+        #if (self.extraBands.size > 0):
+        #    self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
         # newer band checks
         #  1) check that all the filters in filterToBand are in lutFilterNames
@@ -299,9 +310,13 @@ class FgcmConfig(object):
 
         #  1) check that all the filters in filterToBand are in lutFilterNames
         for filterName in self.filterToBand:
-            test,=np.where(filterName == self.lutFilterNames)
-            if test.size == 0:
+            #test,=np.where(filterName == self.lutFilterNames)
+            #if test.size == 0:
+            #    raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
+            if filterName not in self.lutFilterNames:
                 raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
+            #print(self.filterToBand[filterName])
+            #print(self.bands)
             if self.filterToBand[filterName] not in self.bands:
                 raise ValueError("Band %s in filterToBand not in bands" %
                                  (self.filterToBand[filterName]))
@@ -310,7 +325,8 @@ class FgcmConfig(object):
             if lutStdFilterName not in self.lutFilterNames:
                 raise ValueError("lutStdFilterName %s not in list of lutFilterNames" % (lutStdFilterName))
         #  3) check that each band has ONE standard filter
-        bandStdFilterIndex = np.zeros(self.bands.size, dtype=np.int32) - 1
+        #bandStdFilterIndex = np.zeros(self.bands.size, dtype=np.int32) - 1
+        bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
                 if self.filterToBand[filterName] == band:
@@ -325,18 +341,20 @@ class FgcmConfig(object):
                                               self.lutStdFilterNames[bandStdFilterIndex[i]]))
         #  4) check that all the fitBands are in bands
         for fitBand in self.fitBands:
-            test,=np.where(fitBand == self.bands)
-            if (test.size == 0):
+            #test,=np.where(fitBand == self.bands)
+            if fitBand not in self.bands:
+            #if (test.size == 0):
                 raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
         #  5) check that all the extraBands are in bands
         for extraBand in self.extraBands:
-            test,=np.where(extraBand == self.bands)
-            if (test.size == 0):
+            #test,=np.where(extraBand == self.bands)
+            if extraBand not in self.bands:
+            #if (test.size == 0):
                 raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
 
         bandString = " ".join(self.bands)
         self.fgcmLog.info('Found %d CCDs and %d bands (%s)' %
-                         (self.nCCD,self.bands.size,bandString))
+                         (self.nCCD,len(self.bands),bandString))
 
         # get LUT standard values
         self.pmbStd = lutStd['PMBSTD'][0]
@@ -350,9 +368,9 @@ class FgcmConfig(object):
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
 
-        if (self.expGrayPhotometricCut.size != self.bands.size):
+        if (self.expGrayPhotometricCut.size != len(self.bands)):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
-        if (self.expGrayHighCut.size != self.bands.size):
+        if (self.expGrayHighCut.size != len(self.bands)):
             raise ValueError("expGrayHighCut must have same number of elements as bands.")
         if (self.expGrayPhotometricCut.max() >= 0.0):
             raise ValueError("expGrayPhotometricCut must all be negative")
@@ -424,16 +442,16 @@ class FgcmConfig(object):
         #        if (self.bands[i] in self.fitBands and
         #            self.bands[i] in self.extraBands):
         #            raise ValueError("Cannot have the same band as fit and extra")
-        self.bandRequiredFlag = np.zeros(self.bands.size, dtype=np.bool)
-        self.bandExtraFlag = np.zeros(self.bands.size, dtype=np.bool)
-        for i in xrange(self.bands.size):
-            if (self.bands[i] in self.fitBands):
+        self.bandRequiredFlag = np.zeros(len(self.bands), dtype=np.bool)
+        self.bandExtraFlag = np.zeros(len(self.bands), dtype=np.bool)
+        for i,band in enumerate(self.bands):
+            if (band in self.fitBands):
                 self.bandRequiredFlag[i] = True
-            if (self.extraBands.size > 0):
-                if (self.bands[i] in self.extraBands):
+            if (len(self.extraBands) > 0):
+                if (band in self.extraBands):
                     self.bandExtraFlag[i] = True
-                if (self.bands[i] in self.fitBands and
-                    self.bands[i] in self.extraBands):
+                if (band in self.fitBands and
+                    band in self.extraBands):
                     raise ValueError("Cannot have the same band as fit and extra")
 
 

@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -7,7 +8,7 @@ import esutil
 import glob
 import healpy as hp
 
-from fgcmLogger import FgcmLogger
+from .fgcmLogger import FgcmLogger
 
 
 class FgcmMakeStars(object):
@@ -304,8 +305,8 @@ class FgcmMakeStars(object):
                 # slower htm matching...
                 htm = esutil.htm.HTM(11)
 
-                matcher = esutil.htm.Matcher(11, raArray, decArray)
-                matches = matcher.match(raArray, decArray,
+                matcher = esutil.htm.Matcher(11, raArray[p1a], decArray[p1a])
+                matches = matcher.match(raArray[p1a], decArray[p1a],
                                         self.starConfig['matchRadius']/3600.0,
                                         maxmatch=0)
 
@@ -418,7 +419,7 @@ class FgcmMakeStars(object):
                 htm = esutil.htm.HTM(11)
 
                 matcher = esutil.htm.Matcher(10, brightStarRA, brightStarDec)
-                matches = matcher.match(raArray, decArray, brightStarRadius,
+                matches = matcher.match(self.objCat['RA'], self.objCat['DEC'], brightStarRadius,
                                         maxmatch=0)
                 i1=matches[0]
                 i2=matches[1]
@@ -469,7 +470,7 @@ class FgcmMakeStars(object):
            RA for each observation
         decArray: double array
            Dec for each observation
-        filterNameArray: string array
+        filterNameArray: numpy string array
            filterName for each array
         """
 
@@ -491,7 +492,7 @@ class FgcmMakeStars(object):
         #  does it need to be?
         bandArray = np.zeros_like(filterNameArray)
         for filterName in self.filterNames:
-            use,=np.where(filterNameArray == filterName)
+            use,=np.where(filterNameArray == filterName.encode('utf-8'))
             bandArray[use] = self.starConfig['filterToBand'][filterName]
 
 
@@ -528,7 +529,7 @@ class FgcmMakeStars(object):
         # which stars have at least minPerBand observations in each required band?
         #req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
         #reqBands = np.array(self.starConfig['bands'])[req]
-        reqBands = np.array(self.starConfig['requiredBands'])
+        reqBands = np.array(self.starConfig['requiredBands'], dtype=bandArray.dtype)
 
         # this could be made more efficient
         self.fgcmLog.info("Computing number of observations per band")

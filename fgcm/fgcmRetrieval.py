@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -7,19 +8,22 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 
-from fgcmUtilities import _pickle_method
+from .fgcmUtilities import _pickle_method
 
 
 import types
-import copy_reg
+try:
+    import copy_reg as copyreg
+except ImportError:
+    import copyreg
 
 import multiprocessing
 from multiprocessing import Pool
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 
-copy_reg.pickle(types.MethodType, _pickle_method)
+copyreg.pickle(types.MethodType, _pickle_method)
 
 class FgcmRetrieval(object):
     """
@@ -159,10 +163,20 @@ class FgcmRetrieval(object):
 
             # may want to sort by nObservations, but only if we pre-split
 
+            try:
+                self.fgcmLog.pause()
+            except:
+                pass
+
             pool = Pool(processes=self.nCore)
             pool.map(self._worker, uExpIndexList, chunksize=1)
             pool.close()
             pool.join()
+
+            try:
+                self.fgcmLog.resume()
+            except:
+                pass
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)
@@ -181,6 +195,8 @@ class FgcmRetrieval(object):
         uExpIndex: int array
            Unique indices of exposures in this run.
         """
+
+        # NOTE: No logging is allowed in the _worker method
 
         workerStarTime = time.time()
 

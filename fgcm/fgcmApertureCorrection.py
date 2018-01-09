@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -8,9 +9,8 @@ import time
 import matplotlib.pyplot as plt
 import scipy.optimize
 
-
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from fgcmUtilities import dataBinner
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .fgcmUtilities import dataBinner
 
 class FgcmApertureCorrection(object):
     """

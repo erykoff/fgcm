@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -12,8 +13,8 @@ import matplotlib.patches as patches
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from fgcmUtilities import poly2dFunc
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .fgcmUtilities import poly2dFunc
 
 class FgcmSuperStarFlat(object):
     """
@@ -331,8 +332,8 @@ class FgcmSuperStarFlat(object):
            Focal plane sigma of delta for plot scaling
         """
 
-        from fgcmUtilities import plotCCDMap
-        from fgcmUtilities import plotCCDMapPoly2d
+        from .fgcmUtilities import plotCCDMap
+        from .fgcmUtilities import plotCCDMapPoly2d
 
         for e in xrange(self.fgcmPars.nEpochs):
             for f in xrange(self.fgcmPars.nLUTFilter):
@@ -581,7 +582,7 @@ class FgcmSuperStarFlat(object):
            What name to put on the files/plots
         """
 
-        from fgcmUtilities import plotCCDMap
+        from .fgcmUtilities import plotCCDMap
 
         for i in xrange(self.fgcmPars.nEpochs):
             for j in xrange(self.fgcmPars.nLUTFilter):

@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -9,9 +10,9 @@ import scipy.optimize
 
 import matplotlib.pyplot as plt
 
-from fgcmUtilities import objFlagDict
+from .fgcmUtilities import objFlagDict
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmFlagVariables(object):
     """

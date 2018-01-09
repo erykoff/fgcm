@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -7,10 +8,10 @@ import esutil
 
 import matplotlib.pyplot as plt
 
-from fgcmUtilities import zpFlagDict
-from fgcmUtilities import expFlagDict
+from .fgcmUtilities import zpFlagDict
+from .fgcmUtilities import expFlagDict
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 ## FIXME with plotter!
 ## also note retrieval!
@@ -183,8 +184,10 @@ class FgcmZeropoints(object):
         zpCCDIndex = zpStruct[self.ccdField] - self.ccdStartIndex
 
         # fill exposure quantities
-        zpStruct['FILTERNAME'][:] = self.fgcmPars.lutFilterNames[self.fgcmPars.expLUTFilterIndex[zpExpIndex]]
-        zpStruct['BAND'][:] = self.fgcmPars.bands[self.fgcmPars.expBandIndex[zpExpIndex]]
+        lutFilterNameArray = np.array(self.fgcmPars.lutFilterNames)
+        zpStruct['FILTERNAME'][:] = lutFilterNameArray[self.fgcmPars.expLUTFilterIndex[zpExpIndex]]
+        bandArray = np.array(self.fgcmPars.bands)
+        zpStruct['BAND'][:] = bandArray[self.fgcmPars.expBandIndex[zpExpIndex]]
         zpStruct['EXPTIME'][:] = self.fgcmPars.expExptime[zpExpIndex]
 
         # fill in the superstar flat
@@ -633,7 +636,7 @@ class FgcmZeropointPlotter(object):
         ccdField: string, default='CCDNUM'
         """
 
-        from fgcmUtilities import plotCCDMap
+        from .fgcmUtilities import plotCCDMap
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
