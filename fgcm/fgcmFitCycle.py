@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -8,27 +9,27 @@ import scipy.optimize as optimize
 
 import matplotlib.pyplot as plt
 
-from fgcmConfig import FgcmConfig
-from fgcmParameters import FgcmParameters
-from fgcmChisq import FgcmChisq
-from fgcmStars import FgcmStars
-from fgcmLUT import FgcmLUT
-from fgcmGray import FgcmGray
-from fgcmZeropoints import FgcmZeropoints
-from fgcmSuperStarFlat import FgcmSuperStarFlat
-from fgcmRetrieval import FgcmRetrieval
-from fgcmApertureCorrection import FgcmApertureCorrection
-from fgcmBrightObs import FgcmBrightObs
-from fgcmExposureSelector import FgcmExposureSelector
-from fgcmSigFgcm import FgcmSigFgcm
-from fgcmFlagVariables import FgcmFlagVariables
-from fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
+from .fgcmConfig import FgcmConfig
+from .fgcmParameters import FgcmParameters
+from .fgcmChisq import FgcmChisq
+from .fgcmStars import FgcmStars
+from .fgcmLUT import FgcmLUT
+from .fgcmGray import FgcmGray
+from .fgcmZeropoints import FgcmZeropoints
+from .fgcmSuperStarFlat import FgcmSuperStarFlat
+from .fgcmRetrieval import FgcmRetrieval
+from .fgcmApertureCorrection import FgcmApertureCorrection
+from .fgcmBrightObs import FgcmBrightObs
+from .fgcmExposureSelector import FgcmExposureSelector
+from .fgcmSigFgcm import FgcmSigFgcm
+from .fgcmFlagVariables import FgcmFlagVariables
+from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 
-from fgcmUtilities import zpFlagDict
-from fgcmUtilities import getMemoryString
+from .fgcmUtilities import zpFlagDict
+from .fgcmUtilities import getMemoryString
 
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmFitCycle(object):
     """
@@ -52,7 +53,7 @@ class FgcmFitCycle(object):
 
         if (not self.useFits):
             if (noFitsDict is None):
-                raise ValueErrir("if useFits is False, must supply noFitsDict")
+                raise ValueError("if useFits is False, must supply noFitsDict")
 
             if (('lutIndex' not in noFitsDict) or
                 ('lutStd' not in noFitsDict) or
@@ -520,8 +521,8 @@ class FgcmFitCycle(object):
 
         ## FIXME: remove this method, it's not useful
 
-        from fgcmUtilities import expFlagDict
-        from fgcmUtilities import objFlagDict
+        from .fgcmUtilities import expFlagDict
+        from .fgcmUtilities import objFlagDict
 
         self.fgcmLog.info('Performing SOptics fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
@@ -582,7 +583,7 @@ class FgcmFitCycle(object):
                                      self.fgcmPars.nWashIntervals]
 
         # zip together for new parameter bounds
-        parBounds = zip(parLow, parHigh)
+        parBounds = list(zip(parLow, parHigh))
 
 
         # reset chisq list

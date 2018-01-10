@@ -1,23 +1,17 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
-#import fitsio
 import os
 import sys
 import esutil
 
 import matplotlib.pyplot as plt
 
-from fgcmUtilities import _pickle_method
-from fgcmUtilities import expFlagDict
-from fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import expFlagDict
+from .fgcmUtilities import retrievalFlagDict
 
-import types
-import copy_reg
-
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
-copy_reg.pickle(types.MethodType, _pickle_method)
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmParameters(object):
     """
@@ -89,14 +83,14 @@ class FgcmParameters(object):
         # get stuff from config file
         self.nCCD = fgcmConfig.nCCD
         self.bands = fgcmConfig.bands
-        self.nBands = self.bands.size
+        self.nBands = len(self.bands)
         self.fitBands = fgcmConfig.fitBands
-        self.nFitBands = self.fitBands.size
+        self.nFitBands = len(self.fitBands)
         self.extraBands = fgcmConfig.extraBands
-        self.nExtraBands = self.extraBands.size
+        self.nExtraBands = len(self.extraBands)
 
         self.lutFilterNames = fgcmConfig.lutFilterNames
-        self.nLUTFilter = self.lutFilterNames.size
+        self.nLUTFilter = len(self.lutFilterNames)
         self.filterToBand = fgcmConfig.filterToBand
 
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
@@ -507,16 +501,24 @@ class FgcmParameters(object):
 
         bandStrip = np.core.defchararray.strip(self.bands[:])
         for i in xrange(self.nFitBands):
-            u,=np.where(self.fitBands[i] == self.bands)
-            if (u.size == 0):
+            #u,=np.where(self.fitBands[i] == self.bands)
+            #if (u.size == 0):
+            #    raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
+            #self.fitBandIndex[i] = u[0]
+            try:
+                self.fitBandIndex[i] = self.bands.index(self.fitBands[i])
+            except:
                 raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
-            self.fitBandIndex[i] = u[0]
 
         for i in xrange(self.nExtraBands):
-            u,=np.where(self.extraBands[i] == self.bands)
-            if (u.size == 0):
-                raise ValueError("extraBand %s not in list of bands!" % (self.extraBands[i]))
-            self.extraBandIndex[i] = u[0]
+            #u,=np.where(self.extraBands[i] == self.bands)
+            #if (u.size == 0):
+            #    raise ValueError("extraBand %s not in list of bands!" % (self.extraBands[i]))
+            #self.extraBandIndex[i] = u[0]
+            try:
+                self.extraBandIndex[i] = self.bands.index(self.fitBands[i])
+            except:
+                raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
 
     def _loadExposureInfo(self, expInfo):
         """
@@ -595,19 +597,20 @@ class FgcmParameters(object):
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
-                bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+                #bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+                bandIndex = self.bands.index(self.filterToBand[filterName])
             except:
                 self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
                 continue
 
-            use,=np.where(expFilterName == filterName)
+            # note that for Py3 we need to encode filterName to match to the numpy array
+            use,=np.where(expFilterName == filterName.encode('utf-8'))
             if use.size == 0:
                 self.fgcmLog.info('WARNING: no exposures in filter %s' % (filterName))
             else:
                 self.expBandIndex[use] = bandIndex
                 self.expLUTFilterIndex[use] = filterIndex
 
-        #bad,=np.where(self.expBandIndex < 0)
         bad,=np.where(self.expLUTFilterIndex < 0)
         if (bad.size > 0):
             self.fgcmLog.info('***Warning: %d exposures with band not in LUT!' % (bad.size))
@@ -776,10 +779,10 @@ class FgcmParameters(object):
         # this can be run without fits
 
         dtype=[('NCCD','i4'),
-               ('LUTFILTERNAMES','a2',self.lutFilterNames.size),
-               ('BANDS','a2',self.bands.size),
-               ('FITBANDS','a2',self.fitBands.size),
-               ('EXTRABANDS','a2',self.extraBands.size),
+               ('LUTFILTERNAMES','a2',len(self.lutFilterNames)),
+               ('BANDS','a2',len(self.bands)),
+               ('FITBANDS','a2',len(self.fitBands)),
+               ('EXTRABANDS','a2',len(self.extraBands)),
                ('LNTAUUNIT','f8'),
                ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
@@ -1158,7 +1161,7 @@ class FgcmParameters(object):
 
         returns
         -------
-        parBounds: zip(parLow, parHigh)
+        parBounds: list(zip(parLow, parHigh))
 
         """
 
@@ -1338,7 +1341,7 @@ class FgcmParameters(object):
 
 
         # zip these into a list of tuples
-        parBounds = zip(parLow, parHigh)
+        parBounds = list(zip(parLow, parHigh))
 
         return parBounds
 
@@ -1370,7 +1373,7 @@ class FgcmParameters(object):
         # This bit of code simply returns the superStarFlat computed at the center
         # of each CCD
 
-        from fgcmUtilities import poly2dFunc
+        from .fgcmUtilities import poly2dFunc
 
         # this is the version that does the center of the CCD
         # because it is operating on the whole CCD!
@@ -1508,8 +1511,10 @@ class FgcmParameters(object):
 
         ## FIXME: allow other band names  (bandLike or something)
         ## FIXME with aliases?  actually, these are the aliases
-        gBandIndex,=np.where(self.bands=='g')[0]
-        rBandIndex,=np.where(self.bands=='r')[0]
+        #gBandIndex,=np.where(self.bands=='g')[0]
+        #rBandIndex,=np.where(self.bands=='r')[0]
+        gBandIndex = self.bands.index('g')
+        rBandIndex = self.bands.index('r')
 
         tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
                           ((nExpPerBandPerNight[:,gBandIndex] +
@@ -1529,7 +1534,8 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names
-        zBandIndex,=np.where(self.bands=='z')[0]
+        #zBandIndex,=np.where(self.bands=='z')[0]
+        zBandIndex = self.bands.index('z')
 
         pwvGd, = np.where((nExpPerNight > self.minExpPerNight) &
                           (nExpPerBandPerNight[:,zBandIndex] > self.minExpPerNight))
@@ -1547,7 +1553,9 @@ class FgcmParameters(object):
         ax=fig.add_subplot(111)
 
         ## FIXME: allow other band names
-        rBandIndex,=np.where(self.bands=='r')[0]
+        #rBandIndex,=np.where(self.bands=='r')[0]
+        rBandIndex = self.bands.index('r')
+        
         O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
                          (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
 

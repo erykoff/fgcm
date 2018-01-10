@@ -1,19 +1,14 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import esutil
 import time
 
-from fgcmUtilities import _pickle_method
-from fgcmUtilities import objFlagDict
-from fgcmUtilities import obsFlagDict
+from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import obsFlagDict
 
-import types
-import copy_reg
-
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
-copy_reg.pickle(types.MethodType, _pickle_method)
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmStars(object):
     """
@@ -62,11 +57,11 @@ class FgcmStars(object):
         self.indexFile = fgcmConfig.indexFile
 
         self.bands = fgcmConfig.bands
-        self.nBands = fgcmConfig.bands.size
+        self.nBands = len(fgcmConfig.bands)
         self.nCCD = fgcmConfig.nCCD
         self.minPerBand = fgcmConfig.minObsPerBand
         self.fitBands = fgcmConfig.fitBands
-        self.nFitBands = fgcmConfig.fitBands.size
+        self.nFitBands = len(fgcmConfig.fitBands)
         self.extraBands = fgcmConfig.extraBands
         self.sedFitBandFudgeFactors = fgcmConfig.sedFitBandFudgeFactors
         self.sedExtraBandFudgeFactors = fgcmConfig.sedExtraBandFudgeFactors
@@ -360,13 +355,19 @@ class FgcmStars(object):
         # new version for multifilter support
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames):
+            #try:
+            #    bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+            #except:
+            #    self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
+            #    bandIndex = -1
             try:
-                bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
+                bandIndex = self.bands.index(self.filterToBand[filterName])
             except:
                 self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
                 bandIndex = -1
 
-            use, = np.where(obsFilterName == filterName)
+            # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
+            use, = np.where(obsFilterName == filterName.encode('utf-8'))
             if use.size == 0:
                 self.fgcmLog.info('WARNING: no observations in filter %s' % (filterName))
             else:
@@ -690,7 +691,7 @@ class FgcmStars(object):
 
         import healpy as hp
         try:
-            from fgcmPlotmaps import plot_hpxmap
+            from .fgcmPlotmaps import plot_hpxmap
         except:
             self.fgcmLog.info("Map plotting not available.  Sorry!")
             return
@@ -907,7 +908,7 @@ class FgcmStars(object):
         if self.hasXY:
             # new style
 
-            from fgcmUtilities import poly2dFunc
+            from .fgcmUtilities import poly2dFunc
 
             obsX = snmm.getArray(self.obsXHandle)
             obsY = snmm.getArray(self.obsYHandle)

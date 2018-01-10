@@ -1,4 +1,5 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import fitsio
@@ -7,21 +8,24 @@ import sys
 import esutil
 import time
 
-from fgcmUtilities import _pickle_method
-from fgcmChisq import FgcmChisq
-from fgcmUtilities import objFlagDict
+from .fgcmUtilities import _pickle_method
+from .fgcmChisq import FgcmChisq
+from .fgcmUtilities import objFlagDict
 
 
 import types
-import copy_reg
+try:
+    import copy_reg as copyreg
+except ImportError:
+    import copyreg
 
 import multiprocessing
 from multiprocessing import Pool
 
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-copy_reg.pickle(types.MethodType, _pickle_method)
+copyreg.pickle(types.MethodType, _pickle_method)
 
 
 class FgcmBrightObs(object):
@@ -153,7 +157,7 @@ class FgcmBrightObs(object):
             # and split along these indices
             goodObsList = np.split(goodObs,splitIndices)
 
-            workerList = zip(goodStarsList,goodObsList)
+            workerList = list(zip(goodStarsList,goodObsList))
 
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
@@ -161,11 +165,22 @@ class FgcmBrightObs(object):
             self.fgcmLog.info('Using %d sections (%.1f seconds)' %
                              (nSections,time.time() - prepStartTime))
 
+            try:
+                self.fgcmLog.pause()
+            except:
+                pass
+
             # make a pool
             pool = Pool(processes=self.nCore)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
+
+            try:
+                self.fgcmLog.resume()
+            except:
+                pass
+
 
 
         self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
@@ -181,6 +196,8 @@ class FgcmBrightObs(object):
         goodStarsAndObs: tuple[2]
            (goodStars, goodObs)
         """
+
+        # NOTE: No logging is allowed in the _worker method
 
         goodStars = goodStarsAndObs[0]
         goodObs = goodStarsAndObs[1]

@@ -1,3 +1,6 @@
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
+
 import os
 import matplotlib
 try:             os.environ['DISPLAY']
@@ -16,7 +19,7 @@ from mpl_toolkits.axisartist import Subplot
 from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-from fgcmBasemap import FgcmBasemap
+from .fgcmBasemap import FgcmBasemap
 
 def set_cmap(name='viridis'):
     try:
@@ -24,7 +27,7 @@ def set_cmap(name='viridis'):
         plt.register_cmap(name='viridis', cmap=cmaps.viridis)
     except ImportError:
         # this is the local version
-        import colormaps as cmaps
+        from . import colormaps as cmaps
         plt.register_cmap(name='viridis',cmap=cmaps.viridis)
     finally:
         plt.set_cmap(name)

@@ -1,4 +1,6 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
+
 
 import numpy as np
 import scipy.interpolate as interpolate
@@ -24,10 +26,10 @@ except ImportError:
         except ImportError:
             pass
 
-from modtranGenerator import ModtranGenerator
+from .modtranGenerator import ModtranGenerator
 
-from sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from fgcmLogger import FgcmLogger
+from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+from .fgcmLogger import FgcmLogger
 
 class FgcmAtmosphereTable(object):
     """

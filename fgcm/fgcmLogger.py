@@ -1,9 +1,10 @@
-from __future__ import print_function
+from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import os
 import sys
 
-from fgcmUtilities import logDict
+from .fgcmUtilities import logDict
 
 class FgcmLogger(object):
     """
@@ -24,15 +25,36 @@ class FgcmLogger(object):
 
         self.logFile = logFile
         self.printLogger = printLogger
+        self.logging = False
 
         if not printLogger:
             # this might fail.  Let it throw its exception?
             self.logF = open(self.logFile,'w')
+            self.logging = True
 
         self.logLevel = logLevel
 
         if (logLevel not in logDict):
             raise ValueError("Illegal logLevel: %s" % (logLevel))
+
+    def pause(self):
+        """
+        Pause logging for multiprocessing
+        """
+
+        if self.logging:
+            self.logF.close()
+            self.logF = None
+            self.logging = False
+
+    def resume(self):
+        """
+        Resume logging for multiprocessing
+        """
+
+        if not self.logging and not self.printLogger:
+            self.logF = open(self.logFile, "a")
+            self.logging = True
 
     def info(self,logString):
         """
