@@ -11,7 +11,6 @@ from pkg_resources import resource_exists
 from pkg_resources import resource_filename
 from pkg_resources import resource_listdir
 
-import fitsio
 try:
     import fitsio
     fits_package = 'fitsio'
@@ -232,7 +231,7 @@ class FgcmAtmosphereTable(object):
             self.pwvAtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('PWVATM', 1))
             self.o3AtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('O3ATM', 1))
             self.o2AtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('O2ATM', 1))
-            self.rayleightAtmTable = fitsio.getdata(self.atmosphereTableFile, ext=('RAYATM', 1))
+            self.rayleightAtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('RAYATM', 1))
 
     def generateTable(self):
         """
@@ -336,6 +335,7 @@ class FgcmAtmosphereTable(object):
         """
         """
         # at the moment, only work with fitsio...
+
         import fitsio
 
         if os.path.isfile(fileName) and not clobber:
