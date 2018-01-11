@@ -7,7 +7,6 @@ try:             os.environ['DISPLAY']
 except KeyError: matplotlib.use('Agg')
 from collections import OrderedDict as odict
 
-import fitsio
 import numpy as np
 import scipy.ndimage as nd
 import pylab as plt
