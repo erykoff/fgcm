@@ -2,7 +2,6 @@ from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
 import numpy as np
-import fitsio
 import os
 import sys
 import esutil
