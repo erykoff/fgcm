@@ -148,7 +148,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.info(getMemoryString('Setting up with fits'))
 
         # read in the LUT
-        self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile)
+        self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile,
+                                            filterToBand=self.fgcmConfig.filterToBand)
 
         # Generate or Read Parameters
         if (self.initialCycle):
