@@ -231,7 +231,7 @@ class FgcmAtmosphereTable(object):
             self.pwvAtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('PWVATM', 1))
             self.o3AtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('O3ATM', 1))
             self.o2AtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('O2ATM', 1))
-            self.rayleightAtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('RAYATM', 1))
+            self.rayleighAtmTable = pyfits.getdata(self.atmosphereTableFile, ext=('RAYATM', 1))
 
     def generateTable(self):
         """
