@@ -734,3 +734,10 @@ class FgcmGray(object):
                                                              self.outfileBaseWithCycle,
                                                              self.fgcmPars.bands[bandIndex0],
                                                              self.fgcmPars.bands[bandIndex1]))
+
+    def __getstate__(self):
+        # Don't try to pickle the logger.
+
+        state = self.__dict__.copy()
+        del state['fgcmLog']
+        return state

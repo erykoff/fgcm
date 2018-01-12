@@ -1555,7 +1555,7 @@ class FgcmParameters(object):
         ## FIXME: allow other band names
         #rBandIndex,=np.where(self.bands=='r')[0]
         rBandIndex = self.bands.index('r')
-        
+
         O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
                          (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
 
@@ -1594,3 +1594,10 @@ class FgcmParameters(object):
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)
+
+    def __getstate__(self):
+        # Don't try to pickle the logger.
+
+        state = self.__dict__.copy()
+        del state['fgcmLog']
+        return state

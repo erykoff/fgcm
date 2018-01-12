@@ -1065,3 +1065,10 @@ class FgcmStars(object):
         #objFlag &= ~objFlagDict['TEMPORARY_BAD_STAR']
 
         fitsio.write(starFile, outCat, clobber=True)
+
+    def __getstate__(self):
+        # Don't try to pickle the logger.
+
+        state = self.__dict__.copy()
+        del state['fgcmLog']
+        return state
