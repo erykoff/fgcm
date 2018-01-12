@@ -317,3 +317,10 @@ class FgcmRetrieval(object):
             #  on each others' toes
             r0[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[0]
             r10[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[1]/IRetrieved[0]
+
+    def __getstate__(self):
+        # Don't try to pickle the logger.
+
+        state = self.__dict__.copy()
+        del state['fgcmLog']
+        return state

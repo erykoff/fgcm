@@ -297,3 +297,10 @@ class FgcmBrightObs(object):
                 self.fgcmStars.computeObjectSEDSlopes(goodStars)
 
         # and we're done
+
+    def __getstate__(self):
+        # Don't try to pickle the logger.
+
+        state = self.__dict__.copy()
+        del state['fgcmLog']
+        return state
