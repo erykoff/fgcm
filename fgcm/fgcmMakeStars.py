@@ -442,7 +442,7 @@ class FgcmMakeStars(object):
             # slower htm matching...
             htm = esutil.htm.HTM(11)
 
-            matcher = esutil.htm.Matcher(self.objCat['RA'], self.objCat['DEC'])
+            matcher = esutil.htm.Matcher(11, self.objCat['RA'], self.objCat['DEC'])
             matches = matcher.match(self.objCat['RA'], self.objCat['DEC'],
                                     self.starConfig['isolationRadius']/3600.0,
                                     maxmatch = 0)
