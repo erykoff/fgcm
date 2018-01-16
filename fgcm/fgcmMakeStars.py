@@ -310,8 +310,8 @@ class FgcmMakeStars(object):
                                         self.starConfig['matchRadius']/3600.0,
                                         maxmatch=0)
 
-                i1 = matches[0]
-                i2 = matches[1]
+                i1 = matches[1]
+                i2 = matches[0]
 
 
             fakeId = np.arange(p1a.size)
@@ -421,8 +421,10 @@ class FgcmMakeStars(object):
                 matcher = esutil.htm.Matcher(10, brightStarRA, brightStarDec)
                 matches = matcher.match(self.objCat['RA'], self.objCat['DEC'], brightStarRadius,
                                         maxmatch=0)
-                i1=matches[0]
-                i2=matches[1]
+                # matches[0] -> m1 -> array from matcher.match() call (self.objCat)
+                # matches[1] -> m2 -> array from htm.Matcher() (brightStar)
+                i1=matches[1]
+                i2=matches[0]
 
             self.fgcmLog.info("Cutting %d objects too near bright stars." % (i2.size))
             self.objCat = np.delete(self.objCat,i2)
@@ -446,8 +448,8 @@ class FgcmMakeStars(object):
             matches = matcher.match(self.objCat['RA'], self.objCat['DEC'],
                                     self.starConfig['isolationRadius']/3600.0,
                                     maxmatch = 0)
-            i1=matches[0]
-            i2=matches[1]
+            i1=matches[1]
+            i2=matches[0]
 
         use,=np.where(i1 != i2)
 
@@ -516,8 +518,10 @@ class FgcmMakeStars(object):
             matches = matcher.match(raArray, decArray,
                                     self.starConfig['matchRadius']/3600.,
                                     maxmatch=0)
-            i1 = matches[0]
-            i2 = matches[1]
+            # matches[0] -> m1 -> array from matcher.match() call (ra/decArray)
+            # matches[1] -> m2 -> array from htm.Matcher() (self.objCat)
+            i2 = matches[0]
+            i1 = matches[1]
 
         self.fgcmLog.info("Collating observations")
         nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
@@ -527,8 +531,6 @@ class FgcmMakeStars(object):
                              (self.objCat.size, nObsPerObj.size))
 
         # which stars have at least minPerBand observations in each required band?
-        #req, = np.where(np.array(self.starConfig['requiredFlag']) == 1)
-        #reqBands = np.array(self.starConfig['bands'])[req]
         reqBands = np.array(self.starConfig['requiredBands'], dtype=bandArray.dtype)
 
         # this could be made more efficient
