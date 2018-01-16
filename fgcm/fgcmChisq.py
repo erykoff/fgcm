@@ -289,21 +289,12 @@ class FgcmChisq(object):
 
             self.fgcmLog.info('Running chisq on %d cores' % (self.nCore))
 
-            try:
-                self.fgcmLog.pause()
-            except:
-                pass
-
             # make a pool
             pool = Pool(processes=self.nCore)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
 
-            try:
-                self.fgcmLog.resume()
-            except:
-                pass
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')

@@ -164,22 +164,11 @@ class FgcmBrightObs(object):
             self.fgcmLog.info('Using %d sections (%.1f seconds)' %
                              (nSections,time.time() - prepStartTime))
 
-            try:
-                self.fgcmLog.pause()
-            except:
-                pass
-
             # make a pool
             pool = Pool(processes=self.nCore)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
-
-            try:
-                self.fgcmLog.resume()
-            except:
-                pass
-
 
 
         self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
