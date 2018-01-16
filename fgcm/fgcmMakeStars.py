@@ -256,9 +256,9 @@ class FgcmMakeStars(object):
             for filterName in self.filterNames:
                 if (self.starConfig['filterToBand'][filterName] == self.starConfig['referenceBand']):
                     if useFlag is None:
-                        useFlag = (filterNameArray == filterName)
+                        useFlag = (filterNameArray == filterName.encode('utf-8'))
                     else:
-                        useFlag |= (filterNameArray == filterName)
+                        useFlag |= (filterNameArray == filterName.encode('utf-8'))
 
             raArray = raArray[useFlag]
             decArray = decArray[useFlag]
