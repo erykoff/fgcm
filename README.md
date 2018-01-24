@@ -49,13 +49,69 @@ variations).  See `examples/scripts/makeLUTSample.py` and
 `examples/configs/fgcm_sample_lut.yml` for a framework on how to
 make a LUT.
 
+Note that the "standard atmosphere" parameters are chosen for each table.  A
+new table will have to be generated to get a new standard atmosphere (different
+reference airmass, for example).
+
 ## Ingesting and Matching Star Observations
+
+First, you need to create an observation file which is a giant fits file with
+all the observations to be used in the calibration.  This can be tens of
+gigabytes.  In the file should be:
+
+```
+'FILTERNAME': Name of the filter used
+'RA': RA
+'DEC': Dec
+'MAG': raw 'ADU' exposure-time corrected magnitude, MAG = -2.5*log10(FLUX)
++ 2.5*log10(EXPTIME)
+'MAGERR': magnitude error
+expField: Exposure/visit number, name is configurable
+ccdField: ccd number, name is configurable
+'X': x position on CCD (optional)
+'Y': y position on CCD (optional)
+```
+
+The name of the file should be of the form `starfileBase+'_observations.fits`
+for input into the matching code.
+
+Next, you can run the matching code.  See `examples/scripts/makeStarsSample.py`
+and `examples/configs/fgcm_sample_stars.yml`.
 
 ## Running a Fit Cycle
 
 ### The First Cycle (Cycle 0)
 
+See `examples/scripts/fgcm_sample_cycle00_config.yml` for a sample config file
+and an explanation of what is required for inputs in each file.  In addition to
+the LUT and star files, tables describing exposure parameters (including MJD,
+telescope pointing, and barometric pressure), CCD offset positions (for airmass
+corrections for the final zeropoints for large cameras, and for plotting).  You
+also need to define observational epochs (preferably longish timescales when
+new flats were generated), and input dates (in MJD units) when the mirror was
+washed/recoated.
+
+There are two important differences between the first cycle and subsequent
+cycles.  The first is that a "bright observation" algorithm is employed to
+choose approximately photometric observations.  The second is that I recommend
+that you freeze the atmosphere to the standard parameters for the first fit
+cycle.
+
+At the end of the first (and all subsequent) cycles a bunch of diagnostic plots
+are made in a subdirectory generated from the `outfileBase` and the
+`cycleNumber`.  In addition, a new config file is output for the next cycle
+that automatically increments the `cycleNumber` and turns off
+`freezeStdAtmosphere`.
+
 ### Subsequent Cycles
+
+Before running any subsequent cycle, you should especially look at the
+`cycleNUMBER_expgray_BAND.png` plots.  Choose appropriate cuts for each band to
+select "photometric" exposures in the next cycle with the
+`expGrayPhotometricCut` and `expGrayHighCut` parameters.  You can also up the
+number of iterations per cycle.  In my experience, the fit does not improve if
+you go beyond ~50 iterations.  The best way to get the fit to improve is to
+remove non-photometric exposures.
 
 Tests
 -----
@@ -74,4 +130,5 @@ A list of dependencies includes the following:
 * fitsio (for standalone running)
 * healpy
 * pyyaml
-* mpl_toolkits (for fancy coverage map plotting)
+* smatch (optional, for the fastest object matching)
+* mpl_toolkits (optional, for fancy coverage map plotting)
