@@ -21,6 +21,7 @@ outputStars: False
 #   Required: EXPTIME, seeingField, deepFlag, MJD, TELHA (degrees),
 #             TELRA (degrees), TELDEC (degrees), PMB (millibars),
 #             FILTERNAME
+# Note that seeingField and deepFlag can be unfilled.
 exposureFile: /path/to/exposurefile.fits
 
 # ccdOffsetFile: CCD offset info.
