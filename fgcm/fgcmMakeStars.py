@@ -39,8 +39,6 @@ class FgcmMakeStars(object):
        Maximum number of stars in each healpix.  Will randomly sample down to this density.
     referenceBand: string
        Name of reference band
-    zpDefault: float
-       Zeropoint to apply to fluxes get numbers to be normal-ish.
     matchNSide: int
        Healpix nside to do smatch matching.  Should just be 4096.
     coarseNSide: int
@@ -56,7 +54,7 @@ class FgcmMakeStars(object):
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','referenceBand',
-                      'zpDefault','matchNSide','coarseNSide']
+                      'matchNSide','coarseNSide']
 
         for key in requiredKeys:
             if (key not in starConfig):
