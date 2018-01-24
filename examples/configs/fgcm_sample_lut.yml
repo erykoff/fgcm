@@ -1,0 +1,18 @@
+# This is a sample config file that describes LUT config variables
+
+# Output look-up table file
+lutFile: fgcm_sample_lut.fits
+
+# Precomputed Atmosphere table (from data directory or in cwd)
+atmosphereTableName: fgcm_atm_subaru1.fits
+
+# Names of the filters (as will be in the observation table)
+filterNames: ['g', 'r', 'i', 'i2', 'z', 'Y']
+
+# Names of the "Standard Filters".  If there are two different filters
+#  that should be mapped to the same "standard", as in HSC "i" and "i2"
+#  these can be mapped here.
+stdFilterNames: ['g', 'r', 'i', 'i', 'z', 'Y']
+
+# Number of CCDs
+nCCD: 109

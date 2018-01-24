@@ -1,0 +1,7 @@
+numpy
+scipy
+pyyaml
+fitsio
+matplotlib
+esutil
+healpy
