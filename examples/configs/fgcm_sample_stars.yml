@@ -1,0 +1,46 @@
+# This is a sample config file that describes star-making config variables
+
+# starfileBase: The prefix for all the output observation and star files
+starfileBase: fgcm_sample_v1
+
+# brightStarFile: optional file of bright stars to mask with RA, DEC, RADIUS (degrees)
+# brightStarFile: fgcm_sample_brightstars.fits
+
+# filterToBand: dictionary that translates "filterName" into "band"
+#  which allows replacement filters to be cross-calibrated
+filterToBand: {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'Y':'Y'}
+
+# requiredBands: Which bands (not filters!) are required of any star to
+#  be considered for calibration
+requiredBands: ['g', 'r', 'i', 'z']
+
+# minPerBand: minimum number of observations of the star in each band to
+#  be considered for calibration
+minPerBand: 2
+
+# referenceBand: band that is used for primary selection
+referenceBand: 'i'
+
+# matchRadius: Radius (arcseconds) to match observations into the same object
+matchRadius: 1.0
+
+# isolationRadius: Reject all stars that match other stars with this radius (arcseconds)
+isolationRadius: 2.0
+
+# densNSide: Healpix nside for computing density of stars
+densNSide: 128
+
+# densMaxPerPixel: Maximum number of stars in each healpix.  Will randomly sample down
+#  to this density.  Used to ensure that regions with more stars are not given too much
+#  weight
+densMaxPerPixel: 1000
+
+# matchNSide: Healpix nside to do smatch matching (if available)
+matchNSide: 4096
+
+# coarseNSide: Healpix nside to break down initial matches to save memory
+coarseNSide: 8
+
+# zpDefault: zeropoint to apply to fluxes to get numbers to be normal-ish
+#  (not really used for anything)
+# zpDefault: 25.0
