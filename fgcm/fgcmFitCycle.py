@@ -343,6 +343,7 @@ class FgcmFitCycle(object):
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
+        self.fgcmGray.computeExpGrayColorSplit()
         self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
 
         # Compute sigFgcm
