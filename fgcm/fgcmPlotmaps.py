@@ -150,12 +150,12 @@ def plot_hpxmap_hist(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     return fig,[ax1,ax2],ret
 
 def plot_hpxmap(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
-                percRange=[0.1,99.9],
+                percRange=[0.1,99.9],figsize=(6.5,4),
                 cbar_kwargs=dict(),hpxmap_kwargs=dict()):
     if isinstance(hpxmap,basestring):
         hpxmap = healpy.read_map(f)
 
-    fig = plt.figure(10,figsize=(6.5,4))
+    fig = plt.figure(10,figsize=figsize)
     fig.clf()
     gridspec=plt.GridSpec(1,2)
 
