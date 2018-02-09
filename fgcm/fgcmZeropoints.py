@@ -116,9 +116,10 @@ class FgcmZeropoints(object):
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
         expGrayErr = snmm.getArray(self.fgcmGray.expGrayErrHandle)
         expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
-        expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
         expNGoodCCDs = snmm.getArray(self.fgcmGray.expNGoodCCDsHandle)
         expNGoodTilings = snmm.getArray(self.fgcmGray.expNGoodTilingsHandle)
+        expGrayColorSplit = snmm.getArray(self.fgcmGray.expGrayColorSplitHandle)
+        expGrayRMSColorSplit = snmm.getArray(self.fgcmGray.expGrayRMSColorSplitHandle)
 
         ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
         ccdGrayRMS = snmm.getArray(self.fgcmGray.ccdGrayRMSHandle)
@@ -155,6 +156,8 @@ class FgcmZeropoints(object):
                                    ('FGCM_TILINGS','f8'), # done
                                    ('FGCM_FPGRY','f8'), # done
                                    ('FGCM_FPVAR','f8'), # done
+                                   ('FGCM_FPGRY_CSPLIT', 'f8', 3),
+                                   ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
                                    ('FGCM_DUST','f8'), # done
                                    ('FGCM_FLAT','f8'), # done
                                    ('FGCM_APERCORR','f8'), # done
@@ -212,6 +215,9 @@ class FgcmZeropoints(object):
         zpExpOk, = np.where(expNGoodCCDs[zpExpIndex] >= self.minCCDPerExp)
         zpStruct['FGCM_FPGRY'][zpExpOk] = expGray[zpExpIndex[zpExpOk]]
         zpStruct['FGCM_FPVAR'][zpExpOk] = expGrayRMS[zpExpIndex[zpExpOk]]**2.
+
+        zpStruct['FGCM_FPGRY_CSPLIT'][zpExpOk, :] = expGrayColorSplit[zpExpIndex[zpExpOk], :]
+        zpStruct['FGCM_FPGRY_CSPLITVAR'][zpExpOk, :] = expGrayRMSColorSplit[zpExpIndex[zpExpOk], :]**2.
 
         self.fgcmLog.info('%d exposure/ccd sets have exposures with >=%d good ccds' %
                          (zpExpOk.size, self.minCCDPerExp))

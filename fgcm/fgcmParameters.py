@@ -516,7 +516,7 @@ class FgcmParameters(object):
             #    raise ValueError("extraBand %s not in list of bands!" % (self.extraBands[i]))
             #self.extraBandIndex[i] = u[0]
             try:
-                self.extraBandIndex[i] = self.bands.index(self.fitBands[i])
+                self.extraBandIndex[i] = self.bands.index(self.extraBands[i])
             except:
                 raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
 
