@@ -100,6 +100,10 @@ class FgcmGray(object):
         self.expNGoodCCDsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i2')
         self.expNGoodTilingsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
 
+        self.expGrayColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
+        self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
+        self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
+
         #self.sigFgcm = np.zeros(self.fgcmPars.nBands,dtype='f8')
 
     def computeExpGrayForInitialSelection(self,doPlots=True):
@@ -577,6 +581,125 @@ class FgcmGray(object):
         #    return
         if (doPlots):
             self.makeExpGrayPlots()
+
+    def computeExpGrayColorSplit(self, doPlots=True):
+        """
+        """
+
+        if (not self.fgcmStars.magStdComputed):
+            raise RuntimeError("Must run FgcmChisq to compute magStd before computeExpGrayColorSplit")
+
+        startTime = time.time()
+        self.fgcmLog.info('Computing ExpGrayColorSplit')
+
+        expGrayColorSplit = snmm.getArray(self.expGrayColorSplitHandle)
+        expGrayRMSColorSplit = snmm.getArray(self.expGrayRMSColorSplitHandle)
+        expGrayNGoodStarsColorSplit = snmm.getArray(self.expGrayNGoodStarsColorSplitHandle)
+
+        objID = snmm.getArray(self.fgcmStars.objIDHandle)
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+
+        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+
+        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+
+        EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
+        EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
+                           obsMagStd[obsIndex])
+
+        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
+
+        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+                              (objFlag == 0))
+
+        _,goodObs = esutil.numpy_util.match(goodStars,
+                                            obsObjIDIndex,
+                                            presorted=True)
+
+        gd,=np.where(obsFlag[goodObs] == 0)
+        goodObs = goodObs[gd]
+
+        gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], 0] -
+                 objMagStdMean[obsObjIDIndex[goodObs], 2])
+        st = np.argsort(gmiGO)
+        gmiCutLow = np.array([gmiGO[st[0]],
+                              gmiGO[st[int(0.25*st.size)]],
+                              gmiGO[st[int(0.75*st.size)]]])
+        gmiCutHigh = np.array([gmiGO[st[int(0.25*st.size)]],
+                               gmiGO[st[int(0.75*st.size)]],
+                               gmiGO[st[-1]]])
+        gmiCutNames = ['Blue25', 'Middle50', 'Red25']
+
+        # we are only doing this for the required bands
+        _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
+                                               obsBandIndex[goodObs])
+
+        expGrayColorSplit[:, :] = 0.0
+        expGrayRMSColorSplit[:, :] = 0.0
+        expGrayNGoodStarsColorSplit[:, :] = 0
+
+        for c in xrange(gmiCutLow.size):
+            use, = np.where((gmiGO > gmiCutLow[c]) &
+                            (gmiGO < gmiCutHigh[c]))
+
+            np.add.at(expGrayColorSplit[:, c],
+                      obsExpIndex[goodObs[use]],
+                      EGray[goodObs[use]])
+            np.add.at(expGrayRMSColorSplit[:, c],
+                      obsExpIndex[goodObs[use]],
+                      EGray[goodObs[use]]**2.)
+            np.add.at(expGrayNGoodStarsColorSplit[:, c],
+                      obsExpIndex[goodObs[use]],
+                      1)
+
+            gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp)
+            expGrayColorSplit[gd, c] /= expGrayNGoodStarsColorSplit[gd, c]
+            expGrayRMSColorSplit[gd, c] = np.sqrt((expGrayRMSColorSplit[gd, c] / expGrayNGoodStarsColorSplit[gd, c]) -
+                                                  (expGrayColorSplit[gd, c])**2.)
+
+            bd, = np.where(expGrayNGoodStarsColorSplit[:, c] < self.minStarPerExp)
+            expGrayColorSplit[bd, c] = self.illegalValue
+            expGrayRMSColorSplit[bd, c] = self.illegalValue
+
+
+        if doPlots:
+            # main plots:
+            #  per band, plot expGray for red vs blue stars!
+
+            for ind in xrange(self.fgcmStars.bandRequiredIndex.size):
+                bandIndex = self.fgcmStars.bandRequiredIndex[ind]
+                use, = np.where((self.fgcmPars.expBandIndex == bandIndex) &
+                                (self.fgcmPars.expFlag == 0) &
+                                (expGrayColorSplit[:, 0] > self.illegalValue) &
+                                (expGrayColorSplit[:, 2] > self.illegalValue))
+                if (use.size == 0):
+                    self.fgcmLog.info('Could not find photometric exposures in band %d' % (bandIndex))
+                    continue
+
+                fig = plt.figure(1, figsize=(8, 6))
+                fig.clf()
+
+                ax = fig.add_subplot(111)
+                ax.hexbin(expGrayColorSplit[use, 0], expGrayColorSplit[use, 2], bins='log')
+                ax.set_xlabel('EXP_GRAY (%s) (%s)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
+                ax.set_ylabel('EXP_GRAY (%s) (%s)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
+                ax.plot([-0.01, 0.01], [-0.01, 0.01], 'r--')
+
+                fig.savefig('%s/%s_expgray_redblue_compare_%s.png' % (self.plotPath,
+                                                                      self.outfileBaseWithCycle,
+                                                                      self.fgcmPars.bands[bandIndex]))
+
+        # and we're done...
+
+
 
 
     def makeExpGrayPlots(self):
