@@ -396,14 +396,14 @@ class FgcmParameters(object):
         self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
 
         ## and copy the parameters
-        self.parAlpha = inParams['PARALPHA'][0]
-        self.parO3 = inParams['PARO3'][0]
-        self.parLnTauIntercept = inParams['PARLNTAUINTERCEPT'][0]
-        self.parLnTauSlope = inParams['PARLNTAUSLOPE'][0]
-        self.parPWVIntercept = inParams['PARPWVINTERCEPT'][0]
-        self.parPWVPerSlope = inParams['PARPWVPERSLOPE'][0]
-        self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0]
-        self.parQESysSlope = inParams['PARQESYSSLOPE'][0]
+        self.parAlpha = np.atleast_1d(inParams['PARALPHA'][0])
+        self.parO3 = np.atleast_1d(inParams['PARO3'][0])
+        self.parLnTauIntercept = np.atleast_1d(inParams['PARLNTAUINTERCEPT'][0])
+        self.parLnTauSlope = np.atleast_1d(inParams['PARLNTAUSLOPE'][0])
+        self.parPWVIntercept = np.atleast_1d(inParams['PARPWVINTERCEPT'][0])
+        self.parPWVPerSlope = np.atleast_1d(inParams['PARPWVPERSLOPE'][0])
+        self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
+        self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
 
         if (self.resetParameters):
             # reset many of the parameters
@@ -423,7 +423,7 @@ class FgcmParameters(object):
             self.hasExternalPWV = True
             self.loadExternalPWV(self.externalPWVDeltaT)
             self.parExternalPWVScale = inParams['PAREXTERNALPWVSCALE'][0]
-            self.parExternalPWVOffset[:] = inParams['PAREXTERNALPWVOFFSET'][0]
+            self.parExternalPWVOffset[:] = np.atleast_1d(inParams['PAREXTERNALPWVOFFSET'][0])
 
             if (self.resetParameters):
                 self.parExternalPWVScale = 1.0
@@ -435,32 +435,32 @@ class FgcmParameters(object):
             self.hasExternalTau = True
             self.loadExternalTau()
             self.parExternalTauScale = inParams['PAREXTERNALTAUSCALE'][0]
-            self.parExternalTauOffset[:] = inParams['PAREXTERNALTAUOFFSET'][0]
+            self.parExternalTauOffset[:] = np.atleast_1d(inParams['PAREXTERNALTAUOFFSET'][0])
 
             if (self.resetParameters):
                 self.parExternalTauScale = 1.0
                 self.parExternalTauOffset[:] = 0.0
 
 
-        self.compAperCorrPivot = inParams['COMPAPERCORRPIVOT'][0]
-        self.compAperCorrSlope = inParams['COMPAPERCORRSLOPE'][0]
-        self.compAperCorrSlopeErr = inParams['COMPAPERCORRSLOPEERR'][0]
+        self.compAperCorrPivot = np.atleast_1d(inParams['COMPAPERCORRPIVOT'][0])
+        self.compAperCorrSlope = np.atleast_1d(inParams['COMPAPERCORRSLOPE'][0])
+        self.compAperCorrSlopeErr = np.atleast_1d(inParams['COMPAPERCORRSLOPEERR'][0])
         self.compAperCorrRange = np.reshape(inParams['COMPAPERCORRRANGE'][0],(2,self.nBands))
 
-        self.compExpGray = inParams['COMPEXPGRAY'][0]
-        self.compVarGray = inParams['COMPVARGRAY'][0]
-        self.compNGoodStarPerExp = inParams['COMPNGOODSTARPEREXP'][0]
+        self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
+        self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
+        self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
 
-        self.compSigFgcm = inParams['COMPSIGFGCM'][0]
+        self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
 
         # These are exposure-level properties
-        self.compRetrievedPWV = inParams['COMPRETRIEVEDPWV'][0]
+        self.compRetrievedPWV = np.atleast_1d(inParams['COMPRETRIEVEDPWV'][0])
         self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
-        self.compRetrievedPWVRaw = inParams['COMPRETRIEVEDPWVRAW'][0]
-        self.compRetrievedPWVFlag = inParams['COMPRETRIEVEDPWVFLAG'][0]
+        self.compRetrievedPWVRaw = np.atleast_1d(inParams['COMPRETRIEVEDPWVRAW'][0])
+        self.compRetrievedPWVFlag = np.atleast_1d(inParams['COMPRETRIEVEDPWVFLAG'][0])
         self.parRetrievedPWVScale = inParams['PARRETRIEVEDPWVSCALE'][0]
         self.parRetrievedPWVOffset = inParams['PARRETRIEVEDPWVOFFSET'][0]
-        self.parRetrievedPWVNightlyOffset = inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][0]
+        self.parRetrievedPWVNightlyOffset = np.atleast_1d(inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][0])
 
         if self.resetParameters:
             self.parRetrievedPWVScale = 1.0
@@ -468,7 +468,7 @@ class FgcmParameters(object):
             self.parRetrievedPWVNightlyOffset[:] = 0.0
 
         # These are nightly properties
-        self.compRetrievedTauNight = inParams['COMPRETRIEVEDTAUNIGHT'][0]
+        self.compRetrievedTauNight = np.atleast_1d(inParams['COMPRETRIEVEDTAUNIGHT'][0])
         self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
 
         # If we are resetting parameters, and want to use retrieved tau as the initial
