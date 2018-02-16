@@ -398,18 +398,19 @@ class FgcmConfig(object):
         # confirm that we cover all the exposures, and remove excess epochs
 
         try:
-            self.epochNames = np.array(configDict['epochNames'],dtype='a21')
+            self.epochNames = configDict['epochNames']
         except:
-            self.epochNames = np.zeros(self.epochMJDs.size,dtype='a21')
+            self.epochNames = []
             for i in xrange(self.epochMJDs.size):
-                self.epochNames[i] = 'epoch%d' % (i)
+                self.epochNames.append('epoch%d' % (i))
 
-        if (self.epochNames.size != self.epochMJDs.size):
-            raise ValueError("number of epochNames must be same as epochMJDs")
+        if len(self.epochNames) != len(self.epochMJDs):
+            raise ValueError("Number of epochNames must be same as epochMJDs")
 
-        st=np.argsort(self.epochMJDs)
-        self.epochMJDs = self.epochMJDs[st]
-        self.epochNames = self.epochNames[st]
+        # are they sorted?
+        if (self.epochMJDs != np.sort(self.epochMJDs)).any():
+            raise ValueError("epochMJDs must be sorted in ascending order")
+
         test=np.searchsorted(self.epochMJDs,self.mjdRange)
 
         if test.min() == 0:
