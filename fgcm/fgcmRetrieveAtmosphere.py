@@ -65,6 +65,14 @@ class FgcmRetrieveAtmosphere(object):
         r0 = snmm.getArray(fgcmRetrieval.r0Handle)
         r10 = snmm.getArray(fgcmRetrieval.r10Handle)
 
+        # Reset values
+        self.fgcmPars.compRetrievedPWVRaw[:] = self.illegalValue
+        # set this to be the default
+        self.fgcmPars.compRetrievedPWVRaw[:] = self.fgcmPars.pwvStd
+        self.fgcmPars.compRetrievedPWV[:] = self.fgcmPars.pwvStd
+        self.fgcmPars.compRetrievedPWVFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
+
+
         # FIXME: check that there are actually z-band images...etc.
         #zBandIndex, = np.where(self.fgcmPars.bands == 'z')[0]
         zBandIndex = self.fgcmPars.bands.index('z')
@@ -73,6 +81,10 @@ class FgcmRetrieveAtmosphere(object):
                        (self.fgcmPars.expFlag[expIndexArray] == 0) &
                        (np.abs(r0[expIndexArray, ccdIndexArray]) < 1000.0) &
                        (np.abs(r10[expIndexArray, ccdIndexArray]) < 1000.0))
+
+        if zUse.size == 0:
+            self.fgcmLog.info("Could not find any good z-band exposures for PWV retrieval.")
+            return
 
         o3ZU = self.fgcmPars.expO3[expIndexArray[zUse]]
         #lnTauZU = np.log(self.fgcmPars.expTau[expIndexArray[zUse]])
@@ -153,11 +165,6 @@ class FgcmRetrieveAtmosphere(object):
                                   1, dtype=np.int32)
                     rPWVStruct['RPWV_SMOOTH'][i1a[j]] = np.median(rPWVStruct['RPWV_MED'][i1a[u]])
 
-        # Reset values
-        self.fgcmPars.compRetrievedPWVRaw[:] = self.illegalValue
-        # set this to be the default
-        self.fgcmPars.compRetrievedPWV[:] = self.fgcmPars.pwvStd
-        self.fgcmPars.compRetrievedPWVFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
 
         # Record these values and set a flag...
         self.fgcmPars.compRetrievedPWVRaw[rPWVStruct['EXPINDEX']] = rPWVStruct['RPWV_MED']
