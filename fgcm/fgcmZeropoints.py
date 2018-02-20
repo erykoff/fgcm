@@ -590,7 +590,7 @@ class FgcmZeropointPlotter(object):
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
         for filterName in self.filterNames:
-            use,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName) &
+            use,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                           ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                           (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                           (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
@@ -654,7 +654,7 @@ class FgcmZeropointPlotter(object):
         nCCD = (ccdMax - ccdMin) + 1
 
         for filterName in self.filterNames:
-            use0,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName) &
+            use0,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                            ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                            (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                            (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
