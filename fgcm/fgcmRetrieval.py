@@ -163,10 +163,14 @@ class FgcmRetrieval(object):
 
             # may want to sort by nObservations, but only if we pre-split
 
-            pool = Pool(processes=self.nCore)
-            pool.map(self._worker, uExpIndexList, chunksize=1)
-            pool.close()
-            pool.join()
+            if self.nCore == 1:
+                # just do a regular map
+                map(self._worker, uExpIndexList)
+            else:
+                pool = Pool(processes=self.nCore)
+                pool.map(self._worker, uExpIndexList, chunksize=1)
+                pool.close()
+                pool.join()
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)
