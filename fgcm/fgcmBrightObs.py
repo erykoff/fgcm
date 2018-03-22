@@ -165,10 +165,14 @@ class FgcmBrightObs(object):
                              (nSections,time.time() - prepStartTime))
 
             # make a pool
-            pool = Pool(processes=self.nCore)
-            pool.map(self._worker,workerList,chunksize=1)
-            pool.close()
-            pool.join()
+            if self.nCore == 1:
+                # just do a regular map
+                map(self._worker, workerList)
+            else:
+                pool = Pool(processes=self.nCore)
+                pool.map(self._worker,workerList,chunksize=1)
+                pool.close()
+                pool.join()
 
 
         self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
