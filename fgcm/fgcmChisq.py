@@ -295,7 +295,6 @@ class FgcmChisq(object):
             pool.close()
             pool.join()
 
-
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
             for thisCore in xrange(self.nCore):

@@ -734,6 +734,10 @@ class FgcmStars(object):
            Array of object indices to do computation
         """
 
+        if self.nBands < 3:
+            # cannot compute SED slopes ... just leave at 0
+            return
+
         # work on multiple indices
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)

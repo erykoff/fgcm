@@ -74,8 +74,11 @@ class FgcmRetrieveAtmosphere(object):
 
 
         # FIXME: check that there are actually z-band images...etc.
-        #zBandIndex, = np.where(self.fgcmPars.bands == 'z')[0]
-        zBandIndex = self.fgcmPars.bands.index('z')
+        try:
+            zBandIndex = self.fgcmPars.bands.index('z')
+        except ValueError:
+            self.fgcmLog.info("No z band, so no PWV retrieval.")
+            return
 
         zUse,=np.where((self.fgcmPars.expBandIndex[expIndexArray] == zBandIndex) &
                        (self.fgcmPars.expFlag[expIndexArray] == 0) &

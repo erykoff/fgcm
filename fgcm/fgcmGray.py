@@ -71,6 +71,7 @@ class FgcmGray(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
         self.expGrayCheckDeltaT = fgcmConfig.expGrayCheckDeltaT
+        self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
         self._prepareGrayArrays()
 
@@ -627,8 +628,8 @@ class FgcmGray(object):
         gd,=np.where(obsFlag[goodObs] == 0)
         goodObs = goodObs[gd]
 
-        gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], 0] -
-                 objMagStdMean[obsObjIDIndex[goodObs], 2])
+        gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
+                 objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
         st = np.argsort(gmiGO)
         gmiCutLow = np.array([gmiGO[st[0]],
                               gmiGO[st[int(0.25*st.size)]],

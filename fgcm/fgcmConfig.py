@@ -181,6 +181,13 @@ class FgcmConfig(object):
         else:
             self.noChromaticCorrections = False
 
+        if 'colorSplitIndices' in configDict:
+            self.colorSplitIndices = np.array(configDict['colorSplitIndices'], dtype=np.int32)
+            if self.colorSplitIndices.size != 2:
+                raise ValueError("colorSplitIndices must have 2 elements")
+        else:
+            self.colorSplitIndices = np.array([0,2])
+
         if 'expGrayCheckDeltaT' in configDict:
             self.expGrayCheckDeltaT = configDict['expGrayCheckDeltaT']
         else:

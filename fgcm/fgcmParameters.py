@@ -1504,67 +1504,85 @@ class FgcmParameters(object):
         fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
                                                  self.outfileBaseWithCycle))
 
-        # tau
-        fig=plt.figure(1,figsize=(8,6))
-        fig.clf()
-        ax=fig.add_subplot(111)
+        # Tau
+        try:
+            gBandIndex = self.bands.index('g')
+        except ValueError:
+            gBandIndex = -1
+        try:
+            rBandIndex = self.bands.index('r')
+        except ValueError:
+            rBandIndex = -1
 
-        ## FIXME: allow other band names  (bandLike or something)
-        ## FIXME with aliases?  actually, these are the aliases
-        #gBandIndex,=np.where(self.bands=='g')[0]
-        #rBandIndex,=np.where(self.bands=='r')[0]
-        gBandIndex = self.bands.index('g')
-        rBandIndex = self.bands.index('r')
+        if gBandIndex >=0 or rBandIndex >= 0:
 
-        tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
-                          ((nExpPerBandPerNight[:,gBandIndex] +
-                            nExpPerBandPerNight[:,rBandIndex]) >
-                           self.minExpPerNight))
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+            ax=fig.add_subplot(111)
 
-        ax.plot(mjdNight[tauGd] - firstMJD, tauNight[tauGd],'r.')
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel(r'$\tau_{7750}$',fontsize=16)
+            # I'm sure there's a more elegant way of doing this
+            if gBandIndex >= 0 and rBandIndex >= 0:
+                tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
+                                  ((nExpPerBandPerNight[:,gBandIndex] +
+                                    nExpPerBandPerNight[:,rBandIndex]) >
+                                   self.minExpPerNight))
+            elif gBandIndex >= 0:
+                tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
+                                  ((nExpPerBandPerNight[:,gBandIndex]) >
+                                   self.minExpPerNight))
+            elif rBandIndex >= 0:
+                tauGd, = np.where((nExpPerNight > self.minExpPerNight) &
+                                  ((nExpPerBandPerNight[:,rBandIndex]) >
+                                   self.minExpPerNight))
 
-        fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
-                                               self.outfileBaseWithCycle))
+            ax.plot(mjdNight[tauGd] - firstMJD, tauNight[tauGd],'r.')
+            ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+            ax.set_ylabel(r'$\tau_{7750}$',fontsize=16)
 
-        # pwv
-        fig=plt.figure(1,figsize=(8,6))
-        fig.clf()
-        ax=fig.add_subplot(111)
+            fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
+                                                   self.outfileBaseWithCycle))
 
-        ## FIXME: allow other band names
-        #zBandIndex,=np.where(self.bands=='z')[0]
-        zBandIndex = self.bands.index('z')
+        try:
+            zBandIndex = self.bands.index('z')
+        except ValueError:
+            zBandIndex = -1
 
-        pwvGd, = np.where((nExpPerNight > self.minExpPerNight) &
-                          (nExpPerBandPerNight[:,zBandIndex] > self.minExpPerNight))
+        if zBandIndex >= 0:
+            # pwv
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+            ax=fig.add_subplot(111)
 
-        ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel(r'$\mathrm{PWV}$',fontsize=16)
+            pwvGd, = np.where((nExpPerNight > self.minExpPerNight) &
+                              (nExpPerBandPerNight[:,zBandIndex] > self.minExpPerNight))
 
-        fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
-                                               self.outfileBaseWithCycle))
+            ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
+            ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+            ax.set_ylabel(r'$\mathrm{PWV}$',fontsize=16)
+
+            fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
+                                                   self.outfileBaseWithCycle))
 
         # O3
-        fig=plt.figure(1,figsize=(8,6))
-        fig.clf()
-        ax=fig.add_subplot(111)
+        try:
+            rBandIndex = self.bands.index('r')
+        except ValueError:
+            rBandIndex = -1
 
-        ## FIXME: allow other band names
-        #rBandIndex,=np.where(self.bands=='r')[0]
-        rBandIndex = self.bands.index('r')
+        if rBandIndex >= 0:
+            fig=plt.figure(1,figsize=(8,6))
+            fig.clf()
+            ax=fig.add_subplot(111)
 
-        O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
-                         (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
+            O3Gd, = np.where((nExpPerNight > self.minExpPerNight) &
+                             (nExpPerBandPerNight[:,rBandIndex] > self.minExpPerNight))
 
-        ax.plot(mjdNight[O3Gd] - firstMJD, O3Night[O3Gd],'r.')
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel(r'$O_3$',fontsize=16)
+            ax.plot(mjdNight[O3Gd] - firstMJD, O3Night[O3Gd],'r.')
+            ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+            ax.set_ylabel(r'$O_3$',fontsize=16)
 
-        fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
-                                              self.outfileBaseWithCycle))
+            fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
+                                                  self.outfileBaseWithCycle))
 
 
         # mirror gray

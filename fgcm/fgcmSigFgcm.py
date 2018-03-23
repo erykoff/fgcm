@@ -52,6 +52,7 @@ class FgcmSigFgcm(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
+        self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
     def computeSigFgcm(self,reserved=False,doPlots=True,save=True,crunch=False):
         """
@@ -129,8 +130,8 @@ class FgcmSigFgcm(object):
 
         # and we do 4 runs: full, blue 25%, middle 50%, red 25%
         # FIXME: use filterToBand or related for this...
-        gmiGO = (objMagStdMean[obsObjIDIndex[goodObs],0] -
-               objMagStdMean[obsObjIDIndex[goodObs],2])
+        gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
+               objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
         st = np.argsort(gmiGO)
         gmiCutLow = np.array([gmiGO[st[0]],
                               gmiGO[st[0]],
