@@ -154,7 +154,7 @@ class FgcmFitCycle(object):
         # Generate or Read Parameters
         if (self.initialCycle):
             self.fgcmPars = FgcmParameters.newParsWithFits(self.fgcmConfig,
-                                                              self.fgcmLUT)
+                                                           self.fgcmLUT)
         else:
             self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig)
 
@@ -314,6 +314,10 @@ class FgcmFitCycle(object):
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+
+        # Finally, reset the atmosphere parameters if desired (prior to fitting)
+        if self.fgcmConfig.resetParameters:
+            self.fgcmPars.resetAtmosphereParameters()
 
         self.fgcmLog.info(getMemoryString('FitCycle Pre-Fit'))
 
