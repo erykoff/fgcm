@@ -5,8 +5,69 @@ import numpy as np
 import os
 import sys
 import yaml
+import inspect
 
 from .fgcmLogger import FgcmLogger
+
+class ConfigField(object):
+    """
+    A validatable field with a default
+    """
+
+    def __init__(self, datatype, value=None, default=None, required=False, length=None):
+        self._datatype = datatype
+        self._value = value
+        self._required = required
+        self._length = length
+
+        _default = default
+
+        if self._datatype == np.ndarray:
+            if default is not None:
+                _default = np.atleast_1d(default)
+            if value is not None:
+                self._value = np.atleast_1d(value)
+
+        if _default is not None:
+            if type(_default) != datatype:
+                raise TypeError("Default is the wrong datatype.")
+        if self._value is not None:
+            if type(self._value) != datatype:
+                raise TypeError("Value is the wrong datatype.")
+
+        if self._value is None:
+            self._value = _default
+
+    def __get__(self, obj, type=None):
+        return self._value
+
+    def __set__(self, obj, value):
+        # need to convert to numpy array if necessary
+
+        if self._datatype == np.ndarray:
+            self._value = np.atleast_1d(value)
+        else:
+            self._value = value
+
+    def validate(self, name):
+        if self._required:
+            if self._value is None:
+                raise ValueError("Required ConfigField %s is not set" % (name))
+        elif self._value is None:
+            # Okay to have None for not required
+            return True
+
+        if type(self._value) != self._datatype:
+            raise ValueError("Datatype mismatch for %s (got %s, expected %s)" %
+                             (name, str(type(self._value)), str(self._datatype)))
+
+        if self._length is not None:
+            if len(self._value) != self._length:
+                raise ValueError("ConfigField %s has the wrong length (%d != %d)" %
+                                 (name, len(self._value), self._length))
+
+        return True
+
 
 class FgcmConfig(object):
     """
@@ -28,182 +89,108 @@ class FgcmConfig(object):
     checkFiles: bool, default=False
        Check that all fits files exist
     """
+
+    bands = ConfigField(list, required=True)
+
+    fitBands = ConfigField(list, required=True)
+    extraBands = ConfigField(list, required=True)
+    filterToBand = ConfigField(dict, required=True)
+    exposureFile = ConfigField(str, required=False)
+    ccdOffsetFile = ConfigField(str, required=False)
+    obsFile = ConfigField(str, required=False)
+    indexFile = ConfigField(str, required=False)
+    UTBoundary = ConfigField(float, default=0.0)
+    washMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
+    epochMJDs = ConfigField(np.ndarray, default=np.array((0.0, 1e10)))
+    epochNames = ConfigField(list, required=False)
+    lutFile = ConfigField(str, required=False)
+    expField = ConfigField(str, default='EXPNUM')
+    ccdField = ConfigField(str, default='CCDNUM')
+    latitude = ConfigField(float, required=True)
+    seeingField = ConfigField(str, default='SEEING')
+    deepFlag = ConfigField(str, default='DEEPFLAG')
+    minObsPerBand = ConfigField(int, default=2)
+    nCore = ConfigField(int, default=1)
+
+    brightObsGrayMax = ConfigField(float, default=0.15)
+    minStarPerCCD = ConfigField(int, default=5)
+    minStarPerExp = ConfigField(int, default=100)
+    minCCDPerExp = ConfigField(int, default=5)
+    maxCCDGrayErr = ConfigField(float, default=0.05)
+    aperCorrFitNBins = ConfigField(int, default=5)
+    illegalValue = ConfigField(float, default=-9999.0)
+    sedFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
+    sedExtraBandFudgeFactors = ConfigField(np.ndarray, required=True)
+    starColorCuts = ConfigField(list, required=True)
+    cycleNumber = ConfigField(int, default=0)
+    outfileBase = ConfigField(str, required=True)
+    maxIter = ConfigField(int, default=50)
+    sigFgcmMaxErr = ConfigField(float, default=0.01)
+    sigFgcmMaxEGray = ConfigField(float, default=0.05)
+    ccdGrayMaxStarErr = ConfigField(float, default=0.10)
+    mirrorArea = ConfigField(float, required=True)
+    cameraGain = ConfigField(float, required=True)
+    approxThroughput = ConfigField(float, default=1.0)
+    ccdStartIndex = ConfigField(int, default=0)
+    minExpPerNight = ConfigField(int, default=10)
+    expGrayInitialCut = ConfigField(float, default=-0.25)
+    expVarGrayPhotometricCut = ConfigField(float, default=0.0005)
+    expGrayPhotometricCut = ConfigField(np.ndarray, required=True)
+    expGrayRecoverCut = ConfigField(float, default=-1.0)
+    expGrayHighCut = ConfigField(np.ndarray, required=True)
+    expGrayErrRecoverCut = ConfigField(float, default=0.05)
+    sigma0Cal = ConfigField(float, default=0.003)
+    sigma0Phot = ConfigField(float, default=0.003)
+    logLevel = ConfigField(str, default='INFO')
+    mapLongitudeRef = ConfigField(float, default=0.0)
+
+    mapNSide = ConfigField(int, default=256)
+    nStarPerRun = ConfigField(int, default=200000)
+    nExpPerRun = ConfigField(int, default=1000)
+    varNSig = ConfigField(float, default=100.0)
+    varMinBand = ConfigField(int, default=2)
+    useSedLUT = ConfigField(bool, default=False)
+    freezeStdAtmosphere = ConfigField(bool, default=False)
+    reserveFraction = ConfigField(float, default=0.1)
+    precomputeSuperStarInitialCycle = ConfigField(bool, default=False)
+    useRetrievedPWV = ConfigField(bool, default=False)
+    useNightlyRetrievedPWV = ConfigField(bool, default=False)
+    pwvRetrievalSmoothBlock = ConfigField(int, default=25)
+    useRetrievedTauInit = ConfigField(bool, default=False)
+    tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
+    superStarSubCCD = ConfigField(bool, default=False)
+    clobber = ConfigField(bool, default=False)
+    printOnly = ConfigField(bool, default=False)
+    outputStars = ConfigField(bool, default=False)
+    outputPath = ConfigField(str, required=False)
+
+    pwvFile = ConfigField(str, required=False)
+    externalPWVDeltaT = ConfigField(float, default=0.1)
+    tauFile = ConfigField(str, required=False)
+    externalTauDeltaT = ConfigField(float, default=0.1)
+    stepUnitReference = ConfigField(float, default=0.001)
+    stepGrain = ConfigField(float, default=10.0)
+    experimentalMode = ConfigField(bool, default=False)
+    resetParameters = ConfigField(bool, default=True)
+    noChromaticCorrections = ConfigField(bool, default=False)
+    colorSplitIndices = ConfigField(np.ndarray, default=np.array((0,2)), length=2)
+    expGrayCheckDeltaT = ConfigField(float, default=10. / (24. * 60.))
+
+    inParameterFile = ConfigField(str, required=False)
+    inFlagStarFile = ConfigField(str, required=False)
+
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
 
-        requiredKeys=['bands','fitBands','extraBands','filterToBand',
-                      'exposureFile','obsFile','indexFile',
-                      'UTBoundary','washMJDs','epochMJDs','lutFile','expField',
-                      'ccdField','latitude','seeingField',
-                      'deepFlag','minObsPerBand','nCore','brightObsGrayMax',
-                      'minStarPerCCD','minCCDPerExp','maxCCDGrayErr',
-                      'aperCorrFitNBins','illegalValue','sedFitBandFudgeFactors',
-                      'sedExtraBandFudgeFactors','starColorCuts','cycleNumber',
-                      'outfileBase','maxIter','sigFgcmMaxErr','sigFgcmMaxEGray',
-                      'ccdGrayMaxStarErr','mirrorArea','cameraGain',
-                      'approxThroughput','ccdStartIndex','minExpPerNight',
-                      'expGrayInitialCut','expVarGrayPhotometricCut',
-                      'sigFgcmMaxErr','sigFgcmMaxEGray','ccdGrayMaxStarErr',
-                      'expGrayPhotometricCut','expGrayRecoverCut',
-                      'expGrayHighCut',
-                      'expGrayErrRecoverCut','sigma0Cal','logLevel',
-                      'sigma0Phot','mapLongitudeRef','mapNSide','nStarPerRun',
-                      'nExpPerRun','varNSig','varMinBand','useSedLUT',
-                      'freezeStdAtmosphere','reserveFraction',
-                      'precomputeSuperStarInitialCycle',
-                      'useRetrievedPWV','useNightlyRetrievedPWV',
-                      'pwvRetrievalSmoothBlock','useRetrievedTauInit',
-                      'tauRetrievalMinCCDPerNight','superStarSubCCD',
-                      'clobber','printOnly','outputStars']
+        self._setVarsFromDict(configDict)
 
-        for key in requiredKeys:
-            if (key not in configDict):
-                raise ValueError("required %s not in configFile" % (key))
+        self._setDefaultLengths()
 
-        #self.bands = np.array(configDict['bands'])
-        #self.fitBands = np.array(configDict['fitBands'])
-        #self.extraBands = np.array(configDict['extraBands'])
-        #self.filterToBand = configDict['filterToBand']
-        self.bands = configDict['bands']
-        self.fitBands = configDict['fitBands']
-        self.extraBands = configDict['extraBands']
-        self.filterToBand = configDict['filterToBand']
-        self.exposureFile = configDict['exposureFile']
-        self.minObsPerBand = configDict['minObsPerBand']
-        self.obsFile = configDict['obsFile']
-        self.indexFile = configDict['indexFile']
-        self.UTBoundary = configDict['UTBoundary']
-        self.washMJDs = np.array(configDict['washMJDs'],dtype='f8')
-        self.epochMJDs = np.array(configDict['epochMJDs'],dtype='f8')
-        self.lutFile = configDict['lutFile']
-        self.expField = configDict['expField']
-        self.ccdField = configDict['ccdField']
-        self.latitude = float(configDict['latitude'])
-        self.seeingField = configDict['seeingField']
-        self.deepFlag = configDict['deepFlag']
-        self.cosLatitude = np.cos(np.radians(self.latitude))
-        self.sinLatitude = np.sin(np.radians(self.latitude))
-        self.nCore = int(configDict['nCore'])
-        self.brightObsGrayMax = float(configDict['brightObsGrayMax'])
-        self.minStarPerCCD = int(configDict['minStarPerCCD'])
-        self.minStarPerExp = int(configDict['minStarPerExp'])
-        self.minCCDPerExp = int(configDict['minCCDPerExp'])
-        self.maxCCDGrayErr = float(configDict['maxCCDGrayErr'])
-        self.expGrayPhotometricCut = np.array(configDict['expGrayPhotometricCut'])
-        self.expGrayHighCut = np.array(configDict['expGrayHighCut'])
-        self.expGrayRecoverCut = float(configDict['expGrayRecoverCut'])
-        self.expVarGrayPhotometricCut = float(configDict['expVarGrayPhotometricCut'])
-        self.expGrayErrRecoverCut = float(configDict['expGrayErrRecoverCut'])
-        self.minExpPerNight = int(configDict['minExpPerNight'])
-        self.expGrayInitialCut = float(configDict['expGrayInitialCut'])
-        self.aperCorrFitNBins = int(configDict['aperCorrFitNBins'])
-        self.illegalValue = float(configDict['illegalValue'])
-        self.sedFitBandFudgeFactors = np.array(configDict['sedFitBandFudgeFactors'])
-        self.sedExtraBandFudgeFactors = np.array(configDict['sedExtraBandFudgeFactors'])
-        self.starColorCuts = configDict['starColorCuts']
-        self.cycleNumber = int(configDict['cycleNumber'])
-        self.outfileBase = configDict['outfileBase']
-        self.maxIter = int(configDict['maxIter'])
-        self.mirrorArea = float(configDict['mirrorArea'])
-        self.cameraGain = float(configDict['cameraGain'])
-        self.approxThroughput = float(configDict['approxThroughput'])
-        self.ccdStartIndex = int(configDict['ccdStartIndex'])
-        self.sigFgcmMaxErr = float(configDict['sigFgcmMaxErr'])
-        self.sigFgcmMaxEGray = float(configDict['sigFgcmMaxEGray'])
-        self.ccdGrayMaxStarErr = float(configDict['ccdGrayMaxStarErr'])
-        self.sigma0Cal = float(configDict['sigma0Cal'])
-        self.logLevel = configDict['logLevel']
-        self.sigma0Phot = float(configDict['sigma0Phot'])
-        self.mapLongitudeRef =float( configDict['mapLongitudeRef'])
-        self.mapNSide = int(configDict['mapNSide'])
-        self.nStarPerRun = int(configDict['nStarPerRun'])
-        self.nExpPerRun = int(configDict['nExpPerRun'])
-        self.varNSig = float(configDict['varNSig'])
-        self.varMinBand = int(configDict['varMinBand'])
-        self.useSedLUT = configDict['useSedLUT']
-        self.freezeStdAtmosphere = configDict['freezeStdAtmosphere']
-        self.reserveFraction = configDict['reserveFraction']
-        self.precomputeSuperStarInitialCycle = configDict['precomputeSuperStarInitialCycle']
-        self.useRetrievedPWV = configDict['useRetrievedPWV']
-        self.useNightlyRetrievedPWV = configDict['useNightlyRetrievedPWV']
-        self.pwvRetrievalSmoothBlock = configDict['pwvRetrievalSmoothBlock']
-        self.useRetrievedTauInit = configDict['useRetrievedTauInit']
-        self.tauRetrievalMinCCDPerNight = configDict['tauRetrievalMinCCDPerNight']
-        self.clobber = configDict['clobber']
-        self.outputStars = configDict['outputStars']
-        self.superStarSubCCD = configDict['superStarSubCCD']
+        self.validate()
 
-        # Encode filterToBand for easy use with numpy in both py2/3 (sorry)
-        #self.filterToBand = {}
-        #for key in configDict['filterToBand']:
-        #    self.filterToBand[key.encode('utf-8')] = configDict['filterToBand'][key].encode('utf-8')
-
-        if 'pwvFile' in configDict:
-            self.pwvFile = configDict['pwvFile']
-        else:
-            self.pwvFile = None
-            self.externalPWVDeltaT = None
-
-        if (self.pwvFile is not None):
-            if ('externalPWVDeltaT' not in configDict):
-                raise ValueError("Must include externalPWVDeltaT with pwvFile")
-            self.externalPWVDeltaT = configDict['externalPWVDeltaT']
-
-        if 'tauFile' in configDict:
-            self.tauFile = configDict['tauFile']
-        else:
-            self.tauFile = None
-            self.externalTauDeltaT = None
-
-        if (self.tauFile is not None):
-            if ('externalTauDeltaT' not in configDict):
-                raise ValueError("Must include externalTauDeltaT with tauFile")
-            self.externalTauDeltaT = configDict['externalTauDeltaT']
-
-        if 'stepUnitReference' in configDict:
-            self.stepUnitReference = configDict['stepUnitReference']
-        else:
-            self.stepUnitReference = 0.001
-        if 'stepGrain' in configDict:
-            self.stepGrain = configDict['stepGrain']
-        else:
-            self.stepGrain = 10.0
-        if 'experimentalMode' in configDict:
-            self.experimentalMode = bool(configDict['experimentalMode'])
-        else:
-            self.experimentalMode = False
-        if 'resetParameters' in configDict:
-            self.resetParameters = bool(configDict['resetParameters'])
-        else:
-            self.resetParameters = True
-
-        if 'noChromaticCorrections' in configDict:
-            self.noChromaticCorrections = bool(configDict['noChromaticCorrections'])
-        else:
-            self.noChromaticCorrections = False
-
-        if 'colorSplitIndices' in configDict:
-            self.colorSplitIndices = np.array(configDict['colorSplitIndices'], dtype=np.int32)
-            if self.colorSplitIndices.size != 2:
-                raise ValueError("colorSplitIndices must have 2 elements")
-        else:
-            self.colorSplitIndices = np.array([0,2])
-
-        if 'expGrayCheckDeltaT' in configDict:
-            self.expGrayCheckDeltaT = configDict['expGrayCheckDeltaT']
-        else:
-            self.expGrayCheckDeltaT = 10./(24.*60.)
-
-        if (self.expGrayRecoverCut > self.expGrayPhotometricCut.min()) :
-            raise ValueError("expGrayRecoverCut must be less than expGrayPhotometricCut")
-        if (self.expVarGrayPhotometricCut <= 0.0):
-            raise ValueError("expVarGrayPhotometricCut must be > 0.0")
-        if (self.expGrayErrRecoverCut <= 0.0):
-            raise ValueError("expGrayErrRecoverCut must be > 0.0")
-
-        if 'outputPath' in configDict:
-            self.outputPath = os.path.abspath(configDict['outputPath'])
-        else:
+        if self.outputPath is None:
             self.outputPath = os.path.abspath('.')
+        else:
+            self.outputPath = os.path.abspath(self.outputPath)
 
         # create output path if necessary
         if (not os.path.isdir(self.outputPath)):
@@ -225,15 +212,6 @@ class FgcmConfig(object):
             if ('inFlagStarFile' not in configDict):
                 raise ValueError("Must provide inFlagStarFile for cycleNumber > 0")
             self.inFlagStarFile = configDict['inFlagStarFile']
-
-
-        #if (self.sedFitBandFudgeFactors.size != self.fitBands.size) :
-        if (self.sedFitBandFudgeFactors.size != len(self.fitBands)):
-            raise ValueError("sedFitBandFudgeFactors must have same length as fitBands")
-
-        #if (self.sedExtraBandFudgeFactors.size != self.extraBands.size) :
-        if (self.sedExtraBandFudgeFactors.size != len(self.extraBands)):
-            raise ValueError("sedExtraBandFudgeFactors must have same length as extraBands")
 
         # check the cut values
 
@@ -273,10 +251,6 @@ class FgcmConfig(object):
         if (self.noChromaticCorrections) :
             self.fgcmLog.info('WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
-        #self.plotPath = '%s/%s_plots_cycle%02d' % (self.outputPath,self.outfileBase,
-        #                                            self.cycleNumber)
-        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
-
         if (not os.path.isdir(self.plotPath)):
             try:
                 os.makedirs(self.plotPath)
@@ -287,12 +261,8 @@ class FgcmConfig(object):
             raise ValueError("Must set illegalValue to a negative number")
 
         # and look at the lutFile
-        #lutStats=fitsio.read(self.lutFile,ext='INDEX')
-
         self.nCCD = lutIndex['NCCD'][0]
         # these are np arrays and encoded as such
-        #self.lutFilterNames = lutIndex['FILTERNAMES'][0]
-        #self.lutStdFilterNames = lutIndex['STDFILTERNAMES'][0]
         self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
         self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
@@ -301,12 +271,6 @@ class FgcmConfig(object):
         self.tauRange = np.array([np.min(lutIndex['TAU']),np.max(lutIndex['TAU'])])
         self.alphaRange = np.array([np.min(lutIndex['ALPHA']),np.max(lutIndex['ALPHA'])])
         self.zenithRange = np.array([np.min(lutIndex['ZENITH']),np.max(lutIndex['ZENITH'])])
-
-        # make sure we drop trailing spaces
-        #self.bands = np.core.defchararray.strip(self.bands[:])
-        #self.fitBands = np.core.defchararray.strip(self.fitBands[:])
-        #if (self.extraBands.size > 0):
-        #    self.extraBands = np.core.defchararray.strip(self.extraBands[:])
 
         # newer band checks
         #  1) check that all the filters in filterToBand are in lutFilterNames
@@ -317,13 +281,8 @@ class FgcmConfig(object):
 
         #  1) check that all the filters in filterToBand are in lutFilterNames
         for filterName in self.filterToBand:
-            #test,=np.where(filterName == self.lutFilterNames)
-            #if test.size == 0:
-            #    raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
             if filterName not in self.lutFilterNames:
                 raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
-            #print(self.filterToBand[filterName])
-            #print(self.bands)
             if self.filterToBand[filterName] not in self.bands:
                 raise ValueError("Band %s in filterToBand not in bands" %
                                  (self.filterToBand[filterName]))
@@ -332,7 +291,6 @@ class FgcmConfig(object):
             if lutStdFilterName not in self.lutFilterNames:
                 raise ValueError("lutStdFilterName %s not in list of lutFilterNames" % (lutStdFilterName))
         #  3) check that each band has ONE standard filter
-        #bandStdFilterIndex = np.zeros(self.bands.size, dtype=np.int32) - 1
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
@@ -348,15 +306,11 @@ class FgcmConfig(object):
                                               self.lutStdFilterNames[bandStdFilterIndex[i]]))
         #  4) check that all the fitBands are in bands
         for fitBand in self.fitBands:
-            #test,=np.where(fitBand == self.bands)
             if fitBand not in self.bands:
-            #if (test.size == 0):
                 raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
         #  5) check that all the extraBands are in bands
         for extraBand in self.extraBands:
-            #test,=np.where(extraBand == self.bands)
             if extraBand not in self.bands:
-            #if (test.size == 0):
                 raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
 
         bandString = " ".join(self.bands)
@@ -404,15 +358,10 @@ class FgcmConfig(object):
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
 
-        try:
-            self.epochNames = configDict['epochNames']
-        except:
+        if self.epochNames is None:
             self.epochNames = []
             for i in xrange(self.epochMJDs.size):
                 self.epochNames.append('epoch%d' % (i))
-
-        if len(self.epochNames) != len(self.epochMJDs):
-            raise ValueError("Number of epochNames must be same as epochMJDs")
 
         # are they sorted?
         if (self.epochMJDs != np.sort(self.epochMJDs)).any():
@@ -439,17 +388,6 @@ class FgcmConfig(object):
         self.washMJDs = self.washMJDs[gd]
 
         # and deal with fit band indices and extra band indices
-        #self.bandRequired = np.zeros(self.bands.size,dtype=np.bool)
-        #self.bandExtra = np.zeros(self.bands.size,dtype=np.bool)
-        #for i in xrange(self.bands.size):
-        #    if (self.bands[i] in self.fitBands):
-        #        self.bandRequired[i] = True
-        #    if (self.extraBands.size > 0):
-        #        if (self.bands[i] in self.extraBands):
-        #            self.bandExtra[i] = True
-        #        if (self.bands[i] in self.fitBands and
-        #            self.bands[i] in self.extraBands):
-        #            raise ValueError("Cannot have the same band as fit and extra")
         self.bandRequiredFlag = np.zeros(len(self.bands), dtype=np.bool)
         self.bandExtraFlag = np.zeros(len(self.bands), dtype=np.bool)
         for i,band in enumerate(self.bands):
@@ -496,7 +434,6 @@ class FgcmConfig(object):
         with open(configFile) as f:
             configDict = yaml.load(f)
 
-        ##self.fgcmLog.info('Configuration read from %s' % (configFile))
         print("Configuration read from %s" % (configFile))
 
         return configDict
@@ -562,3 +499,33 @@ class FgcmConfig(object):
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)
 
+    def _setVarsFromDict(self, d):
+        for key in d:
+            if key not in type(self).__dict__:
+                raise AttributeError("Unknown config variable: %s" % (key))
+            setattr(self, key, d[key])
+
+    def validate(self):
+        """
+        """
+
+        for var in type(self).__dict__:
+            try:
+                type(self).__dict__[var].validate(var)
+            except AttributeError:
+                pass
+
+    def _setDefaultLengths(self):
+        """
+        """
+
+        # Check the fudge factors...
+        type(self).__dict__['sedFitBandFudgeFactors']._length = len(self.fitBands)
+        type(self).__dict__['sedExtraBandFudgeFactors']._length = len(self.extraBands)
+
+        # And the gray cuts
+        type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)
+        type(self).__dict__['expGrayHighCut']._length = len(self.bands)
+
+        # And the epoch names
+        type(self).__dict__['epochNames']._length = len(self.epochMJDs)
