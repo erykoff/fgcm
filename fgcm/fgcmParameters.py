@@ -42,8 +42,6 @@ class FgcmParameters(object):
        MJDs which divide observing epochs
     washMJDs: double array
        MJDs which denote mirror washing dates
-    resetParameters: bool
-       Reset atmosphere fit parameters from previous cycle?
     useRetrievedPWV: bool
        Use PWV retrieved from colors from previous cycle?
     useNightlyRetrievedPWV: bool
@@ -126,7 +124,6 @@ class FgcmParameters(object):
         self.stepUnitReference = fgcmConfig.stepUnitReference
         self.stepGrain = fgcmConfig.stepGrain
 
-        self.resetParameters = fgcmConfig.resetParameters
         self.pwvFile = fgcmConfig.pwvFile
         self.tauFile = fgcmConfig.tauFile
         self.externalPWVDeltaT = fgcmConfig.externalPWVDeltaT
@@ -405,18 +402,6 @@ class FgcmParameters(object):
         self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
 
-        if (self.resetParameters):
-            # reset many of the parameters
-            self.parAlpha[:] = self.alphaStd
-            self.parO3[:] = self.o3Std
-            self.parLnTauIntercept[:] = self.lnTauStd
-            #self.parLnTauIntercept[:] = np.log(0.05)
-            self.parLnTauSlope[:] = 0.0
-            self.parPWVIntercept[:] = self.pwvStd
-            self.parPWVPerSlope[:] = 0.0
-            # leave the QESysIntercept and Slope as previously fit
-            # though we want to play with this
-
         self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPWV:
             self.pwvFile = str(inParInfo['PWVFILE'][0]).rstrip()
@@ -425,10 +410,6 @@ class FgcmParameters(object):
             self.parExternalPWVScale = inParams['PAREXTERNALPWVSCALE'][0]
             self.parExternalPWVOffset[:] = np.atleast_1d(inParams['PAREXTERNALPWVOFFSET'][0])
 
-            if (self.resetParameters):
-                self.parExternalPWVScale = 1.0
-                self.parExternalPWVOffset[:] = 0.0
-
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalTau:
             self.tauFile = str(inParInfo['TAUFILE'][0]).rstrip()
@@ -436,11 +417,6 @@ class FgcmParameters(object):
             self.loadExternalTau()
             self.parExternalTauScale = inParams['PAREXTERNALTAUSCALE'][0]
             self.parExternalTauOffset[:] = np.atleast_1d(inParams['PAREXTERNALTAUOFFSET'][0])
-
-            if (self.resetParameters):
-                self.parExternalTauScale = 1.0
-                self.parExternalTauOffset[:] = 0.0
-
 
         self.compAperCorrPivot = np.atleast_1d(inParams['COMPAPERCORRPIVOT'][0])
         self.compAperCorrSlope = np.atleast_1d(inParams['COMPAPERCORRSLOPE'][0])
@@ -462,21 +438,9 @@ class FgcmParameters(object):
         self.parRetrievedPWVOffset = inParams['PARRETRIEVEDPWVOFFSET'][0]
         self.parRetrievedPWVNightlyOffset = np.atleast_1d(inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][0])
 
-        if self.resetParameters:
-            self.parRetrievedPWVScale = 1.0
-            self.parRetrievedPWVOffset = 0.0
-            self.parRetrievedPWVNightlyOffset[:] = 0.0
-
         # These are nightly properties
         self.compRetrievedTauNight = np.atleast_1d(inParams['COMPRETRIEVEDTAUNIGHT'][0])
         self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
-
-        # If we are resetting parameters, and want to use retrieved tau as the initial
-        #  guess, set parTauIntercept to that.
-        if self.resetParameters and self.useRetrievedTauInit:
-            #raise RuntimeError("Not implemented yet!")
-            #self.parTauIntercept[:] = self.compRetrievedTauNight
-            self.parLnTauIntercept[:] = np.log(self.compRetrievedTauNight)
 
         self._arrangeParArray()
 
@@ -490,6 +454,36 @@ class FgcmParameters(object):
         else:
             # new-style superstar, use raw
             self.parSuperStarFlat = inSuperStar
+
+    def resetAtmosphereParameters(self):
+        self.fgcmLog.info("Resetting atmosphere parameters.")
+
+        self.parAlpha[:] = self.alphaStd
+        self.parO3[:] = self.o3Std
+        self.parLnTauIntercept[:] = self.lnTauStd
+        self.parLnTauSlope[:] = 0.0
+        self.parPWVIntercept[:] = self.pwvStd
+        self.parPWVPerSlope[:] = 0.0
+
+        # We don't reset QESysIntercept and Slope because they aren't
+        #  atmosphere parameters (they are instrument parameters)
+
+        if self.hasExternalPWV:
+            self.parExternalPWVScale = 1.0
+            self.parExternalPWVOffset = 0.0
+
+        if self.hasExternalTau:
+            self.parExternalTauScale = 1.0
+            self.parExternalTauOffset = 0.0
+
+        self.parRetrievedPWVScale = 1.0
+        self.parRetrievedPWVOffset = 0.0
+        self.parRetrievedPWVNightlyOffset[:] = 0.0
+
+        # If we are resetting parameters, and want to use retrieved tau as the initial
+        #  guess, set parTauIntercept to that.
+        if self.useRetrievedTauInit:
+            self.parLnTauIntercept[:] = np.log(self.compRetrievedTauNight)
 
     def _makeBandIndices(self):
         """
