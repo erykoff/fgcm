@@ -253,7 +253,6 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
     import matplotlib.cm as cmx
 
     cm = plt.get_cmap('rainbow')
-    plt.set_cmap('rainbow')
 
     plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
                    ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
