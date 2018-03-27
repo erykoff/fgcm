@@ -215,6 +215,7 @@ class FgcmRetrieveAtmosphere(object):
 
         if doPlots:
             # if there are fewer than ... 3000 do points, more than do hexbin
+            plt.set_cmap('viridis')
 
             hasPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
@@ -241,6 +242,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rpwv_vs_rpwv_in.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
+            plt.close(fig)
 
             #  RPWV_RAW vs RPWV_SMOOTH (current calculation, just to make sure)
             fig = plt.figure(1, figsize=(8, 6))
@@ -263,6 +265,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rpwv_vs_rpwv_smooth.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
+            plt.close(fig)
 
             #  PWV vs RPWV_SMOOTH
             fig = plt.figure(1, figsize=(8, 6))
@@ -285,7 +288,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
-
+            plt.close(fig)
 
             #  PWV vs RPWV_SCALED
             fig = plt.figure(1, figsize=(8, 6))
@@ -320,6 +323,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_pwv_vs_rpwv_scaled.png' % (self.plotPath,
                                                          self.outfileBaseWithCycle))
+            plt.close(fig)
 
 
         # and we're done!  Everything is filled in!
@@ -430,6 +434,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_rtaunight_in.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle))
+            plt.close(fig)
 
             hasTau, = np.where(self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd)
 
@@ -445,7 +450,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_tauint.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
-
+            plt.close(fig)
 
     def expGrayToNightlyTau(self, fgcmGray, doPlots=True):
         """
@@ -581,6 +586,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_rtaunight_in.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle))
+            plt.close(fig)
 
             hasTau, = np.where(self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd)
 
@@ -596,4 +602,5 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_tauint.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
+            plt.close(fig)
 
