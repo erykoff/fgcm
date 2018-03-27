@@ -208,19 +208,15 @@ class FgcmRetrieval(object):
 
         obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
-        #obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
-        obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
+        # obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
+        obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)[goodObs]
 
         # compute delta mags
         # deltaMag = m_b^inst(i,j)  - <m_b^std>(j) + QE_sys
         #   we want to take out the gray term from the qe
 
-        #deltaMagGO = (obsMagADUGO -
-        #              objMagStdMeanNoChrom[obsObjIDIndexGO,
-        #                                   obsBandIndexGO] +
-        #              self.fgcmPars.expQESys[obsExpIndexGO])
         deltaMagGO = (obsMagADUGO -
                       objMagStdMean[obsObjIDIndexGO,
                                     obsBandIndexGO] +
