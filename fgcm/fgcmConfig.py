@@ -5,7 +5,6 @@ import numpy as np
 import os
 import sys
 import yaml
-import inspect
 
 from .fgcmLogger import FgcmLogger
 
@@ -109,6 +108,8 @@ class FgcmConfig(object):
     latitude = ConfigField(float, required=True)
     seeingField = ConfigField(str, default='SEEING')
     deepFlag = ConfigField(str, default='DEEPFLAG')
+    fwhmField = ConfigField(str, default='PSF_FWHM')
+    skyBrightnessField = ConfigField(str, default='SKYBRIGHTNESS')
     minObsPerBand = ConfigField(int, default=2)
     nCore = ConfigField(int, default=1)
 
@@ -150,6 +151,7 @@ class FgcmConfig(object):
     varNSig = ConfigField(float, default=100.0)
     varMinBand = ConfigField(int, default=2)
     useSedLUT = ConfigField(bool, default=False)
+    modelMagErrors = ConfigField(bool, default=False)
     freezeStdAtmosphere = ConfigField(bool, default=False)
     reserveFraction = ConfigField(float, default=0.1)
     precomputeSuperStarInitialCycle = ConfigField(bool, default=False)
@@ -175,6 +177,7 @@ class FgcmConfig(object):
     noChromaticCorrections = ConfigField(bool, default=False)
     colorSplitIndices = ConfigField(np.ndarray, default=np.array((0,2)), length=2)
     expGrayCheckDeltaT = ConfigField(float, default=10. / (24. * 60.))
+    modelMagErrorNObs = ConfigField(int, default=100000)
 
     inParameterFile = ConfigField(str, required=False)
     inFlagStarFile = ConfigField(str, required=False)
