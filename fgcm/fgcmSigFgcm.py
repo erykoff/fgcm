@@ -83,7 +83,8 @@ class FgcmSigFgcm(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
 
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
@@ -97,12 +98,12 @@ class FgcmSigFgcm(object):
         # select good stars...
         if (reserved):
             # only reserved stars
-            goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+            goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
                                 ((objFlag & objFlagDict['RESERVED']) > 0))
             # FIXME need to remove BAD STARS as well
         else:
             # all good stars
-            goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+            goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
                                 (objFlag == 0))
 
         # match the good stars to the observations
@@ -166,7 +167,7 @@ class FgcmSigFgcm(object):
                                      (EGrayGO != 0.0) &
                                      (obsBandIndex[goodObs] == bandIndex) &
                                      (objNGoodObs[obsObjIDIndex[goodObs],bandIndex] >=
-                                      self.fgcmStars.minPerBand) &
+                                      self.fgcmStars.minObsPerBand) &
                                      (gmiGO > gmiCutLow[c]) &
                                      (gmiGO < gmiCutHigh[c]))
 
@@ -234,12 +235,6 @@ class FgcmSigFgcm(object):
                     plotXRange = ax.get_xlim()
                 else:
                     ax.set_xlim(plotXRange)
-
-                #fig.savefig('%s/%s_sigfgcm_%s_%s_%s.png' % (self.plotPath,
-                #                                            self.outfileBaseWithCycle,
-                #                                            extraName,
-                #                                            self.fgcmPars.bands[bandIndex],
-                #                                            gmiCutNames[c]))
 
             fig.tight_layout()
             fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
