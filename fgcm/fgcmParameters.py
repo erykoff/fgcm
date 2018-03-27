@@ -112,6 +112,8 @@ class FgcmParameters(object):
         self.nExp = fgcmConfig.nExp
         self.seeingField = fgcmConfig.seeingField
         self.deepFlag = fgcmConfig.deepFlag
+        self.fwhmField = fgcmConfig.fwhmField
+        self.skyBrightnessField = fgcmConfig.skyBrightnessField
         self.expField = fgcmConfig.expField
         self.UTBoundary = fgcmConfig.UTBoundary
         self.latitude = fgcmConfig.latitude
@@ -131,6 +133,7 @@ class FgcmParameters(object):
         self.useRetrievedPWV = fgcmConfig.useRetrievedPWV
         self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
+        self.modelMagErrors = fgcmConfig.modelMagErrors
 
         # this is a constant for now (a,x,y,x**2,y**2,xy)
         self.superStarNPar = 6
@@ -304,6 +307,12 @@ class FgcmParameters(object):
         self.compAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
 
+        # The magnitude model parameters
+        self.compModelErrExptimePivot = np.zeros(self.nBands, dtype='f8')
+        self.compModelErrFwhmPivot = np.zeros(self.nBands, dtype='f8')
+        self.compModelErrSkyPivot = np.zeros(self.nBands, dtype='f8')
+        self.compModelErrPars = np.zeros((7, self.nBands), dtype='f8')
+
         # one of the "parameters" is expGray
         self.compExpGray = np.zeros(self.nExp,dtype='f8')
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
@@ -361,13 +370,9 @@ class FgcmParameters(object):
         # set the units from the inParInfo
         self.unitDictSteps = {'lnTauUnit': inParInfo['LNTAUUNIT'][0],
                               'lnTauSlopeUnit': inParInfo['LNTAUSLOPEUNIT'][0],
-                              #'tauUnit': inParInfo['TAUUNIT'][0],
-                              #'tauPerSlopeUnit': inParInfo['TAUPERSLOPEUNIT'][0],
                               'alphaUnit': inParInfo['ALPHAUNIT'][0],
                               'pwvUnit': inParInfo['PWVUNIT'][0],
-                              #'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0] * (3.0*3.0/24.),
                               'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0],
-                              #'pwvGlobalUnit': inParInfo['PWVUNIT'][0] * 500,
                               'pwvGlobalUnit': inParInfo['PWVGLOBALUNIT'][0],
                               'o3Unit': inParInfo['O3UNIT'][0],
                               'qeSysUnit': inParInfo['QESYSUNIT'][0],
@@ -422,6 +427,11 @@ class FgcmParameters(object):
         self.compAperCorrSlope = np.atleast_1d(inParams['COMPAPERCORRSLOPE'][0])
         self.compAperCorrSlopeErr = np.atleast_1d(inParams['COMPAPERCORRSLOPEERR'][0])
         self.compAperCorrRange = np.reshape(inParams['COMPAPERCORRRANGE'][0],(2,self.nBands))
+
+        self.compModelErrExptimePivot = np.atleast_1d(inParams['COMPMODELERREXPTIMEPIVOT'][0])
+        self.compModelErrFwhmPivot = np.atleast_1d(inParams['COMPMODELERRFWHMPIVOT'][0])
+        self.compModelErrSkyPivot = np.atleast_1d(inParams['COMPMODELERRSKYPIVOT'][0])
+        self.compModelErrPars = np.reshape(inParams['COMPMODELERRPARS'][0], (7, self.nBands))
 
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
@@ -537,6 +547,14 @@ class FgcmParameters(object):
 
         self.expSeeingVariable = expInfo[self.seeingField]
         self.expDeepFlag = expInfo[self.deepFlag]
+
+        try:
+            self.expFwhm = expInfo[self.fwhmField]
+            self.expSkyBrightness = expInfo[self.skyBrightnessField]
+        except:
+            if self.modelMagErrors:
+                raise ValueError("Must have columns for %s and %s to use modelMagErrors option" %
+                                 (self.fwhmField, self.skyBrightnessField))
 
         # we need the nights of the survey (integer MJD, maybe rotated)
         self.expMJD = expInfo['MJD']
@@ -831,6 +849,10 @@ class FgcmParameters(object):
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
                ('COMPAPERCORRRANGE','f8',self.compAperCorrRange.size),
+               ('COMPMODELERREXPTIMEPIVOT', 'f8', self.compModelErrExptimePivot.size),
+               ('COMPMODELERRFWHMPIVOT', 'f8', self.compModelErrFwhmPivot.size),
+               ('COMPMODELERRSKYPIVOT', 'f8', self.compModelErrSkyPivot.size),
+               ('COMPMODELERRPARS', 'f8', self.compModelErrPars.size),
                ('COMPEXPGRAY','f8',self.compExpGray.size),
                ('COMPVARGRAY','f8',self.compVarGray.size),
                ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
@@ -876,6 +898,11 @@ class FgcmParameters(object):
         pars['COMPAPERCORRSLOPE'][:] = self.compAperCorrSlope
         pars['COMPAPERCORRSLOPEERR'][:] = self.compAperCorrSlopeErr
         pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange.flatten()
+
+        pars['COMPMODELERREXPTIMEPIVOT'][:] = self.compModelErrExptimePivot
+        pars['COMPMODELERRFWHMPIVOT'][:] = self.compModelErrFwhmPivot
+        pars['COMPMODELERRSKYPIVOT'][:] = self.compModelErrSkyPivot
+        pars['COMPMODELERRPARS'][:] = self.compModelErrPars.flatten()
 
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
@@ -1497,6 +1524,7 @@ class FgcmParameters(object):
 
         fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
                                                  self.outfileBaseWithCycle))
+        plt.close(fig)
 
         # Tau
         try:
@@ -1535,6 +1563,7 @@ class FgcmParameters(object):
 
             fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
+            plt.close(fig)
 
         try:
             zBandIndex = self.bands.index('z')
@@ -1556,6 +1585,7 @@ class FgcmParameters(object):
 
             fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
+            plt.close(fig)
 
         # O3
         try:
@@ -1577,6 +1607,7 @@ class FgcmParameters(object):
 
             fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
+            plt.close(fig)
 
 
         # mirror gray
@@ -1603,6 +1634,7 @@ class FgcmParameters(object):
 
         fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
                                                 self.outfileBaseWithCycle))
+        plt.close(fig)
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)
