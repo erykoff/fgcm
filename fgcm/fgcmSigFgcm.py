@@ -182,7 +182,10 @@ class FgcmSigFgcm(object):
                 #ax=fig.add_subplot(111)
                 ax=fig.add_subplot(2,2,c+1)
 
-                coeff = histoGauss(ax, EGrayGO[sigUse])
+                try:
+                    coeff = histoGauss(ax, EGrayGO[sigUse])
+                except:
+                    coeff = np.array([np.inf, np.inf, np.inf])
 
                 if not np.isfinite(coeff[2]):
                     self.fgcmLog.info("Failed to compute sigFgcm (%s) (%s).  Setting to 0.05" %
