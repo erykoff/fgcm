@@ -24,6 +24,7 @@ from .fgcmExposureSelector import FgcmExposureSelector
 from .fgcmSigFgcm import FgcmSigFgcm
 from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
+from .fgcmModelMagErrors import FgcmModelMagErrors
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -247,6 +248,11 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='initial')
 
+        # Set up the magnitude error modeler
+        self.fgcmModelMagErrs = FgcmModelMagErrors(self.fgcmConfig,
+                                                   self.fgcmPars,
+                                                   self.fgcmStars)
+
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         if (not self.initialCycle):
@@ -306,14 +312,19 @@ class FgcmFitCycle(object):
 
                 # do we need to compute EXP^gray here? yes, probably.  In the _doSOpticsFit
 
+            # Last thing: fit the mag errors (if configured)...
+            self.fgcmModelMagErrs.computeMagErrorModel('initial')
+
 
         # Select calibratable nights
         self.expSelector.selectCalibratableNights()
 
         # We need one last selection to cut last of bad stars
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
-        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+
+        # And apply the errors (if configured)
+        self.fgcmStars.computeModelMagErrors(self.fgcmPars)
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
@@ -404,6 +415,9 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
+        # Compute mag error model (if configured)
+        self.fgcmModelMagErrs.computeMagErrorModel('postfit')
+
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
         #   if we don't the zeropoints before convergence will be wrong.
@@ -460,7 +474,7 @@ class FgcmFitCycle(object):
         zpOk, = np.where((self.fgcmZpts.zpStruct['FGCM_FLAG'] & badZpMask) == 0)
         okExps = self.fgcmZpts.zpStruct[self.fgcmConfig.expField][zpOk]
         okCCDs = self.fgcmZpts.zpStruct[self.fgcmConfig.ccdField][zpOk]
-        self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minPerBand=1)
+        self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minObsPerBand=1)
         self.fgcmStars.plotStarMap(mapType='okcoverage')
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
@@ -516,6 +530,7 @@ class FgcmFitCycle(object):
 
             fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
                                                  self.fgcmConfig.outfileBaseWithCycle))
+            plt.close(fig)
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
@@ -629,6 +644,7 @@ class FgcmFitCycle(object):
 
             fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
                                                  self.fgcmConfig.outfileBaseWithCycle))
+            plt.close(fig)
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
