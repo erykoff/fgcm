@@ -386,7 +386,8 @@ class FgcmChisq(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
         obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
-        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
         # and fgcmGray stuff (if desired)
@@ -455,8 +456,8 @@ class FgcmChisq(object):
             ok,=np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
             obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
 
-        # this is annoying that we have to do this.
-        obsMagErr2GO = obsMagADUErr[goodObs]**2.
+        # Compute the sub-selected error-squared, using model error when available
+        obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
 
         if (self.computeSEDSlopes):
             # first, compute mean mags (code same as below.  FIXME: consolidate, but how?)
@@ -564,15 +565,8 @@ class FgcmChisq(object):
         # compute delta-mags
 
         deltaMagGO = (obsMagStdGO - objMagStdMeanGO)
-        #deltaMagErr2GO = (obsMagErr2GO + objMagStdMeanErr2GO)
-        #deltaMagErr2GO = (obsMagErr2GO - objMagStdMeanErr2GO)
-        # I am not happy about any of these options at the moment.
-        #deltaMagErr2GO = obsMagErr2GO
-        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] / deltaMagErr2GO[obsFitUseGO]
 
-        # and compute chisq
-        #partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2./deltaMagErr2GO[obsFitUseGO])
-
+        # Note that this is the model error when we have it
         obsWeightGO = 1. / obsMagErr2GO
 
         deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
