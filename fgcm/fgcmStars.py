@@ -1055,6 +1055,7 @@ class FgcmStars(object):
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
             # debug bit...
+            """
             plt.set_cmap('viridis')
             fig = plt.figure(1, figsize=(8,6))
             fig.clf()
@@ -1068,7 +1069,7 @@ class FgcmStars(object):
 
             fig.savefig('temp_%s.png' % (self.bands[bandIndex]))
             plt.close(fig)
-
+            """
     def saveFlagStarIndices(self,flagStarFile):
         """
         Save flagged stars to fits.
