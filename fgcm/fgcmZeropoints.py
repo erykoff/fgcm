@@ -495,6 +495,7 @@ class FgcmZeropoints(object):
 
         fig.savefig('%s/%s_zeropoints.png' % (self.plotPath,
                                               self.outfileBaseWithCycle))
+        plt.close(fig)
 
     def _computeZpt(self,zpStruct,zpIndex):
         """
@@ -631,6 +632,7 @@ class FgcmZeropointPlotter(object):
             fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
                                                self.outfileBase,
                                                filterName))
+            plt.close(fig)
 
     def makeR1I1Maps(self, ccdOffsets, ccdField='CCDNUM'):
         """
@@ -710,6 +712,7 @@ class FgcmZeropointPlotter(object):
                                                  self.outfileBase,
                                                  plotType.replace(" ",""),
                                                  filterName))
+                plt.close(fig)
 
         return None
 
