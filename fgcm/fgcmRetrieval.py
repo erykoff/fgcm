@@ -2,6 +2,7 @@ from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
 import numpy as np
+import scipy.linalg as linalg
 import os
 import sys
 import esutil
@@ -293,9 +294,14 @@ class FgcmRetrieval(object):
         # loop, doing the linear algebra
         for i in xrange(expIndexUse.size):
             try:
-                IRetrieved = np.dot(np.linalg.inv(IMatrix[:,:,expIndexUse[i],
-                                                              ccdIndexUse[i]]),
+                #IRetrieved = np.dot(np.linalg.inv(IMatrix[:,:,expIndexUse[i],
+                #                                              ccdIndexUse[i]]),
+                #                    RHS[:,expIndexUse[i],ccdIndexUse[i]])
+                IRetrieved = np.dot(linalg.inv(IMatrix[:,:,expIndexUse[i],
+                                                           ccdIndexUse[i]],
+                                               overwrite_a=True),
                                     RHS[:,expIndexUse[i],ccdIndexUse[i]])
+
             except:
                 continue
 
