@@ -293,22 +293,33 @@ class FgcmRetrieval(object):
 
         # loop, doing the linear algebra
         for i in xrange(expIndexUse.size):
-            try:
+            mat = IMatrix[:, :, expIndexUse[i], ccdIndexUse[i]]
+            det = mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]
+            if not np.isfinite(det):
+                continue
+            inv = (1. / det) * np.array([[mat[1, 1], -mat[0, 1]],
+                                         [-mat[1, 0], mat[0, 0]]])
+            if np.any(~np.isfinite(inv)):
+                continue
+
+            IRetrieved = np.dot(inv, RHS[:, expIndexUse[i], ccdIndexUse[i]])
+
+            #try:
                 #IRetrieved = np.dot(np.linalg.inv(IMatrix[:,:,expIndexUse[i],
                 #                                              ccdIndexUse[i]]),
                 #                    RHS[:,expIndexUse[i],ccdIndexUse[i]])
-                IRetrieved = np.dot(linalg.inv(IMatrix[:,:,expIndexUse[i],
-                                                           ccdIndexUse[i]],
-                                               overwrite_a=True),
-                                    RHS[:,expIndexUse[i],ccdIndexUse[i]])
-
-            except:
-                continue
+            #    IRetrieved = np.dot(linalg.inv(IMatrix[:,:,expIndexUse[i],
+            #                                               ccdIndexUse[i]],
+            #                                   overwrite_a=True),
+            #                        RHS[:,expIndexUse[i],ccdIndexUse[i]])
+            #except:
+            #    continue
 
             # record these in the shared array ... should not step
             #  on each others' toes
             r0[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[0]
             r10[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[1]/IRetrieved[0]
+
 
     def __getstate__(self):
         # Don't try to pickle the logger.
