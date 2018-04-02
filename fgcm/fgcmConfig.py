@@ -112,6 +112,7 @@ class FgcmConfig(object):
     skyBrightnessField = ConfigField(str, default='SKYBRIGHTNESS')
     minObsPerBand = ConfigField(int, default=2)
     nCore = ConfigField(int, default=1)
+    randomSeed = ConfigField(int, required=False)
 
     brightObsGrayMax = ConfigField(float, default=0.15)
     minStarPerCCD = ConfigField(int, default=5)
@@ -189,6 +190,10 @@ class FgcmConfig(object):
         self._setDefaultLengths()
 
         self.validate()
+
+        # First thing: set the random seed if desired
+        if self.randomSeed is not None:
+            np.random.seed(seed=self.randomSeed)
 
         if self.outputPath is None:
             self.outputPath = os.path.abspath('.')
