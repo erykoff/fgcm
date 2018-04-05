@@ -65,6 +65,7 @@ class FgcmRetrieval(object):
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nExpPerRun = fgcmConfig.nExpPerRun
+        self.outputPath = fgcmConfig.outputPath
 
         self._prepareRetrievalArrays()
 
@@ -139,10 +140,14 @@ class FgcmRetrieval(object):
         self.goodObsHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.goodObsHandle)[:] = goodObs
 
+        self.obsExpIndexGOAHandle = snmm.createArray(goodObs.size,dtype='i4')
+        snmm.getArray(self.obsExpIndexGOAHandle)[:] = obsExpIndex[goodObs]
+
         self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
 
         # which exposures have stars?
+        # Note that this always returns a sorted array
         uExpIndex = np.unique(obsExpIndex[goodObs])
 
         self.debug=debug
@@ -163,14 +168,15 @@ class FgcmRetrieval(object):
             uExpIndexList = np.array_split(uExpIndex,nSections)
 
             # may want to sort by nObservations, but only if we pre-split
-
             pool = Pool(processes=self.nCore)
             pool.map(self._worker, uExpIndexList, chunksize=1)
             pool.close()
             pool.join()
+            #map(self._worker, uExpIndexList)
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)
+        snmm.freeArray(self.obsExpIndexGOAHandle)
 
         # and we're done
         self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
@@ -189,13 +195,17 @@ class FgcmRetrieval(object):
 
         # NOTE: No logging is allowed in the _worker method
 
-        workerStarTime = time.time()
-
         goodObsAll = snmm.getArray(self.goodObsHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsExpIndexGOA = snmm.getArray(self.obsExpIndexGOAHandle)
 
-        _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndex[goodObsAll])
-        goodObs = goodObsAll[temp]
+        # Start with only those that are in range ... this saves a ton of
+        # memory
+        inRange, = np.where((obsExpIndexGOA >= uExpIndex.min()) &
+                            (obsExpIndexGOA <= uExpIndex.max()))
+
+        _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndexGOA[inRange])
+        goodObs = goodObsAll[inRange[temp]]
 
         obsExpIndexGO = obsExpIndex[goodObs]
 
@@ -319,7 +329,6 @@ class FgcmRetrieval(object):
             #  on each others' toes
             r0[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[0]
             r10[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[1]/IRetrieved[0]
-
 
     def __getstate__(self):
         # Don't try to pickle the logger.
