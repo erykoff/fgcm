@@ -314,17 +314,6 @@ class FgcmRetrieval(object):
 
             IRetrieved = np.dot(inv, RHS[:, expIndexUse[i], ccdIndexUse[i]])
 
-            #try:
-                #IRetrieved = np.dot(np.linalg.inv(IMatrix[:,:,expIndexUse[i],
-                #                                              ccdIndexUse[i]]),
-                #                    RHS[:,expIndexUse[i],ccdIndexUse[i]])
-            #    IRetrieved = np.dot(linalg.inv(IMatrix[:,:,expIndexUse[i],
-            #                                               ccdIndexUse[i]],
-            #                                   overwrite_a=True),
-            #                        RHS[:,expIndexUse[i],ccdIndexUse[i]])
-            #except:
-            #    continue
-
             # record these in the shared array ... should not step
             #  on each others' toes
             r0[uExpIndex[expIndexUse[i]],ccdIndexUse[i]] = IRetrieved[0]
