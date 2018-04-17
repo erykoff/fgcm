@@ -32,10 +32,19 @@ from .fgcmLogger import FgcmLogger
 
 class FgcmAtmosphereTable(object):
     """
+    Class to generate, store, and interpolate pre-computed atmospheres.
+
+    parameters
+    ----------
+    atmConfig: dict
+       Dictionary with FgcmAtmosphereTable config variables
+    atmosphereTableFile: str, optional
+       Name of the table file
+    fgcmLog: FgcmLog, optional
+       Logger
     """
 
     def __init__(self, atmConfig, atmosphereTableFile=None, fgcmLog=None):
-
 
         if fgcmLog is None:
             self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
@@ -97,10 +106,24 @@ class FgcmAtmosphereTable(object):
             else:
                 self.lambdaNorm = 7750.0
 
+        self.o2Interpolator = None
+        self.o3Interpolator = None
+        self.rayleighInterpolator = None
+        self.pwvInterpolator = None
+
 
     @staticmethod
     def getAvailableTables():
         """
+        Get list of installed tables
+
+        parameters
+        ----------
+        None
+
+        returns
+        -------
+        List of installed table names
         """
 
         try:
@@ -112,9 +135,6 @@ class FgcmAtmosphereTable(object):
 
         availableTables = {}
 
-        #for f in files:
-        #    availableTables['atmosphereTableName'] = os.path.basename(f)
-        #    availableTables['info'] = FgcmAtmosphereTable.getInfoDict(f)
         for f in files:
             availableTables[os.path.basename(f)] = FgcmAtmosphereTable.getInfoDict(f)
 
@@ -123,6 +143,17 @@ class FgcmAtmosphereTable(object):
     @staticmethod
     def getInfoDict(atmosphereTableFile):
         """
+        Get information dictionary on a table file
+
+        parameters
+        ----------
+        atmosphereTableFile: str
+           Name of the table file
+
+        returns
+        -------
+        infoDict: dict
+           Dictionary with key parameters describing the table
         """
 
         if fits_package == 'fitsio':
@@ -158,6 +189,20 @@ class FgcmAtmosphereTable(object):
     @classmethod
     def initWithTableName(cls, atmosphereTableName):
         """
+        Initialize FgcmAtmosphereTable with a table name
+
+        parameters
+        ----------
+        atmosphereTableName: str
+           Name of atmosphere table
+
+        returns
+        -------
+        FgcmAtmosphereTable: FgcmAtmosphereTable object
+
+        notes
+        -----
+        Raises IOError if atmosphereTableName couldn't be found
         """
 
         # first, check if we have something in the path...
@@ -185,6 +230,15 @@ class FgcmAtmosphereTable(object):
 
     def loadTable(self):
         """
+        Load atmosphere table
+
+        parameters
+        ----------
+        None
+
+        returns
+        -------
+        None
         """
 
         # note that at this point these are the only options
@@ -235,6 +289,15 @@ class FgcmAtmosphereTable(object):
 
     def generateTable(self):
         """
+        Generate atmosphere table using MODTRAN
+
+        parameters
+        ----------
+        None
+
+        returns
+        -------
+        None
         """
         self.atmStd = self.modGen(pmb=self.pmbStd,pwv=self.pwvStd,
                                   o3=self.o3Std,tau=self.tauStd,
@@ -333,6 +396,14 @@ class FgcmAtmosphereTable(object):
 
     def saveTable(self, fileName, clobber=False):
         """
+        Save atmosphere table to a file
+
+        parameters
+        ----------
+        fileName: str
+           File name to save file
+        clobber: bool, default=False
+           Clobber fileName if it exists
         """
         # at the moment, only work with fitsio...
 
@@ -405,3 +476,71 @@ class FgcmAtmosphereTable(object):
         fits.write_image(self.rayleighAtmTable, extname='RAYATM')
 
         fits.close()
+
+
+    def interpolateAtmosphere(self, pmb=None, pwv=None, o3=None, tau=None,
+                              alpha=None, zenith=None):
+        """
+        Interpolate the atmosphere table to generate an atmosphere without
+        requiring MODTRAN be installed.
+
+        parameters
+        ----------
+        pmb: float, optional
+           pressure in millibar.  Default to pmbStd
+        pwv: float, optional
+           pwv in mm.  Default to pwvStd
+        o3: float, optional
+           ozone in Dobson.  Default to o3Std
+        tau: float, optional
+           Aerosol optical depth.  Default to tauStd
+        alpha: float, optional
+           Aerosol slope.  Default to alphaStd
+        zenith: float, optional
+           Zenith angle (degrees).  Default to zenithStd
+
+        returns
+        -------
+        atmInterpolated: float array
+           Interpolated atmosphere at self.atmLambda wavelengths
+        """
+
+        if pmb is None:
+            pmb = self.pmbStd
+        if pwv is None:
+            pwv = self.pwvStd
+        if o3 is None:
+            o3 = self.o3Std
+        if tau is None:
+            tau = self.tauStd
+        if alpha is None:
+            alpha = self.alphaStd
+        if zenith is None:
+            zenith = self.zenithStd
+
+        if self.o2Interpolator is None:
+            secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
+            self.o2Interpolator = interpolate.RegularGridInterpolator((secZenithPlus, self.atmLambda), self.o2AtmTable)
+
+        if self.rayleighInterpolator is None:
+            secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
+            self.rayleighInterpolator = interpolate.RegularGridInterpolator((secZenithPlus, self.atmLambda), self.rayleighAtmTable)
+
+        if self.pwvInterpolator is None:
+            pwvPlus = np.append(self.pwv, self.pwv[-1] + self.pwvDelta)
+            secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
+            self.pwvInterpolator = interpolate.RegularGridInterpolator((pwvPlus, secZenithPlus, self.atmLambda), self.pwvAtmTable)
+
+        if self.o3Interpolator is None:
+            o3Plus = np.append(self.o3, self.o3[-1] + self.o3Delta)
+            secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
+            self.o3Interpolator = interpolate.RegularGridInterpolator((o3Plus, secZenithPlus, self.atmLambda), self.o3AtmTable)
+
+        secZenith = 1./np.cos(np.radians(zenith))
+        atmInterpolated = (self.o2Interpolator(secZenith, self.atmLambda) *
+                           self.rayleighInterpolator(secZenith, self.atmLambda) *
+                           self.pwvInterpolator(pwv, secZenith, self.atmLambda) *
+                           self.o3Interpolator(o3, secZenith, self.atmLambda) *
+                           np.exp(-1.0 * tau * secZenith * (self.atmLambda / self.lambdaNorm)**(-alpha)))
+
+        return atmInterpolated
