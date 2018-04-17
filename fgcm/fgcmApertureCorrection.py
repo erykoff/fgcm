@@ -168,6 +168,8 @@ class FgcmApertureCorrection(object):
                                   self.fgcmPars.compAperCorrSlopeErr[i]))
 
             if (doPlots):
+                plt.set_cmap('viridis')
+
                 fig=plt.figure(1,figsize=(8,6))
                 fig.clf()
 
@@ -200,6 +202,7 @@ class FgcmApertureCorrection(object):
                 fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle,
                                                        self.fgcmPars.bands[i]))
+                plt.close(fig)
 
 
         ## MAYBE: modify ccd gray and exp gray?

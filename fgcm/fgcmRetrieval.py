@@ -2,6 +2,7 @@ from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
 import numpy as np
+import scipy.linalg as linalg
 import os
 import sys
 import esutil
@@ -64,6 +65,7 @@ class FgcmRetrieval(object):
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nExpPerRun = fgcmConfig.nExpPerRun
+        self.outputPath = fgcmConfig.outputPath
 
         self._prepareRetrievalArrays()
 
@@ -138,10 +140,14 @@ class FgcmRetrieval(object):
         self.goodObsHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.goodObsHandle)[:] = goodObs
 
+        self.obsExpIndexGOAHandle = snmm.createArray(goodObs.size,dtype='i4')
+        snmm.getArray(self.obsExpIndexGOAHandle)[:] = obsExpIndex[goodObs]
+
         self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
 
         # which exposures have stars?
+        # Note that this always returns a sorted array
         uExpIndex = np.unique(obsExpIndex[goodObs])
 
         self.debug=debug
@@ -162,14 +168,15 @@ class FgcmRetrieval(object):
             uExpIndexList = np.array_split(uExpIndex,nSections)
 
             # may want to sort by nObservations, but only if we pre-split
-
             pool = Pool(processes=self.nCore)
             pool.map(self._worker, uExpIndexList, chunksize=1)
             pool.close()
             pool.join()
+            #map(self._worker, uExpIndexList)
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)
+        snmm.freeArray(self.obsExpIndexGOAHandle)
 
         # and we're done
         self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
@@ -188,13 +195,17 @@ class FgcmRetrieval(object):
 
         # NOTE: No logging is allowed in the _worker method
 
-        workerStarTime = time.time()
-
         goodObsAll = snmm.getArray(self.goodObsHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsExpIndexGOA = snmm.getArray(self.obsExpIndexGOAHandle)
 
-        _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndex[goodObsAll])
-        goodObs = goodObsAll[temp]
+        # Start with only those that are in range ... this saves a ton of
+        # memory
+        inRange, = np.where((obsExpIndexGOA >= uExpIndex.min()) &
+                            (obsExpIndexGOA <= uExpIndex.max()))
+
+        _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndexGOA[inRange])
+        goodObs = goodObsAll[inRange[temp]]
 
         obsExpIndexGO = obsExpIndex[goodObs]
 
@@ -208,19 +219,15 @@ class FgcmRetrieval(object):
 
         obsObjIDIndexGO = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)[goodObs]
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
-        #obsLUTFilterIndexGO = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
-        obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
+        # obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
+        obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)[goodObs]
 
         # compute delta mags
         # deltaMag = m_b^inst(i,j)  - <m_b^std>(j) + QE_sys
         #   we want to take out the gray term from the qe
 
-        #deltaMagGO = (obsMagADUGO -
-        #              objMagStdMeanNoChrom[obsObjIDIndexGO,
-        #                                   obsBandIndexGO] +
-        #              self.fgcmPars.expQESys[obsExpIndexGO])
         deltaMagGO = (obsMagADUGO -
                       objMagStdMean[obsObjIDIndexGO,
                                     obsBandIndexGO] +
@@ -296,12 +303,16 @@ class FgcmRetrieval(object):
 
         # loop, doing the linear algebra
         for i in xrange(expIndexUse.size):
-            try:
-                IRetrieved = np.dot(np.linalg.inv(IMatrix[:,:,expIndexUse[i],
-                                                              ccdIndexUse[i]]),
-                                    RHS[:,expIndexUse[i],ccdIndexUse[i]])
-            except:
+            mat = IMatrix[:, :, expIndexUse[i], ccdIndexUse[i]]
+            det = mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]
+            if not np.isfinite(det):
                 continue
+            inv = (1. / det) * np.array([[mat[1, 1], -mat[0, 1]],
+                                         [-mat[1, 0], mat[0, 0]]])
+            if np.any(~np.isfinite(inv)):
+                continue
+
+            IRetrieved = np.dot(inv, RHS[:, expIndexUse[i], ccdIndexUse[i]])
 
             # record these in the shared array ... should not step
             #  on each others' toes

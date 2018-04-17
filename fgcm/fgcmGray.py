@@ -158,7 +158,7 @@ class FgcmGray(object):
         # for the required bands
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
-        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+        goodStars, = np.where((minObs >= self.fgcmStars.minObsPerBand) &
                               (objFlag == 0))
 
         # select observations of these stars...
@@ -201,7 +201,7 @@ class FgcmGray(object):
         for extraBandIndex in self.fgcmStars.bandExtraIndex:
             extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
                                      (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
-                                      self.fgcmStars.minPerBand))
+                                      self.fgcmStars.minObsPerBand))
 
             np.add.at(expGrayForInitialSelection,
                       obsExpIndex[goodObs[extraBandUse]],
@@ -261,6 +261,7 @@ class FgcmGray(object):
             fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
                                                           self.outfileBaseWithCycle,
                                                           self.fgcmPars.bands[i]))
+            plt.close(fig)
 
 
     def computeCCDAndExpGray(self,doPlots=True,onlyObsErr=False):
@@ -306,7 +307,8 @@ class FgcmGray(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
@@ -321,7 +323,7 @@ class FgcmGray(object):
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
         # select good stars...
-        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+        goodStars, = np.where((minObs >= self.fgcmStars.minObsPerBand) &
                               (objFlag == 0))
 
         # match the good stars to the observations
@@ -464,7 +466,7 @@ class FgcmGray(object):
         for extraBandIndex in self.fgcmStars.bandExtraIndex:
             extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
                                      (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
-                                      self.fgcmStars.minPerBand))
+                                      self.fgcmStars.minObsPerBand))
 
             np.add.at(ccdGrayWt,
                       (obsExpIndex[goodObs[extraBandUse]],obsCCDIndex[goodObs[extraBandUse]]),
@@ -618,7 +620,7 @@ class FgcmGray(object):
 
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
-        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+        goodStars, = np.where((minObs >= self.fgcmStars.minObsPerBand) &
                               (objFlag == 0))
 
         _,goodObs = esutil.numpy_util.match(goodStars,
@@ -675,6 +677,8 @@ class FgcmGray(object):
             # main plots:
             #  per band, plot expGray for red vs blue stars!
 
+            plt.set_cmap('viridis')
+
             for ind in xrange(self.fgcmStars.bandRequiredIndex.size):
                 bandIndex = self.fgcmStars.bandRequiredIndex[ind]
                 use, = np.where((self.fgcmPars.expBandIndex == bandIndex) &
@@ -697,6 +701,7 @@ class FgcmGray(object):
                 fig.savefig('%s/%s_expgray_redblue_compare_%s.png' % (self.plotPath,
                                                                       self.outfileBaseWithCycle,
                                                                       self.fgcmPars.bands[bandIndex]))
+                plt.close(fig)
 
         # and we're done...
 
@@ -745,6 +750,7 @@ class FgcmGray(object):
             fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle,
                                                   self.fgcmPars.bands[i]))
+            plt.close(fig)
 
             # plot EXP^gray as a function of secZenith (airmass)
             secZenith = 1./(np.sin(self.fgcmPars.expTelDec[expUse[inBand]]) *
@@ -772,6 +778,7 @@ class FgcmGray(object):
             fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
                                                           self.outfileBaseWithCycle,
                                                           self.fgcmPars.bands[i]))
+            plt.close(fig)
 
             # plot EXP^gray as a function of UT
 
@@ -791,6 +798,7 @@ class FgcmGray(object):
             fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle,
                                                      self.fgcmPars.bands[i]))
+            plt.close(fig)
 
         # and plot EXP^gray vs MJD for all bands for deep fields
         fig = plt.figure(1,figsize=(8,6))
@@ -811,6 +819,7 @@ class FgcmGray(object):
 
         fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle))
+        plt.close(fig)
 
         # And plot correlations of EXP^gray between pairs of bands
         for ind in xrange(self.fgcmStars.bandRequiredIndex.size-1):
@@ -858,6 +867,7 @@ class FgcmGray(object):
                                                              self.outfileBaseWithCycle,
                                                              self.fgcmPars.bands[bandIndex0],
                                                              self.fgcmPars.bands[bandIndex1]))
+            plt.close(fig)
 
     def __getstate__(self):
         # Don't try to pickle the logger.

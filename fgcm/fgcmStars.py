@@ -5,6 +5,8 @@ import numpy as np
 import esutil
 import time
 
+import matplotlib.pyplot as plt
+
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import obsFlagDict
 
@@ -23,7 +25,7 @@ class FgcmStars(object):
 
     Config variables
     ----------------
-    minPerBand: int
+    minObsPerBand: int
        Minumum number of observations per band to be "good"
     sedFitBandFudgeFactors: float array
        Fudge factors for computing fnuprime for the fit bands
@@ -59,7 +61,7 @@ class FgcmStars(object):
         self.bands = fgcmConfig.bands
         self.nBands = len(fgcmConfig.bands)
         self.nCCD = fgcmConfig.nCCD
-        self.minPerBand = fgcmConfig.minObsPerBand
+        self.minObsPerBand = fgcmConfig.minObsPerBand
         self.fitBands = fgcmConfig.fitBands
         self.nFitBands = len(fgcmConfig.fitBands)
         self.extraBands = fgcmConfig.extraBands
@@ -73,6 +75,7 @@ class FgcmStars(object):
         self.expField = fgcmConfig.expField
         self.ccdField = fgcmConfig.ccdField
         self.reserveFraction = fgcmConfig.reserveFraction
+        self.modelMagErrors = fgcmConfig.modelMagErrors
 
         self.inFlagStarFile = fgcmConfig.inFlagStarFile
 
@@ -283,6 +286,8 @@ class FgcmStars(object):
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagADUErr: raw ADU counts error of individual observation
         self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        #  obsMagADUModelErr: modeled ADU counts error of individual observation
+        self.obsMagADUModelErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsSuperStarApplied: SuperStar correction that was applied
         self.obsSuperStarAppliedHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagStd: corrected (to standard passband) mag of individual observation
@@ -324,6 +329,10 @@ class FgcmStars(object):
                              (bad.size))
 
         obsMagADUErr[:] = np.sqrt(obsMagADUErr[:]**2. + self.sigma0Phot**2.)
+
+        # Initially, we set the model error to the observed error
+        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsMagADUModelErr[:] = obsMagADUErr[:]
 
         startTime = time.time()
         self.fgcmLog.info('Matching observations to exposure table.')
@@ -553,7 +562,7 @@ class FgcmStars(object):
 
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
-                                  minPerBand=None):
+                                  minObsPerBand=None):
         """
         Select stars that have at least the minimum number of observations per band,
          using a list of good exposures
@@ -564,12 +573,12 @@ class FgcmStars(object):
            Array of good (photometric) exposure indices
         temporary: bool, default=False
            Only flag bad objects temporarily
-        minPerBand: int
-           Specify the min obs per band, or use self.minPerBand
+        minObsPerBand: int
+           Specify the min obs per band, or use self.minObsPerBand
         """
 
-        if (minPerBand is None):
-            minPerBand = self.minPerBand
+        if (minObsPerBand is None):
+            minObsPerBand = self.minObsPerBand
 
         # Given a list of good exposures, which stars have at least minObs observations
         #  in each required band?
@@ -604,7 +613,7 @@ class FgcmStars(object):
             objFlag &= ~objFlagDict['TOO_FEW_OBS']
 
         # choose the bad objects with too few observations
-        bad,=np.where(minObs < minPerBand)
+        bad,=np.where(minObs < minObsPerBand)
 
         if (not temporary) :
             objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
@@ -616,7 +625,7 @@ class FgcmStars(object):
             self.fgcmLog.info('Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
 
 
-    def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minPerBand=None):
+    def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minObsPerBand=None):
         """
         Select stars that have at least the minimum number of observations per band,
          using a list of good exposures and ccds.
@@ -627,12 +636,12 @@ class FgcmStars(object):
            Array of good (photometric) exposure numbers
         goodCCDs: int array
            Array of good (photometric) ccd numbers
-        minPerBand: int
-           Specify the min obs per band, or use self.minPerBand
+        minObsPerBand: int
+           Specify the min obs per band, or use self.minObsPerBand
         """
 
-        if (minPerBand is None):
-            minPerBand = self.minPerBand
+        if (minObsPerBand is None):
+            minObsPerBand = self.minObsPerBand
 
         if (goodExps.size != goodCCDs.size) :
             raise ValueError("Length of goodExps and goodCCDs must be the same")
@@ -673,7 +682,7 @@ class FgcmStars(object):
         objFlag &= ~objFlagDict['TOO_FEW_OBS']
 
         # choose the bad objects with too few observations
-        bad,=np.where(minObs < minPerBand)
+        bad,=np.where(minObs < minObsPerBand)
 
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
         self.fgcmLog.info('Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
@@ -722,6 +731,7 @@ class FgcmStars(object):
 
         fig.savefig('%s/%s_%sGoodStars.png' % (self.plotPath, self.outfileBaseWithCycle,
                                                mapType))
+        plt.close(fig)
 
     def computeObjectSEDSlopes(self,objIndicesIn):
         """
@@ -970,6 +980,96 @@ class FgcmStars(object):
 
         obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
+    def computeModelMagErrors(self, fgcmPars):
+        """
+        Compute model magnitude errors.
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
+        """
+
+        if (fgcmPars.compModelErrFwhmPivot[0] <= 0.0) :
+            self.fgcmLog.info('No model for mag errors, so mag errors are unchanged.')
+            return
+
+        if not self.modelMagErrors:
+            self.fgcmLog.info('Model magnitude errors are turned off.')
+            return
+
+        if not self.magStdComputed:
+            raise RuntimeError("Must run FgcmChisq to compute magStd before computeModelMagErrors")
+
+        self.fgcmLog.info('Computing model magnitude errors for photometric observations')
+
+        objFlag = snmm.getArray(self.objFlagHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
+        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+
+        obsExptime = fgcmPars.expExptime[obsExpIndex]
+        obsFwhm = fgcmPars.expFwhm[obsExpIndex]
+        obsSkyBrightness = fgcmPars.expSkyBrightness[obsExpIndex]
+
+        # we will compute all stars that are possibly good, including reserved
+        resMask = 255 & ~objFlagDict['RESERVED']
+        goodStars, = np.where((objFlag & resMask) == 0)
+
+        goodStarsSub, goodObs = esutil.numpy_util.match(goodStars,
+                                                        obsObjIDIndex,
+                                                        presorted=True)
+
+        # Do we want to allow more selection of exposures here?
+        gd, = np.where((obsFlag[goodObs] == 0) &
+                       (fgcmPars.expFlag[obsExpIndex[goodObs]] == 0))
+        goodObs = goodObs[gd]
+        goodStarsSub = goodStarsSub[gd]
+
+        # loop over bands
+        for bandIndex in xrange(fgcmPars.nBands):
+            use, = np.where((obsBandIndex[goodObs] == bandIndex) &
+                            (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] > self.minObsPerBand))
+            pars = fgcmPars.compModelErrPars[:, bandIndex]
+            fwhmPivot = fgcmPars.compModelErrFwhmPivot[bandIndex]
+            skyPivot = fgcmPars.compModelErrSkyPivot[bandIndex]
+            exptimePivot = fgcmPars.compModelErrExptimePivot[bandIndex]
+
+            obsMagADUMeanGOu = (objMagStdMean[obsObjIDIndex[goodObs[use]], bandIndex] -
+                                (obsMagStd[goodObs[use]] - obsMagADU[goodObs[use]]) -
+                                2.5 * np.log10(obsExptime[goodObs[use]] / exptimePivot))
+
+            modErr = 10.**(pars[0] + pars[1] * obsMagADUMeanGOu + pars[2] * obsMagADUMeanGOu**2. +
+                           pars[3] * np.log10(obsFwhm[goodObs[use]] / fwhmPivot) +
+                           pars[4] * np.log10(obsSkyBrightness[goodObs[use]] / skyPivot) +
+                           pars[5] * obsMagADUMeanGOu * np.log10(obsFwhm[goodObs[use]] / fwhmPivot) +
+                           pars[6] * obsMagADUMeanGOu * np.log10(obsSkyBrightness[goodObs[use]] / skyPivot))
+
+            obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
+
+            # debug bit...
+            """
+            plt.set_cmap('viridis')
+            fig = plt.figure(1, figsize=(8,6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            ax.hexbin(obsMagADUErr[goodObs[use]], obsMagADUModelErr[goodObs[use]], bins='log')
+            ax.plot([0., 0.08], [0., 0.08], 'r--')
+            ax.set_title('band = %s, %d' % (self.bands[bandIndex], use.size))
+            ax.set_xlabel('Observed error')
+            ax.set_ylabel('Model Error')
+
+            fig.savefig('temp_%s.png' % (self.bands[bandIndex]))
+            plt.close(fig)
+            """
     def saveFlagStarIndices(self,flagStarFile):
         """
         Save flagged stars to fits.
@@ -1044,7 +1144,7 @@ class FgcmStars(object):
         # this doesn't work because we'd have to recompute all the mags
         # this is more honest about what stars are actually well measured
 
-        #self.selectStarsMinObsExpIndex(goodExpsIndex, minPerBand=1, temporary=True)
+        #self.selectStarsMinObsExpIndex(goodExpsIndex, minObsPerBand=1, temporary=True)
 
         rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
                       objFlagDict['TOO_FEW_OBS'])

@@ -197,7 +197,9 @@ class FgcmBrightObs(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # Note that this will be the same when we don't fit for the error
+        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
@@ -225,7 +227,7 @@ class FgcmBrightObs(object):
             self.fgcmLog.debug('Cut to sub-indices in %.1f seconds.' %
                              (time.time() - startTime))
 
-        obsMagErr2GO = obsMagADUErr[goodObs]**2.
+        obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
 
         # new version using fmin.at()
 

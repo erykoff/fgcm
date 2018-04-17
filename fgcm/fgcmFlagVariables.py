@@ -50,7 +50,8 @@ class FgcmFlagVariables(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        #obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
 
         obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
@@ -64,11 +65,9 @@ class FgcmFlagVariables(object):
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
         # select good stars...
-        #goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
-        #                    (objFlag == 0))
         # compute this for all possibly good stars *including* reserves
         resMask = 255 & ~objFlagDict['RESERVED']
-        goodStars,=np.where((minObs >= self.fgcmStars.minPerBand) &
+        goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
                             ((objFlag & resMask) == 0))
 
         # match the good stars to the observations

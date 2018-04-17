@@ -79,7 +79,8 @@ class FgcmSuperStarFlat(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsSuperStarApplied = snmm.getArray(self.fgcmStars.obsSuperStarAppliedHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
@@ -95,7 +96,7 @@ class FgcmSuperStarFlat(object):
         minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
 
         # select good stars...
-        goodStars, = np.where((minObs >= self.fgcmStars.minPerBand) &
+        goodStars, = np.where((minObs >= self.fgcmStars.minObsPerBand) &
                               (objFlag == 0))
 
         # match the good stars to the observations
@@ -177,7 +178,7 @@ class FgcmSuperStarFlat(object):
             for extraBandIndex in self.fgcmStars.bandExtraIndex:
                 extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
                                          (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
-                                          self.fgcmStars.minPerBand))
+                                          self.fgcmStars.minObsPerBand))
                 np.add.at(superStarWt,
                           (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
                            self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
@@ -240,7 +241,7 @@ class FgcmSuperStarFlat(object):
                 bInd = obsBandIndex[goodObs[i1a[0]]]
                 if bInd in self.fgcmStars.bandExtraIndex:
                     extraBandUse, = np.where(objNGoodObs[obsObjIDIndex[goodObs[i1a]], bInd] >=
-                                             self.fgcmStars.minPerBand)
+                                             self.fgcmStars.minObsPerBand)
                     if extraBandUse.size == 0:
                         continue
 
@@ -614,5 +615,6 @@ class FgcmSuperStarFlat(object):
                                                     name,
                                                     self.fgcmPars.lutFilterNames[j],
                                                     self.epochNames[i]))
+                plt.close(fig)
 
 
