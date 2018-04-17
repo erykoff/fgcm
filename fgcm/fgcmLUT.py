@@ -101,13 +101,9 @@ class FgcmLUTMaker(object):
 
         self.lutConfig = lutConfig
 
-        #self.filterNames = np.array(self.lutConfig['filterNames'])
-        #self.stdFilterNames = np.array(self.lutConfig['stdFilterNames'])
         self.filterNames = self.lutConfig['filterNames']
         self.stdFilterNames = self.lutConfig['stdFilterNames']
 
-        #if self.filterNames.size != self.stdFilterNames.size:
-        #    raise ValueError("Length of filterNames must be same as stdFilterNames")
         if len(self.filterNames) != len(self.stdFilterNames):
             raise ValueError("Length of filterNames must be same as stdFilterNames")
 
