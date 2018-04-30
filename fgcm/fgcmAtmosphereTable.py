@@ -536,8 +536,14 @@ class FgcmAtmosphereTable(object):
             secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
             self.o3Interpolator = interpolate.RegularGridInterpolator((o3Plus, secZenithPlus, self.atmLambda), self.o3AtmTable)
 
+        # And finally the pressure correction
+        pmbMolecularScattering = np.exp(-(pmb - self.pmbElevation) / self.pmbElevation)
+        pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
+        pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
+
         secZenith = 1./np.cos(np.radians(zenith))
-        atmInterpolated = (self.o2Interpolator(secZenith, self.atmLambda) *
+        atmInterpolated = (pmbFactor *
+                           self.o2Interpolator(secZenith, self.atmLambda) *
                            self.rayleighInterpolator(secZenith, self.atmLambda) *
                            self.pwvInterpolator(pwv, secZenith, self.atmLambda) *
                            self.o3Interpolator(o3, secZenith, self.atmLambda) *
