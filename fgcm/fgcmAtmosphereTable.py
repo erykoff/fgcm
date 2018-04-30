@@ -478,7 +478,7 @@ class FgcmAtmosphereTable(object):
         fits.close()
 
 
-    def interpolateAtmosphere(self, pmb=None, pwv=None, o3=None, tau=None,
+    def interpolateAtmosphere(self, lam=None, pmb=None, pwv=None, o3=None, tau=None,
                               alpha=None, zenith=None):
         """
         Interpolate the atmosphere table to generate an atmosphere without
@@ -486,6 +486,8 @@ class FgcmAtmosphereTable(object):
 
         parameters
         ----------
+        lam: float array, optional
+           wavelengths.  Default is self.atmLambda
         pmb: float, optional
            pressure in millibar.  Default to pmbStd
         pwv: float, optional
@@ -505,6 +507,8 @@ class FgcmAtmosphereTable(object):
            Interpolated atmosphere at self.atmLambda wavelengths
         """
 
+        if lam is None:
+            lam = self.atmLambda
         if pmb is None:
             pmb = self.pmbStd
         if pwv is None:
@@ -543,10 +547,10 @@ class FgcmAtmosphereTable(object):
 
         secZenith = 1./np.cos(np.radians(zenith))
         atmInterpolated = (pmbFactor *
-                           self.o2Interpolator(secZenith, self.atmLambda) *
-                           self.rayleighInterpolator(secZenith, self.atmLambda) *
-                           self.pwvInterpolator(pwv, secZenith, self.atmLambda) *
-                           self.o3Interpolator(o3, secZenith, self.atmLambda) *
-                           np.exp(-1.0 * tau * secZenith * (self.atmLambda / self.lambdaNorm)**(-alpha)))
+                           self.o2Interpolator((secZenith, lam)) *
+                           self.rayleighInterpolator((secZenith, lam)) *
+                           self.pwvInterpolator((pwv, secZenith, lam)) *
+                           self.o3Interpolator((o3, secZenith, lam)) *
+                           np.exp(-1.0 * tau * secZenith * (lam / self.lambdaNorm)**(-alpha)))
 
         return atmInterpolated
