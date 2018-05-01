@@ -27,12 +27,13 @@ class ConfigField(object):
             if value is not None:
                 self._value = np.atleast_1d(value)
 
-        if _default is not None:
-            if type(_default) != datatype:
-                raise TypeError("Default is the wrong datatype.")
-        if self._value is not None:
-            if type(self._value) != datatype:
-                raise TypeError("Value is the wrong datatype.")
+        if datatype is not None:
+            if _default is not None:
+                if type(_default) != datatype:
+                    raise TypeError("Default is the wrong datatype.")
+            if self._value is not None:
+                if type(self._value) != datatype:
+                    raise TypeError("Value is the wrong datatype.")
 
         if self._value is None:
             self._value = _default
@@ -56,9 +57,10 @@ class ConfigField(object):
             # Okay to have None for not required
             return True
 
-        if type(self._value) != self._datatype:
-            raise ValueError("Datatype mismatch for %s (got %s, expected %s)" %
-                             (name, str(type(self._value)), str(self._datatype)))
+        if self._datatype is not None:
+            if type(self._value) != self._datatype:
+                raise ValueError("Datatype mismatch for %s (got %s, expected %s)" %
+                                 (name, str(type(self._value)), str(self._datatype)))
 
         if self._length is not None:
             if len(self._value) != self._length:
@@ -113,6 +115,7 @@ class FgcmConfig(object):
     minObsPerBand = ConfigField(int, default=2)
     nCore = ConfigField(int, default=1)
     randomSeed = ConfigField(int, required=False)
+    logger = ConfigField(None, required=False)
 
     brightObsGrayMax = ConfigField(float, default=0.15)
     minStarPerCCD = ConfigField(int, default=5)
