@@ -235,7 +235,7 @@ class FgcmConfig(object):
         self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
         if os.path.isdir(self.plotPath) and not self.clobber:
             # check if directory is empty
-            if len(os.listdir(self.plotPath) > 0):
+            if len(os.listdir(self.plotPath)) > 0:
                 raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
 
         # set up logger are we get the name...
