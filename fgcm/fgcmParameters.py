@@ -428,10 +428,14 @@ class FgcmParameters(object):
         self.compAperCorrSlopeErr = np.atleast_1d(inParams['COMPAPERCORRSLOPEERR'][0])
         self.compAperCorrRange = np.reshape(inParams['COMPAPERCORRRANGE'][0],(2,self.nBands))
 
-        self.compModelErrExptimePivot = np.atleast_1d(inParams['COMPMODELERREXPTIMEPIVOT'][0])
-        self.compModelErrFwhmPivot = np.atleast_1d(inParams['COMPMODELERRFWHMPIVOT'][0])
-        self.compModelErrSkyPivot = np.atleast_1d(inParams['COMPMODELERRSKYPIVOT'][0])
-        self.compModelErrPars = np.reshape(inParams['COMPMODELERRPARS'][0], (7, self.nBands))
+        try:
+            self.compModelErrExptimePivot = np.atleast_1d(inParams['COMPMODELERREXPTIMEPIVOT'][0])
+            self.compModelErrFwhmPivot = np.atleast_1d(inParams['COMPMODELERRFWHMPIVOT'][0])
+            self.compModelErrSkyPivot = np.atleast_1d(inParams['COMPMODELERRSKYPIVOT'][0])
+            self.compModelErrPars = np.reshape(inParams['COMPMODELERRPARS'][0], (7, self.nBands))
+        except ValueError:
+            # This is okay, there will be no model error correction from old run
+            pass
 
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
