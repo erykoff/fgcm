@@ -123,7 +123,8 @@ class FgcmSuperStarFlat(object):
                            objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
-        gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
+        # as well as making sure that it didn't go below zero
+        gd,=np.where((EGrayErr2GO < self.ccdGrayMaxStarErr) & (EGrayErr2GO > 0.0))
         goodObs=goodObs[gd]
         # unapply input superstar correction here (note opposite sign)
         EGrayGO=EGrayGO[gd] + obsSuperStarApplied[goodObs]
