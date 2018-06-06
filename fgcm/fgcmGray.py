@@ -352,7 +352,8 @@ class FgcmGray(object):
                            objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
 
         # one more cut on the maximum error
-        gd,=np.where(EGrayErr2GO < self.ccdGrayMaxStarErr)
+        # as well as making sure that it didn't go below zero
+        gd,=np.where((EGrayErr2GO < self.ccdGrayMaxStarErr) & (EGrayErr2GO > 0.0))
         goodObs=goodObs[gd]
         EGrayGO=EGrayGO[gd]
         EGrayErr2GO=EGrayErr2GO[gd]
