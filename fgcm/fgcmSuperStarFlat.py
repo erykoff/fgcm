@@ -248,6 +248,7 @@ class FgcmSuperStarFlat(object):
 
                     i1a = i1a[extraBandUse]
 
+                computeMean = False
                 try:
                     fit, cov = scipy.optimize.curve_fit(poly2dFunc,
                                                         np.vstack((obsXGO[i1a],
@@ -255,9 +256,16 @@ class FgcmSuperStarFlat(object):
                                                         EGrayGO[i1a],
                                                         p0=[0.0,0.0,0.0,0.0,0.0,0.0],
                                                         sigma=np.sqrt(EGrayErr2GO[i1a]))
+                    if fit[0] == 0.0:
+                        self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean",
+                                          % (epInd, fiInd, cInd))
+                        computeMean = True
                 except:
-                    print("Warning: fit failed to converge (%d, %d, %d), setting to mean"
-                          % (epInd, fiInd, cInd))
+                    self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
+                                      % (epInd, fiInd, cInd))
+                    computeMean = True
+
+                if computeMean:
                     fit = np.zeros(6)
                     fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
                               np.sum(1./EGrayErr2GO[i1a]))
