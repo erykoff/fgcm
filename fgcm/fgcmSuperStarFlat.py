@@ -257,7 +257,7 @@ class FgcmSuperStarFlat(object):
                                                         p0=[0.0,0.0,0.0,0.0,0.0,0.0],
                                                         sigma=np.sqrt(EGrayErr2GO[i1a]))
                     if fit[0] == 0.0:
-                        self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean",
+                        self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
                                           % (epInd, fiInd, cInd))
                         computeMean = True
                 except:
