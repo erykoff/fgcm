@@ -1154,9 +1154,9 @@ class FgcmStars(object):
         outCat = np.zeros(goodStars.size, dtype=[('FGCM_ID', 'i8'),
                                                  ('RA', 'f8'),
                                                  ('DEC', 'f8'),
-                                                 ('NGOOD', 'i4', self.bands.size),
-                                                 ('MAG_STD', 'f4', self.bands.size),
-                                                 ('MAGERR_STD', 'f4', self.bands.size)])
+                                                 ('NGOOD', 'i4', len(self.bands)),
+                                                 ('MAG_STD', 'f4', len(self.bands)),
+                                                 ('MAGERR_STD', 'f4', len(self.bands))])
 
         outCat['FGCM_ID'] = objID[goodStars]
         outCat['RA'] = objRA[goodStars]
