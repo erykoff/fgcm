@@ -1125,7 +1125,18 @@ class FgcmStars(object):
 
         import fitsio
 
-        self.fgcmLog.info( 'Saving standard stars to %s' % (starFile))
+        self.fgcmLog.info('Saving standard stars to %s' % (starFile))
+
+        fitsio.write(starFile, self.retrieveStdStarCatalog(fgcmPars), clobber=True)
+
+    def retrieveStdStarCatalog(self, fgcmPars):
+        """
+        Retrieve standard star catalog.  Note that this does not fill in holes (yet).
+
+        parameters
+        ----------
+        fgcmPars: FgcmParameters
+        """
 
         objID = snmm.getArray(self.objIDHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
@@ -1134,17 +1145,6 @@ class FgcmStars(object):
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
-
-        # reset TEMPORARY_BAD_STAR
-        #objFlag &= ~objFlagDict['TEMPORARY_BAD_STAR']
-
-        # only take photometric exposures...
-        #goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
-
-        # this doesn't work because we'd have to recompute all the mags
-        # this is more honest about what stars are actually well measured
-
-        #self.selectStarsMinObsExpIndex(goodExpsIndex, minObsPerBand=1, temporary=True)
 
         rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
                       objFlagDict['TOO_FEW_OBS'])
@@ -1165,10 +1165,7 @@ class FgcmStars(object):
         outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
         outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]
 
-        # reset TEMPORARY_BAD_STAR
-        #objFlag &= ~objFlagDict['TEMPORARY_BAD_STAR']
-
-        fitsio.write(starFile, outCat, clobber=True)
+        return outCat
 
     def __getstate__(self):
         # Don't try to pickle the logger.
