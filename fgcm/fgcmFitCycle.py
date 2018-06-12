@@ -25,6 +25,7 @@ from .fgcmSigFgcm import FgcmSigFgcm
 from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
+from .fgcmConnectivity import FgcmConnectivity
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -325,6 +326,10 @@ class FgcmFitCycle(object):
 
         # And apply the errors (if configured)
         self.fgcmStars.computeModelMagErrors(self.fgcmPars)
+
+        # Make connectivity maps with what we know about photometric selection
+        fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
