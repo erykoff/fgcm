@@ -94,7 +94,8 @@ class FgcmConfig(object):
     bands = ConfigField(list, required=True)
 
     fitBands = ConfigField(list, required=True)
-    extraBands = ConfigField(list, required=True)
+    notFitBands = ConfigField(list, required=True)
+    requiredBands = ConfigField(list, required=True)
     filterToBand = ConfigField(dict, required=True)
     exposureFile = ConfigField(str, required=False)
     ccdOffsetFile = ConfigField(str, required=False)
@@ -124,8 +125,9 @@ class FgcmConfig(object):
     maxCCDGrayErr = ConfigField(float, default=0.05)
     aperCorrFitNBins = ConfigField(int, default=5)
     illegalValue = ConfigField(float, default=-9999.0)
-    sedFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
-    sedExtraBandFudgeFactors = ConfigField(np.ndarray, required=True)
+    # sedFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
+    # sedNotFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
+    sedFudgeFactors = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
@@ -288,7 +290,8 @@ class FgcmConfig(object):
         #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
         #  3) check that each band has ONE standard filter
         #  4) check that all the fitBands are in bands
-        #  5) check that all the extraBands are in bands
+        #  5) check that all the notFitBands are in bands
+        #  6) check that all the requiredBands are in bands
 
         #  1) check that all the filters in filterToBand are in lutFilterNames
         for filterName in self.filterToBand:
@@ -319,10 +322,14 @@ class FgcmConfig(object):
         for fitBand in self.fitBands:
             if fitBand not in self.bands:
                 raise ValueError("Band %s from fitBands not in full bands" % (fitBand))
-        #  5) check that all the extraBands are in bands
-        for extraBand in self.extraBands:
-            if extraBand not in self.bands:
-                raise ValueError("Band %s from extraBands not in full bands" % (extraBand))
+        #  5) check that all the notFitBands are in bands
+        for notFitBand in self.notFitBands:
+            if notFitBand not in self.bands:
+                raise ValueError("Band %s from notFitBands not in full bands" % (notFitBand))
+        #  6) check that all the requiredBands are in bands
+        for requiredBand in self.requiredBands:
+            if requiredBand not in self.bands:
+                raise ValueError("Band %s from requiredBands not in full bands" % (requiredBand))
 
         bandString = " ".join(self.bands)
         self.fgcmLog.info('Found %d CCDs and %d bands (%s)' %
@@ -398,19 +405,31 @@ class FgcmConfig(object):
                      (self.washMJDs < self.mjdRange[1]))
         self.washMJDs = self.washMJDs[gd]
 
-        # and deal with fit band indices and extra band indices
-        self.bandRequiredFlag = np.zeros(len(self.bands), dtype=np.bool)
-        self.bandExtraFlag = np.zeros(len(self.bands), dtype=np.bool)
-        for i,band in enumerate(self.bands):
-            if (band in self.fitBands):
-                self.bandRequiredFlag[i] = True
-            if (len(self.extraBands) > 0):
-                if (band in self.extraBands):
-                    self.bandExtraFlag[i] = True
-                if (band in self.fitBands and
-                    band in self.extraBands):
-                    raise ValueError("Cannot have the same band as fit and extra")
+        # Deal with fit band, notfit band, required, and notrequired indices
+        bandFitFlag = np.zeros(len(self.bands), dtype=np.bool)
+        bandNotFitFlag = np.zeros_like(bandFitFlag)
+        bandRequiredFlag = np.zeros_like(bandFitFlag)
 
+        for i, band in enumerate(self.bands):
+            if band in self.fitBands:
+                bandFitFlag[i] = True
+            if band in self.requiredBands:
+                bandRequiredFlag[i] = True
+            if len(self.notFitBands) > 0:
+                if band in self.notFitBands:
+                    bandNotFitFlag[i] = True
+                if band in self.fitBands and band in self.notFitBands:
+                    raise ValueError("Cannot have the same band in fitBands and notFitBands")
+
+        self.bandFitIndex = np.where(bandFitFlag)[0]
+        self.bandNotFitIndex = np.where(bandNotFitFlag)[0]
+        self.bandRequiredIndex = np.where(bandRequiredFlag)[0]
+        self.bandNotRequiredIndex = np.where(~bandRequiredFlag)[0]
+
+        if np.array_equal(self.bandFitIndex, self.bandRequiredIndex):
+            self.allFitBandsAreRequired = True
+        else:
+            self.allFitBandsAreRequired = False
 
         # and check the star color cuts and replace with indices...
         #  note that self.starColorCuts is a copy so that we don't overwrite.
@@ -531,8 +550,9 @@ class FgcmConfig(object):
         """
 
         # Check the fudge factors...
-        type(self).__dict__['sedFitBandFudgeFactors']._length = len(self.fitBands)
-        type(self).__dict__['sedExtraBandFudgeFactors']._length = len(self.extraBands)
+        # type(self).__dict__['sedFitBandFudgeFactors']._length = len(self.fitBands)
+        # type(self).__dict__['sedNotFitBandFudgeFactors']._length = len(self.notFitBands)
+        type(self).__dict__['sedFudgeFactors']._length = len(self.bands)
 
         # And the gray cuts
         type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)
