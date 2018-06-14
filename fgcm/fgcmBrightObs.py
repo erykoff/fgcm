@@ -65,10 +65,10 @@ class FgcmBrightObs(object):
         # and fgcmLUT for the SEDs (this makes me unhappy)
         self.fgcmLUT = fgcmLUT
 
-
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
         self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.bandFitIndex = fgcmConfig.bandFitIndex
 
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
@@ -101,13 +101,7 @@ class FgcmBrightObs(object):
         snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
         snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        # and select good stars!  This might be all stars at this point, but good to check
-        #goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
-        # we want to include reserved stars for this, so we have values
-        resMask = 255 & ~objFlagDict['RESERVED']
-        goodStars,=np.where((snmm.getArray(self.fgcmStars.objFlagHandle) & resMask) == 0)
-
-        self.fgcmLog.info('Found %d good stars for bright obs' % (goodStars.size))
+        goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True)
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -121,12 +115,8 @@ class FgcmBrightObs(object):
 
         preStartTime=time.time()
         self.fgcmLog.info('Pre-matching stars and observations...')
-        goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
-                                                       obsObjIDIndex,
-                                                       presorted=True)
 
-        if (goodStarsSub[0] != 0.0):
-            raise ValueError("Very strange that the goodStarsSub first element is non-zero.")
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
         self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
