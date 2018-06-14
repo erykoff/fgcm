@@ -365,6 +365,7 @@ class FgcmMakeStars(object):
                 if bandPixelCat is None:
                     # First time through, these are all new objects
                     bandPixelCat = bandPixelCatTemp
+                    print(" Found %d reference stars in %s band" % (bandPixelCatTemp.size, referenceBand))
                 else:
                     # We already have objects, need to match/append
                     if hasSmatch:
@@ -388,11 +389,12 @@ class FgcmMakeStars(object):
 
                     bandPixelCat = np.append(bandPixelCat, bandPixelCatTemp)
 
-            # Append to list of catalogs...
-            pixelCats.append(bandPixelCat)
+            if bandPixelCat is not None:
+                # Append to list of catalogs...
+                pixelCats.append(bandPixelCat)
 
-            self.fgcmLog.info("Found %d unique objects in pixel %d (%d of %d)." %
-                              (bandPixelCat.size, ipring[p1a[0]], ii, gdpix.size))
+                self.fgcmLog.info("Found %d unique objects in pixel %d (%d of %d)." %
+                                  (bandPixelCat.size, ipring[p1a[0]], ii, gdpix.size))
 
         # now assemble into a total objCat
         count = 0
