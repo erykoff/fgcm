@@ -72,6 +72,7 @@ class FgcmChisq(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
+        self.bandFitIndex = fgcmConfig.bandFitIndex
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -172,13 +173,7 @@ class FgcmChisq(object):
             snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)[:] = 99.0
             snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        # do we want to include reserve stars?
-        if (self.includeReserve):
-            # this mask will filter everything but RESERVED
-            resMask = 255 & ~objFlagDict['RESERVED']
-            goodStars,=np.where((snmm.getArray(self.fgcmStars.objFlagHandle) & resMask) == 0)
-        else:
-            goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+        goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=self.includeReserve)
 
         self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
 
@@ -188,7 +183,6 @@ class FgcmChisq(object):
         # do global pre-matching before giving to workers, because
         #  it is faster this way
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
@@ -201,24 +195,13 @@ class FgcmChisq(object):
             # we need to do matching
             preStartTime=time.time()
             self.fgcmLog.info('Pre-matching stars and observations...')
-            goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
-                                                           obsObjIDIndex,
-                                                           presorted=True)
 
-            if (goodStarsSub[0] != 0.0):
-                raise ValueError("Very strange that the goodStarsSub first element is non-zero.")
-
-            if (not self.allExposures):
-                # cut out all bad exposures and bad observations
-                gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
-                             (obsFlag[goodObs] == 0))
+            if not self.allExposures:
+                expFlag = self.fgcmPars.expFlag
             else:
-                # just cut out bad observations
-                gd,=np.where(obsFlag[goodObs] == 0)
+                expFlag = None
 
-            # crop out both goodObs and goodStarsSub
-            goodObs=goodObs[gd]
-            goodStarsSub=goodStarsSub[gd]
+            goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag)
 
             self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                              (time.time() - preStartTime))
@@ -410,8 +393,9 @@ class FgcmChisq(object):
         obsSecZenithGO = obsSecZenith[goodObs]
         obsCCDIndexGO = obsCCDIndex[goodObs]
 
-        # which observations are used in the fit?
-        _,obsFitUseGO = esutil.numpy_util.match(self.fgcmPars.fitBandIndex,
+        # which observations are actually used in the fit?
+
+        _,obsFitUseGO = esutil.numpy_util.match(self.bandFitIndex,
                                                 obsBandIndexGO)
 
         # now refer to obsBandIndex[goodObs]
