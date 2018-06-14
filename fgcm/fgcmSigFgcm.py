@@ -53,6 +53,8 @@ class FgcmSigFgcm(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
+        self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
+        self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
 
     def computeSigFgcm(self,reserved=False,doPlots=True,save=True,crunch=False):
         """
@@ -92,30 +94,9 @@ class FgcmSigFgcm(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        # make sure we have enough obervations per band
-        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
+        goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
 
-        # select good stars...
-        if (reserved):
-            # only reserved stars
-            goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
-                                ((objFlag & objFlagDict['RESERVED']) > 0))
-            # FIXME need to remove BAD STARS as well
-        else:
-            # all good stars
-            goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
-                                (objFlag == 0))
-
-        # match the good stars to the observations
-        _,goodObs = esutil.numpy_util.match(goodStars,
-                                            obsObjIDIndex,
-                                            presorted=True)
-
-        # and make sure that we only use good observations from good exposures
-        gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
-                     (obsFlag[goodObs] == 0))
-
-        goodObs = goodObs[gd]
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -130,56 +111,58 @@ class FgcmSigFgcm(object):
         sigFgcm = np.zeros(self.fgcmStars.nBands)
 
         # and we do 4 runs: full, blue 25%, middle 50%, red 25%
-        # FIXME: use filterToBand or related for this...
+
+        # Compute "g-i" based on the configured colorSplitIndices
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
-               objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
-        st = np.argsort(gmiGO)
-        gmiCutLow = np.array([gmiGO[st[0]],
-                              gmiGO[st[0]],
-                              gmiGO[st[int(0.25*st.size)]],
-                              gmiGO[st[int(0.75*st.size)]]])
-        gmiCutHigh = np.array([gmiGO[st[-1]],
-                               gmiGO[st[int(0.25*st.size)]],
-                               gmiGO[st[int(0.75*st.size)]],
-                               gmiGO[st[-1]]])
-        gmiCutNames = ['All','Blue25','Middle50','Red25']
+                 objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
 
+        # Note that not every star has a valid g-i color, so we need to check for that.
+        okColor, = np.where((objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] < 90.0) &
+                            (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]] < 90.0))
+        # sort these
+        st = np.argsort(gmiGO[okColor])
+        gmiCutLow = np.array([0.0,
+                              gmiGO[okColor[st[0]]],
+                              gmiGO[okColor[st[int(0.25 * st.size)]]],
+                              gmiGO[okColor[st[int(0.75 * st.size)]]]])
+        gmiCutHigh = np.array([0.0,
+                               gmiGO[okColor[st[int(0.25 * st.size)]]],
+                               gmiGO[okColor[st[int(0.75 * st.size)]]],
+                               gmiGO[okColor[st[-1]]]])
+        gmiCutNames = ['All', 'Blue25', 'Middle50', 'Red25']
 
-        for bandIndex in xrange(self.fgcmStars.nBands):
+        for bandIndex, band in enumerate(self.fgcmStars.bands):
             # start the figure which will have 4 panels
-            fig = plt.figure(figsize=(9,6))
+            fig = plt.figure(figsize=(9, 6))
             fig.clf()
 
             started=False
-            for c in xrange(gmiCutLow.size):
-                if (bandIndex in self.fgcmStars.bandRequiredIndex):
-                    sigUse,=np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray) &
-                                     (EGrayErr2GO > 0.0) &
-                                     (EGrayErr2GO < self.sigFgcmMaxErr**2.) &
-                                     (EGrayGO != 0.0) &
-                                     (obsBandIndex[goodObs] == bandIndex) &
-                                     (gmiGO > gmiCutLow[c]) &
-                                     (gmiGO < gmiCutHigh[c]))
+            for c, name in enumerate(gmiCutNames):
+                if c == 0:
+                    # This is the "All"
+                    # There shouldn't be any need any additional checks on if these
+                    # stars were actually observed in this band, because the goodObs
+                    # selection takes care of that.
+                    sigUse, = np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray) &
+                                       (EGrayErr2GO > 0.0) &
+                                       (EGrayErr2GO < self.sigFgcmMaxErr**2.) &
+                                       (EGrayGO != 0.0) &
+                                       (obsBandIndex[goodObs] == bandIndex))
                 else:
-                    sigUse,=np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray) &
-                                     (EGrayErr2GO > 0.0) &
-                                     (EGrayErr2GO < self.sigFgcmMaxErr**2.) &
-                                     (EGrayGO != 0.0) &
-                                     (obsBandIndex[goodObs] == bandIndex) &
-                                     (objNGoodObs[obsObjIDIndex[goodObs],bandIndex] >=
-                                      self.fgcmStars.minObsPerBand) &
-                                     (gmiGO > gmiCutLow[c]) &
-                                     (gmiGO < gmiCutHigh[c]))
+                    sigUse, = np.where((np.abs(EGrayGO[okColor]) < self.sigFgcmMaxEGray) &
+                                       (EGrayErr2GO[okColor] > 0.0) &
+                                       (EGrayErr2GO[okColor] < self.sigFgcmMaxErr**2.) &
+                                       (EGrayGO[okColor] != 0.0) &
+                                       (obsBandIndex[goodObs[okColor]] == bandIndex) &
+                                       (gmiGO[okColor] > gmiCutLow[c]) &
+                                       (gmiGO[okColor] < gmiCutHigh[c]))
+                    sigUse = okColor[sigUse]
 
                 if (sigUse.size == 0):
                     self.fgcmLog.info('sigFGCM: No good observations in %s band (color cut %d).' %
                                      (self.fgcmPars.bands[bandIndex],c))
                     continue
 
-                #fig = plt.figure(1,figsize=(8,6))
-                #fig.clf()
-
-                #ax=fig.add_subplot(111)
                 ax=fig.add_subplot(2,2,c+1)
 
                 try:
@@ -189,11 +172,11 @@ class FgcmSigFgcm(object):
 
                 if not np.isfinite(coeff[2]):
                     self.fgcmLog.info("Failed to compute sigFgcm (%s) (%s).  Setting to 0.05" %
-                                     (self.fgcmPars.bands[bandIndex],gmiCutNames[c]))
+                                     (self.fgcmPars.bands[bandIndex], name))
                     sigFgcm[bandIndex] = 0.05
                 elif (np.median(EGrayErr2GO[sigUse]) > coeff[2]**2.):
                     self.fgcmLog.info("Typical error is larger than width (%s) (%s).  Setting to 0.001" %
-                                      (self.fgcmPars.bands[bandIndex],gmiCutNames[c]))
+                                      (self.fgcmPars.bands[bandIndex], name))
                     sigFgcm[bandIndex] = 0.001
                 else:
                     sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
@@ -201,7 +184,7 @@ class FgcmSigFgcm(object):
 
                 self.fgcmLog.info("sigFgcm (%s) (%s) = %.4f" % (
                         self.fgcmPars.bands[bandIndex],
-                        gmiCutNames[c],
+                        name,
                         sigFgcm[bandIndex]))
 
                 if (save and (c==0)):
@@ -218,15 +201,15 @@ class FgcmSigFgcm(object):
                     r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
                     r'$\sigma_\mathrm{tot} = %.4f$' % (coeff[2]) + '\n' + \
                     r'$\sigma_\mathrm{FGCM} = %.4f$' % (sigFgcm[bandIndex]) + '\n' + \
-                    gmiCutNames[c]
+                    name
 
                 ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=14)
                 ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=14)
 
                 if (reserved):
-                    extraName = 'reserved'
+                    extraName = 'reserved-stars'
                 else:
-                    extraName = 'all'
+                    extraName = 'all-stars'
 
                 if crunch:
                     extraName += '_crunched'
