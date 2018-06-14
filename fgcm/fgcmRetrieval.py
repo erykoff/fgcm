@@ -107,7 +107,7 @@ class FgcmRetrieval(object):
 
 
         # select good stars
-        goodStars,=np.where(snmm.getArray(self.fgcmStars.objFlagHandle) == 0)
+        goodStars = self.fgcmStars.getGoodStarIndices()
 
         self.fgcmLog.info('Found %d good stars for retrieval' % (goodStars.size))
 
@@ -122,20 +122,8 @@ class FgcmRetrieval(object):
 
         preStartTime=time.time()
         self.fgcmLog.info('Pre-matching stars and observations...')
-        goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
-                                                       obsObjIDIndex,
-                                                       presorted=True)
 
-        if (goodStarsSub[0] != 0.0):
-            raise ValueError("Very strange that the goodStarsSub first element is non-zero.")
-
-        # cut out all bad exposures and bad observations
-        gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
-                     (obsFlag[goodObs] == 0))
-
-        # crop out both goodObs and goodStarsSub
-        goodObs=goodObs[gd]
-        goodStarsSub=goodStarsSub[gd]
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         self.goodObsHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.goodObsHandle)[:] = goodObs
