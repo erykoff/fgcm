@@ -91,23 +91,8 @@ class FgcmSuperStarFlat(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        # make sure we have enough obervations per band
-        #  (this may be redundant)
-        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
-
-        # select good stars...
-        goodStars, = np.where((minObs >= self.fgcmStars.minObsPerBand) &
-                              (objFlag == 0))
-
-        # match the good stars to the observations
-        _,goodObs = esutil.numpy_util.match(goodStars,
-                                            obsObjIDIndex,
-                                            presorted=True)
-
-        # and filter out bad observations, non-photometric, etc
-        gd,=np.where((obsFlag[goodObs] == 0) &
-                     (self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0))
-        goodObs = goodObs[gd]
+        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -156,44 +141,20 @@ class FgcmSuperStarFlat(object):
             superStarWt = np.zeros_like(superStarFlatCenter)
             superStarOffset = np.zeros_like(superStarWt)
 
-            # need separate for required bands and extra bands for which stars to use
-            _,reqBandUse = esutil.numpy_util.match(self.fgcmStars.bandRequiredIndex,
-                                                   obsBandIndex[goodObs])
-
             np.add.at(superStarWt,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       obsCCDIndex[goodObs[reqBandUse]]),
-                      1./EGrayErr2GO[reqBandUse])
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
+                       obsCCDIndex[goodObs]),
+                      1./EGrayErr2GO)
             np.add.at(superStarOffset,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       obsCCDIndex[goodObs[reqBandUse]]),
-                      EGrayGO[reqBandUse]/EGrayErr2GO[reqBandUse])
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
+                       obsCCDIndex[goodObs]),
+                      EGrayGO/EGrayErr2GO)
             np.add.at(superStarNGoodStars,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[reqBandUse]]],
-                       obsCCDIndex[goodObs[reqBandUse]]),
-                      1)
-
-            for extraBandIndex in self.fgcmStars.bandExtraIndex:
-                extraBandUse, = np.where((obsBandIndex[goodObs] == extraBandIndex) &
-                                         (objNGoodObs[obsObjIDIndex[goodObs],extraBandIndex] >=
-                                          self.fgcmStars.minObsPerBand))
-                np.add.at(superStarWt,
-                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           obsCCDIndex[goodObs[extraBandUse]]),
-                          1./EGrayErr2GO[extraBandUse])
-                np.add.at(superStarOffset,
-                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           obsCCDIndex[goodObs[extraBandUse]]),
-                          EGrayGO[extraBandUse]/EGrayErr2GO[extraBandUse])
-                np.add.at(superStarNGoodStars,
-                          (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[extraBandUse]]],
-                           obsCCDIndex[goodObs[extraBandUse]]),
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
+                       obsCCDIndex[goodObs]),
                       1)
 
             gd = np.where(superStarNGoodStars > 2)
@@ -237,16 +198,6 @@ class FgcmSuperStarFlat(object):
                 epInd = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[i1a[0]]]]
                 fiInd = self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[i1a[0]]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
-
-                # check if this is an extra band and needs caution
-                bInd = obsBandIndex[goodObs[i1a[0]]]
-                if bInd in self.fgcmStars.bandExtraIndex:
-                    extraBandUse, = np.where(objNGoodObs[obsObjIDIndex[goodObs[i1a]], bInd] >=
-                                             self.fgcmStars.minObsPerBand)
-                    if extraBandUse.size == 0:
-                        continue
-
-                    i1a = i1a[extraBandUse]
 
                 computeMean = False
                 try:
