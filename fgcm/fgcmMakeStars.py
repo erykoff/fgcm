@@ -359,7 +359,7 @@ class FgcmMakeStars(object):
 
                 # Restore negative RAs
                 lo, = np.where(bandPixelCatTemp['ra'] < 0.0)
-                bandPixelCatTemp['ra'][hi] += 360.0
+                bandPixelCatTemp['ra'][lo] += 360.0
 
                 # Match to previously pixel catalog if available, and remove dupes
                 if bandPixelCat is None:
