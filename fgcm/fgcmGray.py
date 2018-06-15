@@ -494,7 +494,7 @@ class FgcmGray(object):
 
         # Not every star will have a valid g-i color, so we need to check for that.
         okColor, = np.where((objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] < 90.0) &
-                            (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] < 90.0))
+                            (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]] < 90.0))
         st = np.argsort(gmiGO[okColor])
         gmiCutLow = np.array([gmiGO[okColor[st[0]]],
                               gmiGO[okColor[st[int(0.25*st.size)]]],
