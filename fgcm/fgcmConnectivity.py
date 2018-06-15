@@ -120,7 +120,7 @@ class FgcmConnectivity(object):
                 u, = np.where((groupFlag[:, b] & (2**groupNumber)) > 0)
                 u = np.random.choice(u, replace=False, size=np.min([u.size, 1000000]))
                 ax.plot(objRA[u], objDec[u], colors[g % (len(colors))] + ',', zorder=0.5)
-                ax.plot(objRA[u[0]], objDec[u[0]], colors[g % (len(colors))] + '.', label='Group %d' % (groupNumber))
+                ax.plot(objRA[u[0]], objDec[u[0]], colors[g % (len(colors))] + '.', label='Group %d' % (g))
             ax.legend(markerscale=2.0)
             ax.set_xlabel('RA')
             ax.set_ylabel('Dec')
