@@ -491,13 +491,17 @@ class FgcmGray(object):
 
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                  objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
-        st = np.argsort(gmiGO)
-        gmiCutLow = np.array([gmiGO[st[0]],
-                              gmiGO[st[int(0.25*st.size)]],
-                              gmiGO[st[int(0.75*st.size)]]])
-        gmiCutHigh = np.array([gmiGO[st[int(0.25*st.size)]],
-                               gmiGO[st[int(0.75*st.size)]],
-                               gmiGO[st[-1]]])
+
+        # Not every star will have a valid g-i color, so we need to check for that.
+        okColor, = np.where((objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] < 90.0) &
+                            (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] < 90.0))
+        st = np.argsort(gmiGO[okColor])
+        gmiCutLow = np.array([gmiGO[okColor[st[0]]],
+                              gmiGO[okColor[st[int(0.25*st.size)]]],
+                              gmiGO[okColor[st[int(0.75*st.size)]]]])
+        gmiCutHigh = np.array([gmiGO[okColor[st[int(0.25*st.size)]]],
+                               gmiGO[okColor[st[int(0.75*st.size)]]],
+                               gmiGO[okColor[st[-1]]]])
         gmiCutNames = ['Blue25', 'Middle50', 'Red25']
 
         expGrayColorSplit[:, :] = 0.0
@@ -505,17 +509,17 @@ class FgcmGray(object):
         expGrayNGoodStarsColorSplit[:, :] = 0
 
         for c in xrange(gmiCutLow.size):
-            use, = np.where((gmiGO > gmiCutLow[c]) &
-                            (gmiGO < gmiCutHigh[c]))
+            use, = np.where((gmiGO[okColor] > gmiCutLow[c]) &
+                            (gmiGO[okColor] < gmiCutHigh[c]))
 
             np.add.at(expGrayColorSplit[:, c],
-                      obsExpIndex[goodObs[use]],
-                      EGray[goodObs[use]])
+                      obsExpIndex[goodObs[okColor[use]]],
+                      EGray[goodObs[okColor[use]]])
             np.add.at(expGrayRMSColorSplit[:, c],
-                      obsExpIndex[goodObs[use]],
-                      EGray[goodObs[use]]**2.)
+                      obsExpIndex[goodObs[okColor[use]]],
+                      EGray[goodObs[okColor[use]]]**2.)
             np.add.at(expGrayNGoodStarsColorSplit[:, c],
-                      obsExpIndex[goodObs[use]],
+                      obsExpIndex[goodObs[okColor[use]]],
                       1)
 
             gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp)
