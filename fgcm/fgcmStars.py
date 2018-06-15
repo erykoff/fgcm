@@ -939,11 +939,16 @@ class FgcmStars(object):
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
+        # Only cut stars where we have a color
+
         for cCut in self.starColorCuts:
-            thisColor = objMagStdMean[:,cCut[0]] - objMagStdMean[:,cCut[1]]
-            bad,=np.where((thisColor < cCut[2]) |
-                          (thisColor > cCut[3]))
-            objFlag[bad] |= objFlagDict['BAD_COLOR']
+            ok, = np.where((objMagStdMean[:, cCut[0]] < 90.0) &
+                           (objMagStdMean[:, cCut[1]] < 90.0))
+
+            thisColor = objMagStdMean[ok, cCut[0]] - objMagStdMean[ok, cCut[1]]
+            bad, = np.where((thisColor < cCut[2]) |
+                            (thisColor > cCut[3]))
+            objFlag[ok[bad]] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
