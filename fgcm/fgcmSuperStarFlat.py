@@ -407,7 +407,7 @@ class FgcmSuperStarFlat(object):
                         self.ccdOffsets['RASIGN'][cInd] = 1
 
                     corrYDec,_ = scipy.stats.pearsonr(testY,testDec)
-                    if corrYRA < 0:
+                    if corrYDec < 0:
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:
                         self.ccdOffsets['DECSIGN'][cInd] = 1
