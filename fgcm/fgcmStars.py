@@ -693,7 +693,7 @@ class FgcmStars(object):
 
         return np.where(goodFlag)[0]
 
-    def getGoodObsIndices(self, goodStars, expFlag=None):
+    def getGoodObsIndices(self, goodStars, expFlag=None, requireSED=False):
         """
         Get the good observation indices.
 
@@ -703,6 +703,8 @@ class FgcmStars(object):
            Indices of the good stars
         expFlag: np.array
            expFlag from fgcmPars, will be selected on if provided
+        requireSED: bool, default=False
+           Should the good observations require SED measurement?
 
         returns
         -------
@@ -737,6 +739,13 @@ class FgcmStars(object):
             obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
 
             okFlag &= (objNGoodObs[goodStars[goodStarsSub], obsBandIndex[goodObs]] >= self.minObsPerBand)
+
+        if requireSED:
+            # We need to ensure that we have an SED
+            obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+            objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+
+            okFlag &= (objSEDSlope[goodStars[goodStarsSub], obsBandIndex[goodObs]] != 0.0)
 
         return goodStarsSub[okFlag], goodObs[okFlag]
 
