@@ -424,19 +424,16 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
                       ccdOffsets['DELTA_DEC'][k] +
                       ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
         """
+
+        zGridPlot = zGrid.reshape(xValues.size, yValues.size)
         if ccdOffsets['XRA'][k]:
-            # swap x/y axes
-            plt.imshow(zGrid.reshape(yValues.size, xValues.size),
-                       interpolation='bilinear',
-                       origin='lower',
-                       extent=extent,
-                       norm=cNorm)
-        else:
-            plt.imshow(zGrid.reshape(xValues.size, yValues.size),
-                       interpolation='bilinear',
-                       origin='lower',
-                       extent=extent,
-                       norm=cNorm)
+            zGridPlot = zGridPlot.T
+
+        plt.imshow(zGridPlot,
+                   interpolation='bilinear',
+                   origin='lower',
+                   extent=extent,
+                   norm=cNorm)
 
     cb=None
     cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
