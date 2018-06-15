@@ -424,7 +424,7 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
                       ccdOffsets['DELTA_DEC'][k] +
                       ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
         """
-        if ccdOffsets['xra'][k]:
+        if ccdOffsets['XRA'][k]:
             # swap x/y axes
             plt.imshow(zGrid.reshape(yValues.size, xValues.size),
                        interpolation='bilinear',
