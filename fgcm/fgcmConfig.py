@@ -125,8 +125,6 @@ class FgcmConfig(object):
     maxCCDGrayErr = ConfigField(float, default=0.05)
     aperCorrFitNBins = ConfigField(int, default=5)
     illegalValue = ConfigField(float, default=-9999.0)
-    # sedFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
-    # sedNotFitBandFudgeFactors = ConfigField(np.ndarray, required=True)
     sedFudgeFactors = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
     cycleNumber = ConfigField(int, default=0)
