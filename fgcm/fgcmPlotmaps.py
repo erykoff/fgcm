@@ -112,7 +112,7 @@ def draw_hist(skymap,fit_gaussian=False,**kwargs):
 
 def plot_hpxmap_hist(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
                      cbar_kwargs=dict(),hpxmap_kwargs=dict(),
-                     hist_kwargs=dict(),fit_gaussian=False):
+                     hist_kwargs=dict(),fit_gaussian=False,figsize=(10,4)):
 
     hist_defaults = dict(peak=True)
     set_defaults(hist_kwargs,hist_defaults)
@@ -120,7 +120,7 @@ def plot_hpxmap_hist(hpxmap,raRange=[-180,180],decRange=[-90,90],lonRef=0.0,
     if isinstance(hpxmap,basestring):
         hpxmap = healpy.read_map(f)
 
-    fig = plt.figure(10,figsize=(10,4))
+    fig = plt.figure(10,figsize=figsize)
     fig.clf()
     gridspec=plt.GridSpec(1, 3)
 
