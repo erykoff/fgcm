@@ -521,12 +521,12 @@ class FgcmGray(object):
                       obsExpIndex[goodObs[use]],
                       1)
 
-            gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp)
+            gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp / 4)
             expGrayColorSplit[gd, c] /= expGrayNGoodStarsColorSplit[gd, c]
             expGrayRMSColorSplit[gd, c] = np.sqrt((expGrayRMSColorSplit[gd, c] / expGrayNGoodStarsColorSplit[gd, c]) -
                                                   (expGrayColorSplit[gd, c])**2.)
 
-            bd, = np.where(expGrayNGoodStarsColorSplit[:, c] < self.minStarPerExp)
+            bd, = np.where(expGrayNGoodStarsColorSplit[:, c] < self.minStarPerExp / 4)
             expGrayColorSplit[bd, c] = self.illegalValue
             expGrayRMSColorSplit[bd, c] = self.illegalValue
 
