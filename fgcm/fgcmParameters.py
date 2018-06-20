@@ -551,12 +551,15 @@ class FgcmParameters(object):
 
         # we need the duration of each night...
         self.nightDuration = np.zeros(self.nCampaignNights)
+        self.maxDeltaUTPerNight = np.zeros(self.nCampaignNights)
         self.expPerNight = np.zeros(self.nCampaignNights,dtype=np.int32)
         for i in xrange(self.nCampaignNights):
             use,=np.where(mjdForNight == self.campaignNights[i])
             self.expPerNight[i] = use.size
             # night duration in days
             self.nightDuration[i] = (np.max(self.expMJD[use]) - np.min(self.expMJD[use]))
+            # And the maximum deltaUT on a given night.
+            self.maxDeltaUTPerNight[i] = np.max(self.expDeltaUT[use])
         self.meanNightDuration = np.mean(self.nightDuration)  # days
         self.meanExpPerNight = np.mean(self.expPerNight)
 
@@ -1174,10 +1177,16 @@ class FgcmParameters(object):
                         self.parPWVInterceptLoc + \
                         self.nCampaignNights] = ( \
                 self.pwvRange[1] * unitDict['pwvUnit'])
+            #parLow[self.parPWVPerSlopeLoc: \
+            #           self.parPWVPerSlopeLoc + \
+            #           self.nCampaignNights] = ( \
+            #    -4.0 * unitDict['pwvPerSlopeUnit'])
+            # we don't want the PWV to go below 0, so we need to set this
+            # limit based on the maximum deltaUT on each night.
             parLow[self.parPWVPerSlopeLoc: \
                        self.parPWVPerSlopeLoc + \
                        self.nCampaignNights] = ( \
-                -4.0 * unitDict['pwvPerSlopeUnit'])
+                (-1.0 / self.maxDeltaUTPerNight) * unitDict['pwvPerSlopeUnit'])
             parHigh[self.parPWVPerSlopeLoc: \
                         self.parPWVPerSlopeLoc + \
                         self.nCampaignNights] = ( \
