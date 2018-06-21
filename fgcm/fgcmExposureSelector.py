@@ -109,7 +109,10 @@ class FgcmExposureSelector(object):
         # select good exposures,
         #  limit to those that are in the fit bands
         goodExp,=np.where((self.fgcmPars.expFlag == 0) &
-                          (~self.fgcmPars.expExtraBandFlag))
+                          (~self.fgcmPars.expNotFitBandFlag))
+
+        self.fgcmLog.info('Number of good exposures: %d' % (goodExp.size))
+
 
         # we first need to look for the good nights
         nExpPerNight=esutil.stat.histogram(self.fgcmPars.expNightIndex[goodExp],min=0,

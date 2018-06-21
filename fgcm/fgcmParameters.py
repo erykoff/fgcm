@@ -84,8 +84,11 @@ class FgcmParameters(object):
         self.nBands = len(self.bands)
         self.fitBands = fgcmConfig.fitBands
         self.nFitBands = len(self.fitBands)
-        self.extraBands = fgcmConfig.extraBands
-        self.nExtraBands = len(self.extraBands)
+        self.notFitBands = fgcmConfig.notFitBands
+        self.nNotFitBands = len(self.notFitBands)
+
+        self.bandFitIndex = fgcmConfig.bandFitIndex
+        self.bandNotFitIndex = fgcmConfig.bandNotFitIndex
 
         self.lutFilterNames = fgcmConfig.lutFilterNames
         self.nLUTFilter = len(self.lutFilterNames)
@@ -255,7 +258,7 @@ class FgcmParameters(object):
         """
 
         # link band indices
-        self._makeBandIndices()
+        # self._makeBandIndices()
 
         # load the exposure information
         self._loadExposureInfo(expInfo)
@@ -362,7 +365,7 @@ class FgcmParameters(object):
         """
 
         # link band indices
-        self._makeBandIndices()
+        # self._makeBandIndices()
         self._loadExposureInfo(expInfo)
 
         self._loadEpochAndWashInfo()
@@ -499,35 +502,6 @@ class FgcmParameters(object):
         if self.useRetrievedTauInit:
             self.parLnTauIntercept[:] = np.log(self.compRetrievedTauNight)
 
-    def _makeBandIndices(self):
-        """
-        Internal method to make the band indices
-        """
-
-        self.fitBandIndex = np.zeros(self.nFitBands,dtype='i2')
-        self.extraBandIndex = np.zeros(self.nExtraBands,dtype='i2')
-
-        bandStrip = np.core.defchararray.strip(self.bands[:])
-        for i in xrange(self.nFitBands):
-            #u,=np.where(self.fitBands[i] == self.bands)
-            #if (u.size == 0):
-            #    raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
-            #self.fitBandIndex[i] = u[0]
-            try:
-                self.fitBandIndex[i] = self.bands.index(self.fitBands[i])
-            except:
-                raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
-
-        for i in xrange(self.nExtraBands):
-            #u,=np.where(self.extraBands[i] == self.bands)
-            #if (u.size == 0):
-            #    raise ValueError("extraBand %s not in list of bands!" % (self.extraBands[i]))
-            #self.extraBandIndex[i] = u[0]
-            try:
-                self.extraBandIndex[i] = self.bands.index(self.extraBands[i])
-            except:
-                raise ValueError("fitBand %s not in list of bands!" % (self.fitBands[i]))
-
     def _loadExposureInfo(self, expInfo):
         """
         Internal method to load exposure info into variables.
@@ -577,12 +551,15 @@ class FgcmParameters(object):
 
         # we need the duration of each night...
         self.nightDuration = np.zeros(self.nCampaignNights)
+        self.maxDeltaUTPerNight = np.zeros(self.nCampaignNights)
         self.expPerNight = np.zeros(self.nCampaignNights,dtype=np.int32)
         for i in xrange(self.nCampaignNights):
             use,=np.where(mjdForNight == self.campaignNights[i])
             self.expPerNight[i] = use.size
             # night duration in days
             self.nightDuration[i] = (np.max(self.expMJD[use]) - np.min(self.expMJD[use]))
+            # And the maximum deltaUT on a given night.
+            self.maxDeltaUTPerNight[i] = np.max(self.expDeltaUT[use])
         self.meanNightDuration = np.mean(self.nightDuration)  # days
         self.meanExpPerNight = np.mean(self.expPerNight)
 
@@ -603,17 +580,11 @@ class FgcmParameters(object):
         self.expPmb = expInfo['PMB']
 
         # link exposures to bands
-        #self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
-        #for i in xrange(self.bands.size):
-        #    use,=np.where(self.bands[i] == np.core.defchararray.strip(expInfo['BAND']))
-        #    self.expBandIndex[use] = i
-
         self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
-                #bandIndex, = np.where(self.filterToBand[filterName] == self.bands)
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except:
                 self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
@@ -632,11 +603,11 @@ class FgcmParameters(object):
             self.fgcmLog.info('***Warning: %d exposures with band not in LUT!' % (bad.size))
             self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
 
-        # flag those that have extra bands
-        self.expExtraBandFlag = np.zeros(self.nExp,dtype=np.bool)
-        if (self.nExtraBands > 0) :
-            a,b=esutil.numpy_util.match(self.extraBandIndex,self.expBandIndex)
-            self.expExtraBandFlag[b] = True
+        # Flag exposures that are not in the fit bands
+        self.expNotFitBandFlag = np.zeros(self.nExp, dtype=np.bool)
+        if self.nNotFitBands > 0:
+            a, b = esutil.numpy_util.match(self.bandNotFitIndex, self.expBandIndex)
+            self.expNotFitBandFlag[b] = True
 
         # set up the observing epochs and link indices
 
@@ -798,7 +769,7 @@ class FgcmParameters(object):
                ('LUTFILTERNAMES','a2',len(self.lutFilterNames)),
                ('BANDS','a2',len(self.bands)),
                ('FITBANDS','a2',len(self.fitBands)),
-               ('EXTRABANDS','a2',len(self.extraBands)),
+               ('NOTFITBANDS','a2',len(self.notFitBands)),
                ('LNTAUUNIT','f8'),
                ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
@@ -822,7 +793,7 @@ class FgcmParameters(object):
         parInfo['LUTFILTERNAMES'] = self.lutFilterNames
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
-        parInfo['EXTRABANDS'] = self.extraBands
+        parInfo['NOTFITBANDS'] = self.notFitBands
 
         parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
         parInfo['LNTAUSLOPEUNIT'] = self.unitDictSteps['lnTauSlopeUnit']
@@ -1206,10 +1177,16 @@ class FgcmParameters(object):
                         self.parPWVInterceptLoc + \
                         self.nCampaignNights] = ( \
                 self.pwvRange[1] * unitDict['pwvUnit'])
+            #parLow[self.parPWVPerSlopeLoc: \
+            #           self.parPWVPerSlopeLoc + \
+            #           self.nCampaignNights] = ( \
+            #    -4.0 * unitDict['pwvPerSlopeUnit'])
+            # we don't want the PWV to go below 0, so we need to set this
+            # limit based on the maximum deltaUT on each night.
             parLow[self.parPWVPerSlopeLoc: \
                        self.parPWVPerSlopeLoc + \
                        self.nCampaignNights] = ( \
-                -4.0 * unitDict['pwvPerSlopeUnit'])
+                (-1.0 / self.maxDeltaUTPerNight) * unitDict['pwvPerSlopeUnit'])
             parHigh[self.parPWVPerSlopeLoc: \
                         self.parPWVPerSlopeLoc + \
                         self.nCampaignNights] = ( \

@@ -313,19 +313,19 @@ class FgcmZeropoints(object):
         # flag the photometric (fit) exposures
         photZpIndex, = np.where(self.fgcmPars.expFlag[zpExpIndex] == 0)
 
-        photFitBand, = np.where(~self.fgcmPars.expExtraBandFlag[zpExpIndex[photZpIndex]])
+        photFitBand, = np.where(~self.fgcmPars.expNotFitBandFlag[zpExpIndex[photZpIndex]])
         zpStruct['FGCM_FLAG'][photZpIndex[photFitBand]] |= (
             zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'])
 
         self.fgcmLog.info('%d CCDs marked as photometric, used in fit' %
                          (photFitBand.size))
 
-        photExtraBand, = np.where(self.fgcmPars.expExtraBandFlag[zpExpIndex[photZpIndex]])
-        zpStruct['FGCM_FLAG'][photZpIndex[photExtraBand]] |= (
-            zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
+        photNotFitBand, = np.where(self.fgcmPars.expNotFitBandFlag[zpExpIndex[photZpIndex]])
+        zpStruct['FGCM_FLAG'][photZpIndex[photNotFitBand]] |= (
+            zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
         self.fgcmLog.info('%d CCDs marked as photometric, not used in fit' %
-                         (photExtraBand.size))
+                         (photNotFitBand.size))
 
         # flag the non-photometric exposures on calibratable nights
         rejectMask = (expFlagDict['TOO_FEW_EXP_ON_NIGHT'] |
@@ -371,7 +371,7 @@ class FgcmZeropoints(object):
         # start with the passable flag 1,2,4 exposures
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
-              zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'] |
+              zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'] |
               zpFlagDict['NONPHOTOMETRIC_FIT_NIGHT'])
 
         okZpIndex, = np.where((zpStruct['FGCM_FLAG'] & acceptMask) > 0)
@@ -390,7 +390,7 @@ class FgcmZeropoints(object):
         badCCDZpExp = okZpIndex[~okCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |=  zpFlagDict['TOO_FEW_STARS_ON_CCD']
 
-        # and the flag 8 extra exposures
+        # and the flag 8 not-fit exposures
 
         acceptMask = zpFlagDict['NOFIT_NIGHT']
 
@@ -589,7 +589,7 @@ class FgcmZeropointPlotter(object):
         """
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
-                      zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
+                      zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
         for filterName in self.filterNames:
             use,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                           ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
@@ -647,7 +647,7 @@ class FgcmZeropointPlotter(object):
         from .fgcmUtilities import plotCCDMap
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
-                      zpFlagDict['PHOTOMETRIC_EXTRA_EXPOSURE'])
+                      zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
         plotTypes=['I1', 'R1', 'R1 - I1']
 

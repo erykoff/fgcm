@@ -33,7 +33,7 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
 
 # Dictionary of zeropoint flags
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,
-              'PHOTOMETRIC_EXTRA_EXPOSURE':2**1,
+              'PHOTOMETRIC_NOTFIT_EXPOSURE':2**1,
               'NONPHOTOMETRIC_FIT_NIGHT':2**2,
               'NOFIT_NIGHT':2**3,
               'CANNOT_COMPUTE_ZEROPOINT':2**4,
@@ -200,8 +200,14 @@ def histoGauss(ax,array):
         np.std(array)]
 
     try:
-        coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
-                                                   hist['hist'], p0=p0)
+        with np.warnings.catch_warnings():
+            np.warnings.simplefilter("ignore")
+
+            # This fit might throw a warning, which we don't need now.
+            # Note that in the future if we use the output from this fit in an
+            # automated way we'll need to tell the parent that we didn't converge
+            coeff, varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
+                                                        hist['hist'], p0=p0)
     except:
         # set to starting values...
         coeff = p0
@@ -393,30 +399,21 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
                            *parArray[k, :])
 
+        # This seems to be correct
+        extent = [ccdOffsets['DELTA_RA'][k] -
+                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_RA'][k] +
+                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_DEC'][k] -
+                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_DEC'][k] +
+                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
+
+        zGridPlot = zGrid.reshape(xValues.size, yValues.size)
         if ccdOffsets['XRA'][k]:
-            # x/y reversed on plotting
-            extent = [ccdOffsets['DELTA_DEC'][k] -
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] +
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] -
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] +
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
-        else:
-            extent = [ccdOffsets['DELTA_RA'][k] -
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] +
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] -
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] +
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
+            zGridPlot = zGridPlot.T
 
-        # FIXME: probably for a rotated camera, we need to transpose the zGrid?
-        # To be confirmed
-
-        plt.imshow(zGrid.reshape(xValues.size, yValues.size),
+        plt.imshow(zGridPlot,
                    interpolation='bilinear',
                    origin='lower',
                    extent=extent,

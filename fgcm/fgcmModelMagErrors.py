@@ -83,17 +83,8 @@ class FgcmModelMagErrors(object):
         obsFwhm = self.fgcmPars.expFwhm[obsExpIndex]
         obsSkyBrightness = self.fgcmPars.expSkyBrightness[obsExpIndex]
 
-        # Need to select good observations of good stars on good exposures
-        goodStars, = np.where(objFlag == 0)
-
-        goodStarsSub, goodObs = esutil.numpy_util.match(goodStars,
-                                                        obsObjIDIndex,
-                                                        presorted=True)
-
-        gd, = np.where((obsFlag[goodObs] == 0) &
-                       (self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0))
-        goodObs = goodObs[gd]
-        goodStarsSub = goodStarsSub[gd]
+        goodStars = self.fgcmStars.getGoodStarIndices()
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         # And loop over bands
         for bandIndex in xrange(self.fgcmPars.nBands):

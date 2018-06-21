@@ -31,6 +31,7 @@ class FgcmFlagVariables(object):
 
         self.varNSig = fgcmConfig.varNSig
         self.varMinBand = fgcmConfig.varMinBand
+        self.bandFitIndex = fgcmConfig.bandFitIndex
 
     def flagVariables(self):
         """
@@ -60,27 +61,8 @@ class FgcmFlagVariables(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        # only look at stars with enough observations per band
-        #  (this may be redundant)
-        minObs = objNGoodObs[:,self.fgcmStars.bandRequiredIndex].min(axis=1)
-
-        # select good stars...
-        # compute this for all possibly good stars *including* reserves
-        resMask = 255 & ~objFlagDict['RESERVED']
-        goodStars,=np.where((minObs >= self.fgcmStars.minObsPerBand) &
-                            ((objFlag & resMask) == 0))
-
-        # match the good stars to the observations
-        goodStarsSub,goodObs = esutil.numpy_util.match(goodStars,
-                                                       obsObjIDIndex,
-                                                       presorted=True)
-
-        # and make sure that we only use good observations from good exposures
-        gd,=np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
-                     (obsFlag[goodObs] == 0))
-
-        goodObs = goodObs[gd]
-        goodStarsSub = goodStarsSub[gd]
+        goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -94,7 +76,7 @@ class FgcmFlagVariables(object):
         varCount = np.zeros(goodStars.size,dtype='i4')
 
         # loop over fit bands
-        for bandIndex in self.fgcmPars.fitBandIndex:
+        for bandIndex in self.bandFitIndex:
             # which observations are considered for var checks?
             varUse, = np.where((EGrayErr2GO > 0.0) &
                              (EGrayGO != 0.0) &
