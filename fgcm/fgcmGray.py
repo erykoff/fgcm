@@ -557,7 +557,7 @@ class FgcmGray(object):
                 ax.set_ylabel('EXP_GRAY (%s) (%s)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-0.01, 0.01], [-0.01, 0.01], 'r--')
 
-                fig.savefig('%s/%s_expgray-redblue-compare_%s.png' % (self.plotPath,
+                fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
                                                                       self.outfileBaseWithCycle,
                                                                       self.fgcmPars.bands[bandIndex]))
                 plt.close(fig)
