@@ -150,7 +150,6 @@ class FgcmRetrieval(object):
             self.fgcmLog.info('Running retrieval on %d cores' % (self.nCore))
 
             # split exposures into a list of arrays of roughly equal size
-            #nSections = self.fgcmPars.expArray.size // self.nExpPerRun + 1
             nSections = uExpIndex.size // self.nExpPerRun + 1
 
             uExpIndexList = np.array_split(uExpIndex,nSections)
@@ -187,10 +186,18 @@ class FgcmRetrieval(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsExpIndexGOA = snmm.getArray(self.obsExpIndexGOAHandle)
 
+        if goodObsAll.size == 0 or obsExpIndex.size == 0 or obsExpIndexGOA.size == 0:
+            # there is nothing to compute because objects didn't have SED.
+            return
+
         # Start with only those that are in range ... this saves a ton of
         # memory
         inRange, = np.where((obsExpIndexGOA >= uExpIndex.min()) &
                             (obsExpIndexGOA <= uExpIndex.max()))
+
+        if inRange.size == 0:
+            # There is nothing to do here.
+            return
 
         _,temp = esutil.numpy_util.match(uExpIndex, obsExpIndexGOA[inRange])
         goodObs = goodObsAll[inRange[temp]]
@@ -209,7 +216,6 @@ class FgcmRetrieval(object):
         obsBandIndexGO = snmm.getArray(self.fgcmStars.obsBandIndexHandle)[goodObs]
         obsCCDIndexGO = snmm.getArray(self.fgcmStars.obsCCDHandle)[goodObs] - self.ccdStartIndex
         obsMagADUGO = snmm.getArray(self.fgcmStars.obsMagADUHandle)[goodObs]
-        # obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)[goodObs]
         obsMagErrGO = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)[goodObs]
 
         # compute delta mags
