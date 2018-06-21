@@ -200,8 +200,14 @@ def histoGauss(ax,array):
         np.std(array)]
 
     try:
-        coeff,varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
-                                                   hist['hist'], p0=p0)
+        with np.warnings.catch_warnings():
+            np.warnings.simplefilter("ignore")
+
+            # This fit might throw a warning, which we don't need now.
+            # Note that in the future if we use the output from this fit in an
+            # automated way we'll need to tell the parent that we didn't converge
+            coeff, varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
+                                                        hist['hist'], p0=p0)
     except:
         # set to starting values...
         coeff = p0
@@ -402,28 +408,6 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
                   ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
                   ccdOffsets['DELTA_DEC'][k] +
                   ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
-
-        """
-        if ccdOffsets['XRA'][k]:
-            # x/y reversed on plotting
-            extent = [ccdOffsets['DELTA_DEC'][k] -
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] +
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] -
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] +
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.]
-        else:
-            extent = [ccdOffsets['DELTA_RA'][k] -
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_RA'][k] +
-                      ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] -
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                      ccdOffsets['DELTA_DEC'][k] +
-                      ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
-        """
 
         zGridPlot = zGrid.reshape(xValues.size, yValues.size)
         if ccdOffsets['XRA'][k]:
