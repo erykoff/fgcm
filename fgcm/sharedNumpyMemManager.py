@@ -12,6 +12,46 @@ import ctypes
 Singleton Pattern
 '''
 class SharedNumpyMemManager(object):
+    """
+    Class to wrap numpy variables in shared memory for multiprocessing.
+
+    Parameters
+    ----------
+    None
+
+    Usage
+    -----------
+    # Import instantiates a singleton object to track arrays
+    >>> from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+    # Create a wrapped array of floats, size=100
+    >>> arrayHandle = snmm.createArray(100, dtype='f4')
+    # Get a pointer to the shared array
+    >>> array = snmm.getArray(arrayHandle)
+    # Set the array values
+    >>> array[:] = 1
+
+    Alternatively, you can create an array with a lock:
+    # Create an array with an associated lock
+    >>> lockArrayHandle = snmm.createArray(100, dtype='f4', syncAccess=True)
+    # Get the lock associated with the array
+    >>> lockArrayLock = snmm.getArraybase(lockArrayHandle).get_lock()
+    # Acquire the lock
+    >>> lockArrayLock.acquire()
+    # Do work
+    >>> lockArray = snmm.getArray(lockArrayHandle)E
+    # Release lock
+    >>> lockArrayLock.release()
+
+    Note that the array is a pointer to the shared memory, so when
+    run in multiprocessing the shared memory is not copied.
+
+    Note that this can only wrap 1+D numpy arrays, and cannot wrap
+    objects or numpy recarrays, etc.
+
+    Also note when creating wrapped arrays if you read in data
+    then you need to clear this memory (setting to None) or else
+    that input array will be copied in multiprocessing!
+    """
 
     _initSize = 1024
 
@@ -24,15 +64,18 @@ class SharedNumpyMemManager(object):
         return cls._instance
 
     def __init__(self):
+        """ Create the singleton """
+
         self.lock = multiprocessing.Lock()
         self.cur = 0
         self.cnt = 0
         self.sharedArrayBases = [None] * SharedNumpyMemManager._initSize
         self.sharedArrays = [None] * SharedNumpyMemManager._initSize
 
-    #def __createArray(self, dimensions, ctype=ctypes.c_double, dtype=None):
-
     def __createArrayLike(self, inArray, syncAccess=False, dtype=None):
+        """
+        Create an array with same format as another numpy array
+        """
         # like zeros_like
 
         dimensions = inArray.shape
@@ -42,6 +85,9 @@ class SharedNumpyMemManager(object):
         return self.__createArray(dimensions, dtype=dtype, syncAccess=syncAccess)
 
     def __createArray(self, dimensions, dtype=np.float64, syncAccess=False):
+        """
+        Create an array
+        """
         # convert to dtype type (in case short code)
         dtype = np.dtype(dtype)
         if (dtype == np.float32):
@@ -59,6 +105,8 @@ class SharedNumpyMemManager(object):
         else:
             raise ValueError("Unsupported dtype")
 
+        # This lock is only needed when creating the array, which is fast
+        # It is not used when accessing data
         self.lock.acquire()
 
         # double size if necessary
@@ -87,12 +135,16 @@ class SharedNumpyMemManager(object):
         # update cnt
         self.cnt += 1
 
+        # Release the creation lock
         self.lock.release()
 
         # return handle to the shared memory numpy array
         return self.cur
 
     def __getNextFreeHdl(self):
+        """
+        Get the next free handle
+        """
         orgCur = self.cur
         while self.sharedArrays[self.cur] is not None:
             self.cur = (self.cur + 1) % len(self.sharedArrays)
@@ -100,6 +152,9 @@ class SharedNumpyMemManager(object):
                 raise SharedNumpyMemManagerError('Max Number of Shared Numpy Arrays Exceeded!')
 
     def __freeArray(self, hdl):
+        """
+        Free an array
+        """
         self.lock.acquire()
         # set reference to None
         if self.sharedArrays[hdl] is not None: # consider multiple calls to free
@@ -122,22 +177,79 @@ class SharedNumpyMemManager(object):
 
     @staticmethod
     def createArray(*args, **kwargs):
+        """
+        Create an wrapped numpy array
+
+        Parameters
+        ----------
+        dimensions: scalar or tuple
+           Numpy array dimensions
+        dtype: numpy dtype, default float64
+           float32, float64, int16, int32, int64, or bool
+        syncAccess: bool, default False
+           Associate array with lock
+        """
         return SharedNumpyMemManager.getInstance().__createArray(*args, **kwargs)
 
     @staticmethod
     def createArrayLike(*args, **kwargs):
+        """
+        Create an array like another numpy array, as with np.array_like()
+
+        Parameters
+        ----------
+        array: numpy array
+           Numpy array to duplicate type
+        syncAccess: bool, default false
+           Associate array with lock
+        dtype: numpy dtype
+           Override array dtype with float32, float64, int16, int32, int64, or bool
+        """
         return SharedNumpyMemManager.getInstance().__createArrayLike(*args, **kwargs)
 
     @staticmethod
     def getArray(*args, **kwargs):
+        """
+        Get a reference to an array from a handle
+
+        Parameters
+        ----------
+        handle: integer
+           Array handle
+
+        Returns
+        -------
+        Reference to numpy array
+        """
         return SharedNumpyMemManager.getInstance().__getArray(*args, **kwargs)
 
     @staticmethod
     def getArrayBase(*args, **kwargs):
+        """
+        Get a reference to an array base (multiprocessing.Array,
+        and not just wrapped numpy array)
+
+        Parameters
+        ----------
+        handle: integer
+           Array handle
+
+        Returns
+        -------
+        Reterence to multiprocessing.Array base
+        """
         return SharedNumpyMemManager.getInstance().__getArrayBase(*args, **kwargs)
 
     @staticmethod
     def freeArray(*args, **kwargs):
+        """
+        Free wrapped array
+
+        Parameters
+        ----------
+        handle: integer
+           Array handle
+        """
         return SharedNumpyMemManager.getInstance().__freeArray(*args, **kwargs)
 
 # Init Singleton on module load
