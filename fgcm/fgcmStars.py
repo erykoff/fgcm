@@ -980,9 +980,9 @@ class FgcmStars(object):
         # two different tracks, if x/y available or not.
 
         if self.hasXY:
-            # new style
+            # With x/y information
 
-            from .fgcmUtilities import poly2dFunc
+            from .fgcmUtilities import poly2dFunc, cheb2dFunc
 
             obsX = snmm.getArray(self.obsXHandle)
             obsY = snmm.getArray(self.obsYHandle)
@@ -1005,11 +1005,16 @@ class FgcmStars(object):
                 fiInd = fgcmPars.expLUTFilterIndex[obsExpIndex[i1a[0]]]
                 cInd = obsCCDIndex[i1a[0]]
 
-                obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsX[i1a],
-                                                        obsY[i1a])),
-                                                       *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                if fgcmPars.superStarPoly2d:
+                    obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsX[i1a],
+                                                                     obsY[i1a])),
+                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                else:
+                    obsSuperStarApplied[i1a] = cheb2dFunc(np.vstack((obsX[i1a],
+                                                                     obsY[i1a])),
+                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
         else:
-            # old style
+            # No x/y available
 
             obsSuperStarApplied[:] = fgcmPars.expCCDSuperStar[obsExpIndex,
                                                               obsCCDIndex]
