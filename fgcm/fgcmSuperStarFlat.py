@@ -14,7 +14,7 @@ import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from .fgcmUtilities import poly2dFunc
+from .fgcmUtilities import poly2dFunc, cheb2dFunc
 
 class FgcmSuperStarFlat(object):
     """
@@ -52,8 +52,9 @@ class FgcmSuperStarFlat(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
 
-
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.superStarSubCCDChebyshevDegree = fgcmConfig.superStarSubCCDChebyshevDegree
+        self.superStarSubCCDSuppressHighOrders = fgcmConfig.superStarSubCCDSuppressHighOrders
 
     def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
         """
@@ -130,7 +131,7 @@ class FgcmSuperStarFlat(object):
         deltaSuperStarFlatFPSigma = np.zeros_like(superStarFlatFPMean)
 
 
-        # Note that we use the poly2dFunc even when the previous numbers
+        # Note that we use the cheb2dFunc or poly2dFunc even when the previous numbers
         #  were just an offset, because the other terms are zeros
         prevSuperStarFlatCenter[:,:,:] = self.fgcmPars.superStarFlatCenter
 
@@ -201,12 +202,41 @@ class FgcmSuperStarFlat(object):
 
                 computeMean = False
                 try:
-                    fit, cov = scipy.optimize.curve_fit(poly2dFunc,
-                                                        np.vstack((obsXGO[i1a],
-                                                                   obsYGO[i1a])),
-                                                        EGrayGO[i1a],
-                                                        p0=[0.0,0.0,0.0,0.0,0.0,0.0],
-                                                        sigma=np.sqrt(EGrayErr2GO[i1a]))
+                    if self.fgcmPars.superStarPoly2d:
+                        # Older, poly2d method
+                        fit, cov = scipy.optimize.curve_fit(poly2dFunc,
+                                                            np.vstack((obsXGO[i1a],
+                                                                       obsYGO[i1a])),
+                                                            EGrayGO[i1a],
+                                                            p0=[0.0,0.0,0.0,0.0,0.0,0.0],
+                                                            sigma=np.sqrt(EGrayErr2GO[i1a]))
+                    else:
+                        # New chebyshev method
+                        degree = self.superStarSubCCDChebyshevDegree
+                        pars = np.zeros((degree + 1, degree + 1))
+                        lowBonds = np.zeros_like(pars) - np.inf
+                        highBounds = np.zeros_like(pars) + np.inf
+
+                        if self.superStarSubCCDSuppressHighOrders:
+                            iind = np.repeat(np.arange(degree + 1), degree + 1)
+                            jind = np.tile(np.arange(degree + 1), degree + 1)
+                            high, = np.where((iind + jind) > degree)
+                            # Cannot set exactly to zero or curve_fit will complain
+                            lowBounds[iind[high], jind[high]] = -1e-50
+                            highBounds[iind[high], jind[high]] = 1e-50
+
+                        fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
+                                                            np.vstack((obsXGo[i1a],
+                                                                       obsYGo[i1a])),
+                                                            EGrayGO[i1a],
+                                                            p0=list(pars.flatten()),
+                                                            sigma=np.sqrt(EGrayErr2GO[i1a]),
+                                                            bounds=list(np.vstack((lowBounds.flatten(),
+                                                                                   highBounds.flatten()))))
+                        if self.superStarSubCCDSuppressHighOrders:
+                            # Force these to be identically zero (which they probably are)
+                            fit[high] = 0.0
+
                     if fit[0] == 0.0:
                         self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
                                           % (epInd, fiInd, cInd))
@@ -227,8 +257,12 @@ class FgcmSuperStarFlat(object):
                 # compute the central value for use with the delta
                 xy = np.vstack((self.ccdOffsets['X_SIZE'][cInd]/2.,
                                self.ccdOffsets['Y_SIZE'][cInd]/2.))
-                superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
-                                                                     *fit)
+                if self.fgcmPars.superStarPoly2d:
+                    superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
+                                                                         *fit)
+                else:
+                    superStarFlatCenter[epInd, fiInd, cInd] = cheb2dFunc(xy,
+                                                                         *fit)
 
                 # and record the fit
 
@@ -294,7 +328,7 @@ class FgcmSuperStarFlat(object):
         """
 
         from .fgcmUtilities import plotCCDMap
-        from .fgcmUtilities import plotCCDMapPoly2d
+        from .fgcmUtilities import plotCCDMap2d
 
         for e in xrange(self.fgcmPars.nEpochs):
             for f in xrange(self.fgcmPars.nLUTFilter):
@@ -314,8 +348,8 @@ class FgcmSuperStarFlat(object):
                     plotCCDMap(ax, self.ccdOffsets[use], superStarPars[e, f, use, 0],
                                'SuperStar (mag)')
                 else:
-                    plotCCDMapPoly2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
-                                     'SuperStar (mag)')
+                    plotCCDMap2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
+                                 'SuperStar (mag)', usePoly2d=self.fgcmPars.superStarPoly2d)
 
                 # and annotate
 
