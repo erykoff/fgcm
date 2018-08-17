@@ -166,7 +166,7 @@ class FgcmConfig(object):
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCD = ConfigField(bool, default=False)
     superStarSubCCDChebyshevDegree = ConfigField(int, default=1)
-    superStarSubCCDSuppressHighOrders = ConfigField(int, default=False)
+    superStarSubCCDSuppressHighOrders = ConfigField(bool, default=False)
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)
