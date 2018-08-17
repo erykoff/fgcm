@@ -344,8 +344,8 @@ def cheb2dFunc(xy, *cpars):
     Value of function evaluated at xy[0, :], xy[1, :]
     """
 
-    degree = int(np.sqrt(len(cpars)))
-    c = np.array(cpars).reshape(degree, degree)
+    degplus1 = int(np.sqrt(len(cpars)))
+    c = np.array(cpars).reshape(degplus1, degplus1)
 
     return np.polynomial.chebyshev.chebval2d(xy[0, :], xy[1, :], c)
 
