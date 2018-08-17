@@ -141,7 +141,8 @@ class FgcmParameters(object):
         # Old style was (a,x,y,x**2,y**2,xy)
         # Retain this for reading old files
         self.superStarNParOld = 6
-        self.superStarNPar = fgcmConfig.superStarSubCCDChebyshevDegree * fgcmConfig.superStarSubCCDChebyshevDegree
+        self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevDegree + 1) *
+                              (fgcmConfig.superStarSubCCDChebyshevDegree + 1))
         self.superStarPoly2d = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
