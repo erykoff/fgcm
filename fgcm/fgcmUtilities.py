@@ -327,9 +327,32 @@ def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
 
     return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
 
-def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
+def cheb2dFunc(xy, *cpars):
     """
-    Plot CCD map with polynomial fits for each CCD
+    2d Chebyshev polynomial fitting function.
+
+    parameters
+    ----------
+    xy: numpy vstack (2, nvalues)
+    *cpars: Chebyshev parameters
+
+    Note that the degree of the polynomials in inferred from the number of *cpars.
+    The array is reshaped to hand to np.polynomial.chebyshev.chebval2d
+
+    returns
+    -------
+    Value of function evaluated at xy[0, :], xy[1, :]
+    """
+
+    degree = int(np.sqrt(len(cpars)))
+    c = np.array(cpars).reshape(degree, degree)
+
+    return np.polynomial.chebyshev.chebval2d(xy[0, :], xy[1, :], c)
+
+
+def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
+    """
+    Plot CCD map with Chebyshev or polynomial fits for each CCD
 
     parameters
     ----------
@@ -396,8 +419,12 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         xGrid = np.repeat(xValues, yValues.size)
         yGrid = np.tile(yValues, xValues.size)
 
-        zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
-                           *parArray[k, :])
+        if usePoly2d:
+            zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
+                               *parArray[k, :])
+        else:
+            zGrid = cheb2dFunc(np.vstack((xGrid, yGrid)),
+                               *parArray[k, :])
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -
