@@ -226,8 +226,8 @@ class FgcmSuperStarFlat(object):
                             highBounds[iind[high], jind[high]] = 1e-50
 
                         fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
-                                                            np.vstack((obsXGo[i1a],
-                                                                       obsYGo[i1a])),
+                                                            np.vstack((obsXGO[i1a],
+                                                                       obsYGO[i1a])),
                                                             EGrayGO[i1a],
                                                             p0=list(pars.flatten()),
                                                             sigma=np.sqrt(EGrayErr2GO[i1a]),
@@ -247,7 +247,7 @@ class FgcmSuperStarFlat(object):
                     computeMean = True
 
                 if computeMean:
-                    fit = np.zeros(6)
+                    fit = np.zeros(self.fgcmPars.superStarNPar)
                     fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
                               np.sum(1./EGrayErr2GO[i1a]))
 
