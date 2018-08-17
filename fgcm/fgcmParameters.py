@@ -138,8 +138,11 @@ class FgcmParameters(object):
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
 
-        # this is a constant for now (a,x,y,x**2,y**2,xy)
-        self.superStarNPar = 6
+        # Old style was (a,x,y,x**2,y**2,xy)
+        # Retain this for reading old files
+        self.superStarNParOld = 6
+        self.superStarNPar = fgcmConfig.superStarSubCCDChebyshevDegree * fgcmConfig.superStarSubCCDChebyshevDegree
+        self.superStarPoly2d = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
         # and the default unit dict
@@ -276,7 +279,7 @@ class FgcmParameters(object):
         self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
 
         # parameters with per-epoch values
-        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
+        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float64)
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -462,14 +465,20 @@ class FgcmParameters(object):
         self._arrangeParArray()
 
         # need to load the superstarflats
-        # check if we have an "old-style" superstar for compatibility
+        # check if we have an "old-old-style" superstar for compatibility
         if (len(inSuperStar.shape) == 3):
             # we have an old-style superstar
             self.fgcmLog.info("Reading old-style superStarFlat")
             self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
             self.parSuperStarFlat[:,:,:,0] = inSuperStar
         else:
-            # new-style superstar, use raw
+            # Old and new style.
+            # Check if we are reading in an older 2nd order polynomial file
+            if inSuperStar.shape[-1] == self.superStarNParOld:
+                self.superStarPoly2d = True
+                self.superStarNPar = self.superStarNParOld
+
+            # Use the superstar as read in, raw
             self.parSuperStarFlat = inSuperStar
 
     def resetAtmosphereParameters(self):
@@ -1375,7 +1384,7 @@ class FgcmParameters(object):
         # This bit of code simply returns the superStarFlat computed at the center
         # of each CCD
 
-        from .fgcmUtilities import poly2dFunc
+        from .fgcmUtilities import poly2dFunc, cheb2dFunc
 
         # this is the version that does the center of the CCD
         # because it is operating on the whole CCD!
@@ -1388,8 +1397,12 @@ class FgcmParameters(object):
                 for c in xrange(self.nCCD):
                     xy = np.vstack((self.ccdOffsets['X_SIZE'][c]/2.,
                                     self.ccdOffsets['Y_SIZE'][c]/2.))
-                    superStarFlatCenter[e, f, c] = poly2dFunc(xy,
-                                                              *self.parSuperStarFlat[e, f, c, :])
+                    if self.superStarPoly2d:
+                        superStarFlatCenter[e, f, c] = poly2dFunc(xy,
+                                                                  *self.parSuperStarFlat[e, f, c, :])
+                    else:
+                        superStarFlatCenter[e, f, c] = cheb2dFunc(xy,
+                                                                  *self.parSuperStarFlat[e, f, c, :])
         return superStarFlatCenter
 
     @property
