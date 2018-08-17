@@ -383,7 +383,10 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
     for i in xrange(ccdOffsets.size):
         xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
                         ccdOffsets['Y_SIZE'][i]/2.))
-        centralValues[i] = poly2dFunc(xy, *parArray[i,:])
+        if usePoly2d:
+            centralValues[i] = poly2dFunc(xy, *parArray[i, :])
+        else:
+            centralValues[i] = cheb2dFunc(xy, *parArray[i, :])
 
     if (loHi is None):
         st=np.argsort(centralValues)
