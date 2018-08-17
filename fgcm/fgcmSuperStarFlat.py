@@ -214,7 +214,7 @@ class FgcmSuperStarFlat(object):
                         # New chebyshev method
                         degree = self.superStarSubCCDChebyshevDegree
                         pars = np.zeros((degree + 1, degree + 1))
-                        lowBonds = np.zeros_like(pars) - np.inf
+                        lowBounds = np.zeros_like(pars) - np.inf
                         highBounds = np.zeros_like(pars) + np.inf
 
                         if self.superStarSubCCDSuppressHighOrders:
