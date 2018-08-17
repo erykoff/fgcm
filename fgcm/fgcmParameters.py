@@ -475,6 +475,7 @@ class FgcmParameters(object):
             # Old and new style.
             # Check if we are reading in an older 2nd order polynomial file
             if inSuperStar.shape[-1] == self.superStarNParOld:
+                self.fgcmLog.info("Old polynomial2d superstar flat detected")
                 self.superStarPoly2d = True
                 self.superStarNPar = self.superStarNParOld
 
