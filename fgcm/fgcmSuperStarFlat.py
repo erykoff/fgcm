@@ -53,8 +53,8 @@ class FgcmSuperStarFlat(object):
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
-        self.superStarSubCCDChebyshevDegree = fgcmConfig.superStarSubCCDChebyshevDegree
-        self.superStarSubCCDSuppressHighOrders = fgcmConfig.superStarSubCCDSuppressHighOrders
+        self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
+        self.superStarSubCCDSuppressHighCrossTerms = fgcmConfig.superStarSubCCDSuppressHighCrossTerms
 
     def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
         """
@@ -174,11 +174,19 @@ class FgcmSuperStarFlat(object):
             # we will need the ccd offset signs
             self._computeCCDOffsetSigns(goodObs)
 
-            obsX = snmm.getArray(self.fgcmStars.obsXHandle)
-            obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+            if self.fgcmPars.superStarPoly2d:
+                obsXScaled = snmm.getArray(self.fgcmStars.obsXHandle)
+                obsYScaled = snmm.getArray(self.fgcmStars.obsYHandle)
+            else:
+                # Scale X and Y
+                # We assume that ccd goes from 0 to X_SIZE, 0 to Y_SIZE
+                xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex]
+                ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex]
+                obsXScaled = (snmm.getArray(self.fgcmStars.obsXHandle) - xSize/2.) / (xSize/2.)
+                obsYScaled = (snmm.getArray(self.fgcmStars.obsYHandle) - ySize/2.) / (ySize/2.)
 
-            obsXGO = obsX[goodObs]
-            obsYGO = obsY[goodObs]
+            obsXScaledGO = obsXScaled[goodObs]
+            obsYScaledGO = obsYScaled[goodObs]
 
             # need to histogram this all up.  Watch for extra bands
 
@@ -205,35 +213,35 @@ class FgcmSuperStarFlat(object):
                     if self.fgcmPars.superStarPoly2d:
                         # Older, poly2d method
                         fit, cov = scipy.optimize.curve_fit(poly2dFunc,
-                                                            np.vstack((obsXGO[i1a],
-                                                                       obsYGO[i1a])),
+                                                            np.vstack((obsXScaledGO[i1a],
+                                                                       obsYScaledGO[i1a])),
                                                             EGrayGO[i1a],
                                                             p0=[0.0,0.0,0.0,0.0,0.0,0.0],
                                                             sigma=np.sqrt(EGrayErr2GO[i1a]))
                     else:
                         # New chebyshev method
-                        degree = self.superStarSubCCDChebyshevDegree
-                        pars = np.zeros((degree + 1, degree + 1))
+                        order = self.superStarSubCCDChebyshevOrder
+                        pars = np.zeros((order + 1, order + 1))
                         lowBounds = np.zeros_like(pars) - np.inf
                         highBounds = np.zeros_like(pars) + np.inf
 
-                        if self.superStarSubCCDSuppressHighOrders:
-                            iind = np.repeat(np.arange(degree + 1), degree + 1)
-                            jind = np.tile(np.arange(degree + 1), degree + 1)
-                            high, = np.where((iind + jind) > degree)
+                        if self.superStarSubCCDSuppressHighCrossTerms:
+                            iind = np.repeat(np.arange(order + 1), order + 1)
+                            jind = np.tile(np.arange(order + 1), order + 1)
+                            high, = np.where((iind + jind) > order)
                             # Cannot set exactly to zero or curve_fit will complain
                             lowBounds[iind[high], jind[high]] = -1e-50
                             highBounds[iind[high], jind[high]] = 1e-50
 
                         fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
-                                                            np.vstack((obsXGO[i1a],
-                                                                       obsYGO[i1a])),
+                                                            np.vstack((obsYScaledGO[i1a],
+                                                                       obsXScaledGO[i1a])),
                                                             EGrayGO[i1a],
                                                             p0=list(pars.flatten()),
                                                             sigma=np.sqrt(EGrayErr2GO[i1a]),
                                                             bounds=list(np.vstack((lowBounds.flatten(),
                                                                                    highBounds.flatten()))))
-                        if self.superStarSubCCDSuppressHighOrders:
+                        if self.superStarSubCCDSuppressHighCrossTerms:
                             # Force these to be identically zero (which they probably are)
                             fit[high] = 0.0
 
@@ -255,14 +263,13 @@ class FgcmSuperStarFlat(object):
 
 
                 # compute the central value for use with the delta
-                xy = np.vstack((self.ccdOffsets['X_SIZE'][cInd]/2.,
-                               self.ccdOffsets['Y_SIZE'][cInd]/2.))
                 if self.fgcmPars.superStarPoly2d:
+                    xy = np.vstack((self.ccdOffsets['X_SIZE'][cInd]/2.,
+                                    self.ccdOffsets['Y_SIZE'][cInd]/2.))
                     superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
                                                                          *fit)
                 else:
-                    superStarFlatCenter[epInd, fiInd, cInd] = cheb2dFunc(xy,
-                                                                         *fit)
+                    superStarFlatCenter[epInd, fiInd, cInd] = cheb2dFunc(np.vstack((0.0, 0.0)), *fit)
 
                 # and record the fit
 
