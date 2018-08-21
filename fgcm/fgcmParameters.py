@@ -141,8 +141,8 @@ class FgcmParameters(object):
         # Old style was (a,x,y,x**2,y**2,xy)
         # Retain this for reading old files
         self.superStarNParOld = 6
-        self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevDegree + 1) *
-                              (fgcmConfig.superStarSubCCDChebyshevDegree + 1))
+        self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevOrder + 1) *
+                              (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
         self.superStarPoly2d = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
@@ -1397,14 +1397,15 @@ class FgcmParameters(object):
         for e in xrange(self.nEpochs):
             for f in xrange(self.nLUTFilter):
                 for c in xrange(self.nCCD):
-                    xy = np.vstack((self.ccdOffsets['X_SIZE'][c]/2.,
-                                    self.ccdOffsets['Y_SIZE'][c]/2.))
                     if self.superStarPoly2d:
+                        xy = np.vstack((self.ccdOffsets['X_SIZE'][c]/2.,
+                                        self.ccdOffsets['Y_SIZE'][c]/2.))
                         superStarFlatCenter[e, f, c] = poly2dFunc(xy,
                                                                   *self.parSuperStarFlat[e, f, c, :])
                     else:
-                        superStarFlatCenter[e, f, c] = cheb2dFunc(xy,
+                        superStarFlatCenter[e, f, c] = cheb2dFunc(np.vstack((0.0, 0.0)),
                                                                   *self.parSuperStarFlat[e, f, c, :])
+
         return superStarFlatCenter
 
     @property
