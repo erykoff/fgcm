@@ -100,6 +100,7 @@ class FgcmStars(object):
         self.magConstant = 2.5/np.log(10)
 
         self.hasXY = False
+        self.ccdOffsets = fgcmConfig.ccdOffsets
 
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
@@ -984,8 +985,15 @@ class FgcmStars(object):
 
             from .fgcmUtilities import poly2dFunc, cheb2dFunc
 
-            obsX = snmm.getArray(self.obsXHandle)
-            obsY = snmm.getArray(self.obsYHandle)
+            if fgcmPars.superStarPoly2d:
+                obsXScaled = snmm.getArray(self.obsXHandle)
+                obsYScaled = snmm.getArray(self.obsYHandle)
+            else:
+                # Scale X and Y
+                xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex]
+                ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex]
+                obsXScaled = (snmm.getArray(self.obsXHandle) - xSize/2.) / (xSize/2.)
+                obsYScaled = (snmm.getArray(self.obsYHandle) - ySize/2.) / (ySize/2.)
 
             epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex]*
                                (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
@@ -1006,12 +1014,12 @@ class FgcmStars(object):
                 cInd = obsCCDIndex[i1a[0]]
 
                 if fgcmPars.superStarPoly2d:
-                    obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsX[i1a],
-                                                                     obsY[i1a])),
+                    obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsXScaled[i1a],
+                                                                     obsYScaled[i1a])),
                                                           *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
                 else:
-                    obsSuperStarApplied[i1a] = cheb2dFunc(np.vstack((obsX[i1a],
-                                                                     obsY[i1a])),
+                    obsSuperStarApplied[i1a] = cheb2dFunc(np.vstack((obsYScaled[i1a],
+                                                                     obsXScaled[i1a])),
                                                           *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
         else:
             # No x/y available
