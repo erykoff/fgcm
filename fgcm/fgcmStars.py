@@ -1018,9 +1018,9 @@ class FgcmStars(object):
                                                                      obsYScaled[i1a])),
                                                           *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
                 else:
-                    obsSuperStarApplied[i1a] = cheb2dFunc(np.vstack((obsYScaled[i1a],
-                                                                     obsXScaled[i1a])),
-                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                    obsSuperStarApplied[i1a] = -2.5 * np.log10(cheb2dFunc(np.vstack((obsYScaled[i1a],
+                                                                                     obsXScaled[i1a])),
+                                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :]))
         else:
             # No x/y available
 
