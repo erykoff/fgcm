@@ -168,7 +168,7 @@ class FgcmSuperStarFlat(object):
 
             # and record...
 
-            self.fgcmPars.parSuperStarFlat[:,:,:,0] = superStarOffset
+            self.fgcmPars.parSuperStarFlat[:,:,:,0] = 10.**(superStarOffset / (-2.5))
 
         else:
             # with x/y, new sub-ccd
