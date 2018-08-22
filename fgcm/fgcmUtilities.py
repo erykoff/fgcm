@@ -381,13 +381,12 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
     centralValues = np.zeros(ccdOffsets.size)
 
     for i in xrange(ccdOffsets.size):
-        ## FIXME: this should be 0/0 for the cheb2dFunc...
         if usePoly2d:
             xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
                             ccdOffsets['Y_SIZE'][i]/2.))
             centralValues[i] = poly2dFunc(xy, *parArray[i, :])
         else:
-            centralValues[i] = cheb2dFunc(np.vstack((0.0, 0.0)), *parArray[i, :])
+            centralValues[i] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)), *parArray[i, :]))
 
     if (loHi is None):
         st=np.argsort(centralValues)
@@ -421,8 +420,6 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
             xRange = np.array([-1.0, 1.0])
             yRange = np.array([-1.0, 1.0])
 
-        # xValues = np.arange(xRange[0], xRange[1], 50)
-        # yValues = np.arange(yRange[0], yRange[1], 50)
         xValues = np.linspace(xRange[0], xRange[1], 50)
         yValues = np.linspace(yRange[0], yRange[1], 50)
 
@@ -434,8 +431,8 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
             zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
                                *parArray[k, :])
         else:
-            zGrid = cheb2dFunc(np.vstack((yGrid, xGrid)),
-                               *parArray[k, :])
+            zGrid = -2.5 * np.log10(cheb2dFunc(np.vstack((yGrid, xGrid)),
+                                               *parArray[k, :]))
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -
