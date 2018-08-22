@@ -86,7 +86,7 @@ class FgcmZeropoints(object):
            'FGCM_FLAG': Quality flag value
            'FGCM_ZPT': Zeropoint
            'FGCM_ZPTERR': Error on zeropoint
-           'FGCM_ZPT_CHEB': Chebyshev polynomial coefficients for zeropoint (if spatially varying)
+           'FGCM_FZPT_CHEB': Chebyshev polynomial coefficients for zeropoint (flux units) (if spatially varying)
            'FGCM_I0': I0 for exp/ccd (throughput)
            'FGCM_I10': I10 for exp/ccd (chromatic)
            'FGCM_R0': Retrieved throughput integral
@@ -149,8 +149,8 @@ class FgcmZeropoints(object):
         self.useZptCheb = False
         if self.superStarSubCCD and not self.fgcmPars.superStarPoly2d:
             self.useZptCheb = True
-            dtype.extend([('FGCM_ZPT_CHEB', 'f8', self.fgcmPars.superStarNPar),
-                          ('FGCM_ZPT_CHEB_XYMAX', 'f4', 2)])
+            dtype.extend([('FGCM_FZPT_CHEB', 'f8', self.fgcmPars.superStarNPar),
+                          ('FGCM_FZPT_CHEB_XYMAX', 'f4', 2)])
 
         dtype.extend([('FGCM_I0','f8'),
                       ('FGCM_I10','f8'),
@@ -203,8 +203,8 @@ class FgcmZeropoints(object):
 
         # And if necessary the x/y sizes
         if self.useZptCheb:
-            zpStruct['FGCM_ZPT_CHEB_XYMAX'][:, 0] = self.ccdOffsets['X_SIZE'][zpCCDIndex]
-            zpStruct['FGCM_ZPT_CHEB_XYMAX'][:, 1] = self.ccdOffsets['Y_SIZE'][zpCCDIndex]
+            zpStruct['FGCM_FZPT_CHEB_XYMAX'][:, 0] = self.ccdOffsets['X_SIZE'][zpCCDIndex]
+            zpStruct['FGCM_FZPT_CHEB_XYMAX'][:, 1] = self.ccdOffsets['Y_SIZE'][zpCCDIndex]
 
         # fill in the superstar flat
         zpStruct['FGCM_FLAT'][:] = self.fgcmPars.expCCDSuperStar[zpExpIndex,
@@ -382,7 +382,7 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_ZPTERR'][:] = self.illegalValue
 
         if self.useZptCheb:
-            zpStruct['FGCM_ZPT_CHEB'][:, :] = self.illegalValue
+            zpStruct['FGCM_FZPT_CHEB'][:, :] = self.illegalValue
 
         # start with the passable flag 1,2,4 exposures
 
@@ -401,10 +401,9 @@ class FgcmZeropoints(object):
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
 
         zpStruct['FGCM_ZPT'][okCCDZpIndex] = self._computeZpt(zpStruct, okCCDZpIndex)
-        #self._computeZptOld(zpStruct, okCCDZpIndex)
         zpStruct['FGCM_ZPTERR'][okCCDZpIndex] = self._computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
         if self.useZptCheb:
-            zpStruct['FGCM_ZPT_CHEB'][okCCDZpIndex, :] = self._computeZptCheb(zpStruct, okCCDZpIndex)
+            zpStruct['FGCM_FZPT_CHEB'][okCCDZpIndex, :] = self._computeZptCheb(zpStruct, okCCDZpIndex)
 
         badCCDZpExp = okZpIndex[~okCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |=  zpFlagDict['TOO_FEW_STARS_ON_CCD']
@@ -432,7 +431,7 @@ class FgcmZeropoints(object):
             zpStruct['FGCM_ZPTERR'][mehCCDZpIndex] = self._computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
 
             if self.useZptCheb:
-                zpStruct['FGCM_ZPT_CHEB'][mehCCDZpIndex, :] = self._computeZptCheb(zpStruct, mehCCDZpIndex)
+                zpStruct['FGCM_FZPT_CHEB'][mehCCDZpIndex, :] = self._computeZptCheb(zpStruct, mehCCDZpIndex)
 
         badCCDZpExp = mehZpIndex[~mehCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
@@ -552,26 +551,6 @@ class FgcmZeropoints(object):
                 self.zptAB +
                 zpStruct['FGCM_GRY'][indices])
 
-    def _computeZptOld(self, zpStruct, zpIndex):
-    #    """
-    #    Internal method to compute the zeropoint from constituents#
-
-    #    parameters
-    #    ----------
-    #    zpStruct: recarray
-    #       Zero point structure
-    #    zpIndex: int array
-    #       Array of indices to compute zeropoints
-    #    """
-
-        zpStruct['FGCM_ZPT'][zpIndex] = (2.5*np.log10(zpStruct['FGCM_I0'][zpIndex]) +
-                                         zpStruct['FGCM_FLAT'][zpIndex] +
-                                         zpStruct['FGCM_DUST'][zpIndex] +
-                                         zpStruct['FGCM_APERCORR'][zpIndex] +
-                                         2.5*np.log10(zpStruct['EXPTIME'][zpIndex]) +
-                                         self.zptAB +
-                                         zpStruct['FGCM_GRY'][zpIndex])
-
     def _computeZptCheb(self, zpStruct, zpIndex):
         """
         Internal method to compute zeropoint including spatial variation
@@ -608,8 +587,8 @@ class FgcmZeropoints(object):
 
             chebPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :]
 
-        # And now on the 0th term, we need to add the rest of the values
-        chebPars[:, 0] += self._computeZpt(zpStruct, zpIndex, includeFlat=False)
+        # And now on the 0th term, we need to multiply the rest of the values
+        chebPars[:, 0] *= 10.**(self._computeZpt(zpStruct, zpIndex, includeFlat=False) / (-2.5))
 
         return chebPars
 
