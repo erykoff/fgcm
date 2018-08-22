@@ -135,6 +135,8 @@ class FgcmSuperStarFlat(object):
         #  were just an offset, because the other terms are zeros
         prevSuperStarFlatCenter[:,:,:] = self.fgcmPars.superStarFlatCenter
 
+        useFlux = False
+
         if not self.superStarSubCCD or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
@@ -220,8 +222,11 @@ class FgcmSuperStarFlat(object):
                                                             sigma=np.sqrt(EGrayErr2GO[i1a]))
                     else:
                         # New chebyshev method
+                        useFlux = True
+
                         order = self.superStarSubCCDChebyshevOrder
                         pars = np.zeros((order + 1, order + 1))
+                        pars[0, 0] = 1.0
                         lowBounds = np.zeros_like(pars) - np.inf
                         highBounds = np.zeros_like(pars) + np.inf
 
@@ -233,23 +238,27 @@ class FgcmSuperStarFlat(object):
                             lowBounds[iind[high], jind[high]] = -1e-50
                             highBounds[iind[high], jind[high]] = 1e-50
 
+                        FGrayGOInd = 10.**(EGrayGO[i1a] / (-2.5))
+                        FGrayErrGOInd = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO[i1a]) * FGrayGOInd
+
                         fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
                                                             np.vstack((obsYScaledGO[i1a],
                                                                        obsXScaledGO[i1a])),
-                                                            EGrayGO[i1a],
+                                                            FGrayGOInd,
                                                             p0=list(pars.flatten()),
-                                                            sigma=np.sqrt(EGrayErr2GO[i1a]),
+                                                            sigma=FGrayErrGOInd,
                                                             bounds=list(np.vstack((lowBounds.flatten(),
-                                                                                   highBounds.flatten()))))
+                                                                                       highBounds.flatten()))))
+
                         if self.superStarSubCCDSuppressHighCrossTerms:
                             # Force these to be identically zero (which they probably are)
                             fit[high] = 0.0
 
-                    if fit[0] == 0.0:
+                    if fit[0] == 0.0 or fit[0] == 1.0:
                         self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
                                           % (epInd, fiInd, cInd))
                         computeMean = True
-                except:
+                except ValueError, RuntimeError:
                     self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
                                       % (epInd, fiInd, cInd))
                     computeMean = True
@@ -258,9 +267,10 @@ class FgcmSuperStarFlat(object):
                     fit = np.zeros(self.fgcmPars.superStarNPar)
                     fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
                               np.sum(1./EGrayErr2GO[i1a]))
+                    if useFlux:
+                        fit[0] = 10.**(fit[0] / (-2.5))
 
                 superStarNGoodStars[epInd, fiInd, cInd] = i1a.size
-
 
                 # compute the central value for use with the delta
                 if self.fgcmPars.superStarPoly2d:
@@ -269,10 +279,9 @@ class FgcmSuperStarFlat(object):
                     superStarFlatCenter[epInd, fiInd, cInd] = poly2dFunc(xy,
                                                                          *fit)
                 else:
-                    superStarFlatCenter[epInd, fiInd, cInd] = cheb2dFunc(np.vstack((0.0, 0.0)), *fit)
+                    superStarFlatCenter[epInd, fiInd, cInd] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)), *fit))
 
                 # and record the fit
-
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = fit
 
         # compute the delta...
@@ -480,8 +489,6 @@ class FgcmSuperStarFlat(object):
 
         ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
 
-        #deltaSuperStarFlat = np.zeros_like(self.fgcmPars.parSuperStarFlat)
-        #deltaSuperStarFlatNCCD = np.zeros_like(self.fgcmPars.parSuperStarFlat,dtype='i4')
         deltaSuperStarFlat = np.zeros((self.fgcmPars.nEpochs,
                                        self.fgcmPars.nLUTFilter,
                                        self.fgcmPars.nCCD))
