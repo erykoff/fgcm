@@ -145,6 +145,7 @@ class FgcmParameters(object):
                               (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
         self.superStarPoly2d = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
         # and the default unit dict
         self.unitDictOnes = {'pwvUnit':1.0,
@@ -281,6 +282,8 @@ class FgcmParameters(object):
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float64)
+        if self.superStarSubCCD:
+            self.parSuperStarFlat[:, :, :, 0] = 1.0
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
@@ -1403,8 +1406,8 @@ class FgcmParameters(object):
                         superStarFlatCenter[e, f, c] = poly2dFunc(xy,
                                                                   *self.parSuperStarFlat[e, f, c, :])
                     else:
-                        superStarFlatCenter[e, f, c] = cheb2dFunc(np.vstack((0.0, 0.0)),
-                                                                  *self.parSuperStarFlat[e, f, c, :])
+                        superStarFlatCenter[e, f, c] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)),
+                                                                                  *self.parSuperStarFlat[e, f, c, :]))
 
         return superStarFlatCenter
 
