@@ -282,8 +282,8 @@ class FgcmParameters(object):
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float64)
-        if self.superStarSubCCD:
-            self.parSuperStarFlat[:, :, :, 0] = 1.0
+        # The first term should be 1.0 with new flux units
+        self.parSuperStarFlat[:, :, :, 0] = 1.0
 
         # parameters with per-wash values
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
