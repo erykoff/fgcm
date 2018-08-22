@@ -133,7 +133,7 @@ class FgcmConfig(object):
     sigFgcmMaxErr = ConfigField(float, default=0.01)
     sigFgcmMaxEGray = ConfigField(float, default=0.05)
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
-    mirrorArea = ConfigField(float, required=True)
+    mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
     approxThroughput = ConfigField(float, default=1.0)
     ccdStartIndex = ConfigField(int, default=0)
@@ -451,6 +451,7 @@ class FgcmConfig(object):
         self.zptAB = (-48.6 - 2.5*expPlanck +
                        2.5*np.log10((self.mirrorArea * self.approxThroughput) /
                                     (hPlanck * self.cameraGain)))
+        self.fgcmLog.info("AB offset estimated as %.4f" % (self.zptAB))
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
