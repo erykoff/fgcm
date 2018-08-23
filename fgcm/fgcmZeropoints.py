@@ -588,7 +588,8 @@ class FgcmZeropoints(object):
             chebPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :]
 
         # And now on the 0th term, we need to multiply the rest of the values
-        chebPars[:, 0] *= 10.**(self._computeZpt(zpStruct, zpIndex, includeFlat=False) / (-2.5))
+        # Multiply each column by the zeropoint, with the clever double-transpose thingy
+        chebPars[:, :] = (chebPars.T * 10.**(self._computeZpt(zpStruct, zpIndex, includeFlat=False) / (-2.5))).T
 
         return chebPars
 
