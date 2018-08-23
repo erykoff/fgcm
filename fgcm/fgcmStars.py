@@ -98,6 +98,7 @@ class FgcmStars(object):
         self.sedSlopeComputed = False
 
         self.magConstant = 2.5/np.log(10)
+        self.zptAB = fgcmConfig.zptAB
 
         self.hasXY = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
@@ -295,9 +296,12 @@ class FgcmStars(object):
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
         snmm.getArray(self.obsRAHandle)[:] = obsRA
         snmm.getArray(self.obsDecHandle)[:] = obsDec
-        snmm.getArray(self.obsMagADUHandle)[:] = obsMag
+        # We will apply the approximate AB scaling here, it will make
+        # any plots we make have sensible units; will make 99 a sensible sentinal value;
+        # and is arbitrary anyway and doesn't enter the fits.
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptAB
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
-        snmm.getArray(self.obsMagStdHandle)[:] = obsMag   # same as raw at first
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptAB  # same as raw at first
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
