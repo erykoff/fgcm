@@ -130,12 +130,16 @@ class FgcmSuperStarFlat(object):
         deltaSuperStarFlatFPMean = np.zeros_like(superStarFlatFPMean)
         deltaSuperStarFlatFPSigma = np.zeros_like(superStarFlatFPMean)
 
-
         # Note that we use the cheb2dFunc or poly2dFunc even when the previous numbers
         #  were just an offset, because the other terms are zeros
-        prevSuperStarFlatCenter[:,:,:] = self.fgcmPars.superStarFlatCenter
+        prevSuperStarFlatCenter[:, :, :] = self.fgcmPars.superStarFlatCenter
 
-        useFlux = False
+        # Only with backwards compatibility do we not use flux
+        useFlux = not self.fgcmPars.superStarPoly2d
+
+        if useFlux:
+            # Default to ones if we're in flux mode
+            superStarFlatCenter[:, :, :] = 1.0
 
         if not self.superStarSubCCD or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
@@ -167,7 +171,6 @@ class FgcmSuperStarFlat(object):
             superStarFlatCenter[:,:,:] = superStarOffset[:,:,:]
 
             # and record, in flux space
-
             self.fgcmPars.parSuperStarFlat[:,:,:,0] = 10.**(superStarOffset / (-2.5))
 
         else:
@@ -222,8 +225,6 @@ class FgcmSuperStarFlat(object):
                                                             sigma=np.sqrt(EGrayErr2GO[i1a]))
                     else:
                         # New chebyshev method
-                        useFlux = True
-
                         order = self.superStarSubCCDChebyshevOrder
                         pars = np.zeros((order + 1, order + 1))
                         pars[0, 0] = 1.0
