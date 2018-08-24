@@ -110,7 +110,8 @@ class FgcmSuperStarFlat(object):
 
         # one more cut on the maximum error
         # as well as making sure that it didn't go below zero
-        gd,=np.where((EGrayErr2GO < self.ccdGrayMaxStarErr) & (EGrayErr2GO > 0.0))
+        gd,=np.where((EGrayErr2GO < self.ccdGrayMaxStarErr) & (EGrayErr2GO > 0.0) &
+                     (np.abs(EGrayGO) < 50.0))
         goodObs=goodObs[gd]
         # unapply input superstar correction here (note opposite sign)
         EGrayGO=EGrayGO[gd] + obsSuperStarApplied[goodObs]
@@ -357,6 +358,8 @@ class FgcmSuperStarFlat(object):
         from .fgcmUtilities import plotCCDMap
         from .fgcmUtilities import plotCCDMap2d
 
+        useFlux = not self.fgcmPars.superStarPoly2d
+
         for e in xrange(self.fgcmPars.nEpochs):
             for f in xrange(self.fgcmPars.nLUTFilter):
                 use, = np.where(superStarNGoodStars[e, f, :] > 0)
@@ -372,8 +375,14 @@ class FgcmSuperStarFlat(object):
                 ax=fig.add_subplot(121)
 
                 if not self.superStarSubCCD:
-                    plotCCDMap(ax, self.ccdOffsets[use], superStarPars[e, f, use, 0],
-                               'SuperStar (mag)')
+                    if useFlux:
+                        # New flux parameters
+                        plotCCDMap(ax, self.ccdOffsets[use], -2.5 * np.log10(superStarPars[e, f, use, 0]),
+                                   'SuperStar (mag)')
+                    else:
+                        # Old magnitude parameters
+                        plotCCDMap(ax, self.ccdOffsets[use], superStarPars[e, f, use, 0],
+                                   'SuperStar (mag)')
                 else:
                     plotCCDMap2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
                                  'SuperStar (mag)', usePoly2d=self.fgcmPars.superStarPoly2d)
