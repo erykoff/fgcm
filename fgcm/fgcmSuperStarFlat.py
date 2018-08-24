@@ -271,6 +271,7 @@ class FgcmSuperStarFlat(object):
                 except (ValueError, RuntimeError, TypeError):
                     self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
                                       % (epInd, fiInd, cInd))
+                    fit = pars.flatten()
                     computeMean = True
 
                 if computeMean:
