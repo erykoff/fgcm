@@ -166,7 +166,7 @@ class FgcmSuperStarFlat(object):
             # and this is the same as the numbers for the center
             superStarFlatCenter[:,:,:] = superStarOffset[:,:,:]
 
-            # and record...
+            # and record, in flux space
 
             self.fgcmPars.parSuperStarFlat[:,:,:,0] = 10.**(superStarOffset / (-2.5))
 
@@ -230,35 +230,44 @@ class FgcmSuperStarFlat(object):
                         lowBounds = np.zeros_like(pars) - np.inf
                         highBounds = np.zeros_like(pars) + np.inf
 
-                        if self.superStarSubCCDSuppressHighCrossTerms:
-                            iind = np.repeat(np.arange(order + 1), order + 1)
-                            jind = np.tile(np.arange(order + 1), order + 1)
-                            high, = np.where((iind + jind) > order)
-                            # Cannot set exactly to zero or curve_fit will complain
-                            lowBounds[iind[high], jind[high]] = -1e-50
-                            highBounds[iind[high], jind[high]] = 1e-50
+                        # Check that we have enough stars to constrain this...
+                        # In general, let's demand we have 10 times as many stars as
+                        # parameters (which is actually quite thin), or else we'll
+                        # just compute the mean
+                        if (i1a.size < 10 * pars.size):
+                            self.fgcmLog.info("Warning: insufficient stars for chebyshev fit (%d, %d, %d), setting to mean"
+                                              % (epInd, fiInd, cInd))
+                            computeMean = True
+                        else:
+                            if self.superStarSubCCDSuppressHighCrossTerms:
+                                iind = np.repeat(np.arange(order + 1), order + 1)
+                                jind = np.tile(np.arange(order + 1), order + 1)
+                                high, = np.where((iind + jind) > order)
+                                # Cannot set exactly to zero or curve_fit will complain
+                                lowBounds[iind[high], jind[high]] = -1e-50
+                                highBounds[iind[high], jind[high]] = 1e-50
 
-                        FGrayGOInd = 10.**(EGrayGO[i1a] / (-2.5))
-                        FGrayErrGOInd = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO[i1a]) * FGrayGOInd
+                            FGrayGOInd = 10.**(EGrayGO[i1a] / (-2.5))
+                            FGrayErrGOInd = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO[i1a]) * FGrayGOInd
 
-                        fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
-                                                            np.vstack((obsYScaledGO[i1a],
-                                                                       obsXScaledGO[i1a])),
-                                                            FGrayGOInd,
-                                                            p0=list(pars.flatten()),
-                                                            sigma=FGrayErrGOInd,
-                                                            bounds=list(np.vstack((lowBounds.flatten(),
-                                                                                       highBounds.flatten()))))
+                            fit, cov = scipy.optimize.curve_fit(cheb2dFunc,
+                                                                np.vstack((obsYScaledGO[i1a],
+                                                                           obsXScaledGO[i1a])),
+                                                                FGrayGOInd,
+                                                                p0=list(pars.flatten()),
+                                                                sigma=FGrayErrGOInd,
+                                                                bounds=list(np.vstack((lowBounds.flatten(),
+                                                                                           highBounds.flatten()))))
 
-                        if self.superStarSubCCDSuppressHighCrossTerms:
-                            # Force these to be identically zero (which they probably are)
-                            fit[high] = 0.0
+                            if self.superStarSubCCDSuppressHighCrossTerms:
+                                # Force these to be identically zero (which they probably are)
+                                fit[high] = 0.0
 
                     if fit[0] == 0.0 or fit[0] == 1.0:
                         self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
                                           % (epInd, fiInd, cInd))
                         computeMean = True
-                except (ValueError, RuntimeError):
+                except (ValueError, RuntimeError, TypeError):
                     self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
                                       % (epInd, fiInd, cInd))
                     computeMean = True
