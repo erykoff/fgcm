@@ -161,8 +161,12 @@ class FgcmSuperStarFlat(object):
                        obsCCDIndex[goodObs]),
                       1)
 
-            gd = np.where(superStarNGoodStars > 2)
+            # We need to make sure we set the bad ones to zero, or else we get
+            # crazy statistics
+            # This cut maybe should be larger, huh.
+            gd = (superStarNGoodStars > 2)
             superStarOffset[gd] /= superStarWt[gd]
+            superStarOffset[~gd] = 0.0
 
             # The superstar for the center is always in magnitude space
             superStarFlatCenter[:,:,:] = superStarOffset[:, :, :]
