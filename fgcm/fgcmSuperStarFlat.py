@@ -137,10 +137,6 @@ class FgcmSuperStarFlat(object):
         # Only with backwards compatibility do we not use flux
         useFlux = not self.fgcmPars.superStarPoly2d
 
-        if useFlux:
-            # Default to ones if we're in flux mode
-            superStarFlatCenter[:, :, :] = 1.0
-
         if not self.superStarSubCCD or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
@@ -167,11 +163,14 @@ class FgcmSuperStarFlat(object):
             gd = np.where(superStarNGoodStars > 2)
             superStarOffset[gd] /= superStarWt[gd]
 
-            # and this is the same as the numbers for the center
-            superStarFlatCenter[:,:,:] = superStarOffset[:,:,:]
+            # The superstar for the center is always in magnitude space
+            superStarFlatCenter[:,:,:] = superStarOffset[:, :, :]
 
-            # and record, in flux space
-            self.fgcmPars.parSuperStarFlat[:,:,:,0] = 10.**(superStarOffset / (-2.5))
+            # And the central parameter should be in flux or mag space depending
+            if useFlux:
+                self.fgcmPars.parSuperStarFlat[:, :, :, 0] = 10.**(superStarOffset / (-2.5))
+            else:
+                self.fgcmPars.parSuperStarFlat[:, :, :, 0] = superStarOffset
 
         else:
             # with x/y, new sub-ccd
