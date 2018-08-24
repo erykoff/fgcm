@@ -237,6 +237,7 @@ class FgcmSuperStarFlat(object):
                         if (i1a.size < 10 * pars.size):
                             self.fgcmLog.info("Warning: insufficient stars for chebyshev fit (%d, %d, %d), setting to mean"
                                               % (epInd, fiInd, cInd))
+                            fit = pars.flatten()
                             computeMean = True
                         else:
                             if self.superStarSubCCDSuppressHighCrossTerms:
