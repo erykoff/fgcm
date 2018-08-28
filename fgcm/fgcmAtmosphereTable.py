@@ -545,12 +545,14 @@ class FgcmAtmosphereTable(object):
         pmbMolecularAbsorption = pmbMolecularScattering ** 0.6
         pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
 
-        secZenith = 1./np.cos(np.radians(zenith))
+        _secZenith = np.clip(1./np.cos(np.radians(zenith)), self.secZenith[0], self.secZenith[-1])
+        _pwv = np.clip(pwv, self.pwv[0], self.pwv[-1])
+        _o3 = np.clip(o3, self.o3[0], self.o3[-1])
         atmInterpolated = (pmbFactor *
-                           self.o2Interpolator((secZenith, lam)) *
-                           self.rayleighInterpolator((secZenith, lam)) *
-                           self.pwvInterpolator((pwv, secZenith, lam)) *
-                           self.o3Interpolator((o3, secZenith, lam)) *
-                           np.exp(-1.0 * tau * secZenith * (lam / self.lambdaNorm)**(-alpha)))
+                           self.o2Interpolator((_secZenith, lam)) *
+                           self.rayleighInterpolator((_secZenith, lam)) *
+                           self.pwvInterpolator((_pwv, _secZenith, lam)) *
+                           self.o3Interpolator((_o3, _secZenith, lam)) *
+                           np.exp(-1.0 * tau * _secZenith * (lam / self.lambdaNorm)**(-alpha)))
 
         return atmInterpolated
