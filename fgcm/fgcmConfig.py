@@ -308,6 +308,9 @@ class FgcmConfig(object):
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
+                # Check if the LUT filter is even required.  If not, we can ignore it
+                if filterName not in self.filterToBand:
+                    continue
                 if self.filterToBand[filterName] == band:
                     # If we haven't found it yet, set the index
                     ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
