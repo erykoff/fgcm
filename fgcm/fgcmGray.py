@@ -359,7 +359,6 @@ class FgcmGray(object):
         tempRMS2 = np.zeros_like(ccdGrayRMS)
         tempRMS2[gd] = (ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.)
         ok = np.where(tempRMS2 > 0.0)
-        #ccdGrayRMS[gd] = np.sqrt((ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.))
         ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
         ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
@@ -447,8 +446,6 @@ class FgcmGray(object):
         self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
                          (time.time() - startTime))
 
-        #if (not doPlots):
-        #    return
         if (doPlots):
             self.makeExpGrayPlots()
 
