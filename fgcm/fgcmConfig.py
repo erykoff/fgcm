@@ -297,9 +297,9 @@ class FgcmConfig(object):
         for filterName in self.filterToBand:
             if filterName not in self.lutFilterNames:
                 raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
-            if self.filterToBand[filterName] not in self.bands:
-                raise ValueError("Band %s in filterToBand not in bands" %
-                                 (self.filterToBand[filterName]))
+            #if self.filterToBand[filterName] not in self.bands:
+            #    raise ValueError("Band %s in filterToBand not in bands" %
+            #                     (self.filterToBand[filterName]))
         #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
         for lutStdFilterName in self.lutStdFilterNames:
             if lutStdFilterName not in self.lutFilterNames:
@@ -308,9 +308,10 @@ class FgcmConfig(object):
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
-                # Check if the LUT filter is even required.  If not, we can ignore it
+                # Every LUT filter must be in the filterToBand mapping.  Raise an explicit
+                # and clear exception here.
                 if filterName not in self.filterToBand:
-                    continue
+                    raise ValueError("Filter %s is described in the LUT but not mapped in filterToBand" % (filterName))
                 if self.filterToBand[filterName] == band:
                     # If we haven't found it yet, set the index
                     ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
