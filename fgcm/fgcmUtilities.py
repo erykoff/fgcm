@@ -19,7 +19,8 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
 
 # Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE':2**0,
-               'BAD_ERROR':2**1}
+               'BAD_ERROR':2**1,
+               'SUPERSTAR_OUTLIER':2**2}
 
 # Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,

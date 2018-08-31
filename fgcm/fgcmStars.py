@@ -92,6 +92,7 @@ class FgcmStars(object):
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
         self.magStdComputed = False
         self.allMagStdComputed = False
@@ -965,6 +966,52 @@ class FgcmStars(object):
             objFlag[ok[bad]] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
+
+    def performSuperStarOutlierCuts(self, fgcmPars):
+        """
+        Do outlier cuts from common ccd/filter/epochs
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+
+        goodStars = self.getGoodStarIndices(checkMinObs=True)
+        _, goodObs = self.getGoodObsIndices(goodStars, expFlag=fgcmPars.expFlag)
+
+        # we need to compute E_gray == <mstd> - mstd for each observation
+        # compute EGray, GO for Good Obs
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex[goodObs]]*
+                           (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
+                           fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]]*
+                           (fgcmPars.nCCD+1) +
+                           obsCCDIndex[goodObs])
+
+        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+        nbad = 0
+
+        use, = np.where(h > 0)
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            med = np.median(EGrayGO[i1a])
+            sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
+            bad, = np.where(np.abs(EGrayGO[i1a] - med) > self.superStarSigmaClip * sig)
+
+            obsFlag[bad] |= obsFlagDict['SUPERSTAR_OUTLIER']
+
+            nbad += bad.size
+
+        self.fgcmLog.info("Marked %d observations as SUPERSTAR_OUTLIER" % (nbad))
 
     def applySuperStarFlat(self,fgcmPars):
         """

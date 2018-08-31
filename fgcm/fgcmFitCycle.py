@@ -263,6 +263,9 @@ class FgcmFitCycle(object):
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
 
+            # flag superstar outliers
+            self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
+
         else:
             # need to go through the bright observations
 
@@ -289,6 +292,9 @@ class FgcmFitCycle(object):
             #  (we don't go back and select exposures at this point)
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+
+            # flag superstar outliers
+            self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
