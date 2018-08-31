@@ -302,11 +302,12 @@ class FgcmSuperStarFlat(object):
                                 # Force these to be identically zero (which they probably are)
                                 fit[high] = 0.0
 
-                        if (fit[0] == 0.0 or fit[0] == 1.0 or
-                            (fit[0] < 0.0 and not self.fgcmPars.superStarPoly2d)):
-                            self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
+                            if (fit[0] == 0.0 or fit[0] == 1.0 or
+                                (fit[0] < 0.0 and useFlux)):
+                                self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
                                                   % (epInd, fiInd, cInd))
-                            computeMean = True
+                                fit = pars.flatten()
+                                computeMean = True
 
                 except (ValueError, RuntimeError, TypeError):
                     self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
