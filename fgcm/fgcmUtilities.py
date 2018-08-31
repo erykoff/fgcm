@@ -431,8 +431,8 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
             zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
                                *parArray[k, :])
         else:
-            zGrid = -2.5 * np.log10(cheb2dFunc(np.vstack((yGrid, xGrid)),
-                                               *parArray[k, :]))
+            zGrid = -2.5 * np.log10(np.clip(cheb2dFunc(np.vstack((yGrid, xGrid)),
+                                                       *parArray[k, :]), 0.1, None))
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -
