@@ -55,6 +55,7 @@ class FgcmSuperStarFlat(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
         self.superStarSubCCDSuppressHighCrossTerms = fgcmConfig.superStarSubCCDSuppressHighCrossTerms
+        self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
     def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
         """
@@ -112,6 +113,7 @@ class FgcmSuperStarFlat(object):
         # as well as making sure that it didn't go below zero
         gd,=np.where((EGrayErr2GO < self.ccdGrayMaxStarErr) & (EGrayErr2GO > 0.0) &
                      (np.abs(EGrayGO) < 50.0))
+
         goodObs=goodObs[gd]
         # unapply input superstar correction here (note opposite sign)
         EGrayGO=EGrayGO[gd] + obsSuperStarApplied[goodObs]
@@ -141,24 +143,49 @@ class FgcmSuperStarFlat(object):
         if not self.superStarSubCCD or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
+            # We need to sort through to reject outliers (ugh)
+
+            epochFilterHash = (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]]*
+                               (self.fgcmPars.nLUTFilter+1)*(self.fgcmPars.nCCD+1) +
+                               self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]]*
+                               (self.fgcmPars.nCCD+1) +
+                               obsCCDIndex[goodObs])
+
+            mark = np.zeros(goodObs.size, dtype=np.bool)
+
+            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+            for i in xrange(h.size):
+                if h[i] == 0: continue
+
+                i1a = rev[rev[i]:rev[i+1]]
+
+                med = np.median(EGrayGO[i1a])
+                sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
+                okay, = np.where(np.abs(EGrayGO[i1a] - med) <= self.superStarSigmaClip * sig)
+
+                mark[i1a[okay]] = True
+
             # Next, we sort by epoch, band
             superStarWt = np.zeros_like(superStarFlatCenter)
             superStarOffset = np.zeros_like(superStarWt)
 
+            goodObs2 = goodObs[mark]
+
             np.add.at(superStarWt,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
-                       obsCCDIndex[goodObs]),
-                      1./EGrayErr2GO)
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
+                       obsCCDIndex[goodObs2]),
+                      1./EGrayErr2GO[mark])
             np.add.at(superStarOffset,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
-                       obsCCDIndex[goodObs]),
-                      EGrayGO/EGrayErr2GO)
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
+                       obsCCDIndex[goodObs2]),
+                      EGrayGO[mark]/EGrayErr2GO[mark])
             np.add.at(superStarNGoodStars,
-                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
-                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
-                       obsCCDIndex[goodObs]),
+                      (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
+                       self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
+                       obsCCDIndex[goodObs[mark]]),
                       1)
 
             # We need to make sure we set the bad ones to zero, or else we get
@@ -217,6 +244,12 @@ class FgcmSuperStarFlat(object):
                 fiInd = self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[i1a[0]]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
 
+                # Need to reject outliers here...
+                med = np.median(EGrayGO[i1a])
+                sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
+                okay, = np.where(np.abs(EGrayGO[i1a] - med) <= self.superStarSigmaClip * sig)
+                i1a = i1a[okay]
+
                 computeMean = False
                 try:
                     if self.fgcmPars.superStarPoly2d:
@@ -269,10 +302,12 @@ class FgcmSuperStarFlat(object):
                                 # Force these to be identically zero (which they probably are)
                                 fit[high] = 0.0
 
-                    if fit[0] == 0.0 or fit[0] == 1.0:
-                        self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
-                                          % (epInd, fiInd, cInd))
-                        computeMean = True
+                        if (fit[0] == 0.0 or fit[0] == 1.0 or
+                            (fit[0] < 0.0 and not self.fgcmPars.superStarPoly2d)):
+                            self.fgcmLog.info("Warning: fit failed on (%d, %d, %d), setting to mean"
+                                                  % (epInd, fiInd, cInd))
+                            computeMean = True
+
                 except (ValueError, RuntimeError, TypeError):
                     self.fgcmLog.info("Warning: fit failed to converge (%d, %d, %d), setting to mean"
                                       % (epInd, fiInd, cInd))
