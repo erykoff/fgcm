@@ -167,6 +167,7 @@ class FgcmConfig(object):
     superStarSubCCD = ConfigField(bool, default=False)
     superStarSubCCDChebyshevOrder = ConfigField(int, default=1)
     superStarSubCCDSuppressHighCrossTerms = ConfigField(bool, default=False)
+    superStarSigmaClip = ConfigField(float, default=5.0)
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)
