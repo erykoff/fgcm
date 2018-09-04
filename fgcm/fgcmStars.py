@@ -1007,7 +1007,7 @@ class FgcmStars(object):
             sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
             bad, = np.where(np.abs(EGrayGO[i1a] - med) > self.superStarSigmaClip * sig)
 
-            obsFlag[bad] |= obsFlagDict['SUPERSTAR_OUTLIER']
+            obsFlag[goodObs[i1a[bad]]] |= obsFlagDict['SUPERSTAR_OUTLIER']
 
             nbad += bad.size
 
