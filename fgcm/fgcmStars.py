@@ -967,7 +967,7 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
-    def performSuperStarOutlierCuts(self, fgcmPars):
+    def performSuperStarOutlierCuts(self, fgcmPars, reset=False):
         """
         Do outlier cuts from common ccd/filter/epochs
         """
@@ -980,6 +980,10 @@ class FgcmStars(object):
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
         obsFlag = snmm.getArray(self.obsFlagHandle)
+
+        if reset:
+            # reset the obsFlag...
+            obsFlag &= ~obsFlagDict['SUPERSTAR_OUTLIER']
 
         goodStars = self.getGoodStarIndices(checkMinObs=True)
         _, goodObs = self.getGoodObsIndices(goodStars, expFlag=fgcmPars.expFlag)
@@ -1011,7 +1015,8 @@ class FgcmStars(object):
 
             nbad += bad.size
 
-        self.fgcmLog.info("Marked %d observations as SUPERSTAR_OUTLIER" % (nbad))
+        self.fgcmLog.info("Marked %d observations (%.4f%%) as SUPERSTAR_OUTLIER" %
+                          (nbad, float(nbad)/float(goodObs.size)))
 
     def applySuperStarFlat(self,fgcmPars):
         """
