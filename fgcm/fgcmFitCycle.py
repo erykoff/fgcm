@@ -263,9 +263,6 @@ class FgcmFitCycle(object):
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
 
-            # flag superstar outliers
-            self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
-
         else:
             # need to go through the bright observations
 
@@ -293,35 +290,20 @@ class FgcmFitCycle(object):
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
-            # flag superstar outliers
-            self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
-
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
                 self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
-                # we can compute gray values, but only use obs error (since all the fields aren't filled yet)
-                #self.fgcmGray.computeCCDAndExpGray(onlyObsErr=True)
-                # and average them into superstar flats
+                # Flag superstar outliers here before computing superstar...
+                self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
+
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
 
-            ## EXPERIMENTAL
-            ## not needed as far as I can tell
-            if (self.fgcmConfig.experimentalMode) :
-                self._doSOpticsFit(doPlots=True)
-                outParFileTemp =  '%s/%s_parameters_soptics.fits' % (
-                    self.fgcmConfig.outputPath,
-                    self.fgcmConfig.outfileBaseWithCycle)
-                self.fgcmPars.saveParsFits(outParFileTemp)
-
-                # do we need to compute EXP^gray here? yes, probably.  In the _doSOpticsFit
-
             # Last thing: fit the mag errors (if configured)...
             self.fgcmModelMagErrs.computeMagErrorModel('initial')
-
 
         # Select calibratable nights
         self.expSelector.selectCalibratableNights()
@@ -332,6 +314,10 @@ class FgcmFitCycle(object):
 
         # And apply the errors (if configured)
         self.fgcmStars.computeModelMagErrors(self.fgcmPars)
+
+        # Reset the superstar outlier flags and compute them now that we have
+        # flagged good exposures, good nights, etc.
+        self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
 
         # Make connectivity maps with what we know about photometric selection
         fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
