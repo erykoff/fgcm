@@ -92,14 +92,17 @@ class FgcmStars(object):
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
         self.magStdComputed = False
         self.allMagStdComputed = False
         self.sedSlopeComputed = False
 
         self.magConstant = 2.5/np.log(10)
+        self.zptAB = fgcmConfig.zptAB
 
         self.hasXY = False
+        self.ccdOffsets = fgcmConfig.ccdOffsets
 
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
@@ -294,9 +297,12 @@ class FgcmStars(object):
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
         snmm.getArray(self.obsRAHandle)[:] = obsRA
         snmm.getArray(self.obsDecHandle)[:] = obsDec
-        snmm.getArray(self.obsMagADUHandle)[:] = obsMag
+        # We will apply the approximate AB scaling here, it will make
+        # any plots we make have sensible units; will make 99 a sensible sentinal value;
+        # and is arbitrary anyway and doesn't enter the fits.
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptAB
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
-        snmm.getArray(self.obsMagStdHandle)[:] = obsMag   # same as raw at first
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptAB  # same as raw at first
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
@@ -961,6 +967,52 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
+    def performSuperStarOutlierCuts(self, fgcmPars):
+        """
+        Do outlier cuts from common ccd/filter/epochs
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+
+        goodStars = self.getGoodStarIndices(checkMinObs=True)
+        _, goodObs = self.getGoodObsIndices(goodStars, expFlag=fgcmPars.expFlag)
+
+        # we need to compute E_gray == <mstd> - mstd for each observation
+        # compute EGray, GO for Good Obs
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex[goodObs]]*
+                           (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
+                           fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]]*
+                           (fgcmPars.nCCD+1) +
+                           obsCCDIndex[goodObs])
+
+        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+        nbad = 0
+
+        use, = np.where(h > 0)
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            med = np.median(EGrayGO[i1a])
+            sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
+            bad, = np.where(np.abs(EGrayGO[i1a] - med) > self.superStarSigmaClip * sig)
+
+            obsFlag[goodObs[i1a[bad]]] |= obsFlagDict['SUPERSTAR_OUTLIER']
+
+            nbad += bad.size
+
+        self.fgcmLog.info("Marked %d observations as SUPERSTAR_OUTLIER" % (nbad))
+
     def applySuperStarFlat(self,fgcmPars):
         """
         Apply superStarFlat to raw magnitudes.
@@ -980,12 +1032,19 @@ class FgcmStars(object):
         # two different tracks, if x/y available or not.
 
         if self.hasXY:
-            # new style
+            # With x/y information
 
-            from .fgcmUtilities import poly2dFunc
+            from .fgcmUtilities import poly2dFunc, cheb2dFunc
 
-            obsX = snmm.getArray(self.obsXHandle)
-            obsY = snmm.getArray(self.obsYHandle)
+            if fgcmPars.superStarPoly2d:
+                obsXScaled = snmm.getArray(self.obsXHandle)
+                obsYScaled = snmm.getArray(self.obsYHandle)
+            else:
+                # Scale X and Y
+                xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex]
+                ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex]
+                obsXScaled = (snmm.getArray(self.obsXHandle) - xSize/2.) / (xSize/2.)
+                obsYScaled = (snmm.getArray(self.obsYHandle) - ySize/2.) / (ySize/2.)
 
             epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex]*
                                (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
@@ -1005,11 +1064,17 @@ class FgcmStars(object):
                 fiInd = fgcmPars.expLUTFilterIndex[obsExpIndex[i1a[0]]]
                 cInd = obsCCDIndex[i1a[0]]
 
-                obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsX[i1a],
-                                                        obsY[i1a])),
-                                                       *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                if fgcmPars.superStarPoly2d:
+                    obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsXScaled[i1a],
+                                                                     obsYScaled[i1a])),
+                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                else:
+                    fluxScale = cheb2dFunc(np.vstack((obsYScaled[i1a],
+                                                                                     obsXScaled[i1a])),
+                                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                    obsSuperStarApplied[i1a] = -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
         else:
-            # old style
+            # No x/y available
 
             obsSuperStarApplied[:] = fgcmPars.expCCDSuperStar[obsExpIndex,
                                                               obsCCDIndex]

@@ -13,9 +13,6 @@ from .fgcmUtilities import expFlagDict
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-## FIXME with plotter!
-## also note retrieval!
-
 class FgcmZeropoints(object):
     """
     Class to compute final zeropoints
@@ -74,6 +71,7 @@ class FgcmZeropoints(object):
         self.expGrayRecoverCut = fgcmConfig.expGrayRecoverCut
         self.expGrayErrRecoverCut = fgcmConfig.expGrayErrRecoverCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
+        self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
 
     def computeZeropoints(self):
@@ -88,6 +86,7 @@ class FgcmZeropoints(object):
            'FGCM_FLAG': Quality flag value
            'FGCM_ZPT': Zeropoint
            'FGCM_ZPTERR': Error on zeropoint
+           'FGCM_FZPT_CHEB': Chebyshev polynomial coefficients for zeropoint (flux units) (if spatially varying)
            'FGCM_I0': I0 for exp/ccd (throughput)
            'FGCM_I10': I10 for exp/ccd (chromatic)
            'FGCM_R0': Retrieved throughput integral
@@ -141,29 +140,38 @@ class FgcmZeropoints(object):
 
         self.fgcmLog.info('Building zeropoint structure...')
 
+        dtype = [(self.expField,'i4'),
+                 (self.ccdField,'i2'),
+                 ('FGCM_FLAG','i2'),
+                 ('FGCM_ZPT','f8'),
+                 ('FGCM_ZPTERR','f8')]
+
+        self.useZptCheb = False
+        if self.superStarSubCCD and not self.fgcmPars.superStarPoly2d:
+            self.useZptCheb = True
+            dtype.extend([('FGCM_FZPT_CHEB', 'f8', self.fgcmPars.superStarNPar),
+                          ('FGCM_FZPT_CHEB_XYMAX', 'f4', 2)])
+
+        dtype.extend([('FGCM_I0','f8'),
+                      ('FGCM_I10','f8'),
+                      ('FGCM_R0','f8'),
+                      ('FGCM_R10','f8'),
+                      ('FGCM_GRY','f8'),
+                      ('FGCM_ZPTVAR','f8'),
+                      ('FGCM_TILINGS','f8'),
+                      ('FGCM_FPGRY','f8'),
+                      ('FGCM_FPVAR','f8'),
+                      ('FGCM_FPGRY_CSPLIT', 'f8', 3),
+                      ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
+                      ('FGCM_DUST','f8'),
+                      ('FGCM_FLAT','f8'),
+                      ('FGCM_APERCORR','f8'),
+                      ('EXPTIME','f4'),
+                      ('FILTERNAME','a2'),
+                      ('BAND','a2')])
+
         zpStruct = np.zeros(self.fgcmPars.nExp*self.fgcmPars.nCCD,
-                            dtype=[(self.expField,'i4'), # done
-                                   (self.ccdField,'i2'), # done
-                                   ('FGCM_FLAG','i2'), # done
-                                   ('FGCM_ZPT','f8'), # done
-                                   ('FGCM_ZPTERR','f8'), # done
-                                   ('FGCM_I0','f8'), # done
-                                   ('FGCM_I10','f8'), # done
-                                   ('FGCM_R0','f8'),
-                                   ('FGCM_R10','f8'),
-                                   ('FGCM_GRY','f8'), # done
-                                   ('FGCM_ZPTVAR','f8'), # done
-                                   ('FGCM_TILINGS','f8'), # done
-                                   ('FGCM_FPGRY','f8'), # done
-                                   ('FGCM_FPVAR','f8'), # done
-                                   ('FGCM_FPGRY_CSPLIT', 'f8', 3),
-                                   ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
-                                   ('FGCM_DUST','f8'), # done
-                                   ('FGCM_FLAT','f8'), # done
-                                   ('FGCM_APERCORR','f8'), # done
-                                   ('EXPTIME','f4'), # done
-                                   ('FILTERNAME','a2'),
-                                   ('BAND','a2')]) # done
+                            dtype=dtype)
 
         atmStruct = np.zeros(self.fgcmPars.nExp,
                              dtype=[(self.expField,'i4'),
@@ -192,6 +200,11 @@ class FgcmZeropoints(object):
         bandArray = np.array(self.fgcmPars.bands)
         zpStruct['BAND'][:] = bandArray[self.fgcmPars.expBandIndex[zpExpIndex]]
         zpStruct['EXPTIME'][:] = self.fgcmPars.expExptime[zpExpIndex]
+
+        # And if necessary the x/y sizes
+        if self.useZptCheb:
+            zpStruct['FGCM_FZPT_CHEB_XYMAX'][:, 0] = self.ccdOffsets['X_SIZE'][zpCCDIndex]
+            zpStruct['FGCM_FZPT_CHEB_XYMAX'][:, 1] = self.ccdOffsets['Y_SIZE'][zpCCDIndex]
 
         # fill in the superstar flat
         zpStruct['FGCM_FLAT'][:] = self.fgcmPars.expCCDSuperStar[zpExpIndex,
@@ -368,6 +381,9 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_ZPT'][:] = self.illegalValue
         zpStruct['FGCM_ZPTERR'][:] = self.illegalValue
 
+        if self.useZptCheb:
+            zpStruct['FGCM_FZPT_CHEB'][:, :] = self.illegalValue
+
         # start with the passable flag 1,2,4 exposures
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
@@ -384,8 +400,10 @@ class FgcmZeropoints(object):
 
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
 
-        self._computeZpt(zpStruct,okCCDZpIndex)
-        self._computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
+        zpStruct['FGCM_ZPT'][okCCDZpIndex] = self._computeZpt(zpStruct, okCCDZpIndex)
+        zpStruct['FGCM_ZPTERR'][okCCDZpIndex] = self._computeZptErr(zpStruct,zpExpIndex,okCCDZpIndex)
+        if self.useZptCheb:
+            zpStruct['FGCM_FZPT_CHEB'][okCCDZpIndex, :] = self._computeZptCheb(zpStruct, okCCDZpIndex)
 
         badCCDZpExp = okZpIndex[~okCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |=  zpFlagDict['TOO_FEW_STARS_ON_CCD']
@@ -408,8 +426,12 @@ class FgcmZeropoints(object):
 
         mehCCDZpIndex = mehZpIndex[mehCCDZpIndexFlag]
 
-        self._computeZpt(zpStruct,mehCCDZpIndex)
-        self._computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
+        if mehCCDZpIndex.size > 0:
+            zpStruct['FGCM_ZPT'][mehCCDZpIndex] = self._computeZpt(zpStruct,mehCCDZpIndex)
+            zpStruct['FGCM_ZPTERR'][mehCCDZpIndex] = self._computeZptErr(zpStruct,zpExpIndex,mehCCDZpIndex)
+
+            if self.useZptCheb:
+                zpStruct['FGCM_FZPT_CHEB'][mehCCDZpIndex, :] = self._computeZptCheb(zpStruct, mehCCDZpIndex)
 
         badCCDZpExp = mehZpIndex[~mehCCDZpIndexFlag]
         zpStruct['FGCM_FLAG'][badCCDZpExp] |= zpFlagDict['TOO_FEW_STARS_ON_CCD']
@@ -497,7 +519,8 @@ class FgcmZeropoints(object):
                                               self.outfileBaseWithCycle))
         plt.close(fig)
 
-    def _computeZpt(self,zpStruct,zpIndex):
+
+    def _computeZpt(self, zpStruct, indices, includeFlat=True):
         """
         Internal method to compute the zeropoint from constituents
 
@@ -505,17 +528,70 @@ class FgcmZeropoints(object):
         ----------
         zpStruct: recarray
            Zero point structure
+        indices: int array
+           Indices where to compute
+        includeFlat: bool, default=True
+           Include superstar flat corrections
+
+        returns
+        -------
+        Zeropoint values
+        """
+
+        if includeFlat:
+            flatValue = zpStruct['FGCM_FLAT'][indices]
+        else:
+            flatValue = np.zeros_like(zpStruct['FGCM_FLAT'][indices])
+
+        return (2.5*np.log10(zpStruct['FGCM_I0'][indices]) +
+                flatValue +
+                zpStruct['FGCM_DUST'][indices] +
+                zpStruct['FGCM_APERCORR'][indices] +
+                2.5*np.log10(zpStruct['EXPTIME'][indices]) +
+                self.zptAB +
+                zpStruct['FGCM_GRY'][indices])
+
+    def _computeZptCheb(self, zpStruct, zpIndex):
+        """
+        Internal method to compute zeropoint including spatial variation
+
+                parameters
+        ----------
+        zpStruct: recarray
+           Zero point structure
         zpIndex: int array
            Array of indices to compute zeropoints
         """
 
-        zpStruct['FGCM_ZPT'][zpIndex] = (2.5*np.log10(zpStruct['FGCM_I0'][zpIndex]) +
-                                         zpStruct['FGCM_FLAT'][zpIndex] +
-                                         zpStruct['FGCM_DUST'][zpIndex] +
-                                         zpStruct['FGCM_APERCORR'][zpIndex] +
-                                         2.5*np.log10(zpStruct['EXPTIME'][zpIndex]) +
-                                         self.zptAB +
-                                         zpStruct['FGCM_GRY'][zpIndex])
+        chebPars = np.zeros((zpIndex.size, self.fgcmPars.superStarNPar))
+
+        # And now we set the parameters...
+        zpExpIndex = (np.searchsorted(self.fgcmPars.expArray, zpStruct[self.expField]))[zpIndex]
+        zpCCDIndex = (zpStruct[self.ccdField] - self.ccdStartIndex)[zpIndex]
+        epochFilterHash = (self.fgcmPars.expEpochIndex[zpExpIndex] *
+                           (self.fgcmPars.nLUTFilter + 1)*(self.fgcmPars.nCCD + 1) +
+                           self.fgcmPars.expLUTFilterIndex[zpExpIndex] *
+                           (self.fgcmPars.nCCD + 1) +
+                           zpCCDIndex)
+
+        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+
+        for i in xrange(h.size):
+            if h[i] == 0: continue
+
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            epInd = self.fgcmPars.expEpochIndex[zpExpIndex[i1a[0]]]
+            fiInd = self.fgcmPars.expLUTFilterIndex[zpExpIndex[i1a[0]]]
+            cInd = zpCCDIndex[i1a[0]]
+
+            chebPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :]
+
+        # And now on the 0th term, we need to multiply the rest of the values
+        # Multiply each column by the zeropoint, with the clever double-transpose thingy
+        chebPars[:, :] = (chebPars.T * 10.**(self._computeZpt(zpStruct, zpIndex, includeFlat=False) / (-2.5))).T
+
+        return chebPars
 
     def _computeZptErr(self,zpStruct,zpExpIndex,zpIndex):
         """
@@ -535,9 +611,12 @@ class FgcmZeropoints(object):
         sigFgcm = self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
         nTilingsM1 = np.clip(zpStruct['FGCM_TILINGS'][zpIndex]-1.0,1.0,1e10)
 
-        zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
-                                                   zpStruct['FGCM_ZPTVAR'][zpIndex] +
-                                                   self.sigma0Cal**2.)
+        #zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
+        #                                           zpStruct['FGCM_ZPTVAR'][zpIndex] +
+        #                                           self.sigma0Cal**2.)
+        return np.sqrt((sigFgcm**2./nTilingsM1) +
+                       zpStruct['FGCM_ZPTVAR'][zpIndex] +
+                       self.sigma0Cal**2.)
 
     def saveZptFits(self):
         """

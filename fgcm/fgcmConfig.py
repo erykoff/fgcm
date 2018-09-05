@@ -133,7 +133,7 @@ class FgcmConfig(object):
     sigFgcmMaxErr = ConfigField(float, default=0.01)
     sigFgcmMaxEGray = ConfigField(float, default=0.05)
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
-    mirrorArea = ConfigField(float, required=True)
+    mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
     approxThroughput = ConfigField(float, default=1.0)
     ccdStartIndex = ConfigField(int, default=0)
@@ -165,6 +165,9 @@ class FgcmConfig(object):
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCD = ConfigField(bool, default=False)
+    superStarSubCCDChebyshevOrder = ConfigField(int, default=1)
+    superStarSubCCDSuppressHighCrossTerms = ConfigField(bool, default=False)
+    superStarSigmaClip = ConfigField(float, default=5.0)
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)
@@ -295,9 +298,9 @@ class FgcmConfig(object):
         for filterName in self.filterToBand:
             if filterName not in self.lutFilterNames:
                 raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
-            if self.filterToBand[filterName] not in self.bands:
-                raise ValueError("Band %s in filterToBand not in bands" %
-                                 (self.filterToBand[filterName]))
+            #if self.filterToBand[filterName] not in self.bands:
+            #    raise ValueError("Band %s in filterToBand not in bands" %
+            #                     (self.filterToBand[filterName]))
         #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
         for lutStdFilterName in self.lutStdFilterNames:
             if lutStdFilterName not in self.lutFilterNames:
@@ -306,6 +309,10 @@ class FgcmConfig(object):
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
+                # Every LUT filter must be in the filterToBand mapping.  Raise an explicit
+                # and clear exception here.
+                if filterName not in self.filterToBand:
+                    raise ValueError("Filter %s is described in the LUT but not mapped in filterToBand" % (filterName))
                 if self.filterToBand[filterName] == band:
                     # If we haven't found it yet, set the index
                     ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
@@ -449,6 +456,7 @@ class FgcmConfig(object):
         self.zptAB = (-48.6 - 2.5*expPlanck +
                        2.5*np.log10((self.mirrorArea * self.approxThroughput) /
                                     (hPlanck * self.cameraGain)))
+        self.fgcmLog.info("AB offset estimated as %.4f" % (self.zptAB))
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?

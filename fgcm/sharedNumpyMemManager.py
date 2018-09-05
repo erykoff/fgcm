@@ -119,12 +119,18 @@ class SharedNumpyMemManager(object):
 
         # create array in shared memory segment
         if (syncAccess):
-            self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype,
-                                                                    int(np.prod(dimensions)))
+            try:
+                self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype,
+                                                                        int(np.prod(dimensions)))
+            except:
+                raise MemoryError("Failed to allocate memory for shared array.  Note that $TMPDIR must have more space than allocated shared memory.")
             self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur].get_obj(),dtype=dtype)
         else:
-            self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype,
-                                                                       int(np.prod(dimensions)))
+            try:
+                self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype,
+                                                                           int(np.prod(dimensions)))
+            except:
+                raise MemoryError("Failed to allocate memory for shared array.  Note that $TMPDIR must have more space than allocated shared memory.")
             self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur],dtype=dtype)
 
         # do a reshape for correct dimensions

@@ -19,7 +19,8 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
 
 # Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE':2**0,
-               'BAD_ERROR':2**1}
+               'BAD_ERROR':2**1,
+               'SUPERSTAR_OUTLIER':2**2}
 
 # Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,
@@ -327,9 +328,32 @@ def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
 
     return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
 
-def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
+def cheb2dFunc(yx, *cpars):
     """
-    Plot CCD map with polynomial fits for each CCD
+    2d Chebyshev polynomial fitting function.
+
+    parameters
+    ----------
+    yx: numpy vstack (2, nvalues)
+    *cpars: Chebyshev parameters
+
+    Note that the order of the polynomials in inferred from the number of *cpars.
+    The array is reshaped to hand to np.polynomial.chebyshev.chebval2d
+
+    returns
+    -------
+    Value of function evaluated at y = yx[0, :], x = yx[1, :]
+    """
+
+    orderplus1 = int(np.sqrt(len(cpars)))
+    c = np.array(cpars).reshape(orderplus1, orderplus1)
+
+    return np.polynomial.chebyshev.chebval2d(yx[0, :], yx[1, :], c)
+
+
+def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
+    """
+    Plot CCD map with Chebyshev or polynomial fits for each CCD
 
     parameters
     ----------
@@ -358,9 +382,12 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     centralValues = np.zeros(ccdOffsets.size)
 
     for i in xrange(ccdOffsets.size):
-        xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
-                        ccdOffsets['Y_SIZE'][i]/2.))
-        centralValues[i] = poly2dFunc(xy, *parArray[i,:])
+        if usePoly2d:
+            xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
+                            ccdOffsets['Y_SIZE'][i]/2.))
+            centralValues[i] = poly2dFunc(xy, *parArray[i, :])
+        else:
+            centralValues[i] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)), *parArray[i, :]))
 
     if (loHi is None):
         st=np.argsort(centralValues)
@@ -387,17 +414,26 @@ def plotCCDMapPoly2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     ax.tick_params(axis='both',which='major',labelsize=14)
 
     for k in xrange(ccdOffsets.size):
-        xRange = np.array([0, ccdOffsets['X_SIZE'][k]])
-        yRange = np.array([0, ccdOffsets['Y_SIZE'][k]])
+        if usePoly2d:
+            xRange = np.array([0, ccdOffsets['X_SIZE'][k]])
+            yRange = np.array([0, ccdOffsets['Y_SIZE'][k]])
+        else:
+            xRange = np.array([-1.0, 1.0])
+            yRange = np.array([-1.0, 1.0])
 
-        xValues = np.arange(xRange[0], xRange[1], 50)
-        yValues = np.arange(yRange[0], yRange[1], 50)
+        xValues = np.linspace(xRange[0], xRange[1], 50)
+        yValues = np.linspace(yRange[0], yRange[1], 50)
 
         xGrid = np.repeat(xValues, yValues.size)
         yGrid = np.tile(yValues, xValues.size)
 
-        zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
-                           *parArray[k, :])
+        # This swizzle may be unnecessary because of the x/y scaling on the chebyshev input
+        if usePoly2d:
+            zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
+                               *parArray[k, :])
+        else:
+            zGrid = -2.5 * np.log10(np.clip(cheb2dFunc(np.vstack((yGrid, xGrid)),
+                                                       *parArray[k, :]), 0.1, None))
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -
