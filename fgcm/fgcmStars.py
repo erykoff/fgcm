@@ -1016,7 +1016,7 @@ class FgcmStars(object):
             nbad += bad.size
 
         self.fgcmLog.info("Marked %d observations (%.4f%%) as SUPERSTAR_OUTLIER" %
-                          (nbad, float(nbad)/float(goodObs.size)))
+                          (nbad, 100. * float(nbad)/float(goodObs.size)))
 
     def applySuperStarFlat(self,fgcmPars):
         """
