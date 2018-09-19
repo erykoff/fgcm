@@ -110,6 +110,7 @@ class FgcmConfig(object):
     ccdField = ConfigField(str, default='CCDNUM')
     latitude = ConfigField(float, required=True)
     seeingField = ConfigField(str, default='SEEING')
+    seeingSubExposure = ConfigField(bool, default=False)
     deepFlag = ConfigField(str, default='DEEPFLAG')
     fwhmField = ConfigField(str, default='PSF_FWHM')
     skyBrightnessField = ConfigField(str, default='SKYBRIGHTNESS')
