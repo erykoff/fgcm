@@ -104,6 +104,8 @@ class FgcmStars(object):
         self.hasXY = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
+        self.seeingSubExposure = fgcmConfig.seeingSubExposure
+
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
         Load stars from fits files.
@@ -1106,7 +1108,13 @@ class FgcmStars(object):
 
         self.fgcmLog.info('Applying ApertureCorrections to raw magnitudes')
 
+        if self.seeingSubExposure:
+            self.fgcmLog.info('Aperture correction has sub-exposure information')
+        else:
+            self.fgcmLog.info('Aperture correction is per-exposure')
+
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
 
         obsMagADU = snmm.getArray(self.obsMagADUHandle)
 
@@ -1116,7 +1124,11 @@ class FgcmStars(object):
         #  If we add aperCorr to each of mstd_ij, then we get a smaller (brighter)
         #  magnitude.  And this will bring mstd_ij closer to <mstd>_j
 
-        obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
+        if self.seeingSubExposure:
+            obsMagADU[:] += fgcmPars.ccdApertureCorrection[obsExpIndex, obsCCDIndex]
+        else:
+            # Per exposure
+            obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
     def computeModelMagErrors(self, fgcmPars):
         """
