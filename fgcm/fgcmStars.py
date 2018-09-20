@@ -1018,6 +1018,14 @@ class FgcmStars(object):
         self.fgcmLog.info("Marked %d observations (%.4f%%) as SUPERSTAR_OUTLIER" %
                           (nbad, 100. * float(nbad)/float(goodObs.size)))
 
+        # Now we need to flag stars that might have fallen below our threshold
+        # when we flagged these outliers
+        goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
+        self.selectStarsMinObsExpIndex(goodExpsIndex)
+
+        # I had considered it might be necessary to flag bad exposures
+        # at this point, but I don't think that's the case.
+
     def applySuperStarFlat(self,fgcmPars):
         """
         Apply superStarFlat to raw magnitudes.
