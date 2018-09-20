@@ -200,7 +200,7 @@ class FgcmModelMagErrors(object):
                 slit = np.where((obsMagADUMeanGOu > (mid - 0.2)) &
                                 (obsMagADUMeanGOu < (mid + 0.2)))
 
-                if slit.size == 0:
+                if slit[0].size == 0:
                     continue
 
                 extent = (np.min(np.log10(obsFwhmGOu[slit])), np.max(np.log10(obsFwhmGOu[slit])),

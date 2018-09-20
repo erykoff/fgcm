@@ -94,7 +94,7 @@ class FgcmSuperStarFlat(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # Flag bad observations here...
-        self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
+        self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
