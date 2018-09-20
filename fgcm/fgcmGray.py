@@ -233,7 +233,6 @@ class FgcmGray(object):
                                                           self.fgcmPars.bands[i]))
             plt.close(fig)
 
-
     def computeCCDAndExpGray(self,doPlots=True,onlyObsErr=False):
         """
         Compute CCD and exposure gray using calibrated magnitudes.
