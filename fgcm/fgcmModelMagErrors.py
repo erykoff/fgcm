@@ -156,7 +156,10 @@ class FgcmModelMagErrors(object):
 
             p0 = np.array([quadFit[2], quadFit[1], quadFit[0], fwhmFit[0], skyFit[0], 0.0, 0.0])
 
-            pars = scipy.optimize.fmin_bfgs(fitFn, p0, maxiter=1000)
+            # Use nelder-mead simplex
+            pars = scipy.optimize.fmin(fitFn, p0, maxiter=5000, disp=False)
+            # And it looks like it can use another run
+            pars = scipy.optimize.fmin(fitFn, pars, maxiter=5000, disp=False)
 
             # And store the values
             self.fgcmPars.compModelErrExptimePivot[bandIndex] = medExptime
