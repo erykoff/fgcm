@@ -84,7 +84,7 @@ class FgcmModelMagErrors(object):
         obsSkyBrightness = self.fgcmPars.expSkyBrightness[obsExpIndex]
 
         goodStars = self.fgcmStars.getGoodStarIndices()
-        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         # And loop over bands
         for bandIndex in xrange(self.fgcmPars.nBands):
