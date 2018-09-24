@@ -116,7 +116,7 @@ class FgcmBrightObs(object):
         preStartTime=time.time()
         self.fgcmLog.info('Pre-matching stars and observations...')
 
-        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True)
 
         self.fgcmLog.info('Pre-matching done in %.1f sec.' %
                          (time.time() - preStartTime))
