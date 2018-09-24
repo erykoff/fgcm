@@ -62,7 +62,7 @@ class FgcmFlagVariables(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
-        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
