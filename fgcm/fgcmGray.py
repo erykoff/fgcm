@@ -290,7 +290,7 @@ class FgcmGray(object):
         # Only use good observations of good stars...
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -484,7 +484,7 @@ class FgcmGray(object):
 
         # This should check that every star used has a valid g-i color
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True)
 
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                  objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
