@@ -317,6 +317,7 @@ class FgcmGray(object):
         self.fgcmLog.info('FgcmGray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
 
+
         # group by CCD and sum
 
         ## ccdGray = Sum(EGray/EGrayErr^2) / Sum(1./EGrayErr^2)
@@ -480,7 +481,6 @@ class FgcmGray(object):
         EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
         EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
                            obsMagStd[obsIndex])
-
 
         # This should check that every star used has a valid g-i color
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
