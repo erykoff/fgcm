@@ -509,7 +509,7 @@ class FgcmStars(object):
 
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
-                                  minObsPerBand=None):
+                                  minObsPerBand=None, reset=True):
         """
         Select stars that have at least the minimum number of observations per band,
          using a list of good exposures
@@ -522,6 +522,8 @@ class FgcmStars(object):
            Only flag bad objects temporarily
         minObsPerBand: int
            Specify the min obs per band, or use self.minObsPerBand
+        reset: bool, default=False
+           Reset the bad stars
         """
 
         if (minObsPerBand is None):
@@ -568,7 +570,7 @@ class FgcmStars(object):
             bad, = np.where(minObs < minObsPerBand)
 
         # reset too few obs flag if it's already set
-        if not temporary:
+        if reset:
             objFlag &= ~objFlagDict['TOO_FEW_OBS']
 
         if (not temporary) :
@@ -701,7 +703,7 @@ class FgcmStars(object):
 
         return np.where(goodFlag)[0]
 
-    def getGoodObsIndices(self, goodStars, expFlag=None, requireSED=False):
+    def getGoodObsIndices(self, goodStars, expFlag=None, requireSED=False, checkBadMag=False):
         """
         Get the good observation indices.
 
@@ -713,6 +715,8 @@ class FgcmStars(object):
            expFlag from fgcmPars, will be selected on if provided
         requireSED: bool, default=False
            Should the good observations require SED measurement?
+        checkBadMag: bool, default=False
+           Check specifically for bad magnitudes
 
         returns
         -------
@@ -740,11 +744,17 @@ class FgcmStars(object):
             obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
             okFlag &= (expFlag[obsExpIndex[goodObs]] == 0)
 
+        # Make sure we don't have any 99s or related due to stars going bad
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        if checkBadMag:
+            objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+            okFlag &= (objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0)
+
         if not self.allFitBandsAreRequired or self.nNotFitBands > 0:
             # We need to do some extra checks since not all fit bands are required
             # Or we have some extra bands.
             objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-            obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
 
             okFlag &= (objNGoodObs[goodStars[goodStarsSub], obsBandIndex[goodObs]] >= self.minObsPerBand)
 
@@ -1023,7 +1033,7 @@ class FgcmStars(object):
         # Now we need to flag stars that might have fallen below our threshold
         # when we flagged these outliers
         goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
-        self.selectStarsMinObsExpIndex(goodExpsIndex)
+        self.selectStarsMinObsExpIndex(goodExpsIndex, reset=reset)
 
         # I had considered it might be necessary to flag bad exposures
         # at this point, but I don't think that's the case.
