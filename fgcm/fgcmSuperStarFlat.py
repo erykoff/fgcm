@@ -96,7 +96,7 @@ class FgcmSuperStarFlat(object):
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
