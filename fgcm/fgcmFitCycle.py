@@ -369,12 +369,13 @@ class FgcmFitCycle(object):
         self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
         # Flag variables for next cycle
-        self.fgcmLog.debug('FitCycle flagging variables')
-        self.fgcmFlagVars = FgcmFlagVariables(self.fgcmConfig,self.fgcmPars,
-                                              self.fgcmStars)
-        self.fgcmFlagVars.flagVariables()
+        # NOT USED NOW
+        #self.fgcmLog.debug('FitCycle flagging variables')
+        #self.fgcmFlagVars = FgcmFlagVariables(self.fgcmConfig,self.fgcmPars,
+        #                                      self.fgcmStars)
+        #self.fgcmFlagVars.flagVariables()
 
-        self.fgcmLog.info(getMemoryString('After flagging variables'))
+        #self.fgcmLog.info(getMemoryString('After flagging variables'))
 
         # Re-flag exposures for superstar, aperture, etc.
         self.fgcmLog.debug('FitCycle re-selecting good exposures')
