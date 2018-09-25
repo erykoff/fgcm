@@ -144,7 +144,7 @@ class FgcmApertureCorrection(object):
                                      1.0,
                                      w=(1./binStruct['Y_ERR'])**2.,
                                      cov=True)
-            except:
+            except Exception as inst:
                 self.fgcmLog.info('aperture correction completely failed for band %s' %
                                   (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
