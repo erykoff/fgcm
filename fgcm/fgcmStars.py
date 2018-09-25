@@ -354,7 +354,7 @@ class FgcmStars(object):
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
-            except:
+            except KeyError:
                 self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
                 bandIndex = -1
 
@@ -780,7 +780,7 @@ class FgcmStars(object):
         import healpy as hp
         try:
             from .fgcmPlotmaps import plot_hpxmap
-        except:
+        except ImportError:
             self.fgcmLog.info("Map plotting not available.  Sorry!")
             return
 
