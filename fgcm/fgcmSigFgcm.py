@@ -167,7 +167,7 @@ class FgcmSigFgcm(object):
 
                 try:
                     coeff = histoGauss(ax, EGrayGO[sigUse])
-                except:
+                except Exception as inst:
                     coeff = np.array([np.inf, np.inf, np.inf])
 
                 if not np.isfinite(coeff[2]):
