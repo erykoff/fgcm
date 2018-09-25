@@ -3,8 +3,6 @@ from past.builtins import xrange
 
 import os
 import matplotlib
-try:             os.environ['DISPLAY']
-except KeyError: matplotlib.use('Agg')
 from collections import OrderedDict as odict
 
 import numpy as np
@@ -14,9 +12,12 @@ import matplotlib.colors as colors
 import healpy
 import esutil
 
-from mpl_toolkits.axisartist import Subplot
-from matplotlib.ticker import MaxNLocator
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+try:
+    from mpl_toolkits.axisartist import Subplot
+    from matplotlib.ticker import MaxNLocator
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+except ImportError:
+    raise ImportError("Map plotting not available")
 
 from .fgcmBasemap import FgcmBasemap
 
