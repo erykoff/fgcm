@@ -582,7 +582,7 @@ class FgcmParameters(object):
         try:
             self.expFwhm = expInfo[self.fwhmField]
             self.expSkyBrightness = expInfo[self.skyBrightnessField]
-        except:
+        except KeyError:
             if self.modelMagErrors:
                 raise ValueError("Must have columns for %s and %s to use modelMagErrors option" %
                                  (self.fwhmField, self.skyBrightnessField))
@@ -639,7 +639,8 @@ class FgcmParameters(object):
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
-            except:
+            except Exception as inst:
+                print(inst)
                 self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
                 continue
 
