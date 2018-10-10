@@ -483,8 +483,10 @@ class FgcmGray(object):
                            obsMagStd[obsIndex])
 
         # This should check that every star used has a valid g-i color
+        # We also want to filter only photometric observations, because
+        # that's what we're going to be using
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
 
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                  objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
