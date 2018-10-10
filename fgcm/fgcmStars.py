@@ -1196,7 +1196,7 @@ class FgcmStars(object):
         # loop over bands
         for bandIndex in xrange(fgcmPars.nBands):
             use, = np.where((obsBandIndex[goodObs] == bandIndex) &
-                            (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] > self.minObsPerBand))
+                            (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             pars = fgcmPars.compModelErrPars[:, bandIndex]
             fwhmPivot = fgcmPars.compModelErrFwhmPivot[bandIndex]
             skyPivot = fgcmPars.compModelErrSkyPivot[bandIndex]
