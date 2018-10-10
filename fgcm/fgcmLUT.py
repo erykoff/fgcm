@@ -863,7 +863,7 @@ class FgcmLUT(object):
 
         try:
             sedLUT = fitsio.read(lutFile, ext='SED')
-        except:
+        except Exception as inst:
             sedLUT = None
 
         return cls(indexVals, lutFlat, lutDerivFlat, stdVals,

@@ -96,7 +96,7 @@ class FgcmSigFgcm(object):
 
         goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
 
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -167,7 +167,7 @@ class FgcmSigFgcm(object):
 
                 try:
                     coeff = histoGauss(ax, EGrayGO[sigUse])
-                except:
+                except Exception as inst:
                     coeff = np.array([np.inf, np.inf, np.inf])
 
                 if not np.isfinite(coeff[2]):

@@ -313,7 +313,7 @@ class FgcmChisq(object):
         else:
             try:
                 fitChisq = self.fitChisqs[-1]
-            except:
+            except IndexError:
                 fitChisq = 0.0
 
         # free shared arrays

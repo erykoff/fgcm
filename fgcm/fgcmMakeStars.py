@@ -233,7 +233,7 @@ class FgcmMakeStars(object):
             import smatch
             hasSmatch = True
             self.fgcmLog.info("Using smatch for matching.")
-        except:
+        except ImportError:
             hasSmatch = False
             self.fgcmLog.info("Using htm for matching.")
 
@@ -492,7 +492,7 @@ class FgcmMakeStars(object):
         try:
             import smatch
             hasSmatch = True
-        except:
+        except ImportError:
             hasSmatch = False
 
         if (raArray.size != decArray.size or

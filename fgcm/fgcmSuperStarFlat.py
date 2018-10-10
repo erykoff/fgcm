@@ -81,7 +81,6 @@ class FgcmSuperStarFlat(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsSuperStarApplied = snmm.getArray(self.fgcmStars.obsSuperStarAppliedHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
@@ -97,7 +96,7 @@ class FgcmSuperStarFlat(object):
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
@@ -146,29 +145,6 @@ class FgcmSuperStarFlat(object):
         if not self.superStarSubCCD or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
-            # We need to sort through to reject outliers (ugh)
-            """
-            epochFilterHash = (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]]*
-                               (self.fgcmPars.nLUTFilter+1)*(self.fgcmPars.nCCD+1) +
-                               self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]]*
-                               (self.fgcmPars.nCCD+1) +
-                               obsCCDIndex[goodObs])
-
-            mark = np.zeros(goodObs.size, dtype=np.bool)
-
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
-
-            for i in xrange(h.size):
-                if h[i] == 0: continue
-
-                i1a = rev[rev[i]:rev[i+1]]
-
-                med = np.median(EGrayGO[i1a])
-                sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
-                okay, = np.where(np.abs(EGrayGO[i1a] - med) <= self.superStarSigmaClip * sig)
-
-                mark[i1a[okay]] = True
-"""
             mark = np.ones(goodObs.size, dtype=np.bool)
 
             # Next, we sort by epoch, band
@@ -248,14 +224,6 @@ class FgcmSuperStarFlat(object):
                 epInd = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[i1a[0]]]]
                 fiInd = self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[i1a[0]]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
-
-                """
-                # Need to reject outliers here...
-                med = np.median(EGrayGO[i1a])
-                sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
-                okay, = np.where(np.abs(EGrayGO[i1a] - med) <= self.superStarSigmaClip * sig)
-                i1a = i1a[okay]
-                """
 
                 computeMean = False
                 try:

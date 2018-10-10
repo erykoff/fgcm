@@ -72,6 +72,7 @@ class FgcmZeropoints(object):
         self.expGrayErrRecoverCut = fgcmConfig.expGrayErrRecoverCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
 
     def computeZeropoints(self):
@@ -214,7 +215,10 @@ class FgcmZeropoints(object):
         zpStruct['FGCM_DUST'][:] = self.fgcmPars.expQESys[zpExpIndex]
 
         # fill in the aperture correction
-        zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
+        if self.seeingSubExposure:
+            zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.ccdApertureCorrection[zpExpIndex, zpCCDIndex]
+        else:
+            zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
 
         # fill in the retrieved values
         zpStruct['FGCM_R0'][:] = r0[zpExpIndex, zpCCDIndex]

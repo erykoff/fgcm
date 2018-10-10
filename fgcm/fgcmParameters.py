@@ -114,6 +114,7 @@ class FgcmParameters(object):
 
         self.nExp = fgcmConfig.nExp
         self.seeingField = fgcmConfig.seeingField
+        self.seeingSubExposure = fgcmConfig.seeingSubExposure
         self.deepFlag = fgcmConfig.deepFlag
         self.fwhmField = fgcmConfig.fwhmField
         self.skyBrightnessField = fgcmConfig.skyBrightnessField
@@ -537,13 +538,51 @@ class FgcmParameters(object):
         self.expFlag = np.zeros(self.nExp,dtype=np.int8)
         self.expExptime = expInfo['EXPTIME']
 
-        self.expSeeingVariable = expInfo[self.seeingField]
+        # Load in the expSeeingVariable
+        if len(expInfo[self.seeingField].shape) == 2:
+            if expInfo[self.seeingField].shape[1] != self.nCCD:
+                raise ValueError('ExpINfo %s field has the wrong number of ccds (%d != %d)' % (self.seeingField, self.expSeeingVariable.shape[1], self.nCCD))
+
+            self.expSeeingVariablePerCCD = expInfo[self.seeingField]
+
+            # And also compute the median per exposure
+            # This is what will be used for calibration, and in case
+            # the config.seeingSubExposure is set
+
+            # In the future we can also compute a smooth fit to the FOV, that's
+            # less necessary I think
+
+            self.expSeeingVariable = np.zeros(expInfo.size)
+            for i in xrange(expInfo.size):
+                u = ((self.expSeeingVariablePerCCD[i, :] != 0.0) &
+                     (self.expSeeingVariablePerCCD[i, :] > -100.0))
+                if u.sum() >= 3:
+                    self.expSeeingVariable[i] = np.median(self.expSeeingVariablePerCCD[i, u])
+                    # Fill in the bad values with the median of the good ones
+                    self.expSeeingVariablePerCCD[i, ~u] = self.expSeeingVariable[i]
+                else:
+                    self.expSeeingVariablePerCCD[i, :] = -1000.0
+                    self.expSeeingVariable[i] = -1000.0
+
+        else:
+            # Regular per-exposure
+            self.expSeeingVariable = expInfo[self.seeingField]
+
+            if self.seeingSubExposure:
+                raise RuntimeError("Config seeingSubExposure set to true, but no sub-exposure info is in the expInfo file.")
+
+        if (len(self.expSeeingVariable.shape) == 2):
+            if not self.seeingSubExposure:
+                raise ValueError('ExpInfo has multi-dimensional %s field, but seeingSubExposure is False' % (self.seeingField))
+            if self.expSeeingVariable.shape[1] != self.nCCD:
+                raise ValueError('ExpINfo %s field has the wrong number of ccds (%d != %d)' % (self.seeingField, self.expSeeingVariable.shape[1], self.nCCD))
+
         self.expDeepFlag = expInfo[self.deepFlag]
 
         try:
             self.expFwhm = expInfo[self.fwhmField]
             self.expSkyBrightness = expInfo[self.skyBrightnessField]
-        except:
+        except KeyError:
             if self.modelMagErrors:
                 raise ValueError("Must have columns for %s and %s to use modelMagErrors option" %
                                  (self.fwhmField, self.skyBrightnessField))
@@ -600,7 +639,8 @@ class FgcmParameters(object):
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
-            except:
+            except Exception as inst:
+                print(inst)
                 self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
                 continue
 
@@ -1453,6 +1493,29 @@ class FgcmParameters(object):
 
         return expApertureCorrection
 
+    @property
+    def ccdApertureCorrection(self):
+        """
+        CCD aperture correction
+
+        returns
+        -------
+        ccdApertureCorrection: nccd x nexp float array
+        """
+
+        ccdApertureCorrection = np.zeros((self.nExp, self.nCCD), dtype='f8')
+
+
+        # Run per ccd (assuming it's the shorter loop)
+        for i in xrange(self.nCCD):
+            ccdSeeingVariableClipped = np.clip(self.expSeeingVariablePerCCD[:, i],
+                                               self.compAperCorrRange[0, self.expBandIndex],
+                                               self.compAperCorrRange[1, self.expBandIndex])
+            ccdApertureCorrection[:, i] = (self.compAperCorrSlope[self.expBandIndex] *
+                                           (ccdSeeingVariableClipped -
+                                            self.compAperCorrPivot[self.expBandIndex]))
+
+        return ccdApertureCorrection
 
     def plotParameters(self):
         """
