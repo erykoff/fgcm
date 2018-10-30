@@ -160,8 +160,9 @@ class FgcmConfig(object):
     freezeStdAtmosphere = ConfigField(bool, default=False)
     reserveFraction = ConfigField(float, default=0.1)
     precomputeSuperStarInitialCycle = ConfigField(bool, default=False)
-    useRetrievedPWV = ConfigField(bool, default=False)
-    useNightlyRetrievedPWV = ConfigField(bool, default=False)
+    useRetrievedPwv = ConfigField(bool, default=False)
+    useNightlyRetrievedPwv = ConfigField(bool, default=False)
+    useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
@@ -175,7 +176,7 @@ class FgcmConfig(object):
     outputPath = ConfigField(str, required=False)
 
     pwvFile = ConfigField(str, required=False)
-    externalPWVDeltaT = ConfigField(float, default=0.1)
+    externalPwvDeltaT = ConfigField(float, default=0.1)
     tauFile = ConfigField(str, required=False)
     externalTauDeltaT = ConfigField(float, default=0.1)
     stepUnitReference = ConfigField(float, default=0.001)
@@ -344,8 +345,10 @@ class FgcmConfig(object):
         # get LUT standard values
         self.pmbStd = lutStd['PMBSTD'][0]
         self.pwvStd = lutStd['PWVSTD'][0]
+        self.lnPwvStd = np.log(lutStd['PWVSTD'][0])
         self.o3Std = lutStd['O3STD'][0]
         self.tauStd = lutStd['TAUSTD'][0]
+        self.lnTauStd = np.log(lutStd['TAUSTD'][0])
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
 
