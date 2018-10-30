@@ -393,7 +393,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars)
-        self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
+        self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
         #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray)

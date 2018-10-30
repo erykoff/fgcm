@@ -255,7 +255,7 @@ class FgcmZeropoints(object):
 
         # and do the LUT lookups
         lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expLUTFilterIndex[zpExpIndex],
-                                             self.fgcmPars.expPWV[zpExpIndex],
+                                             self.fgcmPars.expLnPwv[zpExpIndex],
                                              self.fgcmPars.expO3[zpExpIndex],
                                              #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                              self.fgcmPars.expLnTau[zpExpIndex],
@@ -263,7 +263,7 @@ class FgcmZeropoints(object):
                                              ccdSecZenith,
                                              zpCCDIndex,
                                              self.fgcmPars.expPmb[zpExpIndex])
-        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[zpExpIndex],
+        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expLnPwv[zpExpIndex],
                                                         self.fgcmPars.expO3[zpExpIndex],
                                                         #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                                         self.fgcmPars.expLnTau[zpExpIndex],
@@ -271,7 +271,7 @@ class FgcmZeropoints(object):
                                                         ccdSecZenith,
                                                         self.fgcmPars.expPmb[zpExpIndex],
                                                         lutIndices)
-        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[zpExpIndex],
+        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(self.fgcmPars.expLnPwv[zpExpIndex],
                                                          self.fgcmPars.expO3[zpExpIndex],
                                                          #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                                          self.fgcmPars.expLnTau[zpExpIndex],
@@ -448,8 +448,7 @@ class FgcmZeropoints(object):
         # and make the parameter file
         atmStruct[self.expField] = self.fgcmPars.expArray
         atmStruct['PMB'] = self.fgcmPars.expPmb
-        atmStruct['PWV'] = self.fgcmPars.expPWV
-        #atmStruct['TAU'] = self.fgcmPars.expTau
+        atmStruct['PWV'] = np.exp(self.fgcmPars.expLnPwv)
         atmStruct['TAU'] = np.exp(self.fgcmPars.expLnTau)
         atmStruct['ALPHA'] = self.fgcmPars.expAlpha
         atmStruct['O3'] = self.fgcmPars.expO3

@@ -42,10 +42,10 @@ class FgcmParameters(object):
        MJDs which divide observing epochs
     washMJDs: double array
        MJDs which denote mirror washing dates
-    useRetrievedPWV: bool
-       Use PWV retrieved from colors from previous cycle?
-    useNightlyRetrievedPWV: bool
-       Re-fit offsets for each night PWV variation (if useRetrievedPWV==True)?
+    useRetrievedPwv: bool
+       Use Pwv retrieved from colors from previous cycle?
+    useNightlyRetrievedPwv: bool
+       Re-fit offsets for each night Pwv variation (if useRetrievedPwv==True)?
     useRetrievedTauInit: bool
        Use nightly retrieved tau from previous cycle as initial guess? (experimental)
     """
@@ -65,7 +65,7 @@ class FgcmParameters(object):
         if (not initNew and not loadOld):
             raise ValueError("Too few parameters specificed: either expInfo/fgcmLUT or inParInof/inParams/inSuperStar")
 
-        self.hasExternalPWV = False
+        self.hasExternalPwv = False
         self.hasExternalTau = False
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
@@ -98,14 +98,16 @@ class FgcmParameters(object):
         self.alphaStd = fgcmConfig.alphaStd
         self.o3Std = fgcmConfig.o3Std
         self.tauStd = fgcmConfig.tauStd
-        self.lnTauStd = np.log(self.tauStd)
+        self.lnTauStd = fgcmConfig.lnTauStd
         self.pwvStd = fgcmConfig.pwvStd
+        self.lnPwvStd = fgcmConfig.lnPwvStd
         self.pmbStd = fgcmConfig.pmbStd
         self.zenithStd = fgcmConfig.zenithStd
         self.secZenithStd = 1./np.cos(self.zenithStd*np.pi/180.)
 
         self.pmbRange = fgcmConfig.pmbRange
         self.pwvRange = fgcmConfig.pwvRange
+        self.lnPwvRange = np.log(self.pwvRange)
         self.O3Range = fgcmConfig.O3Range
         self.tauRange = fgcmConfig.tauRange
         self.lnTauRange = np.log(self.tauRange)
@@ -132,10 +134,11 @@ class FgcmParameters(object):
 
         self.pwvFile = fgcmConfig.pwvFile
         self.tauFile = fgcmConfig.tauFile
-        self.externalPWVDeltaT = fgcmConfig.externalPWVDeltaT
+        self.externalPwvDeltaT = fgcmConfig.externalPwvDeltaT
         self.externalTauDeltaT = fgcmConfig.externalTauDeltaT
-        self.useRetrievedPWV = fgcmConfig.useRetrievedPWV
-        self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
+        self.useRetrievedPwv = fgcmConfig.useRetrievedPwv
+        self.useNightlyRetrievedPwv = fgcmConfig.useNightlyRetrievedPwv
+        self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
 
@@ -149,9 +152,10 @@ class FgcmParameters(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
 
         # and the default unit dict
-        self.unitDictOnes = {'pwvUnit':1.0,
-                             'pwvPerSlopeUnit':1.0,
-                             'pwvGlobalUnit':1.0,
+        self.unitDictOnes = {'lnPwvUnit':1.0,
+                             'lnPwvSlopeUnit':1.0,
+                             'lnPwvQuadraticUnit':1.0,
+                             'lnPwvGlobalUnit':1.0,
                              'o3Unit':1.0,
                              'lnTauUnit':1.0,
                              'lnTauSlopeUnit':1.0,
@@ -278,8 +282,9 @@ class FgcmParameters(object):
         self.parLnTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.lnTauStd
         self.parLnTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
         # these we will always have, won't always fit
-        self.parPWVIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.pwvStd
-        self.parPWVPerSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parLnPwvIntercept = np.zeros(self.campaignNights.size, dtype=np.float32) + fgcmLUT.lnPwvStd
+        self.parLnPwvSlope = np.zeros(self.campaignNights.size, dtype=np.float32)
+        self.parLnPwvQuadratic = np.zeros(self.campaignNights.size, dtype=np.float32)
 
         # parameters with per-epoch values
         self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float64)
@@ -291,15 +296,12 @@ class FgcmParameters(object):
         self.parQESysSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
 
         ## FIXME: need to completely refactor
-        self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
+        self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.pwvFile is not None):
             self.fgcmLog.info('Found external PWV file.')
             self.pwvFile = self.pwvFile
-            self.hasExternalPWV = True
-            self.loadExternalPWV(self.externalPWVDeltaT)
-            # need to add two global parameters!
-            #self.parExternalPWVScale = 1.0
-            #self.parExternalPWVOffset = 0.0
+            self.hasExternalPwv = True
+            self.loadExternalPwv(self.externalPwvDeltaT)
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.tauFile is not None):
@@ -307,9 +309,6 @@ class FgcmParameters(object):
             self.tauFile = self.tauFile
             self.hasExternalTau = True
             self.loadExternalTau()
-            # need to add two global parameters!
-            #self.parExternalTauScale = 1.0
-            #self.parExternalTauOffset = 0.0
 
         # and the aperture corrections
         ## FIXME: should these be per band or filter??
@@ -332,15 +331,15 @@ class FgcmParameters(object):
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
 
-        # and the computed retrieved PWV
+        # and the computed retrieved Pwv
         # these are set to the standard values to start
-        self.compRetrievedPWV = np.zeros(self.nExp,dtype='f8') + self.pwvStd
-        self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
-        self.compRetrievedPWVRaw = np.zeros(self.nExp,dtype='f8')
-        self.compRetrievedPWVFlag = np.zeros(self.nExp,dtype='i2') + retrievalFlagDict['EXPOSURE_STANDARD']
-        self.parRetrievedPWVScale = 1.0
-        self.parRetrievedPWVOffset = 0.0
-        self.parRetrievedPWVNightlyOffset = np.zeros(self.nCampaignNights,dtype='f8')
+        self.compRetrievedLnPwv = np.zeros(self.nExp,dtype='f8') + self.lnPwvStd
+        self.compRetrievedLnPwvInput = self.compRetrievedLnPwv.copy()
+        self.compRetrievedLnPwvRaw = np.zeros(self.nExp,dtype='f8')
+        self.compRetrievedLnPwvFlag = np.zeros(self.nExp,dtype='i2') + retrievalFlagDict['EXPOSURE_STANDARD']
+        self.parRetrievedLnPwvScale = 1.0
+        self.parRetrievedLnPwvOffset = 0.0
+        self.parRetrievedLnPwvNightlyOffset = np.zeros(self.nCampaignNights,dtype='f8')
 
         # and retrieved tau nightly start values
         self.compRetrievedTauNight = np.zeros(self.campaignNights.size,dtype='f8') + self.tauStd
@@ -382,9 +381,10 @@ class FgcmParameters(object):
         self.unitDictSteps = {'lnTauUnit': inParInfo['LNTAUUNIT'][0],
                               'lnTauSlopeUnit': inParInfo['LNTAUSLOPEUNIT'][0],
                               'alphaUnit': inParInfo['ALPHAUNIT'][0],
-                              'pwvUnit': inParInfo['PWVUNIT'][0],
-                              'pwvPerSlopeUnit': inParInfo['PWVPERSLOPEUNIT'][0],
-                              'pwvGlobalUnit': inParInfo['PWVGLOBALUNIT'][0],
+                              'lnPwvUnit': inParInfo['LNPWVUNIT'][0],
+                              'lnPwvSlopeUnit': inParInfo['LNPWVSLOPEUNIT'][0],
+                              'lnPwvQuadraticUnit': inParInfo['LNPWVQUADRATICUNIT'][0],
+                              'lnPwvGlobalUnit': inParInfo['LNPWVGLOBALUNIT'][0],
                               'o3Unit': inParInfo['O3UNIT'][0],
                               'qeSysUnit': inParInfo['QESYSUNIT'][0],
                               'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0]}
@@ -394,18 +394,20 @@ class FgcmParameters(object):
         self.fgcmLog.info('lnTau slope step unit set to %f' %
                          (self.unitDictSteps['lnTauSlopeUnit']))
         self.fgcmLog.info('alpha step unit set to %f' % (self.unitDictSteps['alphaUnit']))
-        self.fgcmLog.info('pwv step unit set to %f' % (self.unitDictSteps['pwvUnit']))
-        self.fgcmLog.info('pwv percent slope step unit set to %f' %
-                         (self.unitDictSteps['pwvPerSlopeUnit']))
-        self.fgcmLog.info('pwv global step unit set to %f' %
-                          (self.unitDictSteps['pwvGlobalUnit']))
+        self.fgcmLog.info('lnPwv step unit set to %f' % (self.unitDictSteps['lnPwvUnit']))
+        self.fgcmLog.info('lnPwv slope step unit set to %f' %
+                         (self.unitDictSteps['lnPwvSlopeUnit']))
+        self.fgcmLog.info('lnPwv quadratic step unit set to %f' %
+                          (self.unitDictSteps['lnPwvQuadraticUnit']))
+        self.fgcmLog.info('lnPwv global step unit set to %f' %
+                          (self.unitDictSteps['lnPwvGlobalUnit']))
         self.fgcmLog.info('O3 step unit set to %f' % (self.unitDictSteps['o3Unit']))
         self.fgcmLog.info('wash step unit set to %f' % (self.unitDictSteps['qeSysUnit']))
         self.fgcmLog.info('wash slope step unit set to %f' %
                          (self.unitDictSteps['qeSysSlopeUnit']))
 
         # look at external...
-        self.hasExternalPWV = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
+        self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
         self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
 
         ## and copy the parameters
@@ -413,26 +415,27 @@ class FgcmParameters(object):
         self.parO3 = np.atleast_1d(inParams['PARO3'][0])
         self.parLnTauIntercept = np.atleast_1d(inParams['PARLNTAUINTERCEPT'][0])
         self.parLnTauSlope = np.atleast_1d(inParams['PARLNTAUSLOPE'][0])
-        self.parPWVIntercept = np.atleast_1d(inParams['PARPWVINTERCEPT'][0])
-        self.parPWVPerSlope = np.atleast_1d(inParams['PARPWVPERSLOPE'][0])
+        self.parLnPwvIntercept = np.atleast_1d(inParams['PARLNPWVINTERCEPT'][0])
+        self.parLnPwvSlope = np.atleast_1d(inParams['PARLNPWVSLOPE'][0])
+        self.parLnPwvQuadratic = np.atleast_1d(inParams['PARLNPWVQUADRATIC'][0])
         self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
 
-        self.externalPWVFlag = np.zeros(self.nExp,dtype=np.bool)
-        if self.hasExternalPWV:
+        self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
+        if self.hasExternalPwv:
             self.pwvFile = str(inParInfo['PWVFILE'][0]).rstrip()
-            self.hasExternalPWV = True
-            self.loadExternalPWV(self.externalPWVDeltaT)
-            self.parExternalPWVScale = inParams['PAREXTERNALPWVSCALE'][0]
-            self.parExternalPWVOffset[:] = np.atleast_1d(inParams['PAREXTERNALPWVOFFSET'][0])
+            self.hasExternalPwv = True
+            self.loadExternalPwv(self.externalPwvDeltaT)
+            self.parExternalLnPwvScale = inParams['PAREXTERNALLNPWVSCALE'][0]
+            self.parExternalLnPwvOffset[:] = np.atleast_1d(inParams['PAREXTERNALLNPWVOFFSET'][0])
 
         self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalTau:
             self.tauFile = str(inParInfo['TAUFILE'][0]).rstrip()
             self.hasExternalTau = True
             self.loadExternalTau()
-            self.parExternalTauScale = inParams['PAREXTERNALTAUSCALE'][0]
-            self.parExternalTauOffset[:] = np.atleast_1d(inParams['PAREXTERNALTAUOFFSET'][0])
+            self.parExternalLnTauScale = inParams['PAREXTERNALLNTAUSCALE'][0]
+            self.parExternalLnTauOffset[:] = np.atleast_1d(inParams['PAREXTERNALLNTAUOFFSET'][0])
 
         self.compAperCorrPivot = np.atleast_1d(inParams['COMPAPERCORRPIVOT'][0])
         self.compAperCorrSlope = np.atleast_1d(inParams['COMPAPERCORRSLOPE'][0])
@@ -455,13 +458,13 @@ class FgcmParameters(object):
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
 
         # These are exposure-level properties
-        self.compRetrievedPWV = np.atleast_1d(inParams['COMPRETRIEVEDPWV'][0])
-        self.compRetrievedPWVInput = self.compRetrievedPWV.copy()
-        self.compRetrievedPWVRaw = np.atleast_1d(inParams['COMPRETRIEVEDPWVRAW'][0])
-        self.compRetrievedPWVFlag = np.atleast_1d(inParams['COMPRETRIEVEDPWVFLAG'][0])
-        self.parRetrievedPWVScale = inParams['PARRETRIEVEDPWVSCALE'][0]
-        self.parRetrievedPWVOffset = inParams['PARRETRIEVEDPWVOFFSET'][0]
-        self.parRetrievedPWVNightlyOffset = np.atleast_1d(inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][0])
+        self.compRetrievedLnPwv = np.atleast_1d(inParams['COMPRETRIEVEDLNPWV'][0])
+        self.compRetrievedLnPwvInput = self.compRetrievedLnPwv.copy()
+        self.compRetrievedLnPwvRaw = np.atleast_1d(inParams['COMPRETRIEVEDLNPWVRAW'][0])
+        self.compRetrievedLnPwvFlag = np.atleast_1d(inParams['COMPRETRIEVEDLNPWVFLAG'][0])
+        self.parRetrievedLnPwvScale = inParams['PARRETRIEVEDLNPWVSCALE'][0]
+        self.parRetrievedLnPwvOffset = inParams['PARRETRIEVEDLNPWVOFFSET'][0]
+        self.parRetrievedLnPwvNightlyOffset = np.atleast_1d(inParams['PARRETRIEVEDLNPWVNIGHTLYOFFSET'][0])
 
         # These are nightly properties
         self.compRetrievedTauNight = np.atleast_1d(inParams['COMPRETRIEVEDTAUNIGHT'][0])
@@ -494,26 +497,27 @@ class FgcmParameters(object):
         self.parO3[:] = self.o3Std
         self.parLnTauIntercept[:] = self.lnTauStd
         self.parLnTauSlope[:] = 0.0
-        self.parPWVIntercept[:] = self.pwvStd
-        self.parPWVPerSlope[:] = 0.0
+        self.parLnPwvIntercept[:] = self.lnPwvStd
+        self.parLnPwvSlope[:] = 0.0
+        self.parLnPwvQuadratic[:] = 0.0
 
         # We don't reset QESysIntercept and Slope because they aren't
         #  atmosphere parameters (they are instrument parameters)
 
-        if self.hasExternalPWV:
-            self.parExternalPWVScale = 1.0
-            self.parExternalPWVOffset = 0.0
+        if self.hasExternalPwv:
+            self.parExternalLnPwvScale = 1.0
+            self.parExternalLnPwvOffset = 0.0
 
         if self.hasExternalTau:
-            self.parExternalTauScale = 1.0
-            self.parExternalTauOffset = 0.0
+            self.parExternalLnTauScale = 1.0
+            self.parExternalLnTauOffset = 0.0
 
-        self.parRetrievedPWVScale = 1.0
-        self.parRetrievedPWVOffset = 0.0
-        self.parRetrievedPWVNightlyOffset[:] = 0.0
+        self.parRetrievedLnPwvScale = 1.0
+        self.parRetrievedLnPwvOffset = 0.0
+        self.parRetrievedLnPwvNightlyOffset[:] = 0.0
 
         # If we are resetting parameters, and want to use retrieved tau as the initial
-        #  guess, set parTauIntercept to that.
+        #  guess, set parLnTauIntercept to that.
         if self.useRetrievedTauInit:
             self.parLnTauIntercept[:] = np.log(self.compRetrievedTauNight)
 
@@ -728,7 +732,8 @@ class FgcmParameters(object):
                          self.nCampaignNights +  # tauPerSlope
                          self.nCampaignNights +  # alpha
                          self.nCampaignNights +  # pwv Intercept
-                         self.nCampaignNights)   # pwv Slope
+                         self.nCampaignNights +  # pwv Slope
+                         self.nCampaignNights)   # pwv Quadratic
         ctr=0
         self.parO3Loc = ctr
         ctr+=self.nCampaignNights
@@ -738,35 +743,37 @@ class FgcmParameters(object):
         ctr+=self.nCampaignNights
         self.parAlphaLoc = ctr
         ctr+=self.nCampaignNights
-        if not self.useRetrievedPWV:
-            self.parPWVInterceptLoc = ctr
+        if not self.useRetrievedPwv:
+            self.parLnPwvInterceptLoc = ctr
             ctr+=self.nCampaignNights
-            self.parPWVPerSlopeLoc = ctr
+            self.parLnPwvSlopeLoc = ctr
+            ctr+=self.nCampaignNights
+            self.parLnPwvQuadraticLoc = ctr
             ctr+=self.nCampaignNights
 
-        if self.hasExternalPWV and not self.useRetrievedPWV:
+        if self.hasExternalPwv and not self.useRetrievedPwv:
             self.nFitPars += (1+self.nCampaignNights)
-            self.parExternalPWVScaleLoc = ctr
+            self.parExternalLnPwvScaleLoc = ctr
             ctr+=1
-            self.parExternalPWVOffsetLoc = ctr
+            self.parExternalLnPwvOffsetLoc = ctr
             ctr+=self.nCampaignNights
 
         if self.hasExternalTau:
             self.nFitPars += (1+self.nCampaignNights)
-            self.parExternalTauScaleLoc = ctr
+            self.parExternalLnTauScaleLoc = ctr
             ctr+=1
-            self.parExternalTauOffsetLoc = ctr
+            self.parExternalLnTauOffsetLoc = ctr
             ctr+=self.nCampaignNights
 
-        if self.useRetrievedPWV:
+        if self.useRetrievedPwv:
             self.nFitPars += 2
-            self.parRetrievedPWVScaleLoc = ctr
+            self.parRetrievedLnPwvScaleLoc = ctr
             ctr+=1
-            if self.useNightlyRetrievedPWV:
-                self.parRetrievedPWVNightlyOffsetLoc = ctr
+            if self.useNightlyRetrievedPwv:
+                self.parRetrievedLnPwvNightlyOffsetLoc = ctr
                 ctr+=self.nCampaignNights
             else:
-                self.parRetrievedPWVOffsetLoc = ctr
+                self.parRetrievedLnPwvOffsetLoc = ctr
                 ctr+=1
 
         self.nFitPars += (self.nWashIntervals + # parQESysIntercept
@@ -827,9 +834,10 @@ class FgcmParameters(object):
                ('LNTAUUNIT','f8'),
                ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
-               ('PWVUNIT','f8'),
-               ('PWVPERSLOPEUNIT','f8'),
-               ('PWVGLOBALUNIT','f8'),
+               ('LNPWVUNIT','f8'),
+               ('LNPWVSLOPEUNIT','f8'),
+               ('LNPWVQUADRATICUNIT','f8'),
+               ('LNPWVGLOBALUNIT','f8'),
                ('O3UNIT','f8'),
                ('QESYSUNIT','f8'),
                ('QESYSSLOPEUNIT','f8'),
@@ -837,7 +845,7 @@ class FgcmParameters(object):
                ('HASEXTERNALTAU','i2')]
 
         ## FIXME: change from these files...
-        if (self.hasExternalPWV):
+        if (self.hasExternalPwv):
             dtype.extend([('PWVFILE','a%d' % (len(self.pwvFile)+1))])
         if (self.hasExternalTau):
             dtype.extend([('TAUFILE','a%d' % (len(self.tauFile)+1))])
@@ -852,15 +860,16 @@ class FgcmParameters(object):
         parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
         parInfo['LNTAUSLOPEUNIT'] = self.unitDictSteps['lnTauSlopeUnit']
         parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
-        parInfo['PWVUNIT'] = self.unitDictSteps['pwvUnit']
-        parInfo['PWVPERSLOPEUNIT'] = self.unitDictSteps['pwvPerSlopeUnit']
-        parInfo['PWVGLOBALUNIT'] = self.unitDictSteps['pwvGlobalUnit']
+        parInfo['LNPWVUNIT'] = self.unitDictSteps['lnPwvUnit']
+        parInfo['LNPWVSLOPEUNIT'] = self.unitDictSteps['lnPwvSlopeUnit']
+        parInfo['LNPWVQUADRATICUNIT'] = self.unitDictSteps['lnPwvQuadraticUnit']
+        parInfo['LNPWVGLOBALUNIT'] = self.unitDictSteps['lnPwvGlobalUnit']
         parInfo['O3UNIT'] = self.unitDictSteps['o3Unit']
         parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
         parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
 
-        parInfo['HASEXTERNALPWV'] = self.hasExternalPWV
-        if (self.hasExternalPWV):
+        parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
+        if (self.hasExternalPwv):
             parInfo['PWVFILE'] = self.pwvFile
         parInfo['HASEXTERNALTAU'] = self.hasExternalTau
         if (self.hasExternalTau):
@@ -868,8 +877,9 @@ class FgcmParameters(object):
 
         dtype=[('PARALPHA','f8',self.parAlpha.size),
                ('PARO3','f8',self.parO3.size),
-               ('PARPWVINTERCEPT','f8',self.parPWVIntercept.size),
-               ('PARPWVPERSLOPE','f8',self.parPWVPerSlope.size),
+               ('PARLNPWVINTERCEPT','f8',self.parLnPwvIntercept.size),
+               ('PARLNPWVSLOPE','f8',self.parLnPwvSlope.size),
+               ('PARLNPWVQUADRATIC','f8',self.parLnPwvQuadratic.size),
                ('PARLNTAUINTERCEPT','f8',self.parLnTauIntercept.size),
                ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
@@ -886,21 +896,21 @@ class FgcmParameters(object):
                ('COMPVARGRAY','f8',self.compVarGray.size),
                ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
                ('COMPSIGFGCM','f8',self.compSigFgcm.size),
-               ('COMPRETRIEVEDPWV','f8',self.compRetrievedPWV.size),
-               ('COMPRETRIEVEDPWVRAW','f8',self.compRetrievedPWVRaw.size),
-               ('COMPRETRIEVEDPWVFLAG','i2',self.compRetrievedPWVFlag.size),
-               ('PARRETRIEVEDPWVSCALE','f8'),
-               ('PARRETRIEVEDPWVOFFSET','f8'),
-               ('PARRETRIEVEDPWVNIGHTLYOFFSET','f8',self.parRetrievedPWVNightlyOffset.size),
+               ('COMPRETRIEVEDLNPWV','f8',self.compRetrievedLnPwv.size),
+               ('COMPRETRIEVEDLNPWVRAW','f8',self.compRetrievedLnPwvRaw.size),
+               ('COMPRETRIEVEDLNPWVFLAG','i2',self.compRetrievedLnPwvFlag.size),
+               ('PARRETRIEVEDLNPWVSCALE','f8'),
+               ('PARRETRIEVEDLNPWVOFFSET','f8'),
+               ('PARRETRIEVEDLNPWVNIGHTLYOFFSET','f8',self.parRetrievedLnPwvNightlyOffset.size),
                ('COMPRETRIEVEDTAUNIGHT','f8',self.compRetrievedTauNight.size)]
 
-        if (self.hasExternalPWV):
-            dtype.extend([('PAREXTERNALPWVSCALE','f8'),
-                          ('PAREXTERNALPWVOFFSET','f8',self.parExternalPWVOffset.size),
-                          ('EXTERNALPWV','f8',self.nExp)])
+        if (self.hasExternalPwv):
+            dtype.extend([('PAREXTERNALLNPWVSCALE','f8'),
+                          ('PAREXTERNALLNPWVOFFSET','f8',self.parExternalLnPwvOffset.size),
+                          ('EXTERNALLNPWV','f8',self.nExp)])
         if (self.hasExternalTau):
-            dtype.extend([('PAREXTERNALTAUSCALE','f8'),
-                          ('PAREXTERNALTAUOFFSET','f8',self.parExternalTauOffset.size),
+            dtype.extend([('PAREXTERNALLNTAUSCALE','f8'),
+                          ('PAREXTERNALLNTAUOFFSET','f8',self.parExternalLnTauOffset.size),
                           ('EXTERNALTAU','f8',self.nExp)])
 
         pars=np.zeros(1,dtype=dtype)
@@ -909,18 +919,19 @@ class FgcmParameters(object):
         pars['PARO3'][:] = self.parO3
         pars['PARLNTAUINTERCEPT'][:] = self.parLnTauIntercept
         pars['PARLNTAUSLOPE'][:] = self.parLnTauSlope
-        pars['PARPWVINTERCEPT'][:] = self.parPWVIntercept
-        pars['PARPWVPERSLOPE'][:] = self.parPWVPerSlope
+        pars['PARLNPWVINTERCEPT'][:] = self.parLnPwvIntercept
+        pars['PARLNPWVSLOPE'][:] = self.parLnPwvSlope
+        pars['PARLNPWVQUADRATIC'][:] = self.parLnPwvQuadratic
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
 
-        if (self.hasExternalPWV):
-            pars['PAREXTERNALPWVSCALE'] = self.parExternalPWVScale
-            pars['PAREXTERNALPWVOFFSET'][:] = self.parExternalPWVOffset
-            pars['EXTERNALPWV'][:] = self.externalPWV
+        if (self.hasExternalPwv):
+            pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
+            pars['PAREXTERNALLNPWVOFFSET'][:] = self.parExternalLnPwvOffset
+            pars['EXTERNALLNPWV'][:] = self.externalLnPwv
         if (self.hasExternalTau):
-            pars['PAREXTERNALTAUSCALE'] = self.parExternalTauScale
-            pars['PAREXTERNALTAUOFFSET'][:] = self.parExternalTauOffset
+            pars['PAREXTERNALLNTAUSCALE'] = self.parExternalLnTauScale
+            pars['PAREXTERNALLNTAUOFFSET'][:] = self.parExternalLnTauOffset
             pars['EXTERNALTAU'][:] = self.externalTau
 
         pars['COMPAPERCORRPIVOT'][:] = self.compAperCorrPivot
@@ -939,33 +950,33 @@ class FgcmParameters(object):
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
 
-        pars['COMPRETRIEVEDPWV'][:] = self.compRetrievedPWV
-        pars['COMPRETRIEVEDPWVRAW'][:] = self.compRetrievedPWVRaw
-        pars['COMPRETRIEVEDPWVFLAG'][:] = self.compRetrievedPWVFlag
-        pars['PARRETRIEVEDPWVSCALE'][:] = self.parRetrievedPWVScale
-        pars['PARRETRIEVEDPWVOFFSET'][:] = self.parRetrievedPWVOffset
-        pars['PARRETRIEVEDPWVNIGHTLYOFFSET'][:] = self.parRetrievedPWVNightlyOffset
+        pars['COMPRETRIEVEDLNPWV'][:] = self.compRetrievedLnPwv
+        pars['COMPRETRIEVEDLNPWVRAW'][:] = self.compRetrievedLnPwvRaw
+        pars['COMPRETRIEVEDLNPWVFLAG'][:] = self.compRetrievedLnPwvFlag
+        pars['PARRETRIEVEDLNPWVSCALE'][:] = self.parRetrievedLnPwvScale
+        pars['PARRETRIEVEDLNPWVOFFSET'][:] = self.parRetrievedLnPwvOffset
+        pars['PARRETRIEVEDLNPWVNIGHTLYOFFSET'][:] = self.parRetrievedLnPwvNightlyOffset
 
         pars['COMPRETRIEVEDTAUNIGHT'][:] = self.compRetrievedTauNight
 
         return parInfo, pars
 
-    def loadExternalPWV(self, externalPWVDeltaT):
+    def loadExternalPwv(self, externalPwvDeltaT):
         """
-        Load external PWV measurements, from fits table.
+        Load external Pwv measurements, from fits table.
 
         parameters
         ----------
-        externalPWVDeltaT: float
-           Maximum delta-T (days) for external PWV measurement to match exposure MJD.
+        externalPwvDeltaT: float
+           Maximum delta-T (days) for external Pwv measurement to match exposure MJD.
         """
 
         import fitsio
 
-        # loads a file with PWV, matches to exposures/times
+        # loads a file with Pwv, matches to exposures/times
         # flags which ones need the nightly fit
 
-        #self.hasExternalPWV = True
+        #self.hasExternalPwv = True
 
         pwvTable = fitsio.read(self.pwvFile,ext=1)
 
@@ -975,15 +986,15 @@ class FgcmParameters(object):
 
         pwvIndex = np.clip(np.searchsorted(pwvTable['MJD'],self.expMJD),0,pwvTable.size-1)
         # this will be True or False...
-        self.externalPWVFlag[:] = (np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPWVDeltaT)
-        self.externalPWV = np.zeros(self.nExp,dtype=np.float32)
-        self.externalPWV[self.externalPWVFlag] = pwvTable['PWV'][pwvIndex[self.externalPWVFlag]]
+        self.externalPwvFlag[:] = (np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPwvDeltaT)
+        self.externalLnPwv = np.zeros(self.nExp,dtype=np.float32)
+        self.externalLnPwv[self.externalPwvFlag] = np.log(np.clip(pwvTable['PWV'][pwvIndex[self.externalPwvFlag]], self.pwvRange[0], self.pwvRange[1]))
 
         # and new PWV scaling pars!
-        self.parExternalPWVOffset = np.zeros(self.nCampaignNights,dtype=np.float32)
-        self.parExternalPWVScale = 1.0
+        self.parExternalLnPwvOffset = np.zeros(self.nCampaignNights,dtype=np.float32)
+        self.parExternalLnPwvScale = 1.0
 
-        match, = np.where(self.externalPWVFlag)
+        match, = np.where(self.externalPwvFlag)
         self.fgcmLog.info('%d exposures of %d have external pwv values' % (match.size,self.nExp))
 
 
@@ -994,7 +1005,7 @@ class FgcmParameters(object):
 
         # load a file with Tau values
         ## not supported yet
-        raise ValueError("externalTau Not supported yet")
+        raise NotImplementedError("externalTau Not supported yet")
 
         if (withAlpha):
             self.hasExternalAlpha = True
@@ -1019,11 +1030,13 @@ class FgcmParameters(object):
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
-        if not self.useRetrievedPWV:
-            self.parPWVIntercept[:] = parArray[self.parPWVInterceptLoc:
-                                                   self.parPWVInterceptLoc+self.nCampaignNights] / unitDict['pwvUnit']
-            self.parPWVPerSlope[:] = parArray[self.parPWVPerSlopeLoc:
-                                                  self.parPWVPerSlopeLoc + self.nCampaignNights] / unitDict['pwvPerSlopeUnit']
+        if not self.useRetrievedPwv:
+            self.parLnPwvIntercept[:] = parArray[self.parLnPwvInterceptLoc:
+                                                     self.parLnPwvInterceptLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
+            self.parLnPwvSlope[:] = parArray[self.parLnPwvSlopeLoc:
+                                                 self.parLnPwvSlopeLoc + self.nCampaignNights] / unitDict['lnPwvSlopeUnit']
+            self.parLnPwvQuadratic[:] = parArray[self.parLnPwvQuadraticLoc:
+                                                     self.parLnPwvQuadraticLoc + self.nCampaignNights] / unitDict['lnPwvQuadraticUnit']
 
         self.parO3[:] = parArray[self.parO3Loc:
                                      self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
@@ -1035,24 +1048,24 @@ class FgcmParameters(object):
 
         self.parAlpha[:] = parArray[self.parAlphaLoc:
                                         self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
-        if self.hasExternalPWV and not self.useRetrievedPWV:
-            self.parExternalPWVScale = parArray[self.parExternalPWVScaleLoc] / unitDict['pwvGlobalUnit']
-            self.parExternalPWVOffset = parArray[self.parExternalPWVOffsetLoc:
-                                                     self.parExternalPWVOffsetLoc+self.nCampaignNights] / unitDict['pwvUnit']
+        if self.hasExternalPwv and not self.useRetrievedPwv:
+            self.parExternalLnPwvScale = parArray[self.parExternalLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
+            self.parExternalLnPwvOffset = parArray[self.parExternalLnPwvOffsetLoc:
+                                                       self.parExternalLnPwvOffsetLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
 
         if (self.hasExternalTau):
-            raise RuntimeError("Not implemented")
-            #self.parExternalTauScale = parArray[self.parExternalTauScaleLoc] / unitDict['tauUnit']
-            #self.parExternalTauOffset = parArray[self.parExternalTauOffsetLoc:
-            #                                         self.parExternalTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
+            raise NotImplementedError("Not implemented")
+            #self.parExternalLnTauScale = parArray[self.parExternalLnTauScaleLoc] / unitDict['tauUnit']
+            #self.parExternalLnTauOffset = parArray[self.parExternalLnTauOffsetLoc:
+            #                                         self.parExternalLnTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
 
-        if self.useRetrievedPWV:
-            self.parRetrievedPWVScale = parArray[self.parRetrievedPWVScaleLoc] / unitDict['pwvGlobalUnit']
-            if self.useNightlyRetrievedPWV:
-                self.parRetrievedPWVNightlyOffset = parArray[self.parRetrievedPWVNightlyOffsetLoc:
-                                                                 self.parRetrievedPWVNightlyOffsetLoc + self.nCampaignNights] / unitDict['pwvUnit']
+        if self.useRetrievedPwv:
+            self.parRetrievedLnPwvScale = parArray[self.parRetrievedLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
+            if self.useNightlyRetrievedPwv:
+                self.parRetrievedLnPwvNightlyOffset = parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
+                                                                   self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights] / unitDict['lnPwvUnit']
             else:
-                self.parRetrievedPWVOffset = parArray[self.parRetrievedPWVOffsetLoc] / unitDict['pwvGlobalUnit']
+                self.parRetrievedLnPwvOffset = parArray[self.parRetrievedLnPwvOffsetLoc] / unitDict['lnPwvGlobalUnit']
 
         self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
                                                  self.parQESysInterceptLoc+self.nWashIntervals] / unitDict['qeSysUnit']
@@ -1069,13 +1082,13 @@ class FgcmParameters(object):
         parameters
         ----------
         retrievedInput: bool, default=False
-           When useRetrievedPWV, do we use the input or final values as the basis for the conversion?
+           When useRetrievedPwv, do we use the input or final values as the basis for the conversion?
 
         Output attributes
         -----------------
         expO3: float array
         expAlpha: float array
-        expPWV: float array
+        expLnPwv: float array
         expLnTau: float array
         expQESys: float array
         """
@@ -1089,48 +1102,42 @@ class FgcmParameters(object):
         self.expO3 = self.parO3[self.expNightIndex]
         self.expAlpha = self.parAlpha[self.expNightIndex]
 
-        if self.useRetrievedPWV:
+        if self.useRetrievedPwv:
             # FIXME
             if retrievedInput:
-                retrievedPWV = self.compRetrievedPWVInput
+                retrievedLnPwv = self.compRetrievedLnPwvInput
             else:
-                retrievedPWV = self.compRetrievedPWV
+                retrievedLnPwv = self.compRetrievedLnPwv
 
-            if self.useNightlyRetrievedPWV:
-                self.expPWV = (self.parRetrievedPWVNightlyOffset[self.expNightIndex] +
-                               self.parRetrievedPWVScale * retrievedPWV)
+            if self.useNightlyRetrievedPwv:
+                self.expLnPwv = (self.parRetrievedLnPwvNightlyOffset[self.expNightIndex] +
+                                 self.parRetrievedLnPwvScale * retrievedLnPwv)
             else:
-                self.expPWV = (self.parRetrievedPWVOffset +
-                               self.parRetrievedPWVScale * retrievedPWV)
+                self.expLnPwv = (self.parRetrievedLnPwvOffset +
+                                 self.parRetrievedLnPwvScale * retrievedLnPwv)
         else:
             # default to the nightly slope/intercept
-            self.expPWV = (self.parPWVIntercept[self.expNightIndex] +
-                           (self.parPWVPerSlope[self.expNightIndex] *
-                            self.parPWVIntercept[self.expNightIndex]) * self.expDeltaUT)
-
-            if (self.hasExternalPWV):
+            self.expLnPwv = (self.parLnPwvIntercept[self.expNightIndex] +
+                             self.parLnPwvSlope[self.expNightIndex] * self.expDeltaUT +
+                             self.parLnPwvQuadratic[self.expNightIndex] * self.expDeltaUT**2.)
+            if (self.hasExternalPwv):
                 # replace where we have these
-                self.expPWV[self.externalPWVFlag] = (self.parExternalPWVOffset[self.expNightIndex[self.externalPWVFlag]] +
-                                                     self.parExternalPWVScale *
-                                                     self.externalPWV[self.externalPWVFlag])
+                self.expLnPwv[self.externalPwvFlag] = (self.parExternalLnPwvOffset[self.expNightIndex[self.externalPwvFlag]] +
+                                                         self.parExternalLnPwvScale *
+                                                         self.externalLnPwv[self.externalPwvFlag])
 
         # default to nightly slope/intercept
-        #self.expTau = (self.parTauIntercept[self.expNightIndex] +
-        #               (self.parTauPerSlope[self.expNightIndex] *
-        #                self.parTauIntercept[self.expNightIndex]) * self.expDeltaUT)
-
         self.expLnTau = (self.parLnTauIntercept[self.expNightIndex] +
                          self.parLnTauSlope[self.expNightIndex] * self.expDeltaUT)
 
         if (self.hasExternalTau):
-            raise RuntimeError("not implemented")
+            raise NotImplementedError("not implemented")
             # replace where we have these
-            #self.expTau[self.externalTauFlag] = (self.parExternalTauOffset[self.expNightIndex[self.externalTauFlag]] +
-            #                                     self.parExternalTauScale *
+            #self.expLnTau[self.externalTauFlag] = (self.parExternalLnTauOffset[self.expNightIndex[self.externalTauFlag]] +
+            #                                     self.parExternalLnTauScale *
             #                                     self.externalTau[self.externalTauFlag])
 
         # and clip to make sure it doesn't go negative
-        #self.expTau = np.clip(self.expTau, self.tauRange[0]+0.0001, self.tauRange[1]-0.0001)
         self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
 
         # and QESys
@@ -1161,11 +1168,13 @@ class FgcmParameters(object):
 
         unitDict = self.getUnitDict(fitterUnits=fitterUnits)
 
-        if not self.useRetrievedPWV:
-            parArray[self.parPWVInterceptLoc:
-                         self.parPWVInterceptLoc+self.nCampaignNights] = self.parPWVIntercept[:] * unitDict['pwvUnit']
-            parArray[self.parPWVPerSlopeLoc:
-                         self.parPWVPerSlopeLoc + self.nCampaignNights] = self.parPWVPerSlope[:] * unitDict['pwvPerSlopeUnit']
+        if not self.useRetrievedPwv:
+            parArray[self.parLnPwvInterceptLoc:
+                         self.parLnPwvInterceptLoc+self.nCampaignNights] = self.parLnPwvIntercept[:] * unitDict['lnPwvUnit']
+            parArray[self.parLnPwvSlopeLoc:
+                         self.parLnPwvSlopeLoc + self.nCampaignNights] = self.parLnPwvSlope[:] * unitDict['lnPwvSlopeUnit']
+            parArray[self.parLnPwvQuadraticLoc:
+                         self.parLnPwvQuadraticLoc + self.nCampaignNights] = self.parLnPwvQuadratic[:] * unitDict['lnPwvQuadraticUnit']
 
         parArray[self.parO3Loc:
                      self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
@@ -1175,22 +1184,22 @@ class FgcmParameters(object):
                      self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * unitDict['lnTauSlopeUnit']
         parArray[self.parAlphaLoc:
                      self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
-        if self.hasExternalPWV and not self.useRetrievedPWV:
-            parArray[self.parExternalPWVScaleLoc] = self.parExternalPWVScale * unitDict['pwvGlobalUnit']
-            parArray[self.parExternalPWVOffsetLoc:
-                         self.parExternalPWVOffsetLoc+self.nCampaignNights] = self.parExternalPWVOffset * unitDict['pwvUnit']
+        if self.hasExternalPwv and not self.useRetrievedPwv:
+            parArray[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
+            parArray[self.parExternalLnPwvOffsetLoc:
+                         self.parExternalLnPwvOffsetLoc+self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
         if (self.hasExternalTau):
-            raise RuntimeError("not implemented")
+            raise NotImplementedError("not implemented")
             #parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['lnTauUnit']
             #parArray[self.parExternalTauOffsetLoc:
             #             self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
-        if self.useRetrievedPWV:
-            parArray[self.parRetrievedPWVScaleLoc] = self.parRetrievedPWVScale * unitDict['pwvGlobalUnit']
-            if self.useNightlyRetrievedPWV:
-                parArray[self.parRetrievedPWVNightlyOffsetLoc:
-                             self.parRetrievedPWVNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedPWVNightlyOffset * unitDict['pwvUnit']
+        if self.useRetrievedPwv:
+            parArray[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
+            if self.useNightlyRetrievedPwv:
+                parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
+                             self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
             else:
-                parArray[self.parRetrievedPWVOffsetLoc] = self.parRetrievedPWVOffset * unitDict['pwvGlobalUnit']
+                parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
 
         parArray[self.parQESysInterceptLoc:
                      self.parQESysInterceptLoc+self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
@@ -1222,44 +1231,51 @@ class FgcmParameters(object):
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
-        if not self.useRetrievedPWV:
-            parLow[self.parPWVInterceptLoc: \
-                       self.parPWVInterceptLoc + \
+        if not self.useRetrievedPwv:
+            parLow[self.parLnPwvInterceptLoc: \
+                       self.parLnPwvInterceptLoc + \
                        self.nCampaignNights] = ( \
-                self.pwvRange[0] * unitDict['pwvUnit'])
-            parHigh[self.parPWVInterceptLoc: \
-                        self.parPWVInterceptLoc + \
+                self.lnPwvRange[0] * unitDict['lnPwvUnit'])
+            parHigh[self.parLnPwvInterceptLoc: \
+                        self.parLnPwvInterceptLoc + \
                         self.nCampaignNights] = ( \
-                self.pwvRange[1] * unitDict['pwvUnit'])
-            #parLow[self.parPWVPerSlopeLoc: \
-            #           self.parPWVPerSlopeLoc + \
-            #           self.nCampaignNights] = ( \
-            #    -4.0 * unitDict['pwvPerSlopeUnit'])
-            # we don't want the PWV to go below 0, so we need to set this
-            # limit based on the maximum deltaUT on each night.
-            parLow[self.parPWVPerSlopeLoc: \
-                       self.parPWVPerSlopeLoc + \
+                self.lnPwvRange[1] * unitDict['lnPwvUnit'])
+            parLow[self.parLnPwvSlopeLoc: \
+                       self.parLnPwvSlopeLoc + \
                        self.nCampaignNights] = ( \
-                (-1.0 / self.maxDeltaUTPerNight) * unitDict['pwvPerSlopeUnit'])
-            parHigh[self.parPWVPerSlopeLoc: \
-                        self.parPWVPerSlopeLoc + \
-                        self.nCampaignNights] = ( \
-                4.0 * unitDict['pwvPerSlopeUnit'])
-        else:
-            parLow[self.parRetrievedPWVScaleLoc] = 0.5 * unitDict['pwvGlobalUnit']
-            parHigh[self.parRetrievedPWVScaleLoc] = 1.5 * unitDict['pwvGlobalUnit']
-            if self.useNightlyRetrievedPWV:
-                parLow[self.parRetrievedPWVNightlyOffsetLoc: \
-                           self.parRetrievedPWVNightlyOffsetLoc + \
-                           self.nCampaignNights] = ( \
-                    -2.0 * unitDict['pwvUnit'])
-                parHigh[self.parRetrievedPWVNightlyOffsetLoc: \
-                           self.parRetrievedPWVNightlyOffsetLoc + \
-                           self.nCampaignNights] = ( \
-                    2.0 * unitDict['pwvUnit'])
+                -4.0 * unitDict['lnPwvSlopeUnit'])
+            parHigh[self.parLnPwvSlopeLoc: \
+                       self.parLnPwvSlopeLoc + \
+                       self.nCampaignNights] = ( \
+                4.0 * unitDict['lnPwvSlopeUnit'])
+            if self.useQuadraticPwv:
+                qlo = -4.0 * unitDict['lnPwvQuadraticUnit']
+                qhi = 4.0 * unitDict['lnPwvQuadraticUnit']
             else:
-                parLow[self.parRetrievedPWVOffsetLoc] = -2.0 * unitDict['pwvGlobalUnit']
-                parHigh[self.parRetrievedPWVOffsetLoc] = 2.0 * unitDict['pwvGlobalUnit']
+                qlo = 0.0
+                qhi = 0.0
+            parLow[self.parLnPwvQuadraticLoc: \
+                       self.parLnPwvQuadraticLoc + \
+                       self.nCampaignNights] = qlo
+            parHigh[self.parLnPwvQuadraticLoc: \
+                       self.parLnPwvQuadraticLoc + \
+                       self.nCampaignNights] = qhi
+        else:
+            parLow[self.parRetrievedLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
+            parHigh[self.parRetrievedLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+
+            if self.useNightlyRetrievedPwv:
+                parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                           self.parRetrievedLnPwvNightlyOffsetLoc + \
+                           self.nCampaignNights] = ( \
+                    -0.5 * unitDict['lnPwvUnit'])
+                parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                           self.parRetrievedLnPwvNightlyOffsetLoc + \
+                           self.nCampaignNights] = ( \
+                    0.5 * unitDict['lnPwvUnit'])
+            else:
+                parLow[self.parRetrievedLnPwvOffsetLoc] = -0.5 * unitDict['lnPwvGlobalUnit']
+                parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
 
         parLow[self.parO3Loc: \
                    self.parO3Loc + \
@@ -1293,20 +1309,19 @@ class FgcmParameters(object):
                     self.parAlphaLoc + \
                     self.nCampaignNights] = ( \
             1.75 * unitDict['alphaUnit'])
-        if self.hasExternalPWV and not self.useRetrievedPWV:
-            parLow[self.parExternalPWVScaleLoc] = 0.5 * unitDict['pwvGlobalUnit']
-            parHigh[self.parExternalPWVScaleLoc] = 1.5 * unitDict['pwvGlobalUnit']
-            parLow[self.parExternalPWVOffsetLoc: \
-                       self.parExternalPWVOffsetLoc + \
+        if self.hasExternalPwv and not self.useRetrievedPwv:
+            parLow[self.parExternalLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
+            parHigh[self.parExternalLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+            parLow[self.parExternalLnPwvOffsetLoc: \
+                       self.parExternalLnPwvOffsetLoc + \
                        self.nCampaignNights] = ( \
-                -1.5 * unitDict['pwvUnit'])
-            parHigh[self.parExternalPWVOffsetLoc: \
-                       self.parExternalPWVOffsetLoc + \
+                -0.5 * unitDict['lnPwvUnit'])
+            parHigh[self.parExternalLnPwvOffsetLoc: \
+                       self.parExternalLnPwvOffsetLoc + \
                         self.nCampaignNights] = ( \
-                3.0 * unitDict['pwvUnit'])
-            ## FIXME: set bounds per night?  Or clip?
+                0.5 * unitDict['lnPwvUnit'])
         if (self.hasExternalTau):
-            raise RuntimeError("not implemented")
+            raise NotImplementedError("not implemented")
             #parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
             #parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
             #parLow[self.parExternalTauOffsetLoc: \
@@ -1343,32 +1358,48 @@ class FgcmParameters(object):
 
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
-            if not self.useRetrievedPWV:
-                parLow[self.parPWVInterceptLoc: \
-                           self.parPWVInterceptLoc + \
-                           self.nCampaignNights] = self.pwvStd * unitDict['pwvUnit']
-                parHigh[self.parPWVInterceptLoc: \
-                            self.parPWVInterceptLoc + \
-                            self.nCampaignNights] = self.pwvStd * unitDict['pwvUnit']
-                parLow[self.parPWVPerSlopeLoc: \
-                           self.parPWVPerSlopeLoc + \
+            if not self.useRetrievedPwv:
+                parLow[self.parLnPwvInterceptLoc: \
+                           self.parLnPwvInterceptLoc + \
+                           self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                parHigh[self.parLnPwvInterceptLoc: \
+                            self.parLnPwvInterceptLoc + \
+                            self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                parLow[self.parLnPwvSlopeLoc: \
+                           self.parLnPwvSlopeLoc + \
                            self.nCampaignNights] = 0.0
-                parHigh[self.parPWVPerSlopeLoc: \
-                            self.parPWVPerSlopeLoc + \
+                parHigh[self.parLnPwvSlopeLoc: \
+                            self.parLnPwvSlopeLoc + \
+                            self.nCampaignNights] = 0.0
+                parLow[self.parLnPwvQuadraticLoc: \
+                           self.parLnPwvQuadraticLoc + \
+                           self.nCampaignNights] = 0.0
+                parHigh[self.parLnPwvQuadraticLoc: \
+                            self.parLnPwvQuadraticLoc + \
                             self.nCampaignNights] = 0.0
             else:
-                parLow[self.parRetrievedPWVScaleLoc] = 1.0 * unitDict['pwvGlobalUnit']
-                parHigh[self.parRetrievedPWVScaleLoc] = 1.0 * unitDict['pwvGlobalUnit']
-                if self.useNightlyRetrievedPWV:
-                    parLow[self.parRetrievedPWVNightlyOffsetLoc: \
-                               self.parRetrievedPWVNightlyOffsetLoc + \
+                parLow[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                parHigh[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                if self.useNightlyRetrievedPwv:
+                    parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                               self.parRetrievedLnPwvNightlyOffsetLoc + \
                                self.nCampaignNights] = 0.0
-                    parHigh[self.parRetrievedPWVNightlyOffsetLoc: \
-                                self.parRetrievedPWVNightlyOffsetLoc + \
+                    parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                                self.parRetrievedLnPwvNightlyOffsetLoc + \
                                 self.nCampaignNights] = 0.0
                 else:
-                    parLow[self.parRetrievedPWVOffsetLoc] = 0.0
-                    parHigh[self.parRetrievedPWVOffsetLoc] = 0.0
+                    parLow[self.parRetrievedLnPwvOffsetLoc] = 0.0
+                    parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.0
+
+            if self.hasExternalPwv and not self.useRetrievedPwv:
+                parLow[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                parHigh[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                parLow[self.parExternalLnPwvOffsetLoc: \
+                           self.parExternalLnPwvOffsetLoc + \
+                           self.nCampaignNights] = 0.0
+                parHigh[self.parExternalLnPwvOffsetLoc: \
+                            self.parExternalLnPwvOffsetLoc + \
+                            self.nCampaignNights] = 0.0
 
             parLow[self.parO3Loc: \
                    self.parO3Loc + \
@@ -1558,7 +1589,7 @@ class FgcmParameters(object):
                   np.exp(self.expLnTau[expUse]))
         np.add.at(pwvNight,
                   self.expNightIndex[expUse],
-                  self.expPWV[expUse])
+                  np.exp(self.expLnPwv[expUse]))
         np.add.at(O3Night,
                   self.expNightIndex[expUse],
                   self.expO3[expUse])
