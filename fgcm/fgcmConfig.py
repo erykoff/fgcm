@@ -355,6 +355,7 @@ class FgcmConfig(object):
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
+        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
