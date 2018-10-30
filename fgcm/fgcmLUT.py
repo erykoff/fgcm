@@ -1208,6 +1208,11 @@ class FgcmLUT(object):
         unitDict['qeSysUnit'] = 1.0 / stepUnitReference / stepGrain
         unitDict['qeSysSlopeUnit'] = unitDict['qeSysUnit'] * meanWashIntervalDuration
 
+        # And filter offset units...
+        # Unsure about this, we might need to get fancy per filter about overlaps
+        # But this is going to be roughly in the right direction, I hope.
+        unitDict['filterOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
+
         return unitDict
 
 

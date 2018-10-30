@@ -91,8 +91,10 @@ class FgcmParameters(object):
         self.bandNotFitIndex = fgcmConfig.bandNotFitIndex
 
         self.lutFilterNames = fgcmConfig.lutFilterNames
+        self.lutStdFilterNames = fgcmConfig.lutStdFilterNames
         self.nLUTFilter = len(self.lutFilterNames)
         self.filterToBand = fgcmConfig.filterToBand
+        self.lambdaStdFilter = fgcmConfig.lambdaStdFilter
 
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
@@ -161,7 +163,8 @@ class FgcmParameters(object):
                              'lnTauSlopeUnit':1.0,
                              'alphaUnit':1.0,
                              'qeSysUnit':1.0,
-                             'qeSysSlopeUnit':1.0}
+                             'qeSysSlopeUnit':1.0,
+                             'filterOffsetUnit':1.0}
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -295,6 +298,22 @@ class FgcmParameters(object):
         self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
         self.parQESysSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
 
+        # parameters for "absolute" offsets (and relative between filters)
+        # Currently, this only will turn on for when there are multiple filters
+        # for the same band.  In the future we can add "primary absolute calibrators"
+        # to the fit, and turn these on.
+        self.parFilterOffset = np.zeros(self.nLUTFilter, dtype=np.float64)
+        self.parFilterOffsetFitFlag = np.zeros(self.nLUTFilter, dtype=np.bool)
+        for i, f in enumerate(self.lutFilterNames):
+            band = self.filterToBand[f]
+            nBand = 0
+            for ff in self.filterToBand:
+                if self.filterToBand[ff] == band:
+                    nBand += 1
+            # And when there is a duplicate band and it's not the "Standard", fit the offset
+            if nBand > 1 and f not in self.lutStdFilterNames:
+                self.parFilterOffsetFitFlag[i] = True
+
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.pwvFile is not None):
@@ -387,7 +406,8 @@ class FgcmParameters(object):
                               'lnPwvGlobalUnit': inParInfo['LNPWVGLOBALUNIT'][0],
                               'o3Unit': inParInfo['O3UNIT'][0],
                               'qeSysUnit': inParInfo['QESYSUNIT'][0],
-                              'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0]}
+                              'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0],
+                              'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0]}
 
         # and log
         self.fgcmLog.info('lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
@@ -404,7 +424,9 @@ class FgcmParameters(object):
         self.fgcmLog.info('O3 step unit set to %f' % (self.unitDictSteps['o3Unit']))
         self.fgcmLog.info('wash step unit set to %f' % (self.unitDictSteps['qeSysUnit']))
         self.fgcmLog.info('wash slope step unit set to %f' %
-                         (self.unitDictSteps['qeSysSlopeUnit']))
+                          (self.unitDictSteps['qeSysSlopeUnit']))
+        self.fgcmLog.info('filter offset step unit set to %f' %
+                          (self.unitDictSteps['filterOffsetUnit']))
 
         # look at external...
         self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
@@ -420,6 +442,8 @@ class FgcmParameters(object):
         self.parLnPwvQuadratic = np.atleast_1d(inParams['PARLNPWVQUADRATIC'][0])
         self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
+        self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
+        self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -503,6 +527,7 @@ class FgcmParameters(object):
 
         # We don't reset QESysIntercept and Slope because they aren't
         #  atmosphere parameters (they are instrument parameters)
+        # Similarly for filterOffset
 
         if self.hasExternalPwv:
             self.parExternalLnPwvScale = 1.0
@@ -784,6 +809,12 @@ class FgcmParameters(object):
         self.parQESysSlopeLoc = ctr
         ctr+=self.nWashIntervals
 
+        self.nFitPars += self.nLUTFilter # parFilterOffset
+
+        self.parFilterOffsetLoc = ctr
+        ctr += self.nLUTFilter
+
+
     def saveParsFits(self, parFile):
         """
         Save parameters to fits file
@@ -841,6 +872,7 @@ class FgcmParameters(object):
                ('O3UNIT','f8'),
                ('QESYSUNIT','f8'),
                ('QESYSSLOPEUNIT','f8'),
+               ('FILTEROFFSETUNIT','f8'),
                ('HASEXTERNALPWV','i2'),
                ('HASEXTERNALTAU','i2')]
 
@@ -867,6 +899,7 @@ class FgcmParameters(object):
         parInfo['O3UNIT'] = self.unitDictSteps['o3Unit']
         parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
         parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
+        parInfo['FILTEROFFSETUNIT'] = self.unitDictSteps['filterOffsetUnit']
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
@@ -884,6 +917,8 @@ class FgcmParameters(object):
                ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
+               ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
+               ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -924,6 +959,8 @@ class FgcmParameters(object):
         pars['PARLNPWVQUADRATIC'][:] = self.parLnPwvQuadratic
         pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
+        pars['PARFILTEROFFSET'][:] = self.parFilterOffset
+        pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1073,6 +1110,9 @@ class FgcmParameters(object):
 
         self.parQESysSlope[:] = parArray[self.parQESysSlopeLoc:
                                              self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
+
+        self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
+                                               self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
         # done
 
     def parsToExposures(self, retrievedInput=False):
@@ -1091,6 +1131,7 @@ class FgcmParameters(object):
         expLnPwv: float array
         expLnTau: float array
         expQESys: float array
+        expFilterOffset: float array
         """
 
         self.fgcmLog.debug('Computing exposure values from parameters')
@@ -1144,6 +1185,9 @@ class FgcmParameters(object):
         self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
                          self.parQESysSlope[self.expWashIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
+
+        # and FilterOffset
+        self.expFilterOffset = self.parFilterOffset[self.expLUTFilterIndex]
 
     # cannot be a property because of the keywords
     def getParArray(self,fitterUnits=False):
@@ -1205,6 +1249,9 @@ class FgcmParameters(object):
                      self.parQESysInterceptLoc+self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
         parArray[self.parQESysSlopeLoc:
                      self.parQESysSlopeLoc+self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
+
+        parArray[self.parFilterOffsetLoc:
+                     self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
 
         return parArray
 
@@ -1355,6 +1402,17 @@ class FgcmParameters(object):
                     self.parQESysSlopeLoc + \
                     self.nWashIntervals] = ( \
             0.001 * unitDict['qeSysSlopeUnit'])
+
+        parLow[self.parFilterOffsetLoc: \
+                   self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
+        parHigh[self.parFilterOffsetLoc: \
+                    self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
+        parLow[self.parFilterOffsetLoc: \
+                   self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
+                   -100.0 * unitDict['filterOffsetUnit']
+        parHigh[self.parFilterOffsetLoc: \
+                    self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
+                    100.0 * unitDict['filterOffsetUnit']
 
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
@@ -1729,6 +1787,20 @@ class FgcmParameters(object):
         fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
                                                 self.outfileBaseWithCycle))
         plt.close(fig)
+
+        # Filter Offset
+        fig = plt.figure(1, figsize=(8, 6))
+        fig.clf()
+        ax = fig.add_subplot(111)
+
+        ax.plot(self.lambdaStdFilter, self.parFilterOffset, 'r.')
+        for i, f in enumerate(self.lutFilterNames):
+            ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], self.parFilterOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
+        ax.set_xlabel('Std Wavelength (A)')
+        ax.set_ylabel('Filter Offset (mag)')
+
+        fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
+                                                  self.outfileBaseWithCycle))
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)

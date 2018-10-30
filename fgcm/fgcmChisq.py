@@ -430,8 +430,9 @@ class FgcmChisq(object):
 
 
         qeSysGO = self.fgcmPars.expQESys[obsExpIndexGO]
+        filterOffsetGO = self.fgcmPars.expFilterOffset[obsExpIndexGO]
 
-        obsMagGO = obsMagADU[goodObs] + 2.5*np.log10(I0GO) + qeSysGO
+        obsMagGO = obsMagADU[goodObs] + 2.5*np.log10(I0GO) + qeSysGO + filterOffsetGO
 
         if (self.fgcmGray is not None):
             # We want to apply the "CCD Gray Crunch"
@@ -615,6 +616,8 @@ class FgcmChisq(object):
             magdLdWashIntercept = np.zeros((self.fgcmPars.nWashIntervals,
                                             self.fgcmPars.nFitBands))
             magdLdWashSlope = np.zeros_like(magdLdWashIntercept)
+
+            magdLdFilterOffset = np.zeros(self.fgcmPars.nLUTFilter)
 
             # note below that objMagStdMeanErr2GO is the the square of the error,
             #  and already cut to [obsObjIDIndexGO,obsBandIndexGO]
@@ -1049,6 +1052,34 @@ class FgcmChisq(object):
                          self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] += 1
 
+            #################
+            ## Filter offset
+            #################
+
+            np.add.at(magdLdFilterOffset,
+                      obsLUTFilterIndexGO[obsFitUseGO],
+                      1./obsMagErr2GO[obsFitUseGO])
+            np.multiply.at(magdLdFilterOffset,
+                           obsLUTFilterIndexGO[obsFitUseGO],
+                           objMagStdMeanErr2GO[obsFitUseGO])
+            np.add.at(partialArray[self.fgcmPars.parFilterOffsetLoc:
+                                       (self.fgcmPars.parFilterOffsetLoc +
+                                        self.fgcmPars.nLUTFilter)],
+                      obsLUTFilterIndexGO[obsFitUseGO],
+                      deltaMagWeightedGOF * (
+                    (1.0 - magdLdFilterOffset[obsLUTFilterIndexGO[obsFitUseGO]])))
+
+            partialArray[self.fgcmPars.parFilterOffsetLoc:
+                             (self.fgcmPars.parFilterOffsetLoc +
+                              self.fgcmPars.nLUTFilter)] *= (2.0 / unitDict['filterOffsetUnit'])
+            # Now set those to zero the derivatives we aren't using
+            partialArray[self.fgcmPars.parFilterOffsetLoc:
+                             (self.fgcmPars.parFilterOffsetLoc +
+                              self.fgcmPars.nLUTFilter)][~self.fgcmPars.parFilterOffsetFitFlag] = 0.0
+            uOffsetIndex, = np.where(self.fgcmPars.parFilterOffsetFitFlag)
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parFilterOffsetLoc +
+                         uOffsetIndex] += 1
 
         # note that this store doesn't need locking because we only access
         #  a given array from a single process

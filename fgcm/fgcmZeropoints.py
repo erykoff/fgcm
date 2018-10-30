@@ -98,6 +98,7 @@ class FgcmZeropoints(object):
            'FGCM_FPGRY': Average focal-plane gray (exp_gray)
            'FGCM_FPVAR': Focal-plane variance
            'FGCM_DUST': Delta-zeropoint due to mirror/corrector dust buildup
+           'FGCM_FILTER': Delta-zeropoint due to the filter offset
            'FGCM_FLAT': Delta-zeropoint due to superStarFlat
            'FGCM_APERCORR': Delta-zeropoint due to aperture correction
            'EXPTIME': Exposure time (seconds)
@@ -165,6 +166,7 @@ class FgcmZeropoints(object):
                       ('FGCM_FPGRY_CSPLIT', 'f8', 3),
                       ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
                       ('FGCM_DUST','f8'),
+                      ('FGCM_FILTER','f8'),
                       ('FGCM_FLAT','f8'),
                       ('FGCM_APERCORR','f8'),
                       ('EXPTIME','f4'),
@@ -213,6 +215,9 @@ class FgcmZeropoints(object):
 
         # fill in the optics dust
         zpStruct['FGCM_DUST'][:] = self.fgcmPars.expQESys[zpExpIndex]
+
+        # And the filter offset
+        zpStruct['FGCM_FILTER'][:] = self.fgcmPars.expFilterOffset[zpExpIndex]
 
         # fill in the aperture correction
         if self.seeingSubExposure:
@@ -397,10 +402,11 @@ class FgcmZeropoints(object):
         okZpIndex, = np.where((zpStruct['FGCM_FLAG'] & acceptMask) > 0)
 
         okCCDZpIndexFlag = ((zpStruct['FGCM_I0'][okZpIndex] > 0.0) &
-                    (zpStruct['FGCM_FLAT'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
+                            (zpStruct['FGCM_FLAT'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_FILTER'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
 
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
 
@@ -421,6 +427,7 @@ class FgcmZeropoints(object):
         mehCCDZpIndexFlag = ((zpStruct['FGCM_I0'][mehZpIndex] > 0.0) &
                              (zpStruct['FGCM_FLAT'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_DUST'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_FILTER'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_APERCORR'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_GRY'][mehZpIndex] > self.illegalValue) &
                              (ccdNGoodStars[zpExpIndex[mehZpIndex],zpCCDIndex[mehZpIndex]] >=
@@ -549,6 +556,7 @@ class FgcmZeropoints(object):
         return (2.5*np.log10(zpStruct['FGCM_I0'][indices]) +
                 flatValue +
                 zpStruct['FGCM_DUST'][indices] +
+                zpStruct['FGCM_FILTER'][indices] +
                 zpStruct['FGCM_APERCORR'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
                 self.zptAB +
