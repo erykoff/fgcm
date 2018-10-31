@@ -549,7 +549,7 @@ class FgcmAtmosphereTable(object):
         pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
 
         _secZenith = np.clip(1./np.cos(np.radians(zenith)), self.secZenith[0], self.secZenith[-1])
-        _pwv = np.clip(pwv, self.pwv[0], self.pwv[-1])
+        _pwv = np.clip(pwv, np.exp(self.lnPwv[0]), np.exp(self.lnPwv[-1]))
         _o3 = np.clip(o3, self.o3[0], self.o3[-1])
         atmInterpolated = (pmbFactor *
                            self.o2Interpolator((_secZenith, lam)) *
