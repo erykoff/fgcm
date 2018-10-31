@@ -1,6 +1,6 @@
 # default Subaru (HSC) Atmosphere File
 
-atmosphereTableFile: fgcm_atm_subaru1_test.fits
+atmosphereTableFile: fgcm_atm_subaru2_test.fits
 
 elevation: 4139.0
 
