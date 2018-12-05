@@ -145,7 +145,9 @@ class FgcmConfig(object):
     expGrayRecoverCut = ConfigField(float, default=-1.0)
     expGrayHighCut = ConfigField(np.ndarray, required=True)
     expGrayErrRecoverCut = ConfigField(float, default=0.05)
-    sigma0Cal = ConfigField(float, default=0.003)
+    sigmaCalRange = ConfigField(list, default=[0.001, 0.003])
+    sigmaCalFitPercentile = ConfigField(list, default=[0.05, 0.15])
+    sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95])
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
     mapLongitudeRef = ConfigField(float, default=0.0)
@@ -365,6 +367,16 @@ class FgcmConfig(object):
             raise ValueError("expGrayPhotometricCut must all be negative")
         if (self.expGrayHighCut.max() <= 0.0):
             raise ValueError("expGrayHighCut must all be positive")
+
+        if len(self.sigmaCalRange) != 2:
+            raise ValueError("sigmaCalRange must have 2 elements")
+        if len(self.sigmaCalFitPercentile) != 2:
+            raise ValueError("sigmaCalFitPercentile must have 2 elements")
+        if len(self.sigmaCalPlotPercentile) != 2:
+            raise ValueError("sigmaCalPlotPercentile must have 2 elements")
+
+        if self.sigmaCalRange[1] < self.sigmaCalRange[0]:
+            raise ValueError("sigmaCalRange[1] must me equal to or larger than sigmaCalRange[0]")
 
         # and look at the exposure file and grab some stats
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
