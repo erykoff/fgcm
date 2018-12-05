@@ -54,6 +54,10 @@ class FgcmSigmaCal(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.sigma0Phot = fgcmConfig.sigma0Phot
+        self.sigmaCalRange = fgcmConfig.sigmaCalRange
+        self.sigmaCalFitPercentile = fgcmConfig.sigmaCalFitPercentile
+        self.sigmaCalPlotPercentile = fgcmConfig.sigmaCalPlotPercentile
+        self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
         # these are the standard *band* I10s
@@ -69,7 +73,7 @@ class FgcmSigmaCal(object):
 
         self.objChi2Handle = snmm.createArray((self.fgcmStars.nStars, self.fgcmPars.nBands), dtype='f8')
 
-    def run(self, applyGray=True):
+    def run(self, applyGray=True, doPlots=True):
         """
 
         """
@@ -117,6 +121,134 @@ class FgcmSigmaCal(object):
 
         self.fgcmLog.info('Running SigmaCal on %d cores' % (self.nCore))
 
+        # Plan:
+        # Do 50 steps in the range; if the range is 0, then just set that.
+        # Compute all the chi2 for each sigmaCal in the range
+        # Take the percentile range of stars by magnitudes
+        # Take the one that is closest to zero.
+        # Plot all 50, with a color gradient.
+        # Overplot in black the one that has the best fit.
+        # Label this, put a color bar, etc.
+        # One plot/fit per band
+
+        objChi2 = snmm.getArray(self.objChi2Handle)
+        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+
+        nStep = 50
+        nPlotBin = 10
+
+        sigmaCals = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], nStep)
+
+        if doPlots:
+            import matplotlib.pyplot as plt
+            import matplotlib.colors as colors
+            import matplotlib.cm as cmx
+            from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+            cm = plt.get_cmap('rainbow')
+            plt.set_cmap('rainbow')
+
+            Z = [[0, 0], [0, 0]]
+            levels = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], 256)
+            CS3 = plt.contourf(Z, levels, cmap=cm)
+
+            cNorm = colors.Normalize(vmin=self.sigmaCalRange[0], vmax=self.sigmaCalRange[1])
+            scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+        medChi2s = np.zeros((nStep, self.fgcmPars.nBands))
+
+        # Get the indices to use for the fit for each band
+        indices = {}
+        plotIndices = {}
+        for bandIndex, band in enumerate(self.fgcmPars.bands):
+            ok, = np.where((objMagStdMean[goodStars, bandIndex] < 90.0) &
+                           (objMagStdMean[goodStars, bandIndex] != 0.0) &
+                           (objNGoodObs[goodStars, bandIndex] > 2))
+            st = np.argsort(objMagStdMean[goodStars[ok], bandIndex])
+            indices[band] = ok[st[int(self.sigmaCalFitPercentile[0] * st.size):
+                                      int(self.sigmaCalFitPercentile[1] * st.size)]]
+            plotIndices[band] = ok[st[int(self.sigmaCalPlotPercentile[0] * st.size):
+                                          int(self.sigmaCalPlotPercentile[1] * st.size)]]
+
+        if doPlots:
+            plotMags = np.zeros((sigmaCals.size, self.fgcmPars.nBands, nPlotBin))
+            plotChi2s = np.zeros_like(plotMags)
+
+        # And do all the sigmaCals:
+        for i, s in enumerate(sigmaCals):
+            self.sigmaCal = s
+
+            pool = Pool(processes=self.nCore)
+            pool.map(self._worker, workerList, chunksize=1)
+            pool.close()
+            pool.join()
+
+            for bandIndex, band in enumerate(self.fgcmPars.bands):
+                ok, = np.where((objChi2[goodStars[indices[band]], bandIndex] > 0.001) &
+                               (objChi2[goodStars[indices[band]], bandIndex] < 1000.0))
+                medChi2s[i, bandIndex] = np.median(objChi2[goodStars[indices[band][ok]], bandIndex])
+
+            if doPlots:
+                for bandIndex, band in enumerate(self.fgcmPars.bands):
+                    ok, = np.where((objChi2[goodStars[plotIndices[band]], bandIndex] > 0.001) &
+                                   (objChi2[goodStars[plotIndices[band]], bandIndex] < 1000.0))
+                    # These have already been limited to the plot percentile range
+                    h, rev = esutil.stat.histogram(objMagStdMean[goodStars[plotIndices[band][ok]], bandIndex],
+                                                   nbin=nPlotBin, rev=True)
+                    for j, nInBin in enumerate(h):
+                        if nInBin < 100:
+                            continue
+                        i1a = rev[rev[j]: rev[j + 1]]
+                        plotMags[i, bandIndex, j] = np.median(objMagStdMean[goodStars[plotIndices[band][ok[i1a]]], bandIndex])
+                        plotChi2s[i, bandIndex, j] = np.median(objChi2[goodStars[plotIndices[band][ok[i1a]]], bandIndex])
+
+        # And get the minima...
+        mininds = np.zeros(self.fgcmPars.nBands, dtype=np.int32)
+        for bandIndex, band in enumerate(self.fgcmPars.bands):
+            mininds[bandIndex] = np.argmin(np.abs(np.log10(medChi2s[:, bandIndex])))
+            self.fgcmPars.compSigmaCal[bandIndex] = sigmaCals[mininds[bandIndex]]
+            self.fgcmLog.info('Best sigmaCal (%s band) = %.4f' % (band, sigmaCals[mininds[bandIndex]]))
+
+        # And do the plots if desired
+        if doPlots:
+            for bandIndex, band in enumerate(self.fgcmPars.bands):
+                fig = plt.figure(figsize=(9, 6))
+                fig.clf()
+
+                ax = fig.add_subplot(111)
+
+                # for each sigmaCal, plot with a new color...
+                for i, s in enumerate(sigmaCals):
+                    ax.plot(plotMags[i, bandIndex, :], np.log10(plotChi2s[i, bandIndex, :]),
+                            '-', color=scalarMap.to_rgba(s))
+
+                # And the best one
+                ax.plot(plotMags[mininds[bandIndex], bandIndex, :],
+                        np.log10(plotChi2s[mininds[bandIndex], bandIndex, :]), 'k-')
+
+                # and a reference line
+                ax.plot([plotMags[i, bandIndex, 0], plotMags[i, bandIndex, -1]], [0, 0], 'k--')
+
+                ax.set_xlabel('Magnitude (%s band)' % (band), fontsize=14)
+                ax.set_ylabel('log10(chi2)', fontsize=14)
+                ax.set_title('%s band, sigma_cal = %.4f' % (band, self.fgcmPars.compSigmaCal[bandIndex]))
+                ax.tick_params(axis='both', which='major', labelsize=14)
+
+                axins=inset_axes(ax, width='45%',height='5%',loc=4)
+                plt.colorbar(CS3,cax=axins,orientation='horizontal',format='%.3f',
+                             ticks=[self.sigmaCalRange[0], (self.sigmaCalRange[0] + self.sigmaCalRange[1]) / 2.,
+                                    self.sigmaCalRange[1]])
+                axins.xaxis.set_ticks_position('top')
+                axins.tick_params(axis='both',which='major',labelsize=12)
+
+                fig.savefig('%s/%s_sigmacal_%s.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle,
+                                                       band))
+
+                plt.close()
+
+        """
         # Debugging now just to get this to run...
         sigmaCals = [0.0, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003]
 
@@ -133,9 +265,6 @@ class FgcmSigmaCal(object):
             pool.map(self._worker, workerList, chunksize=1)
             pool.close()
             pool.join()
-            #map(self._worker, workerList)
-            #for argh in workerList:
-            #    self._worker(argh)
 
             self.fgcmLog.info('Computed object chisq for sigmacal = %.4f in %.2f seconds.' % (s, time.time() - startTime))
 
@@ -148,7 +277,7 @@ class FgcmSigmaCal(object):
             cat['ngood'][:, :] = objNGoodObs[goodStars, :]
 
             fitsio.write('%s_chi2_%d.fits' % (self.outfileBaseWithCycle, i), cat, clobber=True)
-
+            """
     def _worker(self, goodStarsAndObs):
         """
         """
@@ -177,6 +306,7 @@ class FgcmSigmaCal(object):
         obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
         obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         # We already have obsMagStd
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 

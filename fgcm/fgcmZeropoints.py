@@ -33,8 +33,6 @@ class FgcmZeropoints(object):
        Minimum number of stars to recover zeropoint through matching
     maxCCDGrayErr: float
        Maximum CCD Gray error to recover zeropoint through matching
-    sigma0Cal: float
-       Minimum error on zeropoint allowed
     expGrayRecoverCut: float
        Minimum (negative!) exposure gray to consider recovering via focal-plane average
     expGrayErrRecoverCut: float
@@ -65,7 +63,6 @@ class FgcmZeropoints(object):
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
-        self.sigma0Cal = fgcmConfig.sigma0Cal
         self.expField = fgcmConfig.expField
         self.ccdField = fgcmConfig.ccdField
         self.expGrayRecoverCut = fgcmConfig.expGrayRecoverCut
@@ -621,13 +618,11 @@ class FgcmZeropoints(object):
         # sigFgcm is computed per *band* not per *filter*
         sigFgcm = self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
         nTilingsM1 = np.clip(zpStruct['FGCM_TILINGS'][zpIndex]-1.0,1.0,1e10)
+        sigmaCal = self.fgcmPars.compSigmaCal[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
 
-        #zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
-        #                                           zpStruct['FGCM_ZPTVAR'][zpIndex] +
-        #                                           self.sigma0Cal**2.)
         return np.sqrt((sigFgcm**2./nTilingsM1) +
                        zpStruct['FGCM_ZPTVAR'][zpIndex] +
-                       self.sigma0Cal**2.)
+                       sigmaCal**2.)
 
     def saveZptFits(self):
         """
