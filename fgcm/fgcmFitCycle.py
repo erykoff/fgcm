@@ -26,6 +26,7 @@ from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
+from .fgcmSigmaCal import FgcmSigmaCal
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -393,7 +394,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars)
-        self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
+        self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
         #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray)
@@ -419,6 +420,10 @@ class FgcmFitCycle(object):
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
         #   if we don't the zeropoints before convergence will be wrong.
+
+        self.fgcmLog.debug('FitCycle computing SigmaCal')
+        sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
+        sigCal.run()
 
         # Make Zeropoints -- save also
         self.fgcmLog.debug('FitCycle computing zeropoints.')

@@ -225,7 +225,8 @@ class FgcmRetrieval(object):
         deltaMagGO = (obsMagADUGO -
                       objMagStdMean[obsObjIDIndexGO,
                                     obsBandIndexGO] +
-                      self.fgcmPars.expQESys[obsExpIndexGO])
+                      self.fgcmPars.expQESys[obsExpIndexGO] +
+                      self.fgcmPars.expFilterOffset[obsExpIndexGO])
 
         deltaMagErr2GO = (obsMagErrGO**2. +
                           objMagStdMeanErr[obsObjIDIndexGO,

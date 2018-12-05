@@ -1,6 +1,6 @@
 # default Subaru (HSC) Atmosphere File
 
-atmosphereTableFile: fgcm_atm_subaru1.fits
+atmosphereTableFile: fgcm_atm_subaru2.fits
 
 elevation: 4139.0
 
@@ -8,7 +8,7 @@ pmbRange: [820.0,835.0]
 pmbSteps: 5
 
 pwvRange: [0.1,3.6]
-pwvSteps: 11
+pwvSteps: 15
 
 o3Range: [220.0,310.0]
 o3Steps: 3
