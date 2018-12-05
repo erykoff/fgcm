@@ -133,7 +133,10 @@ class FgcmSigmaCal(object):
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
 
-        nStep = 50
+        if self.sigmaCalRange[0] == self.sigmaCalRange[1]:
+            nStep = 1
+        else:
+            nStep = 50
         nPlotBin = 10
 
         sigmaCals = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], nStep)
