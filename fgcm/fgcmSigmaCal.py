@@ -7,8 +7,6 @@ import sys
 import esutil
 import time
 
-import fitsio
-
 from .fgcmUtilities import _pickle_method
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
@@ -248,36 +246,6 @@ class FgcmSigmaCal(object):
 
                 plt.close()
 
-        """
-        # Debugging now just to get this to run...
-        sigmaCals = [0.0, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003]
-
-        objChi2 = snmm.getArray(self.objChi2Handle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-
-        for i, s in enumerate(sigmaCals):
-            self.sigmaCal = s
-
-            startTime = time.time()
-
-            pool = Pool(processes=self.nCore)
-            pool.map(self._worker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
-
-            self.fgcmLog.info('Computed object chisq for sigmacal = %.4f in %.2f seconds.' % (s, time.time() - startTime))
-
-            # And save the values, make plots outside ...
-            cat = np.zeros(goodStars.size, dtype=[('chi2', 'f8', self.fgcmPars.nBands),
-                                                  ('mag', 'f4', self.fgcmPars.nBands),
-                                                  ('ngood', 'i4', self.fgcmPars.nBands)])
-            cat['mag'][:, :] = objMagStdMean[goodStars, :]
-            cat['chi2'][:, :] = objChi2[goodStars, :]
-            cat['ngood'][:, :] = objNGoodObs[goodStars, :]
-
-            fitsio.write('%s_chi2_%d.fits' % (self.outfileBaseWithCycle, i), cat, clobber=True)
-            """
     def _worker(self, goodStarsAndObs):
         """
         """
@@ -371,32 +339,6 @@ class FgcmSigmaCal(object):
         objChi2[obsObjIDIndexGO, obsBandIndexGO] /= (objNGoodObs[obsObjIDIndexGO, obsBandIndexGO] - 1.0)
 
         # And we're done
-
-        """
-        # Need to save this individual stuff just to see what's going on...
-        cat = np.zeros(goodObs.size, dtype=[('obsObjIDIndexGO', 'i4'),
-                                            ('obsBandIndexGO', 'i4'),
-                                            ('obsMagStdGO', 'f4'),
-                                            ('objMagStdMeanGO', 'f4'),
-                                            ('obsMagErr2GO', 'f4'),
-                                            ('obsMagADUModelErrGO', 'f4'),
-                                            ('sigFgcm', 'f4'),
-                                            ('ccdNGoodTilingsGO', 'f4'),
-                                            ('ccdGrayErrGO', 'f4'),
-                                            ('objNGoodObsGO', 'i2')])
-        cat['obsObjIDIndexGO'] = obsObjIDIndexGO
-        cat['obsBandIndexGO'] = obsBandIndexGO
-        cat['obsMagStdGO'] = obsMagStdGO
-        cat['objMagStdMeanGO'] = objMagStdMean[obsObjIDIndexGO, obsBandIndexGO]
-        cat['obsMagErr2GO'] = obsMagErr2GO
-        cat['obsMagADUModelErrGO'] = obsMagADUModelErr[goodObs]
-        cat['sigFgcm'] = self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[obsExpIndexGO]]
-        cat['ccdNGoodTilingsGO'] = ccdNGoodTilings[obsExpIndexGO, obsCCDIndexGO]
-        cat['ccdGrayErrGO'] = ccdGrayErr[obsExpIndexGO, obsCCDIndexGO]
-        cat['objNGoodObsGO'] = objNGoodObs[obsObjIDIndexGO, obsBandIndexGO]
-
-        fitsio.write('%s_forchi2_%d.fits' % (self.outfileBaseWithCycle, int(self.sigmaCal * 10000)), cat, clobber=True)
-        """
 
     def __getstate__(self):
         # Don't try to pickle the logger.
