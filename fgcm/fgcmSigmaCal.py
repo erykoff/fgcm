@@ -142,7 +142,12 @@ class FgcmSigmaCal(object):
             import matplotlib.pyplot as plt
             import matplotlib.colors as colors
             import matplotlib.cm as cmx
-            from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+            use_inset = False
+            try:
+                from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+                use_inset = True
+            except ImportError:
+                pass
 
             cm = plt.get_cmap('rainbow')
             plt.set_cmap('rainbow')
@@ -233,12 +238,13 @@ class FgcmSigmaCal(object):
                 ax.set_title('%s band, sigma_cal = %.4f' % (band, self.fgcmPars.compSigmaCal[bandIndex]))
                 ax.tick_params(axis='both', which='major', labelsize=14)
 
-                axins=inset_axes(ax, width='45%',height='5%',loc=4)
-                plt.colorbar(CS3,cax=axins,orientation='horizontal',format='%.3f',
-                             ticks=[self.sigmaCalRange[0], (self.sigmaCalRange[0] + self.sigmaCalRange[1]) / 2.,
-                                    self.sigmaCalRange[1]])
-                axins.xaxis.set_ticks_position('top')
-                axins.tick_params(axis='both',which='major',labelsize=12)
+                if use_inset:
+                    axins=inset_axes(ax, width='45%',height='5%',loc=4)
+                    plt.colorbar(CS3,cax=axins,orientation='horizontal',format='%.3f',
+                                 ticks=[self.sigmaCalRange[0], (self.sigmaCalRange[0] + self.sigmaCalRange[1]) / 2.,
+                                        self.sigmaCalRange[1]])
+                    axins.xaxis.set_ticks_position('top')
+                    axins.tick_params(axis='both',which='major',labelsize=12)
 
                 fig.savefig('%s/%s_sigmacal_%s.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle,
