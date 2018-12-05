@@ -349,6 +349,7 @@ class FgcmParameters(object):
 
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
+        self.compSigmaCal = np.zeros(self.nBands, dtype='f8')
 
         # and the computed retrieved Pwv
         # these are set to the standard values to start
@@ -480,6 +481,7 @@ class FgcmParameters(object):
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
+        self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
 
         # These are exposure-level properties
         self.compRetrievedLnPwv = np.atleast_1d(inParams['COMPRETRIEVEDLNPWV'][0])
@@ -931,6 +933,7 @@ class FgcmParameters(object):
                ('COMPVARGRAY','f8',self.compVarGray.size),
                ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
                ('COMPSIGFGCM','f8',self.compSigFgcm.size),
+               ('COMPSIGMACAL', 'f8', self.compSigmaCal.size),
                ('COMPRETRIEVEDLNPWV','f8',self.compRetrievedLnPwv.size),
                ('COMPRETRIEVEDLNPWVRAW','f8',self.compRetrievedLnPwvRaw.size),
                ('COMPRETRIEVEDLNPWVFLAG','i2',self.compRetrievedLnPwvFlag.size),
@@ -986,6 +989,7 @@ class FgcmParameters(object):
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
+        pars['COMPSIGMACAL'][:] = self.compSigmaCal
 
         pars['COMPRETRIEVEDLNPWV'][:] = self.compRetrievedLnPwv
         pars['COMPRETRIEVEDLNPWVRAW'][:] = self.compRetrievedLnPwvRaw
@@ -1166,6 +1170,8 @@ class FgcmParameters(object):
                 self.expLnPwv[self.externalPwvFlag] = (self.parExternalLnPwvOffset[self.expNightIndex[self.externalPwvFlag]] +
                                                          self.parExternalLnPwvScale *
                                                          self.externalLnPwv[self.externalPwvFlag])
+        # and clip to make sure it doesn't go out of bounds
+        self.expLnPwv = np.clip(self.expLnPwv, self.lnPwvRange[0], self.lnPwvRange[1])
 
         # default to nightly slope/intercept
         self.expLnTau = (self.parLnTauIntercept[self.expNightIndex] +
