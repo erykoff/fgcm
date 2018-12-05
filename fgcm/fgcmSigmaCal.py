@@ -153,7 +153,11 @@ class FgcmSigmaCal(object):
             plt.set_cmap('rainbow')
 
             Z = [[0, 0], [0, 0]]
-            levels = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], 256)
+            if self.sigmaCalRange[0] == self.sigmaCalRange[1]:
+                useRange = [self.sigmaCalRange[0] - 1e-5, self.sigmaCalRange[1] + 1e-5]
+            else:
+                useRange = self.sigmaCalRange
+            levels = np.linspace(useRange[0], useRange[1], 256)
             CS3 = plt.contourf(Z, levels, cmap=cm)
 
             cNorm = colors.Normalize(vmin=self.sigmaCalRange[0], vmax=self.sigmaCalRange[1])
