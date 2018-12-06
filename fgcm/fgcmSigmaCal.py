@@ -228,14 +228,19 @@ class FgcmSigmaCal(object):
 
                 ax = fig.add_subplot(111)
 
+                # Only plot those that are > 0!
+
                 # for each sigmaCal, plot with a new color...
                 for i, s in enumerate(sigmaCals):
-                    ax.plot(plotMags[i, bandIndex, :], np.log10(plotChi2s[i, bandIndex, :]),
+                    oktoplot, = np.where(plotChi2s[i, bandIndex, :] > 0)
+                    ax.plot(plotMags[i, bandIndex, oktoplot],
+                            np.log10(plotChi2s[i, bandIndex, oktoplot]),
                             '-', color=scalarMap.to_rgba(s))
 
                 # And the best one
-                ax.plot(plotMags[mininds[bandIndex], bandIndex, :],
-                        np.log10(plotChi2s[mininds[bandIndex], bandIndex, :]), 'k-')
+                oktoplot, = np.where(plotChi2s[mininds[bandIndex], bandIndex, :] > 0)
+                ax.plot(plotMags[mininds[bandIndex], bandIndex, oktoplot],
+                        np.log10(plotChi2s[mininds[bandIndex], bandIndex, oktoplot]), 'k-')
 
                 # and a reference line
                 ax.plot([plotMags[i, bandIndex, 0], plotMags[i, bandIndex, -1]], [0, 0], 'k--')
