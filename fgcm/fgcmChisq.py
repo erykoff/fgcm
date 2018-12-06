@@ -10,6 +10,7 @@ import time
 from .fgcmUtilities import _pickle_method
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import MaxFitIterations
 
 import types
 try:
@@ -95,6 +96,8 @@ class FgcmChisq(object):
 
         self.clearMatchCache()
 
+        self.maxIterations = -1
+
 
     def resetFitChisqList(self):
         """
@@ -102,6 +105,15 @@ class FgcmChisq(object):
         """
 
         self.fitChisqs = []
+        self._nIterations = 0
+
+    @property
+    def maxIterations(self):
+        return self._maxIterations
+
+    @maxIterations.setter
+    def maxIterations(self, value):
+        self._maxIterations = value
 
     def clearMatchCache(self):
         """
@@ -308,9 +320,13 @@ class FgcmChisq(object):
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
+            self._nIterations += 1
 
             self.fgcmLog.info('Chisq/dof = %.2f (%d iterations)' %
                              (fitChisq, len(self.fitChisqs)))
+
+            if self.maxIterations > 0 and self._nIterations > self.maxIterations:
+                raise MaxFitIterations
 
         else:
             try:
