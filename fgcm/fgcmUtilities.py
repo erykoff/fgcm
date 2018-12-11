@@ -318,49 +318,163 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
 
     return None
 
-def poly2dFunc(xy, p0, p1, p2, p3, p4, p5):
+class Cheb2dField(object):
     """
-    2d polynomial fitting function.  Up to 2nd order, higher orders dropped.
-
-    parameters
-    ----------
-    xy: numpy vstack (2,nvalues)
-    p0: Const
-    p1: x term
-    p2: y term
-    p3: x**2 term
-    p4: y**2 term
-    p5: x*y term
+    Chebyshev 2d Field class.
     """
+    def __init__(self, xSize, ySize, pars):
+        """
+        Instantiate a Cheb2dField
 
-    return p0 + p1*xy[0,:] + p2*xy[1,:] + p3*xy[0,:]**2. + p4*xy[1,:]**2. + p5*xy[0,:]*xy[1,:]
+        Parameters
+        ----------
+        xSize: `int`
+           Size of bounding box in x direction
+        ySize: `int`
+           Size of bounding box in y direction
+        pars: `np.array`
+           Parameters may be 2d (order + 1, order + 1) or
+           1d (order + 1) * (order + 1)
+        """
+        self.xSize = xSize
+        self.ySize = ySize
 
-def cheb2dFunc(yx, *cpars):
+        if len(pars.shape) == 1:
+            # this is a 1-d flat pars
+            self.order = int(np.sqrt(len(pars))) - 1
+            self.pars = pars.reshape((self.order + 1, self.order + 1))
+        else:
+            # This is a 2-d pars
+            self.order = pars.shape[0] - 1
+            self.pars = pars
+
+    @classmethod
+    def fit(cls, xSize, ySize, order, x, y, value, valueErr=None, triangular=True):
+        """
+        Construct a Cheb2dField by fitting a field of x/y/value
+
+        Parameters
+        ----------
+        xSize: `int`
+           Size of bounding box in x direction
+        ySize: `int`
+           Size of bounding box in y direction
+        order: `int`
+           Chebyshev order of fit
+        x: `np.array`
+           Float array of x values
+        y: `np.array`
+           Float array of y values
+        value: `np.array`
+           Float array of dependent values to fit
+        valueErr: `np.array`, optional
+           Float array of dependent value errors to fit.
+           Default is None (unweighted fit)
+        triangular: `bool`, optional
+           Fit should suppress high-order cross terms.  Default is True
+
+        Returns
+        -------
+        cheb2dField: `fgcm.Cheb2dField`
+           The Cheb2dField object
+        """
+
+        fit = np.zeros((order + 1) * (order + 1))
+
+        if triangular:
+            iind = np.repeat(np.arange(order + 1), order + 1)
+            jind = np.tile(np.arange(order + 1), order + 1)
+            lowInds, = np.where((iind + jind) <= order)
+        else:
+            lowInds = np.arange(fit.size)
+
+        # We add a 0.5 here because of lsst stack compatibility
+        xScaled = (x + 0.5 - xSize/2.) / (xSize / 2.)
+        yScaled = (y + 0.5 - ySize/2.) / (ySize / 2.)
+
+        V = np.polynomial.chebyshev.chebvander2d(yScaled, xScaled, [order, order])
+
+        if triangular:
+            V = V[:, lowInds]
+
+        if valueErr is not None:
+            w = 1./valueErr**2.
+            Vprime = np.matmul(np.diag(w), V)
+        else:
+            w = np.ones(value.size)
+            Vprime = V
+
+        fit[lowInds] = np.matmul(np.matmul(np.linalg.inv(np.matmul(Vprime.T,
+                                                                   Vprime)),
+                                           Vprime.T), value * w)
+
+        return cls(xSize, ySize, fit.reshape((order + 1, order + 1)))
+
+    def evaluate(self, x, y, flatPars=None):
+        """
+        Evaluate the chebyshev field at a given position.  Optionally can
+        substitute a set of fit parameters (used in curve fitter).
+
+        Parameters
+        ----------
+        x: `np.array`
+           Float array of x values
+        y: `np.array`
+           Float array of y values
+        flatPars: 'list' or `np.array`, optional
+           Replacement parameters, must have size (order + 1) * (order + 1)
+           If None, use self.pars
+
+        Returns
+        -------
+        values: `np.array`
+           Float array of Chebyshev field evaluated at x, y
+        """
+
+        if flatPars is not None:
+            c = np.array(flatPars).reshape(self.order + 1, self.order + 1)
+        else:
+            c = self.pars
+
+        xScaled = (x + 0.5 - self.xSize/2.) / (self.xSize / 2.)
+        yScaled = (y + 0.5 - self.ySize/2.) / (self.ySize / 2.)
+
+        return np.polynomial.chebyshev.chebval2d(yScaled, xScaled, c)
+
+    def evaluateCenter(self):
+        """
+        Evaluate the chebyshev field at the center.
+
+        Returns
+        -------
+        value: `float`
+           Float value of Chebyshev field evaluated at center.
+        """
+
+        return float(self.evaluate(self.xSize/2. - 0.5, self.ySize/2. - 0.5))
+
+    def __call__(self, xy, *flatpars):
+        """
+        Evaluate for use in a fitter.
+
+        Parameters
+        ----------
+        yx: `np.array`
+           Numpy vstack (2, nvalues)
+        *flatpars: `float`
+           Chebyshev parameters.
+
+        Returns
+        -------
+        values: `np.array`
+           Value of function evaluated at x = xy[0, :], y = xy[1, :]
+        """
+
+        return self.evaluate(xy[0, :], xy[1, :], flatpars)
+
+def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     """
-    2d Chebyshev polynomial fitting function.
-
-    parameters
-    ----------
-    yx: numpy vstack (2, nvalues)
-    *cpars: Chebyshev parameters
-
-    Note that the order of the polynomials in inferred from the number of *cpars.
-    The array is reshaped to hand to np.polynomial.chebyshev.chebval2d
-
-    returns
-    -------
-    Value of function evaluated at y = yx[0, :], x = yx[1, :]
-    """
-
-    orderplus1 = int(np.sqrt(len(cpars)))
-    c = np.array(cpars).reshape(orderplus1, orderplus1)
-
-    return np.polynomial.chebyshev.chebval2d(yx[0, :], yx[1, :], c)
-
-
-def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
-    """
-    Plot CCD map with Chebyshev or polynomial fits for each CCD
+    Plot CCD map with Chebyshev fits for each CCD
 
     parameters
     ----------
@@ -389,12 +503,8 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
     centralValues = np.zeros(ccdOffsets.size)
 
     for i in xrange(ccdOffsets.size):
-        if usePoly2d:
-            xy = np.vstack((ccdOffsets['X_SIZE'][i]/2.,
-                            ccdOffsets['Y_SIZE'][i]/2.))
-            centralValues[i] = poly2dFunc(xy, *parArray[i, :])
-        else:
-            centralValues[i] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)), *parArray[i, :]))
+        field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[i, :])
+        centralValues[i] = -2.5 * np.log10(field.evaluateCenter())
 
     if (loHi is None):
         st=np.argsort(centralValues)
@@ -421,26 +531,14 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None, usePoly2d=False):
     ax.tick_params(axis='both',which='major',labelsize=14)
 
     for k in xrange(ccdOffsets.size):
-        if usePoly2d:
-            xRange = np.array([0, ccdOffsets['X_SIZE'][k]])
-            yRange = np.array([0, ccdOffsets['Y_SIZE'][k]])
-        else:
-            xRange = np.array([-1.0, 1.0])
-            yRange = np.array([-1.0, 1.0])
-
-        xValues = np.linspace(xRange[0], xRange[1], 50)
-        yValues = np.linspace(yRange[0], yRange[1], 50)
+        xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][i], 50)
+        yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][i], 50)
 
         xGrid = np.repeat(xValues, yValues.size)
         yGrid = np.tile(yValues, xValues.size)
 
-        # This swizzle may be unnecessary because of the x/y scaling on the chebyshev input
-        if usePoly2d:
-            zGrid = poly2dFunc(np.vstack((xGrid, yGrid)),
-                               *parArray[k, :])
-        else:
-            zGrid = -2.5 * np.log10(np.clip(cheb2dFunc(np.vstack((yGrid, xGrid)),
-                                                       *parArray[k, :]), 0.1, None))
+        field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[k, :])
+        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None))
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -

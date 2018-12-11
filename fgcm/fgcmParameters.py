@@ -144,14 +144,11 @@ class FgcmParameters(object):
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
 
-        # Old style was (a,x,y,x**2,y**2,xy)
-        # Retain this for reading old files
-        self.superStarNParOld = 6
         self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevOrder + 1) *
                               (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
-        self.superStarPoly2d = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
 
         # and the default unit dict
         self.unitDictOnes = {'lnPwvUnit':1.0,
@@ -499,6 +496,8 @@ class FgcmParameters(object):
         self._arrangeParArray()
 
         # need to load the superstarflats
+        self.parSuperStarFlat = inSuperStar
+        """
         # check if we have an "old-old-style" superstar for compatibility
         if (len(inSuperStar.shape) == 3):
             # we have an old-style superstar
@@ -515,6 +514,7 @@ class FgcmParameters(object):
 
             # Use the superstar as read in, raw
             self.parSuperStarFlat = inSuperStar
+            """
 
     def resetAtmosphereParameters(self):
         self.fgcmLog.info("Resetting atmosphere parameters.")
@@ -1524,7 +1524,7 @@ class FgcmParameters(object):
         # This bit of code simply returns the superStarFlat computed at the center
         # of each CCD
 
-        from .fgcmUtilities import poly2dFunc, cheb2dFunc
+        from .fgcmUtilities import Cheb2dField
 
         # this is the version that does the center of the CCD
         # because it is operating on the whole CCD!
@@ -1535,14 +1535,10 @@ class FgcmParameters(object):
         for e in xrange(self.nEpochs):
             for f in xrange(self.nLUTFilter):
                 for c in xrange(self.nCCD):
-                    if self.superStarPoly2d:
-                        xy = np.vstack((self.ccdOffsets['X_SIZE'][c]/2.,
-                                        self.ccdOffsets['Y_SIZE'][c]/2.))
-                        superStarFlatCenter[e, f, c] = poly2dFunc(xy,
-                                                                  *self.parSuperStarFlat[e, f, c, :])
-                    else:
-                        superStarFlatCenter[e, f, c] = -2.5 * np.log10(cheb2dFunc(np.vstack((0.0, 0.0)),
-                                                                                  *self.parSuperStarFlat[e, f, c, :]))
+                    field = Cheb2dField(self.ccdOffsets['X_SIZE'][c],
+                                        self.ccdOffsets['Y_SIZE'][c],
+                                        self.parSuperStarFlat[e, f, c, :])
+                    superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
 
         return superStarFlatCenter
 
