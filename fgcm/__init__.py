@@ -29,4 +29,5 @@ from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmAtmosphereTable import FgcmAtmosphereTable
 from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
+from .fgcmSigmaCal import FgcmSigmaCal
 

@@ -26,10 +26,11 @@ from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
+from .fgcmSigmaCal import FgcmSigmaCal
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
-
+from .fgcmUtilities import MaxFitIterations
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -393,7 +394,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars)
-        self.fgcmRetrieveAtmosphere.r1ToPWV(self.fgcmRetrieval)
+        self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
         #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray)
@@ -419,6 +420,10 @@ class FgcmFitCycle(object):
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
         #   if we don't the zeropoints before convergence will be wrong.
+
+        self.fgcmLog.debug('FitCycle computing SigmaCal')
+        sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
+        sigCal.run()
 
         # Make Zeropoints -- save also
         self.fgcmLog.debug('FitCycle computing zeropoints.')
@@ -493,23 +498,31 @@ class FgcmFitCycle(object):
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
         self.fgcmChisq.clearMatchCache()
+        self.fgcmChisq.maxIterations = self.fgcmConfig.maxIter
 
-        pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
-                                                   parInitial,       # initial guess
-                                                   fprime=None,      # in fgcmChisq()
-                                                   args=(True,True,False,False), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
-                                                   approx_grad=False,# don't approx grad
-                                                   bounds=parBounds, # boundaries
-                                                   m=10,             # "variable metric conditions"
-                                                   factr=1e2,        # highish accuracy
-                                                   pgtol=1e-9,       # gradient tolerance
-                                                   maxfun=self.fgcmConfig.maxIter,
-                                                   maxiter=self.fgcmConfig.maxIter,
-                                                   iprint=0,         # only one output
-                                                   callback=None)    # no callback
+        try:
+            pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
+                                                       parInitial,       # initial guess
+                                                       fprime=None,      # in fgcmChisq()
+                                                       args=(True,True,False,False), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
+                                                       approx_grad=False,# don't approx grad
+                                                       bounds=parBounds, # boundaries
+                                                       m=10,             # "variable metric conditions"
+                                                       factr=1e2,        # highish accuracy
+                                                       pgtol=1e-9,       # gradient tolerance
+                                                       maxfun=self.fgcmConfig.maxIter,
+                                                       maxiter=self.fgcmConfig.maxIter,
+                                                       iprint=0,         # only one output
+                                                       callback=None)    # no callback
+        except MaxFitIterations:
+            # We have exceeded the maximum number of iterations, force a cut
+            pars = self.fgcmPars.getParArray(fitterUnits=True)
+            chisq = self.fgcmChisq.fitChisqs[-1]
+            info = None
 
         self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
         self.fgcmChisq.clearMatchCache()
+        self.fgcmChisq.maxIterations = -1
 
         if (doPlots):
             fig=plt.figure(1,figsize=(8,6))
@@ -537,6 +550,8 @@ class FgcmFitCycle(object):
         """
         Internal method to only do the optics fit.  Not recommended.
         """
+
+        raise NotImplementedError("The doSOpticsFit routine does not work correctly.")
 
         ## FIXME: remove this method, it's not useful
 
@@ -660,3 +675,4 @@ class FgcmFitCycle(object):
 
 
         self.fgcmPars.plotParameters()
+

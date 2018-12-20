@@ -984,6 +984,8 @@ class FgcmStars(object):
         Do outlier cuts from common ccd/filter/epochs
         """
 
+        self.fgcmLog.info('Computing superstar outliers')
+
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
 
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)

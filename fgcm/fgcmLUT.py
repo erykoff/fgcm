@@ -119,6 +119,7 @@ class FgcmLUTMaker(object):
 
         self.pmbStd = self.atmosphereTable.atmConfig['pmbStd']
         self.pwvStd = self.atmosphereTable.atmConfig['pwvStd']
+        self.lnPwvStd = np.log(self.atmosphereTable.atmConfig['pwvStd'])
         self.o3Std = self.atmosphereTable.atmConfig['o3Std']
         self.tauStd = self.atmosphereTable.atmConfig['tauStd']
         self.lnTauStd = np.log(self.tauStd)
@@ -256,13 +257,13 @@ class FgcmLUTMaker(object):
            lut['I1']: I1 LUT (multi-dimensional)
         lutDeriv: Derivative recarray
            lutDeriv['D_PMB']: I0 PMB derivative
-           lutDeriv['D_PWV']: I0 PWV derivative
+           lutDeriv['D_LNPWV']: I0 log(PWV) derivative
            lutDeriv['D_O3']: I0 O3 derivative
            lutDeriv['D_LNTAU']: I0 log(tau) derivative
            lutDeriv['D_ALPHA']: I0 alpha derivative
            lutDeriv['D_SECZENITH']: I0 sec(zenith) derivative
            lutDeriv['D_PMB_I1']: I1 PMB derivative
-           lutDeriv['D_PWV_I1']: I1 PWV derivative
+           lutDeriv['D_LNPWV_I1']: I1 log(PWV) derivative
            lutDeriv['D_O3_I1']: I1 O3 derivative
            lutDeriv['D_LNTAU_I1']: I1 log(tau) derivative
            lutDeriv['D_ALPHA_I1']: I1 alpha derivative
@@ -289,9 +290,11 @@ class FgcmLUTMaker(object):
         self.pmbDelta = self.atmosphereTable.pmbDelta
         pmbPlus = np.append(self.pmb, self.pmb[-1] + self.pmbDelta)
 
-        self.pwv = self.atmosphereTable.pwv
-        self.pwvDelta = self.atmosphereTable.pwvDelta
-        pwvPlus = np.append(self.pwv, self.pwv[-1] + self.pwvDelta)
+        self.lnPwv = self.atmosphereTable.lnPwv
+        self.lnPwvDelta = self.atmosphereTable.lnPwvDelta
+        self.pwv = np.exp(self.lnPwv)
+        lnPwvPlus = np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta)
+        pwvPlus = np.exp(lnPwvPlus)
 
         self.o3 = self.atmosphereTable.o3
         self.o3Delta = self.atmosphereTable.o3Delta
@@ -463,13 +466,13 @@ class FgcmLUTMaker(object):
                                   self.zenith.size,
                                   self.nCCDStep),
                                  dtype=[('D_PMB','f4'),
-                                        ('D_PWV','f4'),
+                                        ('D_LNPWV','f4'),
                                         ('D_O3','f4'),
                                         ('D_LNTAU','f4'),
                                         ('D_ALPHA','f4'),
                                         ('D_SECZENITH','f4'),
                                         ('D_PMB_I1','f4'),
-                                        ('D_PWV_I1','f4'),
+                                        ('D_LNPWV_I1','f4'),
                                         ('D_O3_I1','f4'),
                                         ('D_LNTAU_I1','f4'),
                                         ('D_ALPHA_I1','f4'),
@@ -487,15 +490,15 @@ class FgcmLUTMaker(object):
                         for n in xrange(self.alpha.size):
                             for o in xrange(self.zenith.size):
                                 for p in xrange(self.nCCDStep):
-                                    self.lutDeriv['D_PWV'][i,j,k,m,n,o,p] = (
+                                    self.lutDeriv['D_LNPWV'][i,j,k,m,n,o,p] = (
                                         ((lutPlus['I0'][i,j+1,k,m,n,o,p] -
                                           lutPlus['I0'][i,j,k,m,n,o,p]) /
-                                         self.pwvDelta)
+                                         self.lnPwvDelta)
                                         )
-                                    self.lutDeriv['D_PWV_I1'][i,j,k,m,n,o,p] = (
+                                    self.lutDeriv['D_LNPWV_I1'][i,j,k,m,n,o,p] = (
                                         ((lutPlus['I1'][i,j+1,k,m,n,o,p] -
                                           lutPlus['I1'][i,j,k,m,n,o,p]) /
-                                         self.pwvDelta)
+                                         self.lnPwvDelta)
                                         )
                                     self.lutDeriv['D_O3'][i,j,k,m,n,o,p] = (
                                         ((lutPlus['I0'][i,j,k+1,m,n,o,p] -
@@ -739,7 +742,8 @@ class FgcmLUT(object):
         self.lambdaNorm = indexVals['LAMBDANORM'][0]
 
         self.pwv = indexVals['PWV'][0]
-        self.pwvDelta = self.pwv[1] - self.pwv[0]
+        self.lnPwv = np.log(self.pwv)
+        self.lnPwvDelta = self.lnPwv[1] - self.lnPwv[0]
         self.o3 = indexVals['O3'][0]
         self.o3Delta = self.o3[1] - self.o3[0]
         self.tau = indexVals['TAU'][0]
@@ -766,19 +770,19 @@ class FgcmLUT(object):
         # and read in the derivatives
 
         # create shared memory
-        self.lutDPWVHandle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDLnPwvHandle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDO3Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDLnTauHandle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDAlphaHandle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDSecZenithHandle = snmm.createArray(sizeTuple,dtype='f4')
 
-        self.lutDPWVI1Handle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDLnPwvI1Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDO3I1Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDLnTauI1Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDAlphaI1Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDSecZenithI1Handle = snmm.createArray(sizeTuple,dtype='f4')
 
-        snmm.getArray(self.lutDPWVHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_PWV'].reshape(sizeTuple)
+        snmm.getArray(self.lutDLnPwvHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNPWV'].reshape(sizeTuple)
         snmm.getArray(self.lutDO3Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_O3'].reshape(sizeTuple)
         snmm.getArray(self.lutDLnTauHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU'].reshape(sizeTuple)
         snmm.getArray(self.lutDAlphaHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
@@ -786,7 +790,7 @@ class FgcmLUT(object):
 
         self.hasI1Derivatives = False
         try:
-            snmm.getArray(self.lutDPWVI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_PWV_I1'].reshape(sizeTuple)
+            snmm.getArray(self.lutDLnPwvI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNPWV_I1'].reshape(sizeTuple)
             snmm.getArray(self.lutDO3I1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_O3_I1'].reshape(sizeTuple)
             snmm.getArray(self.lutDLnTauI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU_I1'].reshape(sizeTuple)
             snmm.getArray(self.lutDAlphaI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA_I1'].reshape(sizeTuple)
@@ -801,6 +805,7 @@ class FgcmLUT(object):
 
         self.pmbStd = stdVals['PMBSTD'][0]
         self.pwvStd = stdVals['PWVSTD'][0]
+        self.lnPwvStd = np.log(self.pwvStd)
         self.o3Std = stdVals['O3STD'][0]
         self.tauStd = stdVals['TAUSTD'][0]
         self.lnTauStd = np.log(self.tauStd)
@@ -870,7 +875,7 @@ class FgcmLUT(object):
                    sedLUT=sedLUT, filterToBand=filterToBand)
 
 
-    def getIndices(self, filterIndex, pwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
+    def getIndices(self, filterIndex, lnPwv, o3, lnTau, alpha, secZenith, ccdIndex, pmb):
         """
         Compute indices in the look-up table.  These are in regular (non-normalized) units.
 
@@ -878,7 +883,7 @@ class FgcmLUT(object):
         ----------
         filterIndex: int array
            Array with values pointing to the filterName index
-        pwv: float array
+        lnPwv: float array
         o3: float array
         lnTau: float array
         alpha: float array
@@ -889,8 +894,8 @@ class FgcmLUT(object):
         """
 
         return (filterIndex,
-                np.clip(((pwv - self.pwv[0])/self.pwvDelta).astype(np.int32), 0,
-                        self.pwv.size-1),
+                np.clip(((lnPwv - self.lnPwv[0])/self.lnPwvDelta).astype(np.int32), 0,
+                        self.lnPwv.size-1),
                 np.clip(((o3 - self.o3[0])/self.o3Delta).astype(np.int32), 0,
                         self.o3.size-1),
                 np.clip(((lnTau - self.lnTau[0])/self.lnTauDelta).astype(np.int32), 0,
@@ -903,13 +908,13 @@ class FgcmLUT(object):
                 (np.exp(-(pmb - self.pmbElevation)/self.pmbElevation)) ** 1.6)
 
 
-    def computeI0(self, pwv, o3, lnTau, alpha, secZenith, pmb, indices):
+    def computeI0(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices):
         """
         Compute I0 from the look-up table.
 
         parameters
         ----------
-        pwv: float array
+        lnPwv: float array
         o3: float array
         lnTau: float array
         alpha: float array
@@ -919,7 +924,7 @@ class FgcmLUT(object):
         """
 
         # do a simple linear interpolation
-        dPWV = pwv - (self.pwv[0] + indices[1] * self.pwvDelta)
+        dlnPwv = lnPwv - (self.lnPwv[0] + indices[1] * self.lnPwvDelta)
         dO3 = o3 - (self.o3[0] + indices[2] * self.o3Delta)
         dlnTau = lnTau - (self.lnTau[0] + indices[3] * self.lnTauDelta)
         dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
@@ -927,34 +932,34 @@ class FgcmLUT(object):
 
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
-        indicesPWVPlus = np.array(indices[:-1])
-        indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
+        indicesPwvPlus = np.array(indices[:-1])
+        indicesPwvPlus[1] = np.clip(indicesPwvPlus[1] + 1, 0, self.lnPwv.size-1)
 
         # also include cross-terms for tau and pwv
         # and a second-derivative term for pwv
         #  note that indices[-1] is the PMB vactor
 
         return indices[-1]*(snmm.getArray(self.lutI0Handle)[indices[:-1]] +
-                            dPWV * snmm.getArray(self.lutDPWVHandle)[indices[:-1]] +
+                            dlnPwv * snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] +
                             dO3 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] +
                             dlnTau * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] +
                             dAlpha * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] +
                             dSecZenith * snmm.getArray(self.lutDSecZenithHandle)[indices[:-1]] +
                             dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauHandle)[tuple(indicesSecZenithPlus)] -
                                                    snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta +
-                            dPWV * dSecZenith * (snmm.getArray(self.lutDPWVHandle)[tuple(indicesSecZenithPlus)] -
-                                                 snmm.getArray(self.lutDPWVHandle)[indices[:-1]])/self.secZenithDelta +
-                            dPWV * (dPWV - self.pwvDelta) * (snmm.getArray(self.lutDPWVHandle)[tuple(indicesPWVPlus)] -
-                                                             snmm.getArray(self.lutDPWVHandle)[indices[:-1]]))
+                            dlnPwv * dSecZenith * (snmm.getArray(self.lutDLnPwvHandle)[tuple(indicesSecZenithPlus)] -
+                                                 snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (snmm.getArray(self.lutDLnPwvHandle)[tuple(indicesPwvPlus)] -
+                                                             snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]]))
 
 
-    def computeI1(self, pwv, o3, lnTau, alpha, secZenith, pmb, indices):
+    def computeI1(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices):
         """
         Compute I1 from the look-up table.
 
         parameters
         ----------
-        pwv: float array
+        lnPwv: float array
         o3: float array
         lnTau: float array
         alpha: float array
@@ -964,7 +969,7 @@ class FgcmLUT(object):
         """
 
         # do a simple linear interpolation
-        dPWV = pwv - (self.pwv[0] + indices[1] * self.pwvDelta)
+        dlnPwv = lnPwv - (self.lnPwv[0] + indices[1] * self.lnPwvDelta)
         dO3 = o3 - (self.o3[0] + indices[2] * self.o3Delta)
         dlnTau = lnTau - (self.lnTau[0] + indices[3] * self.lnTauDelta)
         dAlpha = alpha - (self.alpha[0] + indices[4] * self.alphaDelta)
@@ -972,24 +977,24 @@ class FgcmLUT(object):
 
         indicesSecZenithPlus = np.array(indices[:-1])
         indicesSecZenithPlus[5] += 1
-        indicesPWVPlus = np.array(indices[:-1])
-        indicesPWVPlus[1] = np.clip(indicesPWVPlus[1] + 1, 0, self.pwv.size-1)
+        indicesPwvPlus = np.array(indices[:-1])
+        indicesPwvPlus[1] = np.clip(indicesPwvPlus[1] + 1, 0, self.lnPwv.size-1)
 
         # also include a cross-term for tau
         #  note that indices[-1] is the PMB vactor
 
         return indices[-1]*(snmm.getArray(self.lutI1Handle)[indices[:-1]] +
-                            dPWV * snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]] +
+                            dlnPwv * snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]] +
                             dO3 * snmm.getArray(self.lutDO3I1Handle)[indices[:-1]] +
                             dlnTau * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]] +
                             dAlpha * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]] +
                             dSecZenith * snmm.getArray(self.lutDSecZenithI1Handle)[indices[:-1]] +
                             dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauI1Handle)[tuple(indicesSecZenithPlus)] -
                                                    snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]])/self.secZenithDelta +
-                            dPWV * dSecZenith * (snmm.getArray(self.lutDPWVI1Handle)[tuple(indicesSecZenithPlus)] -
-                                                 snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]])/self.secZenithDelta +
-                            dPWV * (dPWV - self.pwvDelta) * (snmm.getArray(self.lutDPWVI1Handle)[tuple(indicesPWVPlus)] -
-                                                             snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]]))
+                            dlnPwv * dSecZenith * (snmm.getArray(self.lutDLnPwvI1Handle)[tuple(indicesSecZenithPlus)] -
+                                                 snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (snmm.getArray(self.lutDLnPwvI1Handle)[tuple(indicesPwvPlus)] -
+                                                             snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]]))
 
     def computeI1Old(self, indices):
         """
@@ -1009,9 +1014,9 @@ class FgcmLUT(object):
 
         # dL(i,j|p) = d/dp(2.5*log10(LUT(i,j|p)))
         #           = 1.086*(LUT'(i,j|p)/LUT(i,j|p))
-        return (self.magConstant*snmm.getArray(self.lutDPWVHandle)[indices[:-1]] / I0,
+        return (self.magConstant*snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] / I0,
                 self.magConstant*snmm.getArray(self.lutDO3Handle)[indices[:-1]] / I0,
-                self.magConstant*snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / (I0),
+                self.magConstant*snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / I0,
                 self.magConstant*snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] / I0)
 
 
@@ -1033,8 +1038,8 @@ class FgcmLUT(object):
 
         preFactor = (self.magConstant * (sedSlope / (1 + sedSlope*I10))) / I0**2.
 
-        return (preFactor * (I0 * snmm.getArray(self.lutDPWVHandle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDPWVI1Handle)[indices[:-1]]),
+        return (preFactor * (I0 * snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] -
+                             I10 * I0 * snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]]),
                 preFactor * (I0 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] -
                              I10 * I0 * snmm.getArray(self.lutDO3I1Handle)[indices[:-1]]),
                 preFactor * (I0 * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] -
@@ -1141,15 +1146,17 @@ class FgcmLUT(object):
                 break
 
         if pwvFilterIndex == -1:
-            unitDict['pwvUnit'] = 1.0 / stepUnitReference / stepGrain
+            unitDict['lnPwvUnit'] = 1.0 / stepUnitReference / stepGrain
         else:
-            indicesStd = self.getIndices(pwvFilterIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-            indicesPlus = self.getIndices(pwvFilterIndex,self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Plus = self.computeI0(self.pwvStd+1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
-            deltaMagPWV = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
+            indicesStd = self.getIndices(pwvFilterIndex,np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+            i0Std = self.computeI0(np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
 
-            unitDict['pwvUnit'] = np.abs(deltaMagPWV) / stepUnitReference / stepGrain
+            # Want the change from one step unit
+            indicesMinus = self.getIndices(pwvFilterIndex,np.log(self.pwvStd)-1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+            i0Minus = self.computeI0(np.log(self.pwvStd)-1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesMinus)
+            deltaMagPwv = 2.5*np.log10(i0Minus) - 2.5*np.log10(i0Std)
+
+            unitDict['lnPwvUnit'] = np.abs(deltaMagPwv) / stepUnitReference / stepGrain
 
             # scale by fraction of bands affected
             pwvNAffectedBands = 0
@@ -1161,13 +1168,14 @@ class FgcmLUT(object):
                     (self.filterToBand[filterName] == 'Y' and
                      'Y' in fitBands)):
                     pwvNAffectedBands += 1
-            unitDict['pwvUnit'] *= float(pwvNAffectedBands) / float(len(fitBands))
+            unitDict['lnPwvUnit'] *= float(pwvNAffectedBands) / float(len(fitBands))
 
-        # PWV percent slope units
-        unitDict['pwvPerSlopeUnit'] = unitDict['pwvUnit'] * meanNightDuration * self.pwvStd
+        # PWV slope units
+        unitDict['lnPwvSlopeUnit'] = unitDict['lnPwvUnit'] * meanNightDuration
+        unitDict['lnPwvQuadraticUnit'] = unitDict['lnPwvUnit'] * meanNightDuration**2.
 
         # PWV Global step units
-        unitDict['pwvGlobalUnit'] = unitDict['pwvUnit'] * nCampaignNights
+        unitDict['lnPwvGlobalUnit'] = unitDict['lnPwvUnit'] * nCampaignNights
 
         # O3 units -- reference to r
         o3FilterIndex = -1
@@ -1180,10 +1188,10 @@ class FgcmLUT(object):
         if o3FilterIndex == -1:
             unitDict['o3Unit'] = 1.0 / stepUnitReference / stepGrain
         else:
-            indicesStd = self.getIndices(o3FilterIndex,self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Std = self.computeI0(self.pwvStd,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-            indicesPlus = self.getIndices(o3FilterIndex,self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Plus = self.computeI0(self.pwvStd,self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
+            indicesStd = self.getIndices(o3FilterIndex,np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+            i0Std = self.computeI0(np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
+            indicesPlus = self.getIndices(o3FilterIndex,np.log(self.pwvStd),self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
+            i0Plus = self.computeI0(np.log(self.pwvStd),self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
             deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
 
             unitDict['o3Unit'] = np.abs(deltaMagO3) / stepUnitReference / stepGrain
@@ -1199,6 +1207,11 @@ class FgcmLUT(object):
         # wash parameters units...
         unitDict['qeSysUnit'] = 1.0 / stepUnitReference / stepGrain
         unitDict['qeSysSlopeUnit'] = unitDict['qeSysUnit'] * meanWashIntervalDuration
+
+        # And filter offset units...
+        # Unsure about this, we might need to get fancy per filter about overlaps
+        # But this is going to be roughly in the right direction, I hope.
+        unitDict['filterOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
 
         return unitDict
 

@@ -49,6 +49,13 @@ logDict = {'NONE':0,
            'INFO':1,
            'DEBUG':2}
 
+class MaxFitIterations(Exception):
+    """
+    Raise when we've hit the maximum number of iterations
+    """
+
+    pass
+
 
 def getMemoryString(location):
     """

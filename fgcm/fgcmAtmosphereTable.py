@@ -84,6 +84,7 @@ class FgcmAtmosphereTable(object):
 
             self.pmbStd = self.atmConfig['pmbStd']
             self.pwvStd = self.atmConfig['pwvStd']
+            self.lnPwvStd = np.log(self.pwvStd)
             self.o3Std = self.atmConfig['o3Std']
             self.tauStd = self.atmConfig['tauStd']
             self.lnTauStd = np.log(self.tauStd)
@@ -109,7 +110,7 @@ class FgcmAtmosphereTable(object):
         self.o2Interpolator = None
         self.o3Interpolator = None
         self.rayleighInterpolator = None
-        self.pwvInterpolator = None
+        self.lnPwvInterpolator = None
 
 
     @staticmethod
@@ -166,8 +167,9 @@ class FgcmAtmosphereTable(object):
         infoDict = {'elevation':parStruct['ELEVATION'][0],
                     'pmbRange':[parStruct['PMB'][0][0], parStruct['PMB'][0][-1]],
                     'pmbSteps':parStruct['PMB'][0].size,
-                    'pwvRange':[parStruct['PWV'][0][0], parStruct['PWV'][0][-1]],
-                    'pwvSteps':parStruct['PWV'][0].size,
+                    'pwvRange':[np.exp(parStruct['LNPWV'][0][0]),
+                                np.exp(parStruct['LNPWV'][0][-1])],
+                    'pwvSteps':parStruct['LNPWV'][0].size,
                     'o3Range':[parStruct['O3'][0][0], parStruct['O3'][0][-1]],
                     'o3Steps':parStruct['O3'][0].size,
                     'tauRange':[np.exp(parStruct['LNTAU'][0][0]), np.exp(parStruct['LNTAU'][0][-1])],
@@ -265,8 +267,8 @@ class FgcmAtmosphereTable(object):
 
         self.pmb = parStruct['PMB'][0]
         self.pmbDelta = parStruct['PMBDELTA'][0]
-        self.pwv = parStruct['PWV'][0]
-        self.pwvDelta = parStruct['PWVDELTA'][0]
+        self.lnPwv = parStruct['LNPWV'][0]
+        self.lnPwvDelta = parStruct['LNPWVDELTA'][0]
         self.o3 = parStruct['O3'][0]
         self.o3Delta = parStruct['O3DELTA'][0]
         self.lnTau = parStruct['LNTAU'][0]
@@ -314,11 +316,12 @@ class FgcmAtmosphereTable(object):
         self.pmbDelta = self.pmb[1] - self.pmb[0]
         pmbPlus = np.append(self.pmb, self.pmb[-1] + self.pmbDelta)
 
-        self.pwv = np.linspace(self.atmConfig['pwvRange'][0],
-                               self.atmConfig['pwvRange'][1],
-                               num=self.atmConfig['pwvSteps'])
-        self.pwvDelta = self.pwv[1] - self.pwv[0]
-        pwvPlus = np.append(self.pwv, self.pwv[-1] + self.pwvDelta)
+        self.lnPwv = np.linspace(np.log(self.atmConfig['pwvRange'][0]),
+                                 np.log(self.atmConfig['pwvRange'][1]),
+                                 num=self.atmConfig['pwvSteps'])
+        self.lnPwvDelta = self.lnPwv[1] - self.lnPwv[0]
+        lnPwvPlus = np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta)
+        pwvPlus = np.exp(lnPwvPlus)
 
         self.o3 = np.linspace(self.atmConfig['o3Range'][0],
                                self.atmConfig['o3Range'][1],
@@ -429,8 +432,8 @@ class FgcmAtmosphereTable(object):
                                        ('ATMSTDTRANS','f4',self.atmStdTrans.size),
                                        ('PMB','f4',self.pmb.size),
                                        ('PMBDELTA','f4'),
-                                       ('PWV','f4',self.pwv.size),
-                                       ('PWVDELTA','f4'),
+                                       ('LNPWV','f4',self.lnPwv.size),
+                                       ('LNPWVDELTA','f4'),
                                        ('O3','f4',self.o3.size),
                                        ('O3DELTA','f4'),
                                        ('LNTAU','f4',self.lnTau.size),
@@ -457,8 +460,8 @@ class FgcmAtmosphereTable(object):
 
         parStruct['PMB'][:] = self.pmb
         parStruct['PMBDELTA'] = self.pmbDelta
-        parStruct['PWV'][:] = self.pwv
-        parStruct['PWVDELTA'] = self.pwvDelta
+        parStruct['LNPWV'][:] = self.lnPwv
+        parStruct['LNPWVDELTA'] = self.lnPwvDelta
         parStruct['O3'][:] = self.o3
         parStruct['O3DELTA'] = self.o3Delta
         parStruct['LNTAU'][:] = self.lnTau
@@ -530,10 +533,10 @@ class FgcmAtmosphereTable(object):
             secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
             self.rayleighInterpolator = interpolate.RegularGridInterpolator((secZenithPlus, self.atmLambda), self.rayleighAtmTable)
 
-        if self.pwvInterpolator is None:
-            pwvPlus = np.append(self.pwv, self.pwv[-1] + self.pwvDelta)
+        if self.lnPwvInterpolator is None:
+            lnPwvPlus = np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta)
             secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
-            self.pwvInterpolator = interpolate.RegularGridInterpolator((pwvPlus, secZenithPlus, self.atmLambda), self.pwvAtmTable)
+            self.lnPwvInterpolator = interpolate.RegularGridInterpolator((lnPwvPlus, secZenithPlus, self.atmLambda), self.pwvAtmTable)
 
         if self.o3Interpolator is None:
             o3Plus = np.append(self.o3, self.o3[-1] + self.o3Delta)
@@ -546,12 +549,12 @@ class FgcmAtmosphereTable(object):
         pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
 
         _secZenith = np.clip(1./np.cos(np.radians(zenith)), self.secZenith[0], self.secZenith[-1])
-        _pwv = np.clip(pwv, self.pwv[0], self.pwv[-1])
+        _pwv = np.clip(pwv, np.exp(self.lnPwv[0]), np.exp(self.lnPwv[-1]))
         _o3 = np.clip(o3, self.o3[0], self.o3[-1])
         atmInterpolated = (pmbFactor *
                            self.o2Interpolator((_secZenith, lam)) *
                            self.rayleighInterpolator((_secZenith, lam)) *
-                           self.pwvInterpolator((_pwv, _secZenith, lam)) *
+                           self.lnPwvInterpolator((np.log(_pwv), _secZenith, lam)) *
                            self.o3Interpolator((_o3, _secZenith, lam)) *
                            np.exp(-1.0 * tau * _secZenith * (lam / self.lambdaNorm)**(-alpha)))
 

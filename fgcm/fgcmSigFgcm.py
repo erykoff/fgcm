@@ -85,7 +85,6 @@ class FgcmSigFgcm(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
 
@@ -164,6 +163,7 @@ class FgcmSigFgcm(object):
                     continue
 
                 ax=fig.add_subplot(2,2,c+1)
+
 
                 try:
                     coeff = histoGauss(ax, EGrayGO[sigUse])

@@ -39,13 +39,13 @@ class FgcmRetrieveAtmosphere(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.illegalValue = fgcmConfig.illegalValue
-        self.useNightlyRetrievedPWV = fgcmConfig.useNightlyRetrievedPWV
+        self.useNightlyRetrievedPwv = fgcmConfig.useNightlyRetrievedPwv
         self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
-    def r1ToPWV(self, fgcmRetrieval, doPlots=True):
+    def r1ToPwv(self, fgcmRetrieval, doPlots=True):
         """
-        Convert R1 values to PWV.  Experimental.
+        Convert R1 values to Pwv.  Experimental.
 
         parameters
         ----------
@@ -66,14 +66,14 @@ class FgcmRetrieveAtmosphere(object):
         r10 = snmm.getArray(fgcmRetrieval.r10Handle)
 
         # Reset values
-        self.fgcmPars.compRetrievedPWVRaw[:] = self.illegalValue
+        self.fgcmPars.compRetrievedLnPwvRaw[:] = self.illegalValue
         # set this to be the default
-        self.fgcmPars.compRetrievedPWVRaw[:] = self.fgcmPars.pwvStd
-        self.fgcmPars.compRetrievedPWV[:] = self.fgcmPars.pwvStd
-        self.fgcmPars.compRetrievedPWVFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
-
+        self.fgcmPars.compRetrievedLnPwvRaw[:] = self.fgcmPars.lnPwvStd
+        self.fgcmPars.compRetrievedLnPwv[:] = self.fgcmPars.lnPwvStd
+        self.fgcmPars.compRetrievedLnPwvFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
 
         # FIXME: check that there are actually z-band images...etc.
+        # Also: allow retrieval from other bands, configurable.
         try:
             zBandIndex = self.fgcmPars.bands.index('z')
         except ValueError:
@@ -90,7 +90,6 @@ class FgcmRetrieveAtmosphere(object):
             return
 
         o3ZU = self.fgcmPars.expO3[expIndexArray[zUse]]
-        #lnTauZU = np.log(self.fgcmPars.expTau[expIndexArray[zUse]])
         lnTauZU = self.fgcmPars.expLnTau[expIndexArray[zUse]]
         alphaZU = self.fgcmPars.expAlpha[expIndexArray[zUse]]
         secZenithZU = 1./(np.sin(self.fgcmPars.expTelDec[expIndexArray[zUse]]) *
@@ -103,23 +102,23 @@ class FgcmRetrieveAtmosphere(object):
         r1ZU = (r10[expIndexArray[zUse], ccdIndexArray[zUse]] *
                 r0[expIndexArray[zUse], ccdIndexArray[zUse]])
 
-        rPWVZU = np.zeros(zUse.size)
+        rLnPwvZU = np.zeros(zUse.size)
 
-        pwvVals = self.fgcmLUT.pwv
-        I1Arr = np.zeros((pwvVals.size, zUse.size))
+        lnPwvVals = self.fgcmLUT.lnPwv
+        I1Arr = np.zeros((lnPwvVals.size, zUse.size))
 
-        for i,pwv in enumerate(pwvVals):
+        for i, lnPwv in enumerate(lnPwvVals):
             indices = self.fgcmLUT.getIndices(np.repeat(zBandIndex, zUse.size),
-                                              np.repeat(pwv, zUse.size),
+                                              np.repeat(lnPwv, zUse.size),
                                               o3ZU, lnTauZU, alphaZU, secZenithZU,
                                               ccdIndexArray[zUse], pmbZU)
-            I1Arr[i, :] = self.fgcmLUT.computeI1(np.repeat(pwv, zUse.size),
+            I1Arr[i, :] = self.fgcmLUT.computeI1(np.repeat(lnPwv, zUse.size),
                                                  o3ZU, lnTauZU, alphaZU, secZenithZU,
                                                  pmbZU, indices)
 
         for i in xrange(zUse.size):
-            interpolator = scipy.interpolate.interp1d(I1Arr[:,i], pwvVals)
-            rPWVZU[i] = interpolator(np.clip(r1ZU[i], I1Arr[:,i].min() + 0.0001,
+            interpolator = scipy.interpolate.interp1d(I1Arr[:,i], lnPwvVals)
+            rLnPwvZU[i] = interpolator(np.clip(r1ZU[i], I1Arr[:,i].min() + 0.0001,
                                              I1Arr[:,i].max() - 0.0001))
 
 
@@ -129,24 +128,24 @@ class FgcmRetrieveAtmosphere(object):
 
         gd, = np.where(h >= self.minCCDPerExp)
 
-        rPWVStruct = np.zeros(gd.size, dtype=[('EXPINDEX', 'i4'),
-                                              ('RPWV_MED', 'f8'),
-                                              ('RPWV_SMOOTH', 'f8'),
-                                              ('MJD', 'f8')])
+        rLnPwvStruct = np.zeros(gd.size, dtype=[('EXPINDEX', 'i4'),
+                                                ('RLNPWV_MED', 'f8'),
+                                                ('RLNPWV_SMOOTH', 'f8'),
+                                                ('MJD', 'f8')])
 
-        rPWVStruct['EXPINDEX'] = minExpIndex + gd
+        rLnPwvStruct['EXPINDEX'] = minExpIndex + gd
 
         for i in xrange(gd.size):
             i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
 
-            rPWVStruct['RPWV_MED'][i] = np.mean(rPWVZU[i1a])
+            rLnPwvStruct['RLNPWV_MED'][i] = np.mean(rLnPwvZU[i1a])
 
-        rPWVStruct['MJD'] = self.fgcmPars.expMJD[rPWVStruct['EXPINDEX']]
+        rLnPwvStruct['MJD'] = self.fgcmPars.expMJD[rLnPwvStruct['EXPINDEX']]
 
         # next, we do the median smoothing using pwvRetrievalSmoothBlock
         # self.pwvRetrievalSmoothBlock = fgcmConfig.pwvRetrievalSmoothBlock
 
-        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rPWVStruct['EXPINDEX']],
+        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']],
                                        rev=True)
 
         # we do this on any night that we have at least 1
@@ -156,31 +155,31 @@ class FgcmRetrieveAtmosphere(object):
             i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
 
             if (i1a.size == 1):
-                rPWVStruct['RPWV_SMOOTH'][i1a[0]] = rPWVStruct['RPWV_MED'][i1a[0]]
+                rLnPwvStruct['RLNPWV_SMOOTH'][i1a[0]] = rLnPwvStruct['RLNPWV_MED'][i1a[0]]
             else:
                 # these are not sorted out of expNightIndex
-                st = np.argsort(rPWVStruct['MJD'][i1a])
+                st = np.argsort(rLnPwvStruct['MJD'][i1a])
                 i1a = i1a[st]
 
                 for j in xrange(i1a.size):
                     u = np.arange(np.clip(j - self.pwvRetrievalSmoothBlock/2, 0, i1a.size-1),
                                   np.clip(j + self.pwvRetrievalSmoothBlock/2, 0, i1a.size-1),
                                   1, dtype=np.int32)
-                    rPWVStruct['RPWV_SMOOTH'][i1a[j]] = np.median(rPWVStruct['RPWV_MED'][i1a[u]])
+                    rLnPwvStruct['RLNPWV_SMOOTH'][i1a[j]] = np.median(rLnPwvStruct['RLNPWV_MED'][i1a[u]])
 
 
         # Record these values and set a flag...
-        self.fgcmPars.compRetrievedPWVRaw[rPWVStruct['EXPINDEX']] = rPWVStruct['RPWV_MED']
-        self.fgcmPars.compRetrievedPWV[rPWVStruct['EXPINDEX']] = rPWVStruct['RPWV_SMOOTH']
+        self.fgcmPars.compRetrievedLnPwvRaw[rLnPwvStruct['EXPINDEX']] = rLnPwvStruct['RLNPWV_MED']
+        self.fgcmPars.compRetrievedLnPwv[rLnPwvStruct['EXPINDEX']] = rLnPwvStruct['RLNPWV_SMOOTH']
         # unset standard and set that it's been retrieved
-        self.fgcmPars.compRetrievedPWVFlag[rPWVStruct['EXPINDEX']] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
-        self.fgcmPars.compRetrievedPWVFlag[rPWVStruct['EXPINDEX']] |= retrievalFlagDict['EXPOSURE_RETRIEVED']
+        self.fgcmPars.compRetrievedLnPwvFlag[rLnPwvStruct['EXPINDEX']] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
+        self.fgcmPars.compRetrievedLnPwvFlag[rLnPwvStruct['EXPINDEX']] |= retrievalFlagDict['EXPOSURE_RETRIEVED']
 
         # and finally we do interpolation to all the exposures...
 
-        nightIndexWithPWV = np.unique(self.fgcmPars.expNightIndex[rPWVStruct['EXPINDEX']])
+        nightIndexWithLnPwv = np.unique(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']])
 
-        a, b = esutil.numpy_util.match(nightIndexWithPWV, self.fgcmPars.expNightIndex)
+        a, b = esutil.numpy_util.match(nightIndexWithLnPwv, self.fgcmPars.expNightIndex)
         h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[b], rev=True)
 
         gd, = np.where(h > 0)
@@ -193,31 +192,31 @@ class FgcmRetrieveAtmosphere(object):
             i1a = i1a[st]
 
             # base interpolation on the ones with RPWV fits
-            hasPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+            hasLnPwv, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
-            noPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) == 0)
+            noLnPwv, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[i1a] & retrievalFlagDict['EXPOSURE_RETRIEVED']) == 0)
 
             # if we have < 3, we have a special branch -- night average
-            if hasPWV.size < 3:
-                self.fgcmPars.compRetrievedPWV[i1a[noPWV]] = np.mean(self.fgcmPars.compRetrievedPWV[i1a[hasPWV]])
+            if hasLnPwv.size < 3:
+                self.fgcmPars.compRetrievedLnPwv[i1a[noLnPwv]] = np.mean(self.fgcmPars.compRetrievedLnPwv[i1a[hasLnPwv]])
             else:
                 # regular interpolation
 
-                interpolator = scipy.interpolate.interp1d(self.fgcmPars.expMJD[i1a[hasPWV]],
-                                                          self.fgcmPars.compRetrievedPWV[i1a[hasPWV]],
+                interpolator = scipy.interpolate.interp1d(self.fgcmPars.expMJD[i1a[hasLnPwv]],
+                                                          self.fgcmPars.compRetrievedLnPwv[i1a[hasLnPwv]],
                                                           bounds_error=False,
-                                                          fill_value=(self.fgcmPars.compRetrievedPWV[i1a[hasPWV[0]]],
-                                                                      self.fgcmPars.compRetrievedPWV[i1a[hasPWV[-1]]]))
-                self.fgcmPars.compRetrievedPWV[i1a[noPWV]] = interpolator(self.fgcmPars.expMJD[i1a[noPWV]])
+                                                          fill_value=(self.fgcmPars.compRetrievedLnPwv[i1a[hasLnPwv[0]]],
+                                                                      self.fgcmPars.compRetrievedLnPwv[i1a[hasLnPwv[-1]]]))
+                self.fgcmPars.compRetrievedLnPwv[i1a[noLnPwv]] = interpolator(self.fgcmPars.expMJD[i1a[noLnPwv]])
             # Flagging is the same
-            self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
-            self.fgcmPars.compRetrievedPWVFlag[i1a[noPWV]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
+            self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
+            self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
 
         if doPlots:
             # if there are fewer than ... 3000 do points, more than do hexbin
             plt.set_cmap('viridis')
 
-            hasPWV, = np.where((self.fgcmPars.compRetrievedPWVFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+            hasPwv, = np.where((self.fgcmPars.compRetrievedLnPwvFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
             #  RPWV_SMOOTH vs RPWV_SMOOTH_INPUT  (fgcmPars.compRetrievedPWVInput)
             #   (this checks for convergence on the actual measured values)
@@ -225,17 +224,17 @@ class FgcmRetrieveAtmosphere(object):
             fig.clf()
             ax = fig.add_subplot(111)
 
-            hadPWV, = np.where((self.fgcmPars.compRetrievedPWVInput[hasPWV] != self.fgcmPars.pwvStd))
+            hadPwv, = np.where((self.fgcmPars.compRetrievedLnPwvInput[hasPwv] != self.fgcmPars.pwvStd))
 
-            if (hadPWV.size >= 3000):
-                ax.hexbin(self.fgcmPars.compRetrievedPWVInput[hasPWV[hadPWV]],
-                          self.fgcmPars.compRetrievedPWV[hasPWV[hadPWV]],
+            if (hadPwv.size >= 3000):
+                ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwvInput[hasPwv[hadPwv]]),
+                          np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv[hadPwv]]),
                           bins='log')
             else:
-                ax.plot(self.fgcmPars.compRetrievedPWVInput[hasPWV[hadPWV]],
-                          self.fgcmPars.compRetrievedPWV[hasPWV[hadPWV]], 'b.')
-            plotRange = np.array([self.fgcmPars.compRetrievedPWV[hasPWV].min()+0.001,
-                                  self.fgcmPars.compRetrievedPWV[hasPWV].max()-0.001])
+                ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwvInput[hasPwv[hadPwv]]),
+                        np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv[hadPwv]]), 'b.')
+            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
+                                  np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
             ax.set_xlabel('RPWV_INPUT')
             ax.set_ylabel('RPWV')
@@ -250,15 +249,15 @@ class FgcmRetrieveAtmosphere(object):
 
             ax = fig.add_subplot(111)
 
-            if hasPWV.size >= 3000:
+            if hasPwv.size >= 3000:
                 # we can use hexbin; this is arbitrary.
-                ax.hexbin(self.fgcmPars.compRetrievedPWV[hasPWV],
-                          self.fgcmPars.compRetrievedPWVRaw[hasPWV], bins='log')
+                ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
+                          np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv]), bins='log')
             else:
-                ax.plot(self.fgcmPars.compRetrievedPWV[hasPWV],
-                          self.fgcmPars.compRetrievedPWVRaw[hasPWV], 'b.')
-            plotRange = np.array([self.fgcmPars.compRetrievedPWVRaw[hasPWV].min()+0.001,
-                                  self.fgcmPars.compRetrievedPWVRaw[hasPWV].max()-0.001])
+                ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
+                        np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv]), 'b.')
+            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv].min())+0.001,
+                                  np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
             ax.set_xlabel('RPWV_SMOOTH')
             ax.set_ylabel('RPWV_RAW')
@@ -273,15 +272,15 @@ class FgcmRetrieveAtmosphere(object):
 
             ax = fig.add_subplot(111)
 
-            if hasPWV.size >= 3000:
+            if hasPwv.size >= 3000:
                 # we can use hexbin; this is arbitrary.
-                ax.hexbin(self.fgcmPars.compRetrievedPWV[hasPWV],
-                          self.fgcmPars.expPWV[hasPWV], bins='log')
+                ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
+                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log')
             else:
-                ax.plot(self.fgcmPars.compRetrievedPWV[hasPWV],
-                        self.fgcmPars.expPWV[hasPWV], 'b.')
-            plotRange = np.array([self.fgcmPars.compRetrievedPWV[hasPWV].min()+0.001,
-                                  self.fgcmPars.compRetrievedPWV[hasPWV].max()-0.001])
+                ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
+                        np.exp(self.fgcmPars.expLnPwv[hasPwv]), 'b.')
+            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
+                                  np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
             ax.set_xlabel('RPWV')
             ax.set_ylabel('PWV_MODEL')
@@ -296,26 +295,24 @@ class FgcmRetrieveAtmosphere(object):
 
             ax = fig.add_subplot(111)
 
-            #scaledRetrievedPWV = (self.fgcmPars.compRetrievedPWV * self.fgcmPars.parRetrievedPWVScale +
-            #                      self.fgcmPars.parRetrievedPWVOffset)
-            if self.useNightlyRetrievedPWV:
-                scaledRetrievedPWV = (self.fgcmPars.parRetrievedPWVNightlyOffset[self.fgcmPars.expNightIndex] +
-                                      self.fgcmPars.parRetrievedPWVScale *
-                                      self.fgcmPars.compRetrievedPWV)
+            if self.useNightlyRetrievedPwv:
+                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvNightlyOffset[self.fgcmPars.expNightIndex] +
+                                        self.fgcmPars.parRetrievedLnPwvScale *
+                                        self.fgcmPars.compRetrievedLnPwv)
             else:
-                scaledRetrievedPWV = (self.fgcmPars.parRetrievedPWVOffset +
-                                      self.fgcmPars.parRetrievedPWVScale *
-                                      self.fgcmPars.compRetrievedPWV)
+                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvOffset +
+                                        self.fgcmPars.parRetrievedLnPwvScale *
+                                        self.fgcmPars.compRetrievedLnPwv)
 
-            if hasPWV.size >= 3000:
+            if hasPwv.size >= 3000:
                 # we can use hexbin; this is arbitrary.
-                ax.hexbin(scaledRetrievedPWV[hasPWV],
-                          self.fgcmPars.expPWV[hasPWV], bins='log')
+                ax.hexbin(np.exp(scaledRetrievedLnPwv[hasPwv]),
+                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log')
             else:
-                ax.plot(scaledRetrievedPWV[hasPWV],
-                        self.fgcmPars.expPWV[hasPWV], 'b.')
-            plotRange = np.array([self.fgcmPars.compRetrievedPWV[hasPWV].min()+0.001,
-                                  self.fgcmPars.compRetrievedPWV[hasPWV].max()-0.001])
+                ax.plot(np.exp(scaledRetrievedLnPwv[hasPwv]),
+                        np.exp(self.fgcmPars.expLnPwv[hasPwv]), 'b.')
+            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
+                                  np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
             ax.set_xlabel('RPWV_SCALED')
             ax.set_ylabel('PWV_MODEL')
@@ -476,14 +473,14 @@ class FgcmRetrieveAtmosphere(object):
                            np.cos(self.fgcmPars.expTelHA[expIndexArray]))
 
         lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expBandIndex[expIndexArray],
-                                             self.fgcmPars.expPWV[expIndexArray],
+                                             self.fgcmPars.expLnPwv[expIndexArray],
                                              self.fgcmPars.expO3[expIndexArray],
                                              self.fgcmPars.expLnTau[expIndexArray],
                                              self.fgcmPars.expAlpha[expIndexArray],
                                              expSecZenith,
                                              ccdIndexArray,
                                              self.fgcmPars.expPmb[expIndexArray])
-        i0 = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[expIndexArray],
+        i0 = self.fgcmLUT.computeI0(self.fgcmPars.expLnPwv[expIndexArray],
                                     self.fgcmPars.expO3[expIndexArray],
                                     self.fgcmPars.expLnTau[expIndexArray],
                                     self.fgcmPars.expAlpha[expIndexArray],
@@ -519,7 +516,7 @@ class FgcmRetrieveAtmosphere(object):
                           (r0Gray > 0.0))
 
             indices = self.fgcmLUT.getIndices(np.repeat(bandIndex, use.size),
-                                              self.fgcmPars.expPWV[expIndexArray[use]],
+                                              self.fgcmPars.expLnPwv[expIndexArray[use]],
                                               self.fgcmPars.expO3[expIndexArray[use]],
                                               np.repeat(np.log(0.00001), use.size),
                                               #np.repeat(self.fgcmLUT.alphaStd, use.size),
@@ -527,7 +524,7 @@ class FgcmRetrieveAtmosphere(object):
                                               expSecZenith[use],
                                               ccdIndexArray[use],
                                               self.fgcmPars.expPmb[expIndexArray[use]])
-            I0Ref = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[expIndexArray[use]],
+            I0Ref = self.fgcmLUT.computeI0(self.fgcmPars.expLnPwv[expIndexArray[use]],
                                            self.fgcmPars.expO3[expIndexArray[use]],
                                            np.repeat(np.log(0.00001), use.size),
                                            #np.repeat(self.fgcmLUT.alphaStd, use.size),

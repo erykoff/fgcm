@@ -145,7 +145,9 @@ class FgcmConfig(object):
     expGrayRecoverCut = ConfigField(float, default=-1.0)
     expGrayHighCut = ConfigField(np.ndarray, required=True)
     expGrayErrRecoverCut = ConfigField(float, default=0.05)
-    sigma0Cal = ConfigField(float, default=0.003)
+    sigmaCalRange = ConfigField(list, default=[0.001, 0.003])
+    sigmaCalFitPercentile = ConfigField(list, default=[0.05, 0.15])
+    sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95])
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
     mapLongitudeRef = ConfigField(float, default=0.0)
@@ -160,8 +162,9 @@ class FgcmConfig(object):
     freezeStdAtmosphere = ConfigField(bool, default=False)
     reserveFraction = ConfigField(float, default=0.1)
     precomputeSuperStarInitialCycle = ConfigField(bool, default=False)
-    useRetrievedPWV = ConfigField(bool, default=False)
-    useNightlyRetrievedPWV = ConfigField(bool, default=False)
+    useRetrievedPwv = ConfigField(bool, default=False)
+    useNightlyRetrievedPwv = ConfigField(bool, default=False)
+    useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
@@ -175,7 +178,7 @@ class FgcmConfig(object):
     outputPath = ConfigField(str, required=False)
 
     pwvFile = ConfigField(str, required=False)
-    externalPWVDeltaT = ConfigField(float, default=0.1)
+    externalPwvDeltaT = ConfigField(float, default=0.1)
     tauFile = ConfigField(str, required=False)
     externalTauDeltaT = ConfigField(float, default=0.1)
     stepUnitReference = ConfigField(float, default=0.001)
@@ -344,14 +347,17 @@ class FgcmConfig(object):
         # get LUT standard values
         self.pmbStd = lutStd['PMBSTD'][0]
         self.pwvStd = lutStd['PWVSTD'][0]
+        self.lnPwvStd = np.log(lutStd['PWVSTD'][0])
         self.o3Std = lutStd['O3STD'][0]
         self.tauStd = lutStd['TAUSTD'][0]
+        self.lnTauStd = np.log(lutStd['TAUSTD'][0])
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
 
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
+        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
@@ -361,6 +367,16 @@ class FgcmConfig(object):
             raise ValueError("expGrayPhotometricCut must all be negative")
         if (self.expGrayHighCut.max() <= 0.0):
             raise ValueError("expGrayHighCut must all be positive")
+
+        if len(self.sigmaCalRange) != 2:
+            raise ValueError("sigmaCalRange must have 2 elements")
+        if len(self.sigmaCalFitPercentile) != 2:
+            raise ValueError("sigmaCalFitPercentile must have 2 elements")
+        if len(self.sigmaCalPlotPercentile) != 2:
+            raise ValueError("sigmaCalPlotPercentile must have 2 elements")
+
+        if self.sigmaCalRange[1] < self.sigmaCalRange[0]:
+            raise ValueError("sigmaCalRange[1] must me equal to or larger than sigmaCalRange[0]")
 
         # and look at the exposure file and grab some stats
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])

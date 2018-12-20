@@ -33,8 +33,6 @@ class FgcmZeropoints(object):
        Minimum number of stars to recover zeropoint through matching
     maxCCDGrayErr: float
        Maximum CCD Gray error to recover zeropoint through matching
-    sigma0Cal: float
-       Minimum error on zeropoint allowed
     expGrayRecoverCut: float
        Minimum (negative!) exposure gray to consider recovering via focal-plane average
     expGrayErrRecoverCut: float
@@ -65,7 +63,6 @@ class FgcmZeropoints(object):
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
-        self.sigma0Cal = fgcmConfig.sigma0Cal
         self.expField = fgcmConfig.expField
         self.ccdField = fgcmConfig.ccdField
         self.expGrayRecoverCut = fgcmConfig.expGrayRecoverCut
@@ -98,6 +95,7 @@ class FgcmZeropoints(object):
            'FGCM_FPGRY': Average focal-plane gray (exp_gray)
            'FGCM_FPVAR': Focal-plane variance
            'FGCM_DUST': Delta-zeropoint due to mirror/corrector dust buildup
+           'FGCM_FILTER': Delta-zeropoint due to the filter offset
            'FGCM_FLAT': Delta-zeropoint due to superStarFlat
            'FGCM_APERCORR': Delta-zeropoint due to aperture correction
            'EXPTIME': Exposure time (seconds)
@@ -165,6 +163,7 @@ class FgcmZeropoints(object):
                       ('FGCM_FPGRY_CSPLIT', 'f8', 3),
                       ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
                       ('FGCM_DUST','f8'),
+                      ('FGCM_FILTER','f8'),
                       ('FGCM_FLAT','f8'),
                       ('FGCM_APERCORR','f8'),
                       ('EXPTIME','f4'),
@@ -214,6 +213,9 @@ class FgcmZeropoints(object):
         # fill in the optics dust
         zpStruct['FGCM_DUST'][:] = self.fgcmPars.expQESys[zpExpIndex]
 
+        # And the filter offset
+        zpStruct['FGCM_FILTER'][:] = self.fgcmPars.expFilterOffset[zpExpIndex]
+
         # fill in the aperture correction
         if self.seeingSubExposure:
             zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.ccdApertureCorrection[zpExpIndex, zpCCDIndex]
@@ -255,7 +257,7 @@ class FgcmZeropoints(object):
 
         # and do the LUT lookups
         lutIndices = self.fgcmLUT.getIndices(self.fgcmPars.expLUTFilterIndex[zpExpIndex],
-                                             self.fgcmPars.expPWV[zpExpIndex],
+                                             self.fgcmPars.expLnPwv[zpExpIndex],
                                              self.fgcmPars.expO3[zpExpIndex],
                                              #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                              self.fgcmPars.expLnTau[zpExpIndex],
@@ -263,7 +265,7 @@ class FgcmZeropoints(object):
                                              ccdSecZenith,
                                              zpCCDIndex,
                                              self.fgcmPars.expPmb[zpExpIndex])
-        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expPWV[zpExpIndex],
+        zpStruct['FGCM_I0'][:] = self.fgcmLUT.computeI0(self.fgcmPars.expLnPwv[zpExpIndex],
                                                         self.fgcmPars.expO3[zpExpIndex],
                                                         #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                                         self.fgcmPars.expLnTau[zpExpIndex],
@@ -271,7 +273,7 @@ class FgcmZeropoints(object):
                                                         ccdSecZenith,
                                                         self.fgcmPars.expPmb[zpExpIndex],
                                                         lutIndices)
-        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(self.fgcmPars.expPWV[zpExpIndex],
+        zpStruct['FGCM_I10'][:] = self.fgcmLUT.computeI1(self.fgcmPars.expLnPwv[zpExpIndex],
                                                          self.fgcmPars.expO3[zpExpIndex],
                                                          #np.log(self.fgcmPars.expTau[zpExpIndex]),
                                                          self.fgcmPars.expLnTau[zpExpIndex],
@@ -397,10 +399,11 @@ class FgcmZeropoints(object):
         okZpIndex, = np.where((zpStruct['FGCM_FLAG'] & acceptMask) > 0)
 
         okCCDZpIndexFlag = ((zpStruct['FGCM_I0'][okZpIndex] > 0.0) &
-                    (zpStruct['FGCM_FLAT'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
-                    (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
+                            (zpStruct['FGCM_FLAT'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_FILTER'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
 
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
 
@@ -421,6 +424,7 @@ class FgcmZeropoints(object):
         mehCCDZpIndexFlag = ((zpStruct['FGCM_I0'][mehZpIndex] > 0.0) &
                              (zpStruct['FGCM_FLAT'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_DUST'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_FILTER'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_APERCORR'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_GRY'][mehZpIndex] > self.illegalValue) &
                              (ccdNGoodStars[zpExpIndex[mehZpIndex],zpCCDIndex[mehZpIndex]] >=
@@ -448,8 +452,7 @@ class FgcmZeropoints(object):
         # and make the parameter file
         atmStruct[self.expField] = self.fgcmPars.expArray
         atmStruct['PMB'] = self.fgcmPars.expPmb
-        atmStruct['PWV'] = self.fgcmPars.expPWV
-        #atmStruct['TAU'] = self.fgcmPars.expTau
+        atmStruct['PWV'] = np.exp(self.fgcmPars.expLnPwv)
         atmStruct['TAU'] = np.exp(self.fgcmPars.expLnTau)
         atmStruct['ALPHA'] = self.fgcmPars.expAlpha
         atmStruct['O3'] = self.fgcmPars.expO3
@@ -550,6 +553,7 @@ class FgcmZeropoints(object):
         return (2.5*np.log10(zpStruct['FGCM_I0'][indices]) +
                 flatValue +
                 zpStruct['FGCM_DUST'][indices] +
+                zpStruct['FGCM_FILTER'][indices] +
                 zpStruct['FGCM_APERCORR'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
                 self.zptAB +
@@ -614,13 +618,11 @@ class FgcmZeropoints(object):
         # sigFgcm is computed per *band* not per *filter*
         sigFgcm = self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
         nTilingsM1 = np.clip(zpStruct['FGCM_TILINGS'][zpIndex]-1.0,1.0,1e10)
+        sigmaCal = self.fgcmPars.compSigmaCal[self.fgcmPars.expBandIndex[zpExpIndex[zpIndex]]]
 
-        #zpStruct['FGCM_ZPTERR'][zpIndex] = np.sqrt((sigFgcm**2./nTilingsM1) +
-        #                                           zpStruct['FGCM_ZPTVAR'][zpIndex] +
-        #                                           self.sigma0Cal**2.)
         return np.sqrt((sigFgcm**2./nTilingsM1) +
                        zpStruct['FGCM_ZPTVAR'][zpIndex] +
-                       self.sigma0Cal**2.)
+                       sigmaCal**2.)
 
     def saveZptFits(self):
         """
