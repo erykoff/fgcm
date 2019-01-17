@@ -5,3 +5,4 @@ dist
 fgcm.egg-info
 svn*
 *.pyc
+_eupspkg

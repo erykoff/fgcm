@@ -649,7 +649,6 @@ class FgcmChisq(object):
                 expNightIndexGOF = self.fgcmPars.expNightIndex[obsExpIndexGO[obsFitUseGO]]
                 uNightIndex = np.unique(expNightIndexGOF)
 
-
                 np.add.at(partialArray[self.fgcmPars.parO3Loc:
                                            (self.fgcmPars.parO3Loc +
                                             self.fgcmPars.nCampaignNights)],
@@ -692,7 +691,6 @@ class FgcmChisq(object):
                     uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
 
                     # PWV Nightly Offset
-
                     np.add.at(partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
                                                (self.fgcmPars.parExternalLnPwvOffsetLoc+
                                                 self.fgcmPars.nCampaignNights)],
@@ -794,7 +792,6 @@ class FgcmChisq(object):
                                  uNightIndexNoExt] += 1
 
                     # lnPwv Nightly Slope
-
                     np.add.at(partialArray[self.fgcmPars.parLnPwvSlopeLoc:
                                                (self.fgcmPars.parLnPwvSlopeLoc+
                                                 self.fgcmPars.nCampaignNights)],
@@ -810,7 +807,6 @@ class FgcmChisq(object):
 
                     # lnPwv Nightly Quadratic
                     if self.useQuadraticPwv:
-
                         np.add.at(partialArray[self.fgcmPars.parLnPwvQuadraticLoc:
                                                    (self.fgcmPars.parLnPwvQuadraticLoc+
                                                     self.fgcmPars.nCampaignNights)],
@@ -834,7 +830,6 @@ class FgcmChisq(object):
                     uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
 
                     # Tau Nightly Offset
-
                     np.add.at(partialArray[self.fgcmPars.parExternalLnTauOffsetLoc:
                                                (self.fgcmPars.parExternalLnTauOffsetLoc+
                                                 self.fgcmPars.nCampaignNights)],
@@ -868,7 +863,6 @@ class FgcmChisq(object):
                 uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
 
                 # lnTau Nightly Intercept
-
                 np.add.at(partialArray[self.fgcmPars.parLnTauInterceptLoc:
                                            (self.fgcmPars.parLnTauInterceptLoc+
                                             self.fgcmPars.nCampaignNights)],
@@ -884,7 +878,6 @@ class FgcmChisq(object):
                              uNightIndexNoExt] += 1
 
                 # lnTau nightly slope
-
                 np.add.at(partialArray[self.fgcmPars.parLnTauSlopeLoc:
                                            (self.fgcmPars.parLnTauSlopeLoc+
                                             self.fgcmPars.nCampaignNights)],
