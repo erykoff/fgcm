@@ -1061,17 +1061,11 @@ class FgcmStars(object):
         if self.hasXY:
             # With x/y information
 
-            from .fgcmUtilities import poly2dFunc, cheb2dFunc
+            from .fgcmUtilities import Cheb2dField
 
-            if fgcmPars.superStarPoly2d:
-                obsXScaled = snmm.getArray(self.obsXHandle)
-                obsYScaled = snmm.getArray(self.obsYHandle)
-            else:
-                # Scale X and Y
-                xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex]
-                ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex]
-                obsXScaled = (snmm.getArray(self.obsXHandle) - xSize/2.) / (xSize/2.)
-                obsYScaled = (snmm.getArray(self.obsYHandle) - ySize/2.) / (ySize/2.)
+            # Scale X and Y
+            obsX = snmm.getArray(self.obsXHandle)
+            obsY = snmm.getArray(self.obsYHandle)
 
             epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex]*
                                (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
@@ -1091,15 +1085,11 @@ class FgcmStars(object):
                 fiInd = fgcmPars.expLUTFilterIndex[obsExpIndex[i1a[0]]]
                 cInd = obsCCDIndex[i1a[0]]
 
-                if fgcmPars.superStarPoly2d:
-                    obsSuperStarApplied[i1a] = poly2dFunc(np.vstack((obsXScaled[i1a],
-                                                                     obsYScaled[i1a])),
-                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
-                else:
-                    fluxScale = cheb2dFunc(np.vstack((obsYScaled[i1a],
-                                                                                     obsXScaled[i1a])),
-                                                                          *fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
-                    obsSuperStarApplied[i1a] = -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+                field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
+                                    self.ccdOffsets['Y_SIZE'][cInd],
+                                    fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
+                fluxScale = field.evaluate(obsX[i1a], obsY[i1a])
+                obsSuperStarApplied[i1a] = -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
         else:
             # No x/y available
 

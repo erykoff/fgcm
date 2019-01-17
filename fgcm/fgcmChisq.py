@@ -11,6 +11,7 @@ from .fgcmUtilities import _pickle_method
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
+from .fgcmUtilities import Cheb2dField
 
 import types
 try:
@@ -76,6 +77,8 @@ class FgcmChisq(object):
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
+        self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
+        self.ccdOffsets = fgcmConfig.ccdOffsets
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -397,6 +400,8 @@ class FgcmChisq(object):
             # this is ccdGray[expIndex, ccdIndex]
             # and we only apply when > self.illegalValue
             # same sign as FGCM_DUST (QESys)
+            if self.ccdGraySubCCD:
+                ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
         # and the arrays for locking access
         objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
@@ -455,7 +460,30 @@ class FgcmChisq(object):
             # make sure we aren't adding something crazy, but this shouldn't happen
             # because we're filtering good observations (I hope!)
             ok,=np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
-            obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
+
+            if self.ccdGraySubCCD:
+                #xSizeGO = self.ccdOffsets['X_SIZE'][obsCCDIndexGO]
+                #ySizeGO = self.ccdOffsets['Y_SIZE'][obsCCDIndexGO]
+                #obsXScaledGO = (snmm.getArray(self.fgcmStars.obsXHandle)[goodObs] - xSizeGO/2.) / (xSizeGO/2.)
+                #obsYScaledGO = (snmm.getArray(self.fgcmStars.obsYHandle)[goodObs] - ySizeGO/2.) / (ySizeGO/2.)
+                obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
+                obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+                expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
+                              obsCCDIndexGO[ok])
+                h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+                use, = np.where(h > 0)
+                for i in use:
+                    i1a = rev[rev[i]: rev[i + 1]]
+                    eInd = obsExpIndexGO[ok[i1a[0]]]
+                    cInd = obsCCDIndexGO[ok[i1a[0]]]
+                    field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
+                                        self.ccdOffsets['Y_SIZE'][cInd],
+                                        ccdGraySubCCDPars[eInd, cInd, :])
+                    fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                    obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+            else:
+                # Regular non-sub-ccd
+                obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
 
         # Compute the sub-selected error-squared, using model error when available
         obsMagErr2GO = obsMagADUModelErr[goodObs]**2.

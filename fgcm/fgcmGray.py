@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import Cheb2dField
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -64,6 +65,9 @@ class FgcmGray(object):
         self.minStarPerExp = fgcmConfig.minStarPerExp
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
+        self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
+        self.ccdGraySubCCDChebyshevOrder = fgcmConfig.ccdGraySubCCDChebyshevOrder
+        self.ccdGraySubCCDTriangular = fgcmConfig.ccdGraySubCCDTriangular
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -75,6 +79,7 @@ class FgcmGray(object):
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
+        self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self._prepareGrayArrays()
 
@@ -97,6 +102,11 @@ class FgcmGray(object):
         self.ccdNGoodStarsHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='i4')
         self.ccdNGoodTilingsHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
 
+        if self.ccdGraySubCCD:
+            order = self.ccdGraySubCCDChebyshevOrder
+            self.ccdGraySubCCDParsHandle = snmm.createArray((self.fgcmPars.nExp, self.fgcmPars.nCCD, (order + 1) * (order + 1)), dtype='f8')
+            self.ccdGrayNPar = (order + 1) * (order + 1)
+
         self.expGrayHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayRMSHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayErrHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
@@ -107,8 +117,6 @@ class FgcmGray(object):
         self.expGrayColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
-
-        #self.sigFgcm = np.zeros(self.fgcmPars.nBands,dtype='f8')
 
     def computeExpGrayForInitialSelection(self,doPlots=True):
         """
@@ -261,6 +269,9 @@ class FgcmGray(object):
         ccdNGoodStars = snmm.getArray(self.ccdNGoodStarsHandle)
         ccdNGoodTilings = snmm.getArray(self.ccdNGoodTilingsHandle)
 
+        if self.ccdGraySubCCD:
+            ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
+
         expGray = snmm.getArray(self.expGrayHandle)
         expGrayRMS = snmm.getArray(self.expGrayRMSHandle)
         expGrayErr = snmm.getArray(self.expGrayErrHandle)
@@ -276,7 +287,6 @@ class FgcmGray(object):
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        # obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
@@ -297,8 +307,6 @@ class FgcmGray(object):
         EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
                    obsMagStd[goodObs])
         # and need the error for Egray: sum in quadrature of individual and avg errs
-        #EGrayErr2GO = (objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2. +
-        #               obsMagErr[goodObs]**2.)
         if (onlyObsErr):
             # only obs error ... use this option when doing initial guess at superstarflat
             EGrayErr2GO = obsMagErr[goodObs]**2.
@@ -314,9 +322,16 @@ class FgcmGray(object):
         EGrayGO=EGrayGO[gd]
         EGrayErr2GO=EGrayErr2GO[gd]
 
+        if self.ccdGraySubCCD:
+            #xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex[goodObs]]
+            #ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex[goodObs]]
+            #obsXScaledGO = (snmm.getArray(self.fgcmStars.obsXHandle)[goodObs] - xSize/2.) / (xSize/2.)
+            #obsYScaledGO = (snmm.getArray(self.fgcmStars.obsYHandle)[goodObs] - ySize/2.) / (ySize/2.)
+            obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
+            obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+
         self.fgcmLog.info('FgcmGray using %d observations from %d good stars.' %
                          (goodObs.size,goodStars.size))
-
 
         # group by CCD and sum
 
@@ -332,19 +347,13 @@ class FgcmGray(object):
         ccdNGoodStars[:,:] = 0
         ccdNGoodTilings[:,:] = 0.0
 
-
-        # temporary variable here
+        # These are things we compute no matter what:
+        # This is a temporary variable
         ccdGrayWt = np.zeros_like(ccdGray)
 
         np.add.at(ccdGrayWt,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                   1./EGrayErr2GO)
-        np.add.at(ccdGray,
-                  (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                  EGrayGO/EGrayErr2GO)
-        np.add.at(ccdGrayRMS,
-                  (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                  EGrayGO**2./EGrayErr2GO)
         np.add.at(ccdNGoodStars,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                   1)
@@ -353,19 +362,108 @@ class FgcmGray(object):
                   objNGoodObs[obsObjIDIndex[goodObs],
                               obsBandIndex[goodObs]])
 
-        # need at least 3 or else computation can blow up
-        gd = np.where((ccdNGoodStars > 2) & (ccdGrayWt > 0.0) & (ccdGrayRMS > 0.0))
-        ccdGray[gd] /= ccdGrayWt[gd]
-        tempRMS2 = np.zeros_like(ccdGrayRMS)
-        tempRMS2[gd] = (ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.)
-        ok = np.where(tempRMS2 > 0.0)
-        ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
-        ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
+        if not self.ccdGraySubCCD:
+            np.add.at(ccdGray,
+                      (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
+                      EGrayGO/EGrayErr2GO)
+            np.add.at(ccdGrayRMS,
+                      (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
+                      EGrayGO**2./EGrayErr2GO)
+
+            # need at least 3 or else computation can blow up
+            gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0) & (ccdGrayRMS > 0.0))
+            ccdGray[gd] /= ccdGrayWt[gd]
+            tempRMS2 = np.zeros_like(ccdGrayRMS)
+            tempRMS2[gd] = (ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.)
+            ok = np.where(tempRMS2 > 0.0)
+            ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
+            ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
+
+        else:
+            # We are computing on the sub-ccd scale
+
+            # But first we need to finish the other stuff
+            gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
+            ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
+            ccdGrayRMS[gd] = 0.0  # this is unused
+
+            # This will probably have to be parallelized
+            # For now, let's write some code to do it.
+
+            order = self.ccdGraySubCCDChebyshevOrder
+            pars = np.zeros((order + 1, order + 1))
+            pars[0, 0] = 1.0
+
+            if self.ccdGraySubCCDTriangular:
+                iind = np.repeat(np.arange(order + 1), order + 1)
+                jind = np.tile(np.arange(order + 1), order + 1)
+                lowInds, = np.where((iind + jind) <= order)
+            else:
+                lowInds, = np.arange(pars.size)
+
+            FGrayGO = 10.**(EGrayGO / (-2.5))
+            FGrayErrGO = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO) * FGrayGO
+
+            # Need to split up...
+            # And then do the fit, provided we have enough stars.
+            expCcdHash = (obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) +
+                          obsCCDIndex[goodObs])
+
+            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+
+            # Anything with 2 or fewer stars will be marked bad
+            use, = np.where(h >= 3)
+            for i in use:
+                i1a = rev[rev[i]: rev[i + 1]]
+
+                eInd = obsExpIndex[goodObs[i1a[0]]]
+                cInd = obsCCDIndex[goodObs[i1a[0]]]
+
+                ccdNGoodStars[eInd, cInd] = i1a.size
+
+                computeMean = False
+
+                if i1a.size < 10 * pars.size:
+                    # insufficient stars for chebyshev fit
+                    fit = pars.flatten()
+                    computeMean = True
+                else:
+                    try:
+                        field = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
+                                                self.ccdOffsets['Y_SIZE'][cInd],
+                                                order,
+                                                obsXGO[i1a], obsYGO[i1a],
+                                                FGrayGO[i1a],
+                                                valueErr=FGrayErrGO[i1a],
+                                                triangular=self.ccdGraySubCCDTriangular)
+                        fit = field.pars.flatten()
+                    except (ValueError, RuntimeError, TypeError):
+                        fit = pars.flatten()
+                        computeMean = True
+
+                    if (fit[0] <= 0.0 or fit[0] == 1.0):
+                        # The fit failed...
+                        fit = pars.flatten()
+                        computeMean = True
+
+                if computeMean:
+                    fit = pars.flatten()
+                    fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
+                              np.sum(1./EGrayErr2GO[i1a]))
+                    fit[0] = 10.**(fit[0] / (-2.5))
+
+                ccdGraySubCCDPars[eInd, cInd, :] = fit
+                # Set the CCD Gray in the center
+                # unsure if this should be the mean over all the stars...
+                field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
+                                    self.ccdOffsets['Y_SIZE'][cInd],
+                                    fit)
+                ccdGray[eInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
         self.fgcmLog.info('Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
-        bad = np.where((ccdNGoodStars <= 2) | (ccdGrayWt <= 0.0) | (tempRMS2 <= 0.0))
+        bad = np.where((ccdNGoodStars <= 2) | (ccdGrayWt <= 0.0))
         ccdGray[bad] = self.illegalValue
         ccdGrayRMS[bad] = self.illegalValue
         ccdGrayErr[bad] = self.illegalValue
@@ -422,7 +520,7 @@ class FgcmGray(object):
                   ccdNGoodStars[goodCCD])
 
         # need at least 3 or else computation can blow up
-        gd, = np.where(expNGoodCCDs > 2)
+        gd, = np.where(expNGoodCCDs >= 3)
         expGray[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
@@ -679,9 +777,6 @@ class FgcmGray(object):
         plt.close(fig)
 
         # And plot correlations of EXP^gray between pairs of bands
-        #for ind in xrange(self.fgcmStars.bandRequiredIndex.size-1):
-            #bandIndex0 = self.fgcmStars.bandRequiredIndex[ind]
-            #bandIndex1 = self.fgcmStars.bandRequiredIndex[ind+1]
         for ind, bandIndex0 in enumerate(self.bandFitIndex[:-2]):
             bandIndex1 = self.bandFitIndex[ind + 1]
 

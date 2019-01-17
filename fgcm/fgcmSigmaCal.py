@@ -322,6 +322,8 @@ class FgcmSigmaCal(object):
         obsMagStdGO = obsMagStd[goodObs]
 
         if self.applyGray:
+            # NOTE: This only applies the mean gray per ccd for speed
+            # (since this is approximate anyway)
             obsMagStdGO += ccdGray[obsExpIndexGO, obsCCDIndexGO]
 
         # chi2 = 1. / (N - 1) * Sum ((m_i - mbar)**2. / (sigma_i**2.))
