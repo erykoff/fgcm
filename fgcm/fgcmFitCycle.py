@@ -425,11 +425,14 @@ class FgcmFitCycle(object):
         sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
         sigCal.run()
 
-        # Make Zeropoints -- save also
-        self.fgcmLog.debug('FitCycle computing zeropoints.')
-        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig,self.fgcmPars,
-                                       self.fgcmLUT,self.fgcmGray,
+        # Make Zeropoints
+        # We always want to compute these because of the plots
+        # In the future we might want to streamline if something is bogging down.
+
+        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
+                                       self.fgcmLUT, self.fgcmGray,
                                        self.fgcmRetrieval)
+        self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
         # And finally compute the stars and test repeatability *after* the crunch
@@ -442,8 +445,9 @@ class FgcmFitCycle(object):
         self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
         if (self.useFits):
-            self.fgcmZpts.saveZptFits()
-            self.fgcmZpts.saveAtmFits()
+            if self.fgcmConfig.outputZeropoints:
+                self.fgcmZpts.saveZptFits()
+                self.fgcmZpts.saveAtmFits()
 
             # Save parameters
             outParFile = '%s/%s_parameters.fits' % (self.fgcmConfig.outputPath,
@@ -471,14 +475,9 @@ class FgcmFitCycle(object):
         # and make map of coverage
 
         self.fgcmLog.info('Making map of coverage')
-        badZpMask = (zpFlagDict['NOFIT_NIGHT'] |
-                     zpFlagDict['CANNOT_COMPUTE_ZEROPOINT'] |
-                     zpFlagDict['TOO_FEW_STARS_ON_CCD'])
-        zpOk, = np.where((self.fgcmZpts.zpStruct['FGCM_FLAG'] & badZpMask) == 0)
-        okExps = self.fgcmZpts.zpStruct[self.fgcmConfig.expField][zpOk]
-        okCCDs = self.fgcmZpts.zpStruct[self.fgcmConfig.ccdField][zpOk]
-        self.fgcmStars.selectStarsMinObsExpAndCCD(okExps, okCCDs, minObsPerBand=1)
-        self.fgcmStars.plotStarMap(mapType='okcoverage')
+        goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
+        self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
+        self.fgcmStars.plotStarMap(mapType='final')
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 

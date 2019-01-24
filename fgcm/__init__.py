@@ -1,5 +1,11 @@
 from __future__ import division, absolute_import, print_function
 
+import os
+
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+
 from ._version import __version__, __version_info__
 
 version = __version__
