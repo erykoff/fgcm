@@ -357,6 +357,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
         self.fgcmGray.computeExpGrayColorSplit()
+        # This must be here before we modify the selection
+        self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCuts()
         self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
 
         # Compute sigFgcm
@@ -459,11 +461,14 @@ class FgcmFitCycle(object):
                                                            self.fgcmConfig.outfileBaseWithCycle)
             self.fgcmStars.saveFlagStarIndices(outFlagStarFile)
 
-            ## FIXME: save standard stars if desired.  (Need code to save std stars)
             if self.fgcmConfig.outputStars:
                 outStarFile = '%s/%s_stdstars.fits' % (self.fgcmConfig.outputPath,
                                                        self.fgcmConfig.outfileBaseWithCycle)
                 self.fgcmStars.saveStdStars(outStarFile, self.fgcmPars)
+
+            # Auto-update photometric cuts
+            self.fgcmConfig.expGrayPhotometricCut[:] = self.updatedPhotometricCut
+            self.fgcmConfig.expGrayHighCut[:] = self.updatedHighCut
 
             # Save yaml for input to next fit cycle
             outConfFile = '%s/%s_cycle%02d_config.yml' % (self.fgcmConfig.outputPath,

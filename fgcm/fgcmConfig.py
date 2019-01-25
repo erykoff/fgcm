@@ -155,6 +155,10 @@ class FgcmConfig(object):
     logLevel = ConfigField(str, default='INFO')
     mapLongitudeRef = ConfigField(float, default=0.0)
 
+    autoPhotometricCutNSig = ConfigField(float, default=3.0)
+    autoPhotometricCutStep = ConfigField(float, default=0.0025)
+    autoHighCutNSig = ConfigField(float, default=4.0)
+
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
     nExpPerRun = ConfigField(int, default=1000)
@@ -551,7 +555,10 @@ class FgcmConfig(object):
 
         configDict['inFlagStarFile'] = flagStarFile
 
-        # do we want to guess as to the photometric cut?  not now.
+        # And update the photometric cuts...
+        # These need to be converted to lists of floats
+        configDict['expGrayPhotometricCut'] = [float(f) for f in self.expGrayPhotometricCut]
+        configDict['expGrayHighCut'] = [float(f) for f in self.expGrayHighCut]
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)

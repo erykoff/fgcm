@@ -81,6 +81,12 @@ class FgcmGray(object):
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
+        self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
+        self.expGrayHighCut = fgcmConfig.expGrayHighCut
+        self.autoPhotometricCutNSig = fgcmConfig.autoPhotometricCutNSig
+        self.autoPhotometricCutStep = fgcmConfig.autoPhotometricCutStep
+        self.autoHighCutNSig = fgcmConfig.autoHighCutNSig
+
         self._prepareGrayArrays()
 
     def _prepareGrayArrays(self):
@@ -323,10 +329,6 @@ class FgcmGray(object):
         EGrayErr2GO=EGrayErr2GO[gd]
 
         if self.ccdGraySubCCD:
-            #xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex[goodObs]]
-            #ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex[goodObs]]
-            #obsXScaledGO = (snmm.getArray(self.fgcmStars.obsXHandle)[goodObs] - xSize/2.) / (xSize/2.)
-            #obsYScaledGO = (snmm.getArray(self.fgcmStars.obsYHandle)[goodObs] - ySize/2.) / (ySize/2.)
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
@@ -822,6 +824,54 @@ class FgcmGray(object):
                                                              self.fgcmPars.bands[bandIndex0],
                                                              self.fgcmPars.bands[bandIndex1]))
             plt.close(fig)
+
+    def computeExpGrayCuts(self):
+        """
+        Compute the exposure gray recommended cuts.
+
+        Returns
+        -------
+        expGrayPhotometricCut: `np.array`
+           Float array (per band) of recommended expGray cuts
+        expGrayHighCut: `np.array`
+           Float array (per band) of recommended expGray cuts (high side)
+        """
+        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
+        expGray = snmm.getArray(self.expGrayHandle)
+
+        expUse,=np.where((self.fgcmPars.expFlag == 0) &
+                         (expNGoodStars > self.minStarPerExp))
+
+        expGrayPhotometricCut = np.zeros(self.fgcmPars.nBands)
+        expGrayHighCut = np.zeros_like(expGrayPhotometricCut)
+
+        # set defaults to those that were set in the config file
+        # These are going to be lists of floats for persistence
+        expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]
+        expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
+
+        for i in xrange(self.fgcmPars.nBands):
+            inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
+
+            if inBand.size == 0:
+                continue
+
+            coeff = histoGauss(None, expGray[expUse[inBand]])
+
+            # Use nsig * sigma - mean
+            delta = self.autoPhotometricCutNSig * coeff[2] - coeff[1]
+
+            cut = -1 * int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
+            # Clip the cut to a range from 2 times the input to 5 mmag
+            expGrayPhotometricCut[i] = max(expGrayPhotometricCut[i]*2,
+                                           min(cut, -0.005))
+
+            delta = self.autoHighCutNSig * coeff[2] + coeff[1]
+            cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
+            expGrayHighCut[i] = max(0.005,
+                                    min(cut, expGrayHighCut[i]*2))
+
+        return (expGrayPhotometricCut, expGrayHighCut)
 
     def __getstate__(self):
         # Don't try to pickle the logger.
