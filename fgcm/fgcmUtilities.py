@@ -234,14 +234,15 @@ def histoGauss(ax,array):
     ok,=np.where(hcenter < rangeHi)
     hhist[ok[-1]] += np.sum(hhist[hi])
 
-    ax.plot(hcenter[ok],hhist[ok],'b-',linewidth=3)
-    ax.set_xlim(rangeLo,rangeHi)
+    if ax is not None:
+        ax.plot(hcenter[ok],hhist[ok],'b-',linewidth=3)
+        ax.set_xlim(rangeLo,rangeHi)
 
-    xvals=np.linspace(rangeLo,rangeHi,1000)
-    yvals=gaussFunction(xvals,*coeff)
+        xvals=np.linspace(rangeLo,rangeHi,1000)
+        yvals=gaussFunction(xvals,*coeff)
 
-    ax.plot(xvals,yvals,'k--',linewidth=3)
-    ax.locator_params(axis='x',nbins=6)  # hmmm
+        ax.plot(xvals,yvals,'k--',linewidth=3)
+        ax.locator_params(axis='x',nbins=6)  # hmmm
 
     return coeff
 
