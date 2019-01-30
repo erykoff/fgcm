@@ -93,7 +93,10 @@ class FgcmSigFgcm(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
+        if reserved:
+            goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
+        else:
+            goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
