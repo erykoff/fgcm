@@ -55,6 +55,7 @@ class FgcmStars(object):
 
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
+        self.refstarFile = fgcmConfig.refstarFile
 
         self.bands = fgcmConfig.bands
         self.nBands = len(fgcmConfig.bands)
@@ -102,6 +103,7 @@ class FgcmStars(object):
         self.zptAB = fgcmConfig.zptAB
 
         self.hasXY = False
+        self.hasRefstars = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
@@ -148,10 +150,25 @@ class FgcmStars(object):
         startTime = time.time()
         self.fgcmLog.info('Reading in star positions...')
         pos = fitsio.read(self.indexFile, ext='POS', upper=True)
-        self.fgcmLog.info('Done reading in %d unique star positions in %.1f secondds.' %
+        self.fgcmLog.info('Done reading in %d unique star positions in %.1f seconds.' %
                          (pos.size, time.time() - startTime))
 
         obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
+
+        # And refstars if available
+        if self.refstarFile is not None:
+            startTime = time.time()
+            self.fgcmLog.info('Reading in reference stars...')
+            ref = fitsio.read(self.refstarFile, ext=1, lower=True)
+            self.fgcmLog.info('Done reading %d reference starss in %.1f seconds.' %
+                              (ref.size, time.time() - startTime))
+            refID = ref['fgcm_id']
+            refMag = ref['mag']
+            refMagErr = ref['mag_err']
+        else:
+            refID = None
+            refMag = None
+            refMagErr = None
 
         if (self.inFlagStarFile is not None):
             self.fgcmLog.info('Reading in list of previous flagged stars from %s' %
@@ -189,6 +206,9 @@ class FgcmStars(object):
                        pos['NOBS'],
                        obsX=obsX,
                        obsY=obsY,
+                       refID=refID,
+                       refMag=refMag,
+                       refMagErr=refMagErr,
                        flagID=flagID,
                        flagFlag=flagFlag,
                        computeNobs=computeNobs)
@@ -197,10 +217,12 @@ class FgcmStars(object):
         index = None
         obs = None
         pos = None
+        ref = None
 
     def loadStars(self, fgcmPars,
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
+                  refID=None, refMag=None, refMagErr=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
         Load stars from arrays
@@ -232,6 +254,14 @@ class FgcmStars(object):
            For each object, where in the obs table to look
         objNobs: int array
            number of observations of this object (all bands)
+        refID: int array, optional
+           ID of each object that is an absolute reference
+        refMag: float array, optional
+           Absolute mag for each reference object, (nref, nmag).
+           Set to >90 for no magnitude.
+        refMagErr: float array, optional
+           Absolute magnitude error for each reference object (nref, nmag).
+           Set to >90 for no magnitude.
         obsX: float array, optional
            x position for each observation
         obsY: float array, optional
@@ -295,6 +325,17 @@ class FgcmStars(object):
             if self.superStarSubCCD:
                 raise ValueError("Input stars do not have x/y but superStarSubCCD is set.")
 
+        if (refID is not None and refMag is not None and refMagErr is not None):
+            self.hasRefstars = True
+            self.nRefstars = refID.size
+
+            # refID: matched ID of reference stars
+            self.refIDHandle = snmm.createArray(self.nRefstars, dtype='i4')
+            # refMag: absolute magnitudes of reference stars
+            self.refMagHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+            # refMagErr: absolute magnitude errors of reference stars
+            self.refMagErrHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+
         snmm.getArray(self.obsExpHandle)[:] = obsExp
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
         snmm.getArray(self.obsRAHandle)[:] = obsRA
@@ -309,6 +350,11 @@ class FgcmStars(object):
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
             snmm.getArray(self.obsYHandle)[:] = obsY
+
+        if self.hasRefstars:
+            snmm.getArray(self.refIDHandle)[:] = refID
+            snmm.getArray(self.refMagHandle)[:, :] = refMag
+            snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
 
         self.fgcmLog.info('Applying sigma0Phot = %.4f to mag errs' %
                          (self.sigma0Phot))
@@ -416,12 +462,42 @@ class FgcmStars(object):
         self.fgcmLog.info('Done indexing in %.1f seconds.' %
                          (time.time() - startTime))
 
-        #pos=None
+        # And we need to match the reference stars if necessary
+        if self.hasRefstars:
+            # self.refIdHandle
+            startTime = time.time()
+            self.fgcmLog.info('Matching reference star IDs')
+            self.objRefIDIndexHandle = snmm.createArray(self.nStars, dtype='i4')
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+
+            # Set the default to -1 (no match)
+            objRefIDIndex[:] = -1
+
+            objID = snmm.getArray(self.objIDHandle)
+            refID = snmm.getArray(self.refIDHandle)
+
+            a, b = esutil.numpy_util.match(refID, objID)
+            objRefIDIndex[b] = a
+
+            # Compute the fraction of stars that are reference stars
+            self.fracStarsWithRef = (float(len(snmm.getArray(self.refIDHandle))) /
+                                     float(len(snmm.getArray(self.objIDHandle))))
+
+            self.fgcmLog.info('%.5f%% of stars have a reference match.' % (self.fracStarsWithRef * 100.0))
+
+            self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
+                              (time.time() - startTime))
+        else:
+            self.fracStarsWithRef = 0.0
+
         obsObjIDIndex = None
         objID = None
         obsIndex = None
         objObsIndex = None
         objNobs = None
+        refID = None
+        refMag = None
+        refMagErr = None
 
         # and create a objFlag which flags bad stars as they fall out...
 
@@ -456,7 +532,16 @@ class FgcmStars(object):
                 self.fgcmLog.info('Reserving %d stars from the fit.' % (nReserve))
                 objFlag[reserve] |= objFlagDict['RESERVED']
 
-
+                # If we have a "small" number of reference stars,
+                # these should not be held in reserve
+                if self.hasRefstars:
+                    if self.nRefstars < 100:
+                        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+                        cancel, = np.where(((objFlag & objFlagDict['RESERVED']) > 0) &
+                                           (objRefIDIndex >= 0))
+                        if cancel.size > 0:
+                            objFlag[cancel] &= ~objFlagDict['RESERVED']
+                            self.fgcmLog.info('Cancelling RESERVED flag on %d reference stars' % (cancel.size))
 
         # And we need to record the mean mag, error, SED slopes...
 
@@ -966,7 +1051,7 @@ class FgcmStars(object):
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
-        # Only cut stars where we have a color
+        # Only cut stars where we have a color, and are *not* reference stars
 
         for cCut in self.starColorCuts:
             ok, = np.where((objMagStdMean[:, cCut[0]] < 90.0) &
@@ -978,6 +1063,14 @@ class FgcmStars(object):
             objFlag[ok[bad]] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
+
+        if self.hasRefstars:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
+                               (objRefIDIndex >= 0))
+            if cancel.size > 0:
+                objFlag[cancel] &= ~objFlagDict['BAD_COLOR']
+                self.fgcmLog.info('Cancelling BAD_COLOR flag on %d reference stars' % (cancel.size))
 
     def performSuperStarOutlierCuts(self, fgcmPars, reset=False):
         """
@@ -1205,6 +1298,45 @@ class FgcmStars(object):
                            pars[6] * obsMagADUMeanGOu * np.log10(obsSkyBrightness[goodObs[use]] / skyPivot))
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
+
+    def estimateAbsMagOffsets(self):
+        """
+        Estimate the absolute magnitude offsets from the mean mags
+
+        Returns
+        -------
+        absOffsets: `np.array`
+           Float array of estimated absolute offsets
+        """
+
+        absOffsets = np.zeros(self.nBands)
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        refMag = snmm.getArray(self.refMagHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+
+        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        goodRefStars = goodStars[use]
+
+        for bandIndex, band in enumerate(self.bands):
+            refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
+                               (objMagStdMean[goodRefStars, bandIndex] < 90.0))
+
+            if refUse.size == 0:
+                self.fgcmLog.info("No reference stars in %s band." % (band))
+                continue
+
+            delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+                     refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+
+            absOffsets[bandIndex] = -1.0 * np.median(delta)
+
+            self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
+
+        return absOffsets
 
     def saveFlagStarIndices(self,flagStarFile):
         """

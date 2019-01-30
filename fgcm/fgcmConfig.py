@@ -101,6 +101,7 @@ class FgcmConfig(object):
     ccdOffsetFile = ConfigField(str, required=False)
     obsFile = ConfigField(str, required=False)
     indexFile = ConfigField(str, required=False)
+    refstarFile = ConfigField(str, required=False)
     UTBoundary = ConfigField(float, default=0.0)
     washMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
     epochMJDs = ConfigField(np.ndarray, default=np.array((0.0, 1e10)))

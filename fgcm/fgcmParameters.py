@@ -95,6 +95,7 @@ class FgcmParameters(object):
         self.nLUTFilter = len(self.lutFilterNames)
         self.filterToBand = fgcmConfig.filterToBand
         self.lambdaStdFilter = fgcmConfig.lambdaStdFilter
+        self.lambdaStdBand = fgcmConfig.lambdaStdBand
 
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
@@ -161,7 +162,8 @@ class FgcmParameters(object):
                              'alphaUnit':1.0,
                              'qeSysUnit':1.0,
                              'qeSysSlopeUnit':1.0,
-                             'filterOffsetUnit':1.0}
+                             'filterOffsetUnit':1.0,
+                             'absOffsetUnit':1.0}
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -311,6 +313,9 @@ class FgcmParameters(object):
             if nBand > 1 and f not in self.lutStdFilterNames:
                 self.parFilterOffsetFitFlag[i] = True
 
+        # And absolute offset parameters (used if reference mags are supplied)
+        self.parAbsOffset = np.zeros(self.nBands, dtype=np.float64)
+
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.pwvFile is not None):
@@ -405,7 +410,8 @@ class FgcmParameters(object):
                               'o3Unit': inParInfo['O3UNIT'][0],
                               'qeSysUnit': inParInfo['QESYSUNIT'][0],
                               'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0],
-                              'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0]}
+                              'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0],
+                              'absOffsetUnit': inParInfo['ABSOFFSETUNIT'][0]}
 
         # and log
         self.fgcmLog.info('lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
@@ -425,6 +431,8 @@ class FgcmParameters(object):
                           (self.unitDictSteps['qeSysSlopeUnit']))
         self.fgcmLog.info('filter offset step unit set to %f' %
                           (self.unitDictSteps['filterOffsetUnit']))
+        self.fgcmLog.info('abs offset step unit set to %f' %
+                          (self.unitDictSteps['absOffsetUnit']))
 
         # look at external...
         self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
@@ -442,6 +450,7 @@ class FgcmParameters(object):
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
         self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
+        self.parAbsOffset = np.atleast_1d(inParams['PARABSOFFSET'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -812,9 +821,12 @@ class FgcmParameters(object):
         ctr+=self.nWashIntervals
 
         self.nFitPars += self.nLUTFilter # parFilterOffset
-
         self.parFilterOffsetLoc = ctr
         ctr += self.nLUTFilter
+
+        self.nFitPars += self.nBands # parAbsOffset
+        self.parAbsOffsetLoc = ctr
+        ctr += self.nBands
 
 
     def saveParsFits(self, parFile):
@@ -875,6 +887,7 @@ class FgcmParameters(object):
                ('QESYSUNIT','f8'),
                ('QESYSSLOPEUNIT','f8'),
                ('FILTEROFFSETUNIT','f8'),
+               ('ABSOFFSETUNIT','f8'),
                ('HASEXTERNALPWV','i2'),
                ('HASEXTERNALTAU','i2')]
 
@@ -902,6 +915,7 @@ class FgcmParameters(object):
         parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
         parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
         parInfo['FILTEROFFSETUNIT'] = self.unitDictSteps['filterOffsetUnit']
+        parInfo['ABSOFFSETUNIT'] = self.unitDictSteps['absOffsetUnit']
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
@@ -921,6 +935,7 @@ class FgcmParameters(object):
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
                ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
                ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
+               ('PARABSOFFSET', 'f8', self.parAbsOffset.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -964,6 +979,7 @@ class FgcmParameters(object):
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
         pars['PARFILTEROFFSET'][:] = self.parFilterOffset
         pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
+        pars['PARABSOFFSET'][:] = self.parAbsOffset
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1117,6 +1133,10 @@ class FgcmParameters(object):
 
         self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
                                                self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
+
+        self.parAbsOffset[:] = parArray[self.parAbsOffsetLoc:
+                                            self.parAbsOffsetLoc + self.nBands] / unitDict['absOffsetUnit']
+
         # done
 
     def parsToExposures(self, retrievedInput=False):
@@ -1192,8 +1212,9 @@ class FgcmParameters(object):
                          self.parQESysSlope[self.expWashIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
 
-        # and FilterOffset
-        self.expFilterOffset = self.parFilterOffset[self.expLUTFilterIndex]
+        # and FilterOffset + abs offset
+        self.expFilterOffset = (self.parFilterOffset[self.expLUTFilterIndex] +
+                                self.parAbsOffset[self.expBandIndex])
 
     # cannot be a property because of the keywords
     def getParArray(self,fitterUnits=False):
@@ -1258,6 +1279,9 @@ class FgcmParameters(object):
 
         parArray[self.parFilterOffsetLoc:
                      self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
+
+        parArray[self.parAbsOffsetLoc:
+                     self.parAbsOffsetLoc + self.nBands] = self.parAbsOffset * unitDict['absOffsetUnit']
 
         return parArray
 
@@ -1419,6 +1443,11 @@ class FgcmParameters(object):
         parHigh[self.parFilterOffsetLoc: \
                     self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
                     100.0 * unitDict['filterOffsetUnit']
+
+        parLow[self.parAbsOffsetLoc: \
+                   self.parAbsOffsetLoc + self.nBands] = -100.0 * unitDict['absOffsetUnit']
+        parHigh[self.parAbsOffsetLoc: \
+                    self.parAbsOffsetLoc + self.nBands] = 100.0 * unitDict['absOffsetUnit']
 
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
@@ -1803,6 +1832,20 @@ class FgcmParameters(object):
 
         fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
+
+        # Abs Offset
+        fig = plt.figure(1, figsize=(8, 6))
+        fig.clf()
+        ax = fig.add_subplot(111)
+
+        ax.plot(self.lambdaStdBand, self.parAbsOffset, 'r.')
+        for i, b in enumerate(self.bands):
+            ax.annotate(r'$%s$' % (b), (self.lambdaStdBand[i], self.parAbsOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
+        ax.set_xlabel('Std Wavelength (A)')
+        ax.set_ylabel('Absolute offset (mag)')
+
+        fig.savefig('%s/%s_abs_offsets.png' % (self.plotPath,
+                                               self.outfileBaseWithCycle))
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)

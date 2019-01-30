@@ -197,6 +197,11 @@ class FgcmChisq(object):
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
 
+        if self.fgcmStars.hasRefstars:
+            objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
+            test, = np.where(objRefIDIndex[goodStars] >= 0)
+            self.fgcmLog.info('Found %d reference stars for chisq' % (test.size))
+
         # do global pre-matching before giving to workers, because
         #  it is faster this way
 
@@ -264,6 +269,12 @@ class FgcmChisq(object):
             nSections = goodStars.size // self.nStarPerRun + 1
             goodStarsList = np.array_split(goodStars,nSections)
 
+            if self.fgcmStars.hasRefstars:
+                for gs in goodStarsList:
+                    test, = np.where(objRefIDIndex[gs] >= 0)
+                    if test.size > 0:
+                        self.fgcmLog.info('Found %d reference stars in list' % (test.size))
+
 
             # is there a better way of getting all the first elements from the list?
             #  note that we need to skip the first which should be zero (checked above)
@@ -301,6 +312,13 @@ class FgcmChisq(object):
                 partialSums[:] += snmm.getArray(
                     self.totalHandleDict[workerIndex + thisCore])[:]
 
+            # FIXME
+            print(partialSums[self.fgcmPars.parQESysInterceptLoc:
+                                   (self.fgcmPars.parQESysInterceptLoc +
+                                    self.fgcmPars.nWashIntervals)].__repr__())
+            print(partialSums[self.fgcmPars.parAbsOffsetLoc:
+                                       (self.fgcmPars.parAbsOffsetLoc +
+                                        self.fgcmPars.nBands)].__repr__())
 
         if (not self.allExposures):
             # we get the number of fit parameters by counting which of the parameters
@@ -320,12 +338,13 @@ class FgcmChisq(object):
             fitChisq = partialSums[-2] / fitDOF
             if (self.computeDerivatives):
                 dChisqdP = partialSums[0:self.fgcmPars.nFitPars] / fitDOF
+                print(dChisqdP)
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
             self._nIterations += 1
 
-            self.fgcmLog.info('Chisq/dof = %.2f (%d iterations)' %
+            self.fgcmLog.info('Chisq/dof = %.6f (%d iterations)' %
                              (fitChisq, len(self.fitChisqs)))
 
             if self.maxIterations > 0 and self._nIterations > self.maxIterations:
@@ -420,7 +439,6 @@ class FgcmChisq(object):
 
         _,obsFitUseGO = esutil.numpy_util.match(self.bandFitIndex,
                                                 obsBandIndexGO)
-
         # now refer to obsBandIndex[goodObs]
         # add GO to index names that are cut to goodObs
         # add GOF to index names that are cut to goodObs[obsFitUseGO]
@@ -442,7 +460,6 @@ class FgcmChisq(object):
                                       lutIndicesGO)
         I10GO = self.fgcmLUT.computeI1(self.fgcmPars.expLnPwv[obsExpIndexGO],
                                        self.fgcmPars.expO3[obsExpIndexGO],
-                                       #np.log(self.fgcmPars.expTau[obsExpIndexGO]),
                                        self.fgcmPars.expLnTau[obsExpIndexGO],
                                        self.fgcmPars.expAlpha[obsExpIndexGO],
                                        obsSecZenithGO,
@@ -462,10 +479,6 @@ class FgcmChisq(object):
             ok,=np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
 
             if self.ccdGraySubCCD:
-                #xSizeGO = self.ccdOffsets['X_SIZE'][obsCCDIndexGO]
-                #ySizeGO = self.ccdOffsets['Y_SIZE'][obsCCDIndexGO]
-                #obsXScaledGO = (snmm.getArray(self.fgcmStars.obsXHandle)[goodObs] - xSizeGO/2.) / (xSizeGO/2.)
-                #obsYScaledGO = (snmm.getArray(self.fgcmStars.obsYHandle)[goodObs] - ySizeGO/2.) / (ySizeGO/2.)
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
                 expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
@@ -602,9 +615,73 @@ class FgcmChisq(object):
 
         partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2. * obsWeightGO[obsFitUseGO])
 
+        # Here is the section on using reference stars...
+        useRefstars = False
+        if self.fgcmStars.hasRefstars:
+            # Prepare arrays
+            objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.fgcmStars.refMagHandle)
+            refMagErr = snmm.getArray(self.fgcmStars.refMagErrHandle)
+
+            # Are there any reference stars in this set of stars?
+            use, = np.where(objRefIDIndex[goodStars] >= 0)
+            if use.size == 0:
+                # There are no reference stars in this list of stars.  That's okay!
+                useRefstars = False
+                #print("No reference stars in this set of stars...")
+            else:
+                # Get the good reference stars
+                goodRefStars = goodStars[use]
+
+                # And the good observations of reference stars
+                # This must be two steps because we first need the indices to
+                # avoid out-of-bounds
+                goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
+
+                # And check that these are all quality stars
+                tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
+                                                   obsBandIndexGO[goodRefObsGO]] < 90.0) &
+                                    (refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                            obsBandIndexGO[goodRefObsGO]] < 90.0))
+
+                if tempUse.size > 0:
+                    useRefstars = True
+                    #print("Found %d good reference star observations." % (tempUse.size))
+                    goodRefObsGO = goodRefObsGO[tempUse]
+                #else:
+                    # There are no good reference stars with good values
+                    #print("No good reference stars!")
+
+            if useRefstars:
+                # get the indices that we're fitting, for derivatives...
+                _, obsFitUseGRO = esutil.numpy_util.match(self.bandFitIndex,
+                                                          obsBandIndexGO[goodRefObsGO])
+
+                # Add in the chi-squared from the reference stars, that have measurements
+                deltaRefMagGRS = (objMagStdMean[goodRefStars, :].flatten() -
+                                  refMag[objRefIDIndex[goodRefStars], :].flatten())
+                refWeightGRS = 1. / (objMagStdMeanErr[goodRefStars, :].flatten()**2. +
+                                     refMagErr[objRefIDIndex[goodRefStars], :].flatten()**2.)
+
+                gdDeltaRef, = np.where((objMagStdMean[goodRefStars, :].flatten() < 90.0) &
+                                       (refMag[objRefIDIndex[goodRefStars], :].flatten() < 90.0))
+
+                # We sum up all bands here, not just the ones that are used in the "fit",
+                # I believe.
+
+                print(self.fgcmPars.parAbsOffset)
+                print(deltaRefMagGRS.__repr__())
+                print(refWeightGRS.__repr__())
+                print(np.sum(deltaRefMagGRS[gdDeltaRef]**2. * refWeightGRS[gdDeltaRef]))
+
+                partialChisq += np.sum(deltaRefMagGRS[gdDeltaRef]**2. * refWeightGRS[gdDeltaRef])
+
         partialArray = np.zeros(self.nSums,dtype='f8')
         partialArray[-2] = partialChisq
         partialArray[-1] = obsFitUseGO.size
+
+        if useRefstars:
+            partialArray[-1] += gdDeltaRef.size
 
         if (self.computeDerivatives):
             unitDict=self.fgcmPars.getUnitDict(fitterUnits=self.fitterUnits)
@@ -634,6 +711,25 @@ class FgcmChisq(object):
             #   note that this is summed over all observations of an object in a band
             #   so that this is already done
 
+            # If we have reference stars, we have to set up some variables
+            if useRefstars:
+
+                goodRefObsGOF = goodRefObsGO[obsFitUseGRO]
+
+                magMeanGROTemp = objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
+                                               obsBandIndexGO[goodRefObsGO]]
+                refMagGROTemp = refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                       obsBandIndexGO[goodRefObsGO]]
+                magErrGROTemp = objMagStdMeanErr[obsObjIDIndexGO[goodRefObsGO],
+                                                 obsBandIndexGO[goodRefObsGO]]
+                refErrGROTemp = refMagErr[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                          obsBandIndexGO[goodRefObsGO]]
+
+                deltaRefMagWeightedGRO = ((magMeanGROTemp - refMagGROTemp) /
+                                          (magErrGROTemp**2. + refErrGROTemp**2.))
+
+                # These numbers are clearly wrong? No, correct.
+
             # note below that objMagStdMeanErr2GO is the the square of the error,
             #  and already cut to [obsObjIDIndexGO,obsBandIndexGO]
 
@@ -649,17 +745,28 @@ class FgcmChisq(object):
                 expNightIndexGOF = self.fgcmPars.expNightIndex[obsExpIndexGO[obsFitUseGO]]
                 uNightIndex = np.unique(expNightIndexGOF)
 
-
                 np.add.at(partialArray[self.fgcmPars.parO3Loc:
                                            (self.fgcmPars.parO3Loc +
                                             self.fgcmPars.nCampaignNights)],
                           expNightIndexGOF,
-                          deltaMagWeightedGOF * (
+                          2.0 * deltaMagWeightedGOF * (
                         errSummandGOF *
                         dLdO3GO[obsFitUseGO]))
 
+                if useRefstars:
+                    # We assume that the unique nights must be a subset of those above
+                    expNightIndexGROF = self.fgcmPars.expNightIndex[obsExpIndexGO[goodRefObsGO[obsFitUseGRO]]]
+                    tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+                    np.add.at(tempArray, expNightIndexGROF,
+                              ((dLdO3GO[goodRefObsGOF] / obsMagErr2GO[goodRefObsGOF]) *
+                               2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                               objMagStdMeanErr2GO[goodRefObsGOF]))
+                    partialArray[self.fgcmPars.parO3Loc:
+                                     (self.fgcmPars.parO3Loc +
+                                      self.fgcmPars.nCampaignNights)] += tempArray
+
                 partialArray[self.fgcmPars.parO3Loc +
-                             uNightIndex] *= (2.0 / unitDict['o3Unit'])
+                             uNightIndex] /= unitDict['o3Unit']
                 partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parO3Loc +
                              uNightIndex] += 1
@@ -672,16 +779,25 @@ class FgcmChisq(object):
                                            (self.fgcmPars.parAlphaLoc+
                                             self.fgcmPars.nCampaignNights)],
                           expNightIndexGOF,
-                          deltaMagWeightedGOF * (
+                          2.0 * deltaMagWeightedGOF * (
                         errSummandGOF *
                         dLdAlphaGO[obsFitUseGO]))
 
+                if useRefstars:
+                    tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+                    np.add.at(tempArray, expNightIndexGROF,
+                              ((dLdAlphaGO[goodRefObsGOF] / obsMagErr2GO[goodRefObsGOF]) *
+                               2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                               objMagStdMeanErr2GO[goodRefObsGOF]))
+                    partialArray[self.fgcmPars.parAlphaLoc:
+                                     (self.fgcmPars.parAlphaLoc+
+                                      self.fgcmPars.nCampaignNights)] += tempArray
+
                 partialArray[self.fgcmPars.parAlphaLoc +
-                             uNightIndex] *= (2.0 / unitDict['alphaUnit'])
+                             uNightIndex] /= unitDict['alphaUnit']
                 partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parAlphaLoc +
                              uNightIndex] += 1
-
 
                 ###########
                 ## PWV External
@@ -697,12 +813,25 @@ class FgcmChisq(object):
                                                (self.fgcmPars.parExternalLnPwvOffsetLoc+
                                                 self.fgcmPars.nCampaignNights)],
                               expNightIndexGOF[hasExtGOF],
-                              deltaMagWeightedGOF[hasExtGOF] * (
+                              2.0 * deltaMagWeightedGOF[hasExtGOF] * (
                             errSummandGOF[hasExtGOF] *
                             dLdLnPwvGO[obsFitUseGO[hasExtGOF]]))
 
+                    if useRefstars:
+                        hasExtGROF, = np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGO[goodRefObsGOF]])
+
+                        tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                        np.add.at(tempArray, expNightIndexGROF[hasExtGROF],
+                                  ((dLdLnPwvGO[goodRefObsGOF[hasExtGROF]]) *
+                                   2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                   objMagStdMeanErr2GO[goodRefObsGOF[hasExtGROF]]))
+                        partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
+                                         (self.fgcmPars.parExternalLnPwvOffsetLoc+
+                                          self.fgcmPars.nCampaignNights)] += tempArray
+
                     partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc +
-                                 uNightIndexHasExt] *= (2.0 / unitDict['lnPwvUnit'])
+                                 uNightIndexHasExt] /= unitDict['lnPwvUnit']
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parExternalLnPwvOffsetLoc +
                                  uNightIndexHasExt] += 1
@@ -713,7 +842,16 @@ class FgcmChisq(object):
                         np.sum(deltaMagWeightedGOF[hasExtGOF] * (
                                 self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasExtGOF]]] *
                                 errSummandGOF[hasExtGOF] *
-                                dLdLnPwvGO[obsFitUseGO[hasExtGOF]])) / unitDict['lnPwvGlobalUnit'])
+                                dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
+
+                    if useRefstars:
+                        temp = np.sum(self.fgcmPars.expLnPwv[obsExpIndexGO[goodRefObsGOF[hasExtGOF]]] *
+                                      dLdLnPwvGO[goodRefObsGOF[hasExtGROF]] *
+                                      2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                      objMagStdMeanErr2GO[goodRefObsGOF[hasExtGROF]])
+                        partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] += temp
+
+                    partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] /= unitDict['lnPwvGlobalUnit']
 
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parExternalLnPwvScaleLoc] += 1
@@ -735,7 +873,18 @@ class FgcmChisq(object):
                             np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
                                     self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasRetreivedPwvGOF]]] *
                                     errSummandGOF[hasRetrievedPwvGOF] *
-                                    dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])) / unitDict['lnPwvGlobalUnit'])
+                                    dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
+
+                        if useRefstars:
+                            hasRetrievedPwvGROF, = np.where((self.fgcmPars.computeRetrievedLnPwvFlag[obsExpIndexGO[goodRefObsGOF]] &
+                                                             (retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0))
+                            temp = np.sum(self.fgcmPars.expLnPwv[obsExpIndexGO[goodRefObsGOF[hasRetrievedPwvGROF]]] *
+                                          dLdLnPwvGO[goodRefObsGOF[hasRetrievedPwvGROF]] *
+                                          2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                          objMagStdMeanErr2GO[goodRefObsGOF[hasRetrievedPwvGROF]])
+                            partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] += temp
+
+                        partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] /= unitDict['lnPwvGlobalUnit']
 
                         partialArray[self.fgcmPars.nFitPars +
                                      self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
@@ -749,12 +898,23 @@ class FgcmChisq(object):
                                                        (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
                                                         self.fgcmPars.nCampaignNights)],
                                       expNightIndexGOF[hasRetrievedPwvGOF],
-                                      deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
+                                      2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
                                     errSummandGOF[hasRetrievedPwvGOF] *
                                     dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]]))
 
+                            if useRefstars:
+                                tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                                np.add.at(tempArray, expNightIndexGROF[hasRetrievedPwvGROF],
+                                          ((dLdLnPwvGO[goodRefObsGOF[hasRetrievedPwvGOF]]) *
+                                          2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                           objMagStdMeanErr2GO[goodRefObsGOF[hasRetrievedPwvGROF]]))
+                                partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
+                                                 (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
+                                                  self.fgcmPars.nCampaignNights)] += tempArray
+
                             partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
-                                         uNightIndexHasRetrievedPwv] *= (2.0 / unitDict['lnPwvUnit'])
+                                         uNightIndexHasRetrievedPwv] /= unitDict['lnPwvUnit']
                             partialArray[self.fgcmPars.nFitPars +
                                          self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
                                          uNightIndexHasRetrievedPwv] += 1
@@ -765,7 +925,15 @@ class FgcmChisq(object):
                             partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
                                 np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
                                         errSummandGOF[hasRetrievedPwvGOF] *
-                                        dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]]))) / unitDict['pwvGlobalUnit']
+                                        dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
+
+                            if useRefstars:
+                                temp = np.sum(dLdLnPwvGO[goodRefObsGOF[hasRetrievedPwvGROF]] *
+                                              2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                              objMagStdMeanErr2GO[goodRefObsGOF[hasRetrievedPwvGROF]])
+                                partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] += temp
+
+                            partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] /= unitDict['pwvGlobalUnit']
                             partialArray[self.fgcmPars.nFitPars +
                                          self.fgcmPars.parRetrievedLnPwvOffsetLoc] += 1
 
@@ -783,12 +951,26 @@ class FgcmChisq(object):
                                                (self.fgcmPars.parLnPwvInterceptLoc+
                                                 self.fgcmPars.nCampaignNights)],
                               expNightIndexGOF[noExtGOF],
-                              deltaMagWeightedGOF[noExtGOF] * (
+                              2.0 * deltaMagWeightedGOF[noExtGOF] * (
                             errSummandGOF[noExtGOF] *
                             dLdLnPwvGO[obsFitUseGO[noExtGOF]]))
 
+                    if useRefstars:
+                        noExtGROF, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGO[goodRefObsGOF]])
+
+                        tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                        np.add.at(tempArray, expNightIndexGROF[noExtGROF],
+                                  dLdLnPwvGO[goodRefObsGOF[noExtGROF]] *
+                                  2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                  objMagStdMeanErr2GO[goodRefObsGOF[noExtGROF]])
+
+                        partialArray[self.fgcmPars.parLnPwvInterceptLoc:
+                                         (self.fgcmPars.parLnPwvInterceptLoc+
+                                          self.fgcmPars.nCampaignNights)] += tempArray
+
                     partialArray[self.fgcmPars.parLnPwvInterceptLoc +
-                                 uNightIndexNoExt] *= (2.0 / unitDict['lnPwvUnit'])
+                                 uNightIndexNoExt] /= unitDict['lnPwvUnit']
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parLnPwvInterceptLoc +
                                  uNightIndexNoExt] += 1
@@ -799,12 +981,25 @@ class FgcmChisq(object):
                                                (self.fgcmPars.parLnPwvSlopeLoc+
                                                 self.fgcmPars.nCampaignNights)],
                               expNightIndexGOF[noExtGOF],
-                              deltaMagWeightedGOF[noExtGOF] * (
+                              2.0 * deltaMagWeightedGOF[noExtGOF] * (
                             errSummandGOF[noExtGOF] *
                             (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] * dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
 
+                    if useRefstars:
+                        tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                        np.add.at(tempArray, expNightIndexGROF[noExtGROF],
+                                  self.fgcmPars.expDeltaUT[obsExpIndexGO[goodRefObsGOF[noExtGROF]]] *
+                                  dLdLnPwvGO[goodRefObsGOF[noExtGROF]] *
+                                  2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                  objMagStdMeanErr2GO[goodRefObsGOF[noExtGROF]])
+
+                        partialArray[self.fgcmPars.parLnPwvSlopeLoc:
+                                         (self.fgcmPars.parLnPwvSlopeLoc+
+                                          self.fgcmPars.nCampaignNights)] += tempArray
+
                     partialArray[self.fgcmPars.parLnPwvSlopeLoc +
-                                 uNightIndex] *= (2.0 / unitDict['lnPwvSlopeUnit'])
+                                 uNightIndex] /= unitDict['lnPwvSlopeUnit']
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parLnPwvSlopeLoc] += 1
 
@@ -815,12 +1010,23 @@ class FgcmChisq(object):
                                                    (self.fgcmPars.parLnPwvQuadraticLoc+
                                                     self.fgcmPars.nCampaignNights)],
                                   expNightIndexGOF[noExtGOF],
-                                  deltaMagWeightedGOF[noExtGOF] * (
+                                  2.0 * deltaMagWeightedGOF[noExtGOF] * (
                                 errSummandGOF[noExtGOF] *
                                 (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]]**2. * dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
 
+                        if useRefstars:
+                            tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+                            np.add.at(tempArray, expNightIndexGROF[noExtGROF],
+                                      self.fgcmPars.expDeltaUT[obsExpIndexGO[goodRefObsGOF[noExtGROF]]]**2. *
+                                      dLdLnPwvGO[goodRefObsGOF[noExtGROF]] *
+                                      2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                      objMagStdMeanErr2GO[goodRefObsGOF[noExtGROF]])
+                            partialArray[self.fgcmPars.parLnPwvQuadraticLoc:
+                                             (self.fgcmPars.parLnPwvQuadraticLoc+
+                                              self.fgcmPars.nCampaignNights)] += tempArray
+
                         partialArray[self.fgcmPars.parLnPwvQuadraticLoc +
-                                     uNightIndex] *= (2.0 / unitDict['lnPwvQuadraticUnit'])
+                                     uNightIndex] /= unitDict['lnPwvQuadraticUnit']
                         partialArray[self.fgcmPars.nFitPars +
                                      self.fgcmPars.parLnPwvQuadraticLoc] += 1
 
@@ -839,12 +1045,25 @@ class FgcmChisq(object):
                                                (self.fgcmPars.parExternalLnTauOffsetLoc+
                                                 self.fgcmPars.nCampaignNights)],
                               expNightIndexGOF[hasExtGOF],
-                              deltaMagWeightedGOF[hasExtGOF] * (
+                              2.0 * deltaMagWeightedGOF[hasExtGOF] * (
                             errSummandGOF[hasExtGOF] *
                             dLdLnTauGO[obsFitUseGO[hasExtGOF]]))
 
+                    if useRefstars:
+                        hasExtGROF, = np.where(self.fgcmPars.externalTauFlag[obsExpIndexGO[goodRefObsGOF]])
+
+                        tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                        np.add.at(tempArray, expNightIndexGROF[hasExtGROF],
+                                  (dLdLnTauGO[goodRefObsGOF[hasExtGROF]] *
+                                   2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                   objMagStdMeanErr2GO[goodRefObsGOF[hasExtGROF]]))
+                        partialArray[self.fgcmPars.parExternalLnTauOffsetLoc:
+                                         (self.fgcmPars.parExternalLnTauOffsetLoc+
+                                          self.fgcmPars.nCampaignNights)] += tempArray
+
                     partialArray[self.fgcmPars.parExternalLnTauOffsetLoc +
-                                 uNightIndexHasExt] *= (2.0 / unitDict['lnTauUnit'])
+                                 uNightIndexHasExt] /= unitDict['lnTauUnit']
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parExternalLnTauOffsetLoc +
                                  uNightIndexHasExt] += 1
@@ -855,7 +1074,15 @@ class FgcmChisq(object):
                     partialArray[self.fgcmPars.parExternalLnTauScaleLoc] = 2.0 * (
                         np.sum(deltaMagWeightedGOF[hasExtGOF] * (
                                 errSummandGOF[hasExtGOF] *
-                                dLdLnTauGO[obsFitUseGO[hasExtGOF]]))) / unitDict['lnTauUnit']
+                                dLdLnTauGO[obsFitUseGO[hasExtGOF]])))
+
+                    if useRefstars:
+                        temp = np.sum(dLdLnTauGO[goodRefObsGOF[hasExtGROF]] *
+                                      2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                                      objMagStdMeanErr2GO[goodRefObsGOF[hasExtGROF]])
+                        partialArray[self.fgcmPars.parExternalLnTauScaleLoc] += temp
+
+                    partialArray[self.fgcmPars.parExternalLnTauScaleLoc] /= unitDict['lnTauUnit']
 
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parExternalLnTauScaleLoc] += 1
@@ -873,12 +1100,26 @@ class FgcmChisq(object):
                                            (self.fgcmPars.parLnTauInterceptLoc+
                                             self.fgcmPars.nCampaignNights)],
                           expNightIndexGOF[noExtGOF],
-                          deltaMagWeightedGOF[noExtGOF] * (
+                          2.0 * deltaMagWeightedGOF[noExtGOF] * (
                         errSummandGOF[noExtGOF] *
                         dLdLnTauGO[obsFitUseGO[noExtGOF]]))
 
+                if useRefstars:
+                    noExtGROF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGO[goodRefObsGOF]])
+
+                    tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                    np.add.at(tempArray, expNightIndexGROF[noExtGROF],
+                              dLdLnTauGO[goodRefObsGOF[noExtGROF]] *
+                              2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                              objMagStdMeanErr2GO[goodRefObsGOF[noExtGROF]])
+
+                    partialArray[self.fgcmPars.parLnTauInterceptLoc:
+                                     (self.fgcmPars.parLnTauInterceptLoc+
+                                      self.fgcmPars.nCampaignNights)] += tempArray
+
                 partialArray[self.fgcmPars.parLnTauInterceptLoc +
-                             uNightIndexNoExt] *= (2.0 / unitDict['lnTauUnit'])
+                             uNightIndexNoExt] /= unitDict['lnTauUnit']
                 partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parLnTauInterceptLoc +
                              uNightIndexNoExt] += 1
@@ -889,13 +1130,26 @@ class FgcmChisq(object):
                                            (self.fgcmPars.parLnTauSlopeLoc+
                                             self.fgcmPars.nCampaignNights)],
                           expNightIndexGOF[noExtGOF],
-                          deltaMagWeightedGOF[noExtGOF] * (
+                          2.0 * deltaMagWeightedGOF[noExtGOF] * (
                         errSummandGOF[noExtGOF] *
                         (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
                          dLdLnTauGO[obsFitUseGO[noExtGOF]])))
 
+                if useRefstars:
+                    tempArray = np.zeros(self.fgcmPars.nCampaignNights)
+
+                    np.add.at(tempArray, expNightIndexGROF[noExtGROF],
+                              self.fgcmPars.expDeltaUT[obsExpIndexGO[goodRefObsGOF[noExtGROF]]] *
+                              dLdLnTauGO[goodRefObsGOF[noExtGROF]] *
+                              2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                              objMagStdMeanErr2GO[goodRefObsGOF[noExtGROF]])
+
+                    partialArray[self.fgcmPars.parLnTauSlopeLoc:
+                                     (self.fgcmPars.parLnTauSlopeLoc+
+                                      self.fgcmPars.nCampaignNights)] += tempArray
+
                 partialArray[self.fgcmPars.parLnTauSlopeLoc +
-                             uNightIndexNoExt] *= (2.0 / unitDict['lnTauSlopeUnit'])
+                             uNightIndexNoExt] /= unitDict['lnTauSlopeUnit']
                 partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parLnTauSlopeLoc +
                              uNightIndexNoExt] += 1
@@ -915,11 +1169,23 @@ class FgcmChisq(object):
                                        (self.fgcmPars.parQESysInterceptLoc +
                                         self.fgcmPars.nWashIntervals)],
                       expWashIndexGOF,
-                      deltaMagWeightedGOF * (
+                      2.0 * deltaMagWeightedGOF * (
                     errSummandGOF))
 
+            if useRefstars:
+                expWashIndexGROF = self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]
+                tempArray = np.zeros(self.fgcmPars.nWashIntervals)
+
+                np.add.at(tempArray, expWashIndexGROF,
+                          2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                          objMagStdMeanErr2GO[goodRefObsGOF])
+
+                partialArray[self.fgcmPars.parQESysInterceptLoc:
+                                 (self.fgcmPars.parQESysInterceptLoc +
+                                  self.fgcmPars.nWashIntervals)] += tempArray
+
             partialArray[self.fgcmPars.parQESysInterceptLoc +
-                         uWashIndex] *= (2.0 / unitDict['qeSysUnit'])
+                         uWashIndex] /= unitDict['qeSysUnit']
             partialArray[self.fgcmPars.nFitPars +
                          self.fgcmPars.parQESysInterceptLoc +
                          uWashIndex] += 1
@@ -930,13 +1196,26 @@ class FgcmChisq(object):
                                        (self.fgcmPars.parQESysSlopeLoc +
                                         self.fgcmPars.nWashIntervals)],
                       expWashIndexGOF,
-                      deltaMagWeightedGOF * (
+                      2.0 * deltaMagWeightedGOF * (
                     errSummandGOF *
                     (self.fgcmPars.expMJD[obsExpIndexGO[obsFitUseGO]] -
                      self.fgcmPars.washMJDs[expWashIndexGOF])))
 
+            if useRefstars:
+                tempArray = np.zeros(self.fgcmPars.nWashIntervals)
+
+                np.add.at(tempArray, expWashIndexGROF,
+                          (self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
+                           self.fgcmPars.washMJDs[expWashIndexGROF]) *
+                          2.0 * deltaRefMagWeightedGRO[obsFitUseGRO] *
+                          objMagStdMeanErr2GO[goodRefObsGOF])
+
+                partialArray[self.fgcmPars.parQESysSlopeLoc:
+                                       (self.fgcmPars.parQESysSlopeLoc +
+                                        self.fgcmPars.nWashIntervals)] += tempArray
+
             partialArray[self.fgcmPars.parQESysSlopeLoc +
-                         uWashIndex] *= (2.0 / unitDict['qeSysSlopeUnit'])
+                         uWashIndex] /= unitDict['qeSysSlopeUnit']
             partialArray[self.fgcmPars.nFitPars +
                          self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] += 1
@@ -949,12 +1228,13 @@ class FgcmChisq(object):
                                        (self.fgcmPars.parFilterOffsetLoc +
                                         self.fgcmPars.nLUTFilter)],
                       obsLUTFilterIndexGO[obsFitUseGO],
-                      deltaMagWeightedGOF * (
+                      2.0 * deltaMagWeightedGOF * (
                     errSummandGOF))
 
             partialArray[self.fgcmPars.parFilterOffsetLoc:
                              (self.fgcmPars.parFilterOffsetLoc +
-                              self.fgcmPars.nLUTFilter)] *= (2.0 / unitDict['filterOffsetUnit'])
+                              self.fgcmPars.nLUTFilter)] /= unitDict['filterOffsetUnit']
+
             # Now set those to zero the derivatives we aren't using
             partialArray[self.fgcmPars.parFilterOffsetLoc:
                              (self.fgcmPars.parFilterOffsetLoc +
@@ -963,6 +1243,37 @@ class FgcmChisq(object):
             partialArray[self.fgcmPars.nFitPars +
                          self.fgcmPars.parFilterOffsetLoc +
                          uOffsetIndex] += 1
+
+            ##################
+            ## Absolute offset
+            ##################
+
+            if useRefstars:
+                # Note that we do *not* just cut to the fit bands here,
+                # because we want absolute offsets for all the bands that
+                # we have reference stars.
+                np.add.at(partialArray[self.fgcmPars.parAbsOffsetLoc:
+                                           (self.fgcmPars.parAbsOffsetLoc +
+                                            self.fgcmPars.nBands)],
+                          obsBandIndexGO[goodRefObsGO],
+                          2.0 * deltaRefMagWeightedGRO *
+                          objMagStdMeanErr2GO[goodRefObsGO])
+
+                partialArray[self.fgcmPars.parAbsOffsetLoc:
+                                 (self.fgcmPars.parAbsOffsetLoc +
+                                  self.fgcmPars.nBands)] /= unitDict['absOffsetUnit']
+
+                print(obsBandIndexGO[goodRefObsGO].__repr__())
+                print(deltaRefMagWeightedGRO.__repr__())
+                print(objMagStdMeanErr2GO[goodRefObsGO].__repr__())
+                print(partialArray[self.fgcmPars.parAbsOffsetLoc:
+                                       (self.fgcmPars.parAbsOffsetLoc +
+                                        self.fgcmPars.nBands)].__repr__())
+
+                uAbsIndex = np.arange(self.fgcmPars.nBands, dtype=np.int32)
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parAbsOffsetLoc +
+                             uAbsIndex] += 1
 
         # note that this store doesn't need locking because we only access
         #  a given array from a single process
