@@ -339,8 +339,14 @@ class FgcmFitCycle(object):
             self._doFit()
 
             # FIXME hack here
-            self.fgcmPars.parAbsOffset += np.array([0.0159, 0.0087, 0.0160, 0.0101, 0.0279])
-            _ = self.fgcmChisq(self.fgcmPars.getParArray(fitterUnits=True), fitterUnits=True, computeDerivatives=True, computeSEDSlopes=False, useMatchCache=False)
+            #self.fgcmPars.parAbsOffset += np.array([0.0159, 0.0087, 0.0160, 0.0101, 0.0279])
+            #_ = self.fgcmChisq(self.fgcmPars.getParArray(fitterUnits=True), fitterUnits=True, computeDerivatives=True, computeSEDSlopes=False, useMatchCache=False)
+
+            # Will want to configure what is a "small number" of reference stars.
+            # Is it fraction of total?  Leave this for now.
+            if self.fgcmStars.hasRefstars and self.fgcmStars.nRefstars < 100:
+                # do a second fit with only reference stars, only abs terms
+                self._doFit(doPlots=False, refOnly=True, absOnly=True)
 
             self.fgcmPars.plotParameters()
         else:
@@ -500,7 +506,7 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
-    def _doFit(self,doPlots=True):
+    def _doFit(self, doPlots=True, refOnly=False, absOnly=False):
         """
         Internal method to do the fit using fmin_l_bfgs_b
         """
@@ -509,9 +515,9 @@ class FgcmFitCycle(object):
                          (self.fgcmConfig.maxIter))
 
         # get the initial parameters
-        parInitial = self.fgcmPars.getParArray(fitterUnits=True)
+        parInitial = self.fgcmPars.getParArray(fitterUnits=True, refOnly=refOnly)
         # and the fit bounds
-        parBounds = self.fgcmPars.getParBounds(fitterUnits=True)
+        parBounds = self.fgcmPars.getParBounds(fitterUnits=True, absOnly=absOnly, refOnly=refOnly)
 
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
@@ -522,7 +528,7 @@ class FgcmFitCycle(object):
             pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                        parInitial,       # initial guess
                                                        fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
+                                                       args=(True,True,False,False,refOnly,absOnly), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, refOnly, absOnly
                                                        approx_grad=False,# don't approx grad
                                                        bounds=parBounds, # boundaries
                                                        m=10,             # "variable metric conditions"
@@ -536,7 +542,7 @@ class FgcmFitCycle(object):
                                                        callback=None)    # no callback
         except MaxFitIterations:
             # We have exceeded the maximum number of iterations, force a cut
-            pars = self.fgcmPars.getParArray(fitterUnits=True)
+            pars = self.fgcmPars.getParArray(fitterUnits=True, refOnly=refOnly)
             chisq = self.fgcmChisq.fitChisqs[-1]
             info = None
 
@@ -564,5 +570,5 @@ class FgcmFitCycle(object):
             plt.close(fig)
 
         # record new parameters
-        self.fgcmPars.reloadParArray(pars, fitterUnits=True)
+        self.fgcmPars.reloadParArray(pars, fitterUnits=True, refOnly=refOnly)
 

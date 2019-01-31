@@ -163,7 +163,8 @@ class FgcmParameters(object):
                              'qeSysUnit':1.0,
                              'qeSysSlopeUnit':1.0,
                              'filterOffsetUnit':1.0,
-                             'absOffsetUnit':1.0}
+                             'absOffsetUnit':1.0,
+                             'refOnlyAbsOffsetUnit':1.0}
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -411,7 +412,8 @@ class FgcmParameters(object):
                               'qeSysUnit': inParInfo['QESYSUNIT'][0],
                               'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0],
                               'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0],
-                              'absOffsetUnit': inParInfo['ABSOFFSETUNIT'][0]}
+                              'absOffsetUnit': inParInfo['ABSOFFSETUNIT'][0],
+                              'refOnlyAbsOffsetUnit': inParInfo['REFONLYABSOFFSETUNIT'][0]}
 
         # and log
         self.fgcmLog.info('lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
@@ -433,6 +435,8 @@ class FgcmParameters(object):
                           (self.unitDictSteps['filterOffsetUnit']))
         self.fgcmLog.info('abs offset step unit set to %f' %
                           (self.unitDictSteps['absOffsetUnit']))
+        self.fgcmLog.info('ref only abs offset step unit set to %f' %
+                          (self.unitDictSteps['refOnlyAbsOffsetUnit']))
 
         # look at external...
         self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
@@ -888,6 +892,7 @@ class FgcmParameters(object):
                ('QESYSSLOPEUNIT','f8'),
                ('FILTEROFFSETUNIT','f8'),
                ('ABSOFFSETUNIT','f8'),
+               ('REFONLYABSOFFSETUNIT', 'f8'),
                ('HASEXTERNALPWV','i2'),
                ('HASEXTERNALTAU','i2')]
 
@@ -916,6 +921,7 @@ class FgcmParameters(object):
         parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
         parInfo['FILTEROFFSETUNIT'] = self.unitDictSteps['filterOffsetUnit']
         parInfo['ABSOFFSETUNIT'] = self.unitDictSteps['absOffsetUnit']
+        parInfo['REFONLYABSOFFSETUNIT'] = self.unitDictSteps['refOnlyAbsOffsetUnit']
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
@@ -1067,7 +1073,7 @@ class FgcmParameters(object):
         if (withAlpha):
             self.hasExternalAlpha = True
 
-    def reloadParArray(self, parArray, fitterUnits=False):
+    def reloadParArray(self, parArray, fitterUnits=False, refOnly=False):
         """
         Take parameter array and stuff into individual parameter attributes.
 
@@ -1077,6 +1083,8 @@ class FgcmParameters(object):
            Array with all fit parameters
         fitterUnits: bool, default=False
            Is the parArray in normalized fitter units?
+        refOnly: bool, default=False
+           Is this a reference-star only fit?
         """
 
         # takes in a parameter array and loads the local split copies?
@@ -1134,8 +1142,12 @@ class FgcmParameters(object):
         self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
                                                self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
 
+        if refOnly:
+            unit = unitDict['refOnlyAbsOffsetUnit']
+        else:
+            unit = unitDict['absOffsetUnit']
         self.parAbsOffset[:] = parArray[self.parAbsOffsetLoc:
-                                            self.parAbsOffsetLoc + self.nBands] / unitDict['absOffsetUnit']
+                                            self.parAbsOffsetLoc + self.nBands] / unit
 
         # done
 
@@ -1217,7 +1229,7 @@ class FgcmParameters(object):
                                 self.parAbsOffset[self.expBandIndex])
 
     # cannot be a property because of the keywords
-    def getParArray(self,fitterUnits=False):
+    def getParArray(self, fitterUnits=False, refOnly=False):
         """
         Take individual parameter attributes and build a parameter array.
 
@@ -1225,6 +1237,8 @@ class FgcmParameters(object):
         ----------
         fitterUnits: bool, default=False
            Will the parArray be in normalized fitter units?
+        refOnly: bool, default=False
+           Is this for a reference-star only fit?
 
         returns
         -------
@@ -1280,13 +1294,17 @@ class FgcmParameters(object):
         parArray[self.parFilterOffsetLoc:
                      self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
 
+        if refOnly:
+            unit = unitDict['refOnlyAbsOffsetUnit']
+        else:
+            unit = unitDict['absOffsetUnit']
         parArray[self.parAbsOffsetLoc:
-                     self.parAbsOffsetLoc + self.nBands] = self.parAbsOffset * unitDict['absOffsetUnit']
+                     self.parAbsOffsetLoc + self.nBands] = self.parAbsOffset * unit
 
         return parArray
 
     # this cannot be a property because it takes units
-    def getParBounds(self,fitterUnits=False):
+    def getParBounds(self, fitterUnits=False, absOnly=False, refOnly=False):
         """
         Create parameter fit bounds
 
@@ -1294,6 +1312,10 @@ class FgcmParameters(object):
         ----------
         fitterUnits: bool, default=False
            Will the parArray be in normalized fitter units?
+        absOnly: bool, default=False
+           Only fit the absolute terms
+        refOnly: bool, default=False
+           Is this a reference-star only fit?
 
         returns
         -------
@@ -1444,81 +1466,106 @@ class FgcmParameters(object):
                     self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
                     100.0 * unitDict['filterOffsetUnit']
 
+        if refOnly:
+            unit = unitDict['refOnlyAbsOffsetUnit']
+        else:
+            unit = unitDict['absOffsetUnit']
         parLow[self.parAbsOffsetLoc: \
-                   self.parAbsOffsetLoc + self.nBands] = -100.0 * unitDict['absOffsetUnit']
+                   self.parAbsOffsetLoc + self.nBands] = -100.0 * unit
         parHigh[self.parAbsOffsetLoc: \
-                    self.parAbsOffsetLoc + self.nBands] = 100.0 * unitDict['absOffsetUnit']
+                    self.parAbsOffsetLoc + self.nBands] = 100.0 * unit
 
-        if self.freezeStdAtmosphere:
+        # This should be self.freezeAtmosphere...
+        if self.freezeStdAtmosphere or absOnly:
             # atmosphere parameters set to std values
             if not self.useRetrievedPwv:
                 parLow[self.parLnPwvInterceptLoc: \
                            self.parLnPwvInterceptLoc + \
-                           self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                           self.nCampaignNights] = self.parLnPwvIntercept * unitDict['lnPwvUnit']
                 parHigh[self.parLnPwvInterceptLoc: \
                             self.parLnPwvInterceptLoc + \
-                            self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                            self.nCampaignNights] = self.parLnPwvIntercept * unitDict['lnPwvUnit']
                 parLow[self.parLnPwvSlopeLoc: \
                            self.parLnPwvSlopeLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parLnPwvSlope * unitDict['lnPwvSlopeUnit']
                 parHigh[self.parLnPwvSlopeLoc: \
                             self.parLnPwvSlopeLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parLnPwvSlope * unitDict['lnPwvSlopeUnit']
                 parLow[self.parLnPwvQuadraticLoc: \
                            self.parLnPwvQuadraticLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parLnPwvQuadratic * unitDict['lnPwvQuadraticUnit']
                 parHigh[self.parLnPwvQuadraticLoc: \
                             self.parLnPwvQuadraticLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parLnPwvQuadratic * unitDict['lnPwvQuadraticUnit']
             else:
-                parLow[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                parLow[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
+                parHigh[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
                 if self.useNightlyRetrievedPwv:
                     parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                self.parRetrievedLnPwvNightlyOffsetLoc + \
-                               self.nCampaignNights] = 0.0
+                               self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
                     parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                 self.parRetrievedLnPwvNightlyOffsetLoc + \
-                                self.nCampaignNights] = 0.0
+                                self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
                 else:
-                    parLow[self.parRetrievedLnPwvOffsetLoc] = 0.0
-                    parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.0
+                    parLow[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
+                    parHigh[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
 
             if self.hasExternalPwv and not self.useRetrievedPwv:
-                parLow[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                parLow[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
+                parHigh[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
                 parLow[self.parExternalLnPwvOffsetLoc: \
                            self.parExternalLnPwvOffsetLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
                 parHigh[self.parExternalLnPwvOffsetLoc: \
                             self.parExternalLnPwvOffsetLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
 
             parLow[self.parO3Loc: \
                    self.parO3Loc + \
-                   self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+                   self.nCampaignNights] = self.parO3 * unitDict['o3Unit']
             parHigh[self.parO3Loc: \
                     self.parO3Loc + \
-                    self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+                    self.nCampaignNights] = self.parO3 * unitDict['o3Unit']
             parLow[self.parLnTauInterceptLoc: \
                    self.parLnTauInterceptLoc + \
-                   self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+                   self.nCampaignNights] = self.parLnTauIntercept * unitDict['lnTauUnit']
             parHigh[self.parLnTauInterceptLoc: \
                     self.parLnTauInterceptLoc + \
-                self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+                self.nCampaignNights] = self.parLnTauIntercept * unitDict['lnTauUnit']
             parLow[self.parLnTauSlopeLoc: \
                    self.parLnTauSlopeLoc + \
-                   self.nCampaignNights] = 0.0
+                   self.nCampaignNights] = self.parLnTauSlope * unitDict['lnTauSlopeUnit']
             parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
-                    self.nCampaignNights] = 0.0
+                    self.nCampaignNights] = self.parLnTauSlope * unitDict['lnTauSlopeUnit']
             parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
-                   self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
+                   self.nCampaignNights] = self.parAlpha * unitDict['alphaUnit']
             parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
-                    self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
+                    self.nCampaignNights] = self.parAlpha * unitDict['alphaUnit']
 
+        if absOnly:
+            # Additional terms to freeze...
+            parLow[self.parQESysSlopeLoc: \
+                       self.parQESysSlopeLoc + \
+                       self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
+            parHigh[self.parQESysSlopeLoc: \
+                        self.parQESysSlopeLoc + \
+                        self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
+
+            parLow[self.parQESysSlopeLoc: \
+                       self.parQESysSlopeLoc + \
+                       self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
+            parHigh[self.parQESysSlopeLoc: \
+                        self.parQESysSlopeLoc + \
+                        self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
+
+            parLow[self.parFilterOffsetLoc: \
+                       self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
+            parHigh[self.parFilterOffsetLoc: \
+                       self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
 
         # zip these into a list of tuples
         parBounds = list(zip(parLow, parHigh))

@@ -104,6 +104,7 @@ class FgcmStars(object):
 
         self.hasXY = False
         self.hasRefstars = False
+        self.nRefStars = 0
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure

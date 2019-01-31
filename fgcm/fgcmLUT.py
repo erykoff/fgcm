@@ -1214,7 +1214,8 @@ class FgcmLUT(object):
         unitDict['filterOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
 
         # Test this out
-        unitDict['absOffsetUnit'] = 1.0 / stepUnitReference / stepGrain / 10000.
+        unitDict['absOffsetUnit'] = 1.0 / stepUnitReference / stepGrain  / 1000.
+        unitDict['refOnlyAbsOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
 
         return unitDict
 
