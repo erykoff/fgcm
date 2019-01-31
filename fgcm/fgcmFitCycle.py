@@ -293,7 +293,8 @@ class FgcmFitCycle(object):
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
             # Compute absolute magnitude starting points (if appropriate)
-            self.fgcmPars.parAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
+            if self.fgcmStars.hasRefstars:
+                self.fgcmPars.parAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
