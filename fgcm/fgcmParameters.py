@@ -315,7 +315,7 @@ class FgcmParameters(object):
                 self.parFilterOffsetFitFlag[i] = True
 
         # And absolute offset parameters (used if reference mags are supplied)
-        self.parAbsOffset = np.zeros(self.nBands, dtype=np.float64)
+        self.compAbsOffset = np.zeros(self.nBands, dtype=np.float64)
 
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
@@ -454,7 +454,7 @@ class FgcmParameters(object):
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
         self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
-        self.parAbsOffset = np.atleast_1d(inParams['PARABSOFFSET'][0])
+        self.compAbsOffset = np.atleast_1d(inParams['COMPABSOFFSET'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -828,9 +828,9 @@ class FgcmParameters(object):
         self.parFilterOffsetLoc = ctr
         ctr += self.nLUTFilter
 
-        self.nFitPars += self.nBands # parAbsOffset
-        self.parAbsOffsetLoc = ctr
-        ctr += self.nBands
+        #self.nFitPars += self.nBands # parAbsOffset
+        #self.parAbsOffsetLoc = ctr
+        #ctr += self.nBands
 
 
     def saveParsFits(self, parFile):
@@ -941,7 +941,7 @@ class FgcmParameters(object):
                ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
                ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
                ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
-               ('PARABSOFFSET', 'f8', self.parAbsOffset.size),
+               ('COMPABSOFFSET', 'f8', self.compAbsOffset.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -985,7 +985,7 @@ class FgcmParameters(object):
         pars['PARQESYSSLOPE'][:] = self.parQESysSlope
         pars['PARFILTEROFFSET'][:] = self.parFilterOffset
         pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
-        pars['PARABSOFFSET'][:] = self.parAbsOffset
+        pars['COMPABSOFFSET'][:] = self.compAbsOffset
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1073,7 +1073,7 @@ class FgcmParameters(object):
         if (withAlpha):
             self.hasExternalAlpha = True
 
-    def reloadParArray(self, parArray, fitterUnits=False, refOnly=False):
+    def reloadParArray(self, parArray, fitterUnits=False):
         """
         Take parameter array and stuff into individual parameter attributes.
 
@@ -1083,8 +1083,6 @@ class FgcmParameters(object):
            Array with all fit parameters
         fitterUnits: bool, default=False
            Is the parArray in normalized fitter units?
-        refOnly: bool, default=False
-           Is this a reference-star only fit?
         """
 
         # takes in a parameter array and loads the local split copies?
@@ -1141,13 +1139,6 @@ class FgcmParameters(object):
 
         self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
                                                self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
-
-        if refOnly:
-            unit = unitDict['refOnlyAbsOffsetUnit']
-        else:
-            unit = unitDict['absOffsetUnit']
-        self.parAbsOffset[:] = parArray[self.parAbsOffsetLoc:
-                                            self.parAbsOffsetLoc + self.nBands] / unit
 
         # done
 
@@ -1226,10 +1217,10 @@ class FgcmParameters(object):
 
         # and FilterOffset + abs offset
         self.expFilterOffset = (self.parFilterOffset[self.expLUTFilterIndex] +
-                                self.parAbsOffset[self.expBandIndex])
+                                self.compAbsOffset[self.expBandIndex])
 
     # cannot be a property because of the keywords
-    def getParArray(self, fitterUnits=False, refOnly=False):
+    def getParArray(self, fitterUnits=False):
         """
         Take individual parameter attributes and build a parameter array.
 
@@ -1237,8 +1228,6 @@ class FgcmParameters(object):
         ----------
         fitterUnits: bool, default=False
            Will the parArray be in normalized fitter units?
-        refOnly: bool, default=False
-           Is this for a reference-star only fit?
 
         returns
         -------
@@ -1294,17 +1283,10 @@ class FgcmParameters(object):
         parArray[self.parFilterOffsetLoc:
                      self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
 
-        if refOnly:
-            unit = unitDict['refOnlyAbsOffsetUnit']
-        else:
-            unit = unitDict['absOffsetUnit']
-        parArray[self.parAbsOffsetLoc:
-                     self.parAbsOffsetLoc + self.nBands] = self.parAbsOffset * unit
-
         return parArray
 
     # this cannot be a property because it takes units
-    def getParBounds(self, fitterUnits=False, absOnly=False, refOnly=False):
+    def getParBounds(self, fitterUnits=False):
         """
         Create parameter fit bounds
 
@@ -1312,10 +1294,6 @@ class FgcmParameters(object):
         ----------
         fitterUnits: bool, default=False
            Will the parArray be in normalized fitter units?
-        absOnly: bool, default=False
-           Only fit the absolute terms
-        refOnly: bool, default=False
-           Is this a reference-star only fit?
 
         returns
         -------
@@ -1466,17 +1444,8 @@ class FgcmParameters(object):
                     self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
                     100.0 * unitDict['filterOffsetUnit']
 
-        if refOnly:
-            unit = unitDict['refOnlyAbsOffsetUnit']
-        else:
-            unit = unitDict['absOffsetUnit']
-        parLow[self.parAbsOffsetLoc: \
-                   self.parAbsOffsetLoc + self.nBands] = -100.0 * unit
-        parHigh[self.parAbsOffsetLoc: \
-                    self.parAbsOffsetLoc + self.nBands] = 100.0 * unit
-
         # This should be self.freezeAtmosphere...
-        if self.freezeStdAtmosphere or absOnly:
+        if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
             if not self.useRetrievedPwv:
                 parLow[self.parLnPwvInterceptLoc: \
@@ -1545,27 +1514,6 @@ class FgcmParameters(object):
             parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
                     self.nCampaignNights] = self.parAlpha * unitDict['alphaUnit']
-
-        if absOnly:
-            # Additional terms to freeze...
-            parLow[self.parQESysSlopeLoc: \
-                       self.parQESysSlopeLoc + \
-                       self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
-            parHigh[self.parQESysSlopeLoc: \
-                        self.parQESysSlopeLoc + \
-                        self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
-
-            parLow[self.parQESysSlopeLoc: \
-                       self.parQESysSlopeLoc + \
-                       self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
-            parHigh[self.parQESysSlopeLoc: \
-                        self.parQESysSlopeLoc + \
-                        self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
-
-            parLow[self.parFilterOffsetLoc: \
-                       self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
-            parHigh[self.parFilterOffsetLoc: \
-                       self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
 
         # zip these into a list of tuples
         parBounds = list(zip(parLow, parHigh))
@@ -1885,9 +1833,9 @@ class FgcmParameters(object):
         fig.clf()
         ax = fig.add_subplot(111)
 
-        ax.plot(self.lambdaStdBand, self.parAbsOffset, 'r.')
+        ax.plot(self.lambdaStdBand, self.compAbsOffset, 'r.')
         for i, b in enumerate(self.bands):
-            ax.annotate(r'$%s$' % (b), (self.lambdaStdBand[i], self.parAbsOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
+            ax.annotate(r'$%s$' % (b), (self.lambdaStdBand[i], self.compAbsOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
         ax.set_ylabel('Absolute offset (mag)')
 

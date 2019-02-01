@@ -1039,7 +1039,51 @@ class FgcmStars(object):
 
         objSEDSlopeLock.release()
 
+    def computeAbsOffset(self):
+        """
+        Compute the absolute offset
 
+        Returns
+        ------
+        deltaOffsetRef: `np.array`
+           Float array (nBands) that is the delta offset in abs mag
+        """
+
+        if not self.hasRefstars:
+            # should this Raise because it's programmer error, or just pass because
+            # it's harmless?
+            self.fgcmLog.info("Warning: cannot compute abs offset without reference stars.")
+            return np.zeros(self.nBands)
+
+        # Set things up
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        refMag = snmm.getArray(self.refMagHandle)
+        refMagErr = snmm.getArray(self.refMagErrHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
+
+        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        goodRefStars = goodStars[use]
+
+        deltaOffsetRef = np.zeros(self.nBands)
+        deltaOffsetWtRef = np.zeros(self.nBands)
+
+        gdStarInd, gdBandInd = np.where((objMagStdMean[goodRefStars, :] < 90.0) &
+                                        (refMag[objRefIDIndex[goodRefStars], :] < 90.0))
+        delta = objMagStdMean[goodRefStars, :] - refMag[objRefIDIndex[goodRefStars], :]
+        wt = 1. / (objMagStdMeanErr[goodRefStars, :]**2. +
+                   refMagErr[objRefIDIndex[goodRefStars], :]**2.)
+
+        np.add.at(deltaOffsetRef, gdBandInd, delta[gdStarInd, gdBandInd] * wt[gdStarInd, gdBandInd])
+        np.add.at(deltaOffsetWtRef, gdBandInd, wt[gdStarInd, gdBandInd])
+
+        # Make sure we have a measurement in the band
+        ok, = np.where(deltaOffsetWtRef > 0.0)
+        deltaOffsetRef[ok] /= deltaOffsetWtRef[ok]
+
+        return deltaOffsetRef
 
     def performColorCuts(self):
         """

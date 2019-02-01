@@ -294,7 +294,7 @@ class FgcmFitCycle(object):
 
             # Compute absolute magnitude starting points (if appropriate)
             if self.fgcmStars.hasRefstars:
-                self.fgcmPars.parAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
+                self.fgcmPars.compAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
@@ -345,9 +345,9 @@ class FgcmFitCycle(object):
 
             # Will want to configure what is a "small number" of reference stars.
             # Is it fraction of total?  Leave this for now.
-            if self.fgcmStars.hasRefstars and self.fgcmStars.nRefstars < 100:
+            #if self.fgcmStars.hasRefstars and self.fgcmStars.nRefstars < 100:
                 # do a second fit with only reference stars, only abs terms
-                self._doFit(doPlots=False, refOnly=True, absOnly=True)
+            #    self._doFit(doPlots=False, refOnly=True, absOnly=True)
 
             self.fgcmPars.plotParameters()
         else:
@@ -507,7 +507,7 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
-    def _doFit(self, doPlots=True, refOnly=False, absOnly=False):
+    def _doFit(self, doPlots=True):
         """
         Internal method to do the fit using fmin_l_bfgs_b
         """
@@ -516,20 +516,23 @@ class FgcmFitCycle(object):
                          (self.fgcmConfig.maxIter))
 
         # get the initial parameters
-        parInitial = self.fgcmPars.getParArray(fitterUnits=True, refOnly=refOnly)
+        parInitial = self.fgcmPars.getParArray(fitterUnits=True)
         # and the fit bounds
-        parBounds = self.fgcmPars.getParBounds(fitterUnits=True, absOnly=absOnly, refOnly=refOnly)
+        parBounds = self.fgcmPars.getParBounds(fitterUnits=True)
 
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
         self.fgcmChisq.clearMatchCache()
         self.fgcmChisq.maxIterations = self.fgcmConfig.maxIter
 
+        # In the fit, we want to compute the absolute offset if needed.  Otherwise, no.
+        computeAbsOffset = self.fgcmStars.hasRefstars
+
         try:
             pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                        parInitial,       # initial guess
                                                        fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False,refOnly,absOnly), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, refOnly, absOnly
+                                                       args=(True,True,False,False,computeAbsOffset), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsOffset
                                                        approx_grad=False,# don't approx grad
                                                        bounds=parBounds, # boundaries
                                                        m=10,             # "variable metric conditions"
@@ -543,7 +546,7 @@ class FgcmFitCycle(object):
                                                        callback=None)    # no callback
         except MaxFitIterations:
             # We have exceeded the maximum number of iterations, force a cut
-            pars = self.fgcmPars.getParArray(fitterUnits=True, refOnly=refOnly)
+            pars = self.fgcmPars.getParArray(fitterUnits=True)
             chisq = self.fgcmChisq.fitChisqs[-1]
             info = None
 
@@ -571,5 +574,5 @@ class FgcmFitCycle(object):
             plt.close(fig)
 
         # record new parameters
-        self.fgcmPars.reloadParArray(pars, fitterUnits=True, refOnly=refOnly)
+        self.fgcmPars.reloadParArray(pars, fitterUnits=True)
 
