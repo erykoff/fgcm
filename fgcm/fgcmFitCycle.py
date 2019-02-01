@@ -337,10 +337,12 @@ class FgcmFitCycle(object):
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
-            if self.initialCycle:
-                self._doFit(ignoreRef=True)
-            else:
-                self._doFit(ignoreRef=False)
+            #if self.initialCycle:
+            #    self._doFit(ignoreRef=True)
+            #else:
+            #    self._doFit(ignoreRef=False)
+
+            self._doFit(ignoreRef=False)
 
             # FIXME hack here
             #self.fgcmPars.parAbsOffset += np.array([0.0159, 0.0087, 0.0160, 0.0101, 0.0279])
@@ -550,6 +552,8 @@ class FgcmFitCycle(object):
                                                        maxiter=maxIter,
                                                        iprint=0,         # only one output
                                                        callback=None)    # no callback
+
+            chisq = self.fgcmChisq.fitChisqs[-1]
         except MaxFitIterations:
             # We have exceeded the maximum number of iterations, force a cut
             pars = self.fgcmPars.getParArray(fitterUnits=True)
