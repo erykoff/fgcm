@@ -126,7 +126,7 @@ class FgcmChisq(object):
         self.goodObs = None
         self.goodStarsSub = None
 
-    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,computeAbsOffset=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
+    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,computeAbsOffset=False,ignoreRef=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
         """
         Compute the chi-squared for a given set of parameters.
 
@@ -144,6 +144,8 @@ class FgcmChisq(object):
            Cache observation matches.  Do not use!
         computeAbsOffset: `bool`, default=False
            Compute the absolute offset after computing mean mags
+        ignoreRef: `bool`, default=False
+           Ignore reference stars for computation...
         debug: bool, default=False
            Debug mode with no multiprocessing
         allExposures: bool, default=False
@@ -166,6 +168,7 @@ class FgcmChisq(object):
         self.includeReserve = includeReserve
         self.fgcmGray = fgcmGray    # may be None
         self.computeAbsOffset = computeAbsOffset
+        self.ignoreRef = ignoreRef
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -291,11 +294,11 @@ class FgcmChisq(object):
             nSections = goodStars.size // self.nStarPerRun + 1
             goodStarsList = np.array_split(goodStars,nSections)
 
-            if self.fgcmStars.hasRefstars:
-                for gs in goodStarsList:
-                    test, = np.where(objRefIDIndex[gs] >= 0)
-                    if test.size > 0:
-                        self.fgcmLog.info('Found %d reference stars in list' % (test.size))
+            #if self.fgcmStars.hasRefstars:
+            #    for gs in goodStarsList:
+            #        test, = np.where(objRefIDIndex[gs] >= 0)
+            #        if test.size > 0:
+            #            self.fgcmLog.info('Found %d reference stars in list' % (test.size))
 
 
             # is there a better way of getting all the first elements from the list?
@@ -333,12 +336,12 @@ class FgcmChisq(object):
                 self.applyDelta = True
                 self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
                 self.fgcmPars.compAbsOffset -= self.deltaAbsOffset
-                #self.fgcmLog.info('Offsets are: %.5f, %.5f, %.5f, %.5f, %.5f' %
-                #                  (self.fgcmPars.compAbsOffset[0],
-                #                   self.fgcmPars.compAbsOffset[1],
-                #                   self.fgcmPars.compAbsOffset[2],
-                #                   self.fgcmPars.compAbsOffset[3],
-                #                   self.fgcmPars.compAbsOffset[4]))
+                self.fgcmLog.info('Offsets are: %.5f, %.5f, %.5f, %.5f, %.5f' %
+                                  (self.fgcmPars.compAbsOffset[0],
+                                   self.fgcmPars.compAbsOffset[1],
+                                   self.fgcmPars.compAbsOffset[2],
+                                   self.fgcmPars.compAbsOffset[3],
+                                   self.fgcmPars.compAbsOffset[4]))
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
@@ -759,7 +762,7 @@ class FgcmChisq(object):
 
         # Here is the section on using reference stars...
         useRefstars = False
-        if self.fgcmStars.hasRefstars:
+        if self.fgcmStars.hasRefstars and not self.ignoreRef:
             # Prepare arrays
             objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
             refMag = snmm.getArray(self.fgcmStars.refMagHandle)

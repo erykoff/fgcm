@@ -337,7 +337,10 @@ class FgcmFitCycle(object):
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
-            self._doFit()
+            if self.initialCycle:
+                self._doFit(ignoreRef=True)
+            else:
+                self._doFit(ignoreRef=False)
 
             # FIXME hack here
             #self.fgcmPars.parAbsOffset += np.array([0.0159, 0.0087, 0.0160, 0.0101, 0.0279])
@@ -507,13 +510,16 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
-    def _doFit(self, doPlots=True):
+    def _doFit(self, doPlots=True, ignoreRef=False, maxIter=None):
         """
         Internal method to do the fit using fmin_l_bfgs_b
         """
 
         self.fgcmLog.info('Performing fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
+
+        if maxIter is None:
+            maxIter = self.fgcmConfig.maxIter
 
         # get the initial parameters
         parInitial = self.fgcmPars.getParArray(fitterUnits=True)
@@ -523,7 +529,7 @@ class FgcmFitCycle(object):
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
         self.fgcmChisq.clearMatchCache()
-        self.fgcmChisq.maxIterations = self.fgcmConfig.maxIter
+        self.fgcmChisq.maxIterations = maxIter
 
         # In the fit, we want to compute the absolute offset if needed.  Otherwise, no.
         computeAbsOffset = self.fgcmStars.hasRefstars
@@ -532,7 +538,7 @@ class FgcmFitCycle(object):
             pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                        parInitial,       # initial guess
                                                        fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False,computeAbsOffset), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsOffset
+                                                       args=(True,True,False,False,computeAbsOffset,ignoreRef), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsOffset, ignoreRef
                                                        approx_grad=False,# don't approx grad
                                                        bounds=parBounds, # boundaries
                                                        m=10,             # "variable metric conditions"
@@ -540,8 +546,8 @@ class FgcmFitCycle(object):
                                                        factr=10.0,
                                                        #pgtol=1e-9,       # gradient tolerance
                                                        pgtol=1e-12,
-                                                       maxfun=self.fgcmConfig.maxIter,
-                                                       maxiter=self.fgcmConfig.maxIter,
+                                                       maxfun=maxIter,
+                                                       maxiter=maxIter,
                                                        iprint=0,         # only one output
                                                        callback=None)    # no callback
         except MaxFitIterations:
