@@ -27,6 +27,8 @@ class FgcmMakeStars(object):
        e.g. {'g':'g', 'r':'r', 'i':'i', 'i2':'i'}
     requiredBands: string list
        List of required bands
+    referenceBands: string list
+       List of reference bands, in wavelength order
     minPerBand: int
        Minimum number of observations per required band for a star to be considered
     matchRadius: float
@@ -37,8 +39,8 @@ class FgcmMakeStars(object):
        Healpix nside for computing density
     densMaxPerPixel: int
        Maximum number of stars in each healpix.  Will randomly sample down to this density.
-    referenceBands: string
-       List of reference bands
+    primaryBands: string
+       List of primary bands
     matchNSide: int
        Healpix nside to do smatch matching.  Should just be 4096.
     coarseNSide: int
@@ -50,10 +52,10 @@ class FgcmMakeStars(object):
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
-        requiredKeys=['filterToBand','requiredBands',
+        requiredKeys=['filterToBand','requiredBands','referenceBands',
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
-                      'densMaxPerPixel','referenceBands',
+                      'densMaxPerPixel','primaryBands',
                       'matchNSide','coarseNSide']
 
         for key in requiredKeys:
@@ -74,6 +76,15 @@ class FgcmMakeStars(object):
                     break
             if not found:
                 raise ValueError("requiredBand %s not in filterToBand!" % (reqBand))
+
+        for referenceBand in starConfig['referenceBands']:
+            found = False
+            for filterName in self.filterNames:
+                if (starConfig['filterToBand'][filterName] == referenceBand):
+                    found = True
+                    break
+            if not found:
+                raise ValueError("band %s not in filterToBand!" % (referenceBand))
 
         if 'logger' in starConfig:
             self.fgcmLog = starConfig['logger']
@@ -101,12 +112,12 @@ class FgcmMakeStars(object):
 
         obsIndexFile = self.starConfig['starfileBase']+'_obs_index.fits'
 
-        self.makeReferenceStarsFromFits(observationFile)
+        self.makePrimaryStarsFromFits(observationFile)
         self.makeMatchedStarsFromFits(observationFile, obsIndexFile, clobber=clobber)
 
-    def makeReferenceStarsFromFits(self, observationFile):
+    def makePrimaryStarsFromFits(self, observationFile):
         """
-        Make reference stars, loading observations from fits.
+        Make primary stars, loading observations from fits.
 
         parameters
         ----------
@@ -130,8 +141,8 @@ class FgcmMakeStars(object):
         fits = fitsio.FITS(observationFile)
         fitsWhere = None
         for filterName in self.filterNames:
-            for referenceBand in self.starConfig['referenceBands']:
-                if (self.starConfig['filterToBand'][filterName] == referenceBand):
+            for primaryBand in self.starConfig['primaryBands']:
+                if (self.starConfig['filterToBand'][filterName] == primaryBand):
                     clause = '(filtername == "%s")' % (filterName)
                     if fitsWhere is None:
                         fitsWhere = clause
@@ -155,10 +166,10 @@ class FgcmMakeStars(object):
 
         filterNameArray = np.core.defchararray.strip(obsCat['filtername'])
 
-        self.makeReferenceStars(obsCat['ra'], obsCat['dec'], filterNameArray,
-                                brightStarRA = brightStarRA,
-                                brightStarDec = brightStarDec,
-                                brightStarRadius = brightStarRadius)
+        self.makePrimaryStars(obsCat['ra'], obsCat['dec'], filterNameArray,
+                                brightStarRA=brightStarRA,
+                                brightStarDec=brightStarDec,
+                                brightStarRadius=brightStarRadius)
 
         fitsio.write(self.starConfig['starfileBase']+'_prepositions.fits',self.objCat,clobber=True)
 
@@ -171,7 +182,7 @@ class FgcmMakeStars(object):
         ----------
         observationFile: string
         obsIndexFile: string
-           File output from makeReferenceStarsFromFits
+           File output from makePrimaryStarsFromFits
         """
 
         import fitsio
@@ -197,13 +208,38 @@ class FgcmMakeStars(object):
         fits.create_table_hdu(data=self.obsIndexCat, extname='INDEX')
         fits[2].write(self.obsIndexCat)
 
+    def makeReferenceMatchesFromFits(self, refLoader, clobber=False):
+        """
+        Make an absolute reference match catalog, saving to fits.
 
+        Parameters
+        ----------
+        refLoader: `object`
+           Object which has refLoader.getFgcmReferenceStarsHealpix
+        clobber: `bool`, optional
+           Clobber existing absref catalog?  Default is False.
+        """
 
-    def makeReferenceStars(self, raArray, decArray, filterNameArray,
+        import fitsio
+
+        refFile = self.starConfig['starfileBase'] + '_refcat.fits'
+
+        if not clobber:
+            if os.path.isfile(refFile):
+                self.fgcmLog.info("Found %s" % (refFile))
+                return refFile
+
+        self.makeReferenceMatches(refLoader)
+
+        fitsio.write(refFile, self.referenceCat, clobber=True)
+
+        return refFile
+
+    def makePrimaryStars(self, raArray, decArray, filterNameArray,
                            bandSelected=False,
                            brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
-        Make reference stars, from pre-loaded arrays
+        Make primary stars, from pre-loaded arrays
 
         parameters
         ----------
@@ -225,7 +261,7 @@ class FgcmMakeStars(object):
         Output attributes
         -----------------
         objCat: numpy recarray
-           Catalog of unique objects selected from reference band
+           Catalog of unique objects selected from primary band
         """
 
         # can we use the better smatch code?
@@ -276,12 +312,12 @@ class FgcmMakeStars(object):
             bandPixelCat = None
 
             # loop over bands...
-            for referenceBand in self.starConfig['referenceBands']:
-                print("Working on %s" % (referenceBand))
+            for primaryBand in self.starConfig['primaryBands']:
+                print("Working on %s" % (primaryBand))
                 # We first need to select based on the band, not on the filter name
                 useFlag = None
                 for filterName in self.filterNames:
-                    if (self.starConfig['filterToBand'][filterName] == referenceBand):
+                    if (self.starConfig['filterToBand'][filterName] == primaryBand):
                         if useFlag is None:
                             useFlag = (filterNameArray[p1a] == filterName.encode('utf-8'))
                         else:
@@ -318,7 +354,7 @@ class FgcmMakeStars(object):
 
                 if (hist.max() == 1):
                     self.fgcmLog.info("Warning: No matches found for pixel %d, band %s!" %
-                                      (ipring[p1a[0]], referenceBand))
+                                      (ipring[p1a[0]], primaryBand))
                     continue
 
                 maxObs = hist.max()
@@ -351,8 +387,6 @@ class FgcmMakeStars(object):
                         starInd = i2[i1a]
                         # make sure this doesn't get used again
                         hist[starInd] = 0
-                        #bandPixelCatTemp['ra'][index] = np.sum(raTemp[p1a[starInd]]) / starInd.size
-                        #bandPixelCatTemp['dec'][index] = np.sum(decArray[p1a[starInd]]) / starInd.size
                         bandPixelCatTemp['ra'][index] = np.sum(raTemp[starInd]) / starInd.size
                         bandPixelCatTemp['dec'][index] = np.sum(decArrayUse[starInd]) / starInd.size
                         index = index + 1
@@ -365,7 +399,7 @@ class FgcmMakeStars(object):
                 if bandPixelCat is None:
                     # First time through, these are all new objects
                     bandPixelCat = bandPixelCatTemp
-                    print(" Found %d reference stars in %s band" % (bandPixelCatTemp.size, referenceBand))
+                    print(" Found %d primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
                 else:
                     # We already have objects, need to match/append
                     if hasSmatch:
@@ -385,7 +419,7 @@ class FgcmMakeStars(object):
 
                     # Remove all matches from the temp catalog
                     bandPixelCatTemp = np.delete(bandPixelCatTemp, i2b)
-                    print(" Found %d new reference stars in %s band" % (bandPixelCatTemp.size, referenceBand))
+                    print(" Found %d new primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
 
                     bandPixelCat = np.append(bandPixelCat, bandPixelCatTemp)
 
@@ -473,7 +507,7 @@ class FgcmMakeStars(object):
     def makeMatchedStars(self, raArray, decArray, filterNameArray):
         """
         Make matched stars, from pre-loaded arrays.  Requires self.objCat was
-         generated from makeReferenceStars().
+         generated from makePrimaryStars().
 
         parameters
         ----------
@@ -486,7 +520,7 @@ class FgcmMakeStars(object):
         """
 
         if (self.objCat is None):
-            raise ValueError("Must run makeReferenceStars first")
+            raise ValueError("Must run makePrimaryStars first")
 
         # can we use the better smatch code?
         try:
@@ -536,14 +570,14 @@ class FgcmMakeStars(object):
         nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
 
         if (nObsPerObj.size != self.objCat.size):
-            raise ValueError("Number of reference stars (%d) does not match observations (%d)." %
+            raise ValueError("Number of primary stars (%d) does not match observations (%d)." %
                              (self.objCat.size, nObsPerObj.size))
 
         # and our simple classifier
         #    1 is a good star, 0 is bad.
         objClass = np.zeros(self.objCat.size, dtype='i2')
 
-        # We may have no "required" bands beyond being in one of the reference bands
+        # We may have no "required" bands beyond being in one of the primary bands
         if len(self.starConfig['requiredBands']) > 0:
 
             # which stars have at least minPerBand observations in each required band?
@@ -618,6 +652,98 @@ class FgcmMakeStars(object):
 
         # and we're done
 
+    def makeReferenceMatches(self, refLoader):
+        """
+        Make an absolute reference match catalog.
 
+        Parameters
+        ----------
+        refLoader: `object`
+           Object which has refLoader.getFgcmReferenceStarsHealpix
+        """
 
+        # can we use the better smatch code?
+        try:
+            import smatch
+            hasSmatch = True
+        except ImportError:
+            hasSmatch = False
 
+        ipring = hp.ang2pix(self.starConfig['coarseNSide'],
+                            np.radians(90.0 - self.objIndexCat['dec']),
+                            np.radians(self.objIndexCat['ra']))
+        hpix, revpix = esutil.stat.histogram(ipring, rev=True)
+
+        pixelCats = []
+        nBands = len(self.starConfig['referenceBands'])
+
+        dtype = [('fgcm_id', 'i4'),
+                 ('refMag', 'f4', nBands),
+                 ('refMagErr', 'f4', nBands)]
+
+        gdpix, = np.where(hpix > 0)
+        for ii, gpix in enumerate(gdpix):
+            p1a = revpix[revpix[gpix]: revpix[gpix + 1]]
+
+            # Load in reference catalog
+            refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
+                                                            ipring[p1a[0]],
+                                                            self.starConfig['referenceBands'])
+
+            if refCat.size == 0:
+                # No stars in this pixel.  That's okay.
+                continue
+
+            if hasSmatch:
+                matches = smatch.match(self.objIndexCat['ra'][p1a],
+                                       self.objIndexCat['dec'][p1a],
+                                       self.starConfig['matchRadius']/3600.0,
+                                       refCat['ra'], refCat['dec'],
+                                       nside=self.starConfig['matchNSide'],
+                                       maxmatch=1)
+                i1 = matches['i1']
+                i2 = matches['i2']
+            else:
+                htm = esutil.htm.HTM(11)
+
+                matcher = esutil.htm.Matcher(11,
+                                             self.objIndexCat['ra'][p1a],
+                                             self.objIndexCat['dec'][p1a])
+                matches = matcher.match(refCat['ra'], refCat['dec'],
+                                        self.starConfig['matchRadius']/3600.0,
+                                        maxmatch=1)
+
+                # matches[0] -> m1 -> array from matcher.match() call (refCat)
+                # matches[1] -> m2 -> array from htm.Matcher() (self.objIndexCat)
+                i2 = matches[0]
+                i1 = matches[1]
+
+            # i1 -> objIndexCat[p1a]
+            # i2 -> refCat
+
+            if i1.size == 0:
+                # No matched stars in this pixel.  That's okay.
+                continue
+
+            pixelCat = np.zeros(i1.size, dtype=dtype)
+            pixelCat['fgcm_id'] = self.objIndexCat['fgcm_id'][p1a[i1]]
+            pixelCat['refMag'][:, :] = refCat['refMag'][i2, :]
+            pixelCat['refMagErr'][:, :] = refCat['refMagErr'][i2, :]
+
+            pixelCats.append(pixelCat)
+
+            self.fgcmLog.info("Found %d reference matches in pixel %d (%d of %d)." %
+                              (pixelCat.size, ipring[p1a[0]], ii, gdpix.size))
+
+        # Now assemble
+        count = 0
+        for pixelCat in pixelCats:
+            count += pixelCat.size
+
+        self.referenceCat = np.zeros(count, dtype=dtype)
+        ctr = 0
+        for pixelCat in pixelCats:
+            self.referenceCat[ctr: ctr + pixelCat.size] = pixelCat
+            ctr += pixelCat.size
+            # and clear memory
+            pixelCat = None

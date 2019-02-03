@@ -100,7 +100,8 @@ class FgcmStars(object):
         self.sedSlopeComputed = False
 
         self.magConstant = 2.5/np.log(10)
-        self.zptAB = fgcmConfig.zptAB
+        self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
+        self.approxThroughput = fgcmConfig.approxThroughput
 
         self.hasXY = False
         self.hasRefstars = False
@@ -344,9 +345,9 @@ class FgcmStars(object):
         # We will apply the approximate AB scaling here, it will make
         # any plots we make have sensible units; will make 99 a sensible sentinal value;
         # and is arbitrary anyway and doesn't enter the fits.
-        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptAB
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
-        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptAB  # same as raw at first
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput  # same as raw at first
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
@@ -1085,6 +1086,80 @@ class FgcmStars(object):
 
         return deltaOffsetRef
 
+    def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
+        """
+        Compute the delta-mag between the observed and true value (EGray) for a set of
+        observations (goodObs).
+
+        EGray == <mstd> - mstd
+        or
+        EGray == mref - mstd
+
+        Parameters
+        ----------
+        goodObs: `np.array`
+           Array of indices of good observations
+        ignoreRef: `bool`, default=False
+           Ignore reference stars.
+        onlyObsErr: `bool`, default=False
+           Only use the observational error (for non-ref stars)
+
+        Returns
+        -------
+        EGrayGO: `np.array`
+           Array of gray residuals for goodObs observations
+        EGrayErr2GO: `np.array`
+           Array of gray residual error squared
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        # First compute EGray for all the observations
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        if onlyObsErr:
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.)
+
+        # And if we need reference stars, replace these
+        if self.hasRefstars and not ignoreRef:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.refMagHandle)
+            refMagErr = snmm.getArray(self.refMagErrHandle)
+
+            goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
+
+            if goodRefObsGO.size > 0:
+                #obsUse, = np.where((objMagStdMean[obsObjIDIndex[goodObs[goodRefObsGO]],
+                #                                  obsBandIndex[goodObs[goodRefObsGO]]] < 90.0) &
+                #                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                #                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+                obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
+                                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+
+                if obsUse.size > 0:
+                    goodRefObsGO = goodRefObsGO[obsUse]
+
+                    EGrayGO[goodRefObsGO] = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                   obsBandIndex[goodObs[goodRefObsGO]]] -
+                                             obsMagStd[goodObs[goodRefObsGO]])
+
+                    EGrayErr2GO[goodRefObsGO] = (obsMagErr[goodObs[goodRefObsGO]]**2. +
+                                                 refMagErr[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                           obsBandIndex[goodObs[goodRefObsGO]]]**2.)
+
+        return EGrayGO, EGrayErr2GO
+
     def performColorCuts(self):
         """
         Make the color cuts that are specified in the config.
@@ -1344,44 +1419,88 @@ class FgcmStars(object):
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
-    def estimateAbsMagOffsets(self):
-        """
-        Estimate the absolute magnitude offsets from the mean mags
+    #def estimateAbsThroughputs(self):
+    #    """
+    #    Estimate the absolute throughput of the system from mean mags
 
-        Returns
-        -------
-        absOffsets: `np.array`
-           Float array of estimated absolute offsets
-        """
+    #    Returns
+    #    -------
+    #    absThroughputs: `np.array`
+    #       Float array of estimated absolute throughputs
+    #    """
 
-        absOffsets = np.zeros(self.nBands)
+    #    absThroughputs = np.zeros(self.nBands)
+        # Set to the default values...
+    #    if len(self.approxThroughput) == 1:
+    #        absThroughputs[:] = self.approxThroughput[0]
+    #    else:
+    #        absThroughputs[:] = np.array(self.approxThroughput)
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
 
-        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.refMagHandle)
+    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+    #    refMag = snmm.getArray(self.refMagHandle)
 
-        goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
-        goodRefStars = goodStars[use]
+    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
+    #    goodRefStars = goodStars[use]
 
-        for bandIndex, band in enumerate(self.bands):
-            refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
-                               (objMagStdMean[goodRefStars, bandIndex] < 90.0))
+    #    for bandIndex, band in enumerate(self.bands):
+    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
+    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
 
-            if refUse.size == 0:
-                self.fgcmLog.info("No reference stars in %s band." % (band))
-                continue
+    #        if refUse.size == 0:
+    #            self.fgcmLog.info("No reference stars in %s band." % (band))
+    #            continue
 
-            delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
-                     refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
 
-            absOffsets[bandIndex] = -1.0 * np.median(delta)
+    #        absThroughputs[bandIndex] = 10.**(-np.median(delta) / 2.5)
 
-            self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
+    #        self.fgcmLog.info("Estimated absolute throughput in %s band = %.4f" % (band, absThroughputs[bandIndex]))
 
-        return absOffsets
+    #    return absThroughputs
+
+    #def estimateAbsMagOffsets(self):
+    #    """
+    #    Estimate the absolute magnitude offsets from the mean mags
+
+    #    Returns
+    #    -------
+    #    absOffsets: `np.array`
+    #       Float array of estimated absolute offsets
+    #    """
+
+    #    absOffsets = np.zeros(self.nBands)
+
+    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+    #    refMag = snmm.getArray(self.refMagHandle)
+
+    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+
+    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
+    #    goodRefStars = goodStars[use]
+
+    #    for bandIndex, band in enumerate(self.bands):
+    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
+    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
+
+    #        if refUse.size == 0:
+    #            self.fgcmLog.info("No reference stars in %s band." % (band))
+    #            continue
+
+    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+
+    #        absOffsets[bandIndex] = -1.0 * np.median(delta)
+
+    #        self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
+
+    #    return absOffsets
 
     def saveFlagStarIndices(self,flagStarFile):
         """

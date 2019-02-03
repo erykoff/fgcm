@@ -101,12 +101,9 @@ class FgcmSigFgcm(object):
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
-        # compute EGray, GO for Good Obs
-        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
-                   obsMagStd[goodObs])
-        # and need the error for Egray: sum in quadrature of individual and avg errs
-        EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        # this statistic is internal only, no reference stars.
+        # see fgcmSigmaRef for reference stars
+        EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, ignoreRef=True)
 
         # now we can compute sigFgcm
 

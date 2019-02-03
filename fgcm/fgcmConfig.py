@@ -140,7 +140,7 @@ class FgcmConfig(object):
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
     mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
-    approxThroughput = ConfigField(float, default=1.0)
+    approxThroughput = ConfigField(list, default=[1.0])
     ccdStartIndex = ConfigField(int, default=0)
     minExpPerNight = ConfigField(int, default=10)
     expGrayInitialCut = ConfigField(float, default=-0.25)
@@ -477,12 +477,19 @@ class FgcmConfig(object):
                 cCut[1] = list(self.bands).index(cCut[1])
 
         # and AB zeropoint
-        hPlanck = 6.6
-        expPlanck = -27.0
-        self.zptAB = (-48.6 - 2.5*expPlanck +
-                       2.5*np.log10((self.mirrorArea * self.approxThroughput) /
-                                    (hPlanck * self.cameraGain)))
-        self.fgcmLog.info("AB offset estimated as %.4f" % (self.zptAB))
+        self.hPlanck = 6.6
+        self.expPlanck = -27.0
+        #self.zptABNoThroughput = (-48.6 - 2.5*self.expPlanck +
+        #                           2.5*np.log10((self.mirrorArea) /
+        #                                        (self.hPlanck * self.cameraGain)))
+        self.zptABNoThroughput = (-48.6 - 2.5 * self.expPlanck +
+                                   2.5 * np.log10(self.mirrorArea) -
+                                   2.5 * np.log10(self.hPlanck * self.cameraGain))
+
+        if len(self.approxThroughput) != 1 and len(self.approxThroughput) != len(self.bands):
+            raise ValueError("approxThroughput must have 1 or nbands elements.")
+
+        self.fgcmLog.info("AB offset (w/o throughput) estimated as %.4f" % (self.zptABNoThroughput))
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?

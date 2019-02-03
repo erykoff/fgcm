@@ -126,7 +126,7 @@ class FgcmChisq(object):
         self.goodObs = None
         self.goodStarsSub = None
 
-    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,computeAbsOffset=False,ignoreRef=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
+    def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,computeAbsThroughput=False,ignoreRef=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
         """
         Compute the chi-squared for a given set of parameters.
 
@@ -142,8 +142,8 @@ class FgcmChisq(object):
            Compute SED slopes from magnitudes?
         useMatchCache: bool, default=False
            Cache observation matches.  Do not use!
-        computeAbsOffset: `bool`, default=False
-           Compute the absolute offset after computing mean mags
+        computeAbsThroughputt: `bool`, default=False
+           Compute the absolute throughput after computing mean mags
         ignoreRef: `bool`, default=False
            Ignore reference stars for computation...
         debug: bool, default=False
@@ -167,7 +167,7 @@ class FgcmChisq(object):
         self.useMatchCache = useMatchCache
         self.includeReserve = includeReserve
         self.fgcmGray = fgcmGray    # may be None
-        self.computeAbsOffset = computeAbsOffset
+        self.computeAbsThroughput = computeAbsThroughput
         self.ignoreRef = ignoreRef
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
@@ -240,12 +240,6 @@ class FgcmChisq(object):
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
 
-        #self.nSums = 2  # chisq, nobs
-        #if (self.computeDerivatives):
-            # we have one for each of the derivatives
-            # and a duplicate set to track which parameters were "touched"
-        #    self.nSums += 2*self.fgcmPars.nFitPars
-
         self.nSums = 4 # chisq, chisq_ref, nobs, nobs_ref
         if self.computeDerivatives:
             # 0: nFitPars -> derivative for regular chisq
@@ -265,10 +259,10 @@ class FgcmChisq(object):
             #self._worker((goodStars,goodObs))
             self._magWorker((goodStars, goodObs))
 
-            if self.computeAbsOffset:
+            if self.computeAbsThroughput:
                 self.applyDelta = True
-                self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsOffset += self.deltaAbsOffset
+                self.deltaAbsThroughput = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.0**(-self.deltaAbsThroughput / 2.5)
 
             if not self.allExposures:
                 self._chisqWorker((goodStars, goodObs))
@@ -276,7 +270,6 @@ class FgcmChisq(object):
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
             # regular multi-core
-
 
             # make a dummy process to discover starting child number
             proc = multiprocessing.Process()
@@ -293,13 +286,6 @@ class FgcmChisq(object):
             prepStartTime = time.time()
             nSections = goodStars.size // self.nStarPerRun + 1
             goodStarsList = np.array_split(goodStars,nSections)
-
-            #if self.fgcmStars.hasRefstars:
-            #    for gs in goodStarsList:
-            #        test, = np.where(objRefIDIndex[gs] >= 0)
-            #        if test.size > 0:
-            #            self.fgcmLog.info('Found %d reference stars in list' % (test.size))
-
 
             # is there a better way of getting all the first elements from the list?
             #  note that we need to skip the first which should be zero (checked above)
@@ -332,16 +318,16 @@ class FgcmChisq(object):
             pool.map(self._magWorker, workerList, chunksize=1)
 
             # And compute absolute offset if desired...
-            if self.computeAbsOffset:
+            if self.computeAbsThroughput:
                 self.applyDelta = True
                 self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsOffset -= self.deltaAbsOffset
-                self.fgcmLog.info('Offsets are: %.5f, %.5f, %.5f, %.5f, %.5f' %
-                                  (self.fgcmPars.compAbsOffset[0],
-                                   self.fgcmPars.compAbsOffset[1],
-                                   self.fgcmPars.compAbsOffset[2],
-                                   self.fgcmPars.compAbsOffset[3],
-                                   self.fgcmPars.compAbsOffset[4]))
+                self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
+                #self.fgcmLog.info('Throughputs are: %.5f,  %.5f, %.5f, %.5f, %.5f' %
+                #                  (self.fgcmPars.compAbsThroughput[0],
+                #                   self.fgcmPars.compAbsThroughput[1],
+                #                   self.fgcmPars.compAbsThroughput[2],
+                #                   self.fgcmPars.compAbsThroughput[3],
+                #                   self.fgcmPars.compAbsThroughput[4]))
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
@@ -371,27 +357,14 @@ class FgcmChisq(object):
                 self.fgcmLog.info('Actually fit %d parameters.' % (self.nActualFitPars))
 
             fitDOF = partialSums[-3] + partialSums[-1] - float(self.nActualFitPars)
-            #fitDOF = partialSums[-3] - float(self.nActualFitPars)
 
             if (fitDOF <= 0):
                 raise ValueError("Number of parameters fitted is more than number of constraints! (%d > %d)" % (self.fgcmPars.nFitPars,partialSums[-1]))
 
             fitChisq = (partialSums[-4] + partialSums[-2]) / fitDOF
-            #fitChisq = partialSums[-4] / fitDOF
             if self.computeDerivatives:
                 dChisqdP = (partialSums[0:self.fgcmPars.nFitPars] +
                             partialSums[2*self.fgcmPars.nFitPars: 3*self.fgcmPars.nFitPars]) / fitDOF
-                #dChisqdP = partialSums[2*self.fgcmPars.nFitPars: 3*self.fgcmPars.nFitPars] / fitDOF
-                #dChisqdP = partialSums[0:self.fgcmPars.nFitPars] / fitDOF
-                #print(partialSums[self.fgcmPars.parQESysSlopeLoc:
-                #                      self.fgcmPars.parQESysSlopeLoc + self.fgcmPars.nWashIntervals])
-                #print(partialSums[2*self.fgcmPars.nFitPars + self.fgcmPars.parQESysSlopeLoc:
-                #                      2*self.fgcmPars.nFitPars + self.fgcmPars.parQESysSlopeLoc + self.fgcmPars.nWashIntervals])
-                #print(partialSums[self.fgcmPars.parQESysInterceptLoc:
-                #                      self.fgcmPars.parQESysInterceptLoc + self.fgcmPars.nWashIntervals])
-                #print(partialSums[2*self.fgcmPars.nFitPars + self.fgcmPars.parQESysInterceptLoc:
-                #                      2*self.fgcmPars.nFitPars + self.fgcmPars.parQESysInterceptLoc + self.fgcmPars.nWashIntervals])
-
 
             self.fgcmLog.info("Total chisq/DOF is %.6f" % ((partialSums[-4] + partialSums[-2]) / (partialSums[-3] + partialSums[-1] - float(self.nActualFitPars))))
 
@@ -778,15 +751,12 @@ class FgcmChisq(object):
                 # There are no reference stars in this list of stars.  That's okay!
                 useRefstars = False
             else:
-                # Get the good reference stars
-                goodRefStars = goodStars[use]
-
-                # And the good observations of reference stars
+                # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
                 goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
 
-                # And check that these are all quality stars
+                # And check that these are all quality observations
                 tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
                                                    obsBandIndexGO[goodRefObsGO]] < 90.0) &
                                     (refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
@@ -799,13 +769,13 @@ class FgcmChisq(object):
                 if useRefstars:
                     # At this point, we have to "down-select" obsFitUseGO to remove reference stars...
                     # This will only be run when we actually have reference stars!
-                    # Note that when a star is used as a reference star it will be removed from
-                    # the summation in all bands, even if we only have the reference in one
-                    # band.  FIXME
-                    # We can overwrite the index here.
 
-                    tempUse, = np.where((objRefIDIndex[obsObjIDIndexGO[obsFitUseGO]] < 0))
-                    obsFitUseGO = obsFitUseGO[tempUse]
+                    # Only remove specific observations that have reference observations.
+                    # This means that a star that has a reference mag in only one band
+                    # will be used in the regular way in the other bands.
+                    maskGO = np.ones(goodObs.size, dtype=np.bool)
+                    maskGO[goodRefObsGO[tempUse]] = False
+                    obsFitUseGO = obsFitUseGO[maskGO]
 
         # Now we can compute delta and chisq for non-reference stars
 
@@ -842,70 +812,6 @@ class FgcmChisq(object):
 
             partialChisqRef += np.sum(deltaMagGRO[obsFitUseGRO]**2. * obsWeightGRO[obsFitUseGRO])
 
-        """
-        # compute delta-mags
-
-        deltaMagGO = (obsMagStdGO - objMagStdMeanGO)
-
-        # Note that this is the model error when we have it
-        obsWeightGO = 1. / obsMagErr2GO
-
-        deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
-
-        partialChisq = 0.0
-        partialChisqRef = 0.0
-
-        partialChisq = np.sum(deltaMagGO[obsFitUseGO]**2. * obsWeightGO[obsFitUseGO])
-
-        # Here is the section on using reference stars...
-        useRefstars = False
-        if self.fgcmStars.hasRefstars and not self.ignoreRef:
-            # Prepare arrays
-            objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
-            refMag = snmm.getArray(self.fgcmStars.refMagHandle)
-            refMagErr = snmm.getArray(self.fgcmStars.refMagErrHandle)
-
-            # Are there any reference stars in this set of stars?
-            use, = np.where(objRefIDIndex[goodStars] >= 0)
-            if use.size == 0:
-                # There are no reference stars in this list of stars.  That's okay!
-                useRefstars = False
-            else:
-                # Get the good reference stars
-                goodRefStars = goodStars[use]
-
-                # And the good observations of reference stars
-                # This must be two steps because we first need the indices to
-                # avoid out-of-bounds
-                goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
-
-                # And check that these are all quality stars
-                tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
-                                                   obsBandIndexGO[goodRefObsGO]] < 90.0) &
-                                    (refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
-                                            obsBandIndexGO[goodRefObsGO]] < 90.0))
-
-                if tempUse.size > 0:
-                    useRefstars = True
-                    goodRefObsGO = goodRefObsGO[tempUse]
-
-            if useRefstars:
-                # get the indices that we're fitting, for derivatives...
-                _, obsFitUseGRO = esutil.numpy_util.match(self.bandFitIndex,
-                                                          obsBandIndexGO[goodRefObsGO])
-
-                # Add in the chi-squared from the reference stars, that have measurements
-                deltaRefMagGRS = (objMagStdMean[goodRefStars, :].flatten() -
-                                  refMag[objRefIDIndex[goodRefStars], :].flatten())
-                refWeightGRS = 1. / (objMagStdMeanErr[goodRefStars, :].flatten()**2. +
-                                     refMagErr[objRefIDIndex[goodRefStars], :].flatten()**2.)
-
-                gdDeltaRef, = np.where((objMagStdMean[goodRefStars, :].flatten() < 90.0) &
-                                       (refMag[objRefIDIndex[goodRefStars], :].flatten() < 90.0))
-
-                partialChisqRef += np.sum(deltaRefMagGRS[gdDeltaRef]**2. * refWeightGRS[gdDeltaRef])
-                """
-
         partialArray = np.zeros(self.nSums, dtype='f8')
         partialArray[-4] = partialChisq
         partialArray[-3] = obsFitUseGO.size
@@ -940,27 +846,6 @@ class FgcmChisq(object):
             # we have objMagStdMeanErr[objIndex,:] = \Sum_{i"} 1/\sigma^2_{i"j}
             #   note that this is summed over all observations of an object in a band
             #   so that this is already done
-
-            # If we have reference stars, we have to set up some variables
-            """
-            if useRefstars:
-
-                goodRefObsGOF = goodRefObsGO[obsFitUseGRO]
-
-                magMeanGROTemp = objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
-                                               obsBandIndexGO[goodRefObsGO]]
-                refMagGROTemp = refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
-                                       obsBandIndexGO[goodRefObsGO]]
-                magErrGROTemp = objMagStdMeanErr[obsObjIDIndexGO[goodRefObsGO],
-                                                 obsBandIndexGO[goodRefObsGO]]
-                refErrGROTemp = refMagErr[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
-                                          obsBandIndexGO[goodRefObsGO]]
-
-                deltaRefMagWeightedGRO = ((magMeanGROTemp - refMagGROTemp) /
-                                          (magErrGROTemp**2. + refErrGROTemp**2.))
-
-                # These numbers are clearly wrong? No, correct.
-            """
 
             # note below that objMagStdMeanErr2GO is the the square of the error,
             #  and already cut to [obsObjIDIndexGO,obsBandIndexGO]
@@ -1488,27 +1373,10 @@ class FgcmChisq(object):
                          self.fgcmPars.parQESysInterceptLoc +
                          uWashIndex] += 1
 
-            """
-            if useRefstars:
-                expWashIndexGROF = self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]
-                uRefWashIndex = np.unique(expWashIndexGROF)
-                #print(uRefWashIndex)
+            # We don't want to use the reference stars for the wash intercept
+            # or slope because if they aren't evenly sampled it can cause the
+            # fitter to go CRAZY.
 
-                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
-                                       self.fgcmPars.parQESysInterceptLoc:
-                                           (2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parQESysInterceptLoc +
-                                            self.fgcmPars.nWashIntervals)],
-                          expWashIndexGROF,
-                          2.0 * deltaRefMagWeightedGROF)
-
-                partialArray[2*self.fgcmPars.nFitPars +
-                             self.fgcmPars.parQESysInterceptLoc +
-                             uRefWashIndex] /= unitDict['qeSysUnit']
-                partialArray[3*self.fgcmPars.nFitPars +
-                             self.fgcmPars.parQESysInterceptLoc +
-                             uRefWashIndex] += 1
-                             """
             # Wash Slope
 
             np.add.at(partialArray[self.fgcmPars.parQESysSlopeLoc:
@@ -1526,33 +1394,6 @@ class FgcmChisq(object):
                          self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] += 1
 
-            #print(np.mean(self.fgcmPars.expMJD[obsExpIndexGO[obsFitUseGO]] -
-            #              self.fgcmPars.washMJDs[expWashIndexGOF]))
-            #print(np.std(self.fgcmPars.expMJD[obsExpIndexGO[obsFitUseGO]] -
-            #             self.fgcmPars.washMJDs[expWashIndexGOF]))
-            """
-            if useRefstars:
-                #print((self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
-                #           self.fgcmPars.washMJDs[expWashIndexGROF]).__repr__())
-                #print(np.mean(self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
-                #              self.fgcmPars.washMJDs[expWashIndexGROF]))
-                #print(np.std(self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
-                #             self.fgcmPars.washMJDs[expWashIndexGROF]))
-                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
-                                       self.fgcmPars.parQESysSlopeLoc:
-                                           (2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parQESysSlopeLoc +
-                                            self.fgcmPars.nWashIntervals)],
-                          expWashIndexGROF,
-                          2.0 * deltaRefMagWeightedGROF *
-                          (self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
-                           self.fgcmPars.washMJDs[expWashIndexGROF]))
-
-                partialArray[2*self.fgcmPars.parQESysSlopeLoc +
-                             uRefWashIndex] /= unitDict['qeSysSlopeUnit']
-                partialArray[3*self.fgcmPars.parQESysSlopeLoc +
-                             uRefWashIndex] += 1
-                             """
             #################
             ## Filter offset
             #################
