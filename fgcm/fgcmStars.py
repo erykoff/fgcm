@@ -100,7 +100,8 @@ class FgcmStars(object):
         self.sedSlopeComputed = False
 
         self.magConstant = 2.5/np.log(10)
-        self.zptAB = fgcmConfig.zptAB
+        self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
+        self.approxThroughput = fgcmConfig.approxThroughput
 
         self.hasXY = False
         self.hasRefstars = False
@@ -344,9 +345,9 @@ class FgcmStars(object):
         # We will apply the approximate AB scaling here, it will make
         # any plots we make have sensible units; will make 99 a sensible sentinal value;
         # and is arbitrary anyway and doesn't enter the fits.
-        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptAB
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
-        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptAB  # same as raw at first
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput  # same as raw at first
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
@@ -1344,44 +1345,88 @@ class FgcmStars(object):
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
-    def estimateAbsMagOffsets(self):
-        """
-        Estimate the absolute magnitude offsets from the mean mags
+    #def estimateAbsThroughputs(self):
+    #    """
+    #    Estimate the absolute throughput of the system from mean mags
 
-        Returns
-        -------
-        absOffsets: `np.array`
-           Float array of estimated absolute offsets
-        """
+    #    Returns
+    #    -------
+    #    absThroughputs: `np.array`
+    #       Float array of estimated absolute throughputs
+    #    """
 
-        absOffsets = np.zeros(self.nBands)
+    #    absThroughputs = np.zeros(self.nBands)
+        # Set to the default values...
+    #    if len(self.approxThroughput) == 1:
+    #        absThroughputs[:] = self.approxThroughput[0]
+    #    else:
+    #        absThroughputs[:] = np.array(self.approxThroughput)
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
 
-        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.refMagHandle)
+    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+    #    refMag = snmm.getArray(self.refMagHandle)
 
-        goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
-        goodRefStars = goodStars[use]
+    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
+    #    goodRefStars = goodStars[use]
 
-        for bandIndex, band in enumerate(self.bands):
-            refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
-                               (objMagStdMean[goodRefStars, bandIndex] < 90.0))
+    #    for bandIndex, band in enumerate(self.bands):
+    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
+    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
 
-            if refUse.size == 0:
-                self.fgcmLog.info("No reference stars in %s band." % (band))
-                continue
+    #        if refUse.size == 0:
+    #            self.fgcmLog.info("No reference stars in %s band." % (band))
+    #            continue
 
-            delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
-                     refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
 
-            absOffsets[bandIndex] = -1.0 * np.median(delta)
+    #        absThroughputs[bandIndex] = 10.**(-np.median(delta) / 2.5)
 
-            self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
+    #        self.fgcmLog.info("Estimated absolute throughput in %s band = %.4f" % (band, absThroughputs[bandIndex]))
 
-        return absOffsets
+    #    return absThroughputs
+
+    #def estimateAbsMagOffsets(self):
+    #    """
+    #    Estimate the absolute magnitude offsets from the mean mags
+
+    #    Returns
+    #    -------
+    #    absOffsets: `np.array`
+    #       Float array of estimated absolute offsets
+    #    """
+
+    #    absOffsets = np.zeros(self.nBands)
+
+    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+    #    refMag = snmm.getArray(self.refMagHandle)
+
+    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+
+    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
+    #    goodRefStars = goodStars[use]
+
+    #    for bandIndex, band in enumerate(self.bands):
+    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
+    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
+
+    #        if refUse.size == 0:
+    #            self.fgcmLog.info("No reference stars in %s band." % (band))
+    #            continue
+
+    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+
+    #        absOffsets[bandIndex] = -1.0 * np.median(delta)
+
+    #        self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
+
+    #    return absOffsets
 
     def saveFlagStarIndices(self,flagStarFile):
         """

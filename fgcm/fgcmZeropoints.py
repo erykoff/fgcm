@@ -58,7 +58,8 @@ class FgcmZeropoints(object):
         self.cycleNumber = fgcmConfig.cycleNumber
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.plotPath = fgcmConfig.plotPath
-        self.zptAB = fgcmConfig.zptAB
+        #self.zptAB = fgcmConfig.zptAB
+        self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
@@ -592,10 +593,11 @@ class FgcmZeropoints(object):
         return (2.5*np.log10(zpStruct['FGCM_I0'][indices]) +
                 flatValue +
                 zpStruct['FGCM_DUST'][indices] +
-                zpStruct['FGCM_FILTER'][indices] +
+                zpStruct['FGCM_FILTER'][indices] +  # includes throughput correction
                 zpStruct['FGCM_APERCORR'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
-                self.zptAB +
+                #self.zptAB +
+                self.zptABNoThroughput +
                 grayValue)
 
     def _computeZptCheb(self, zpStruct, zpIndex):

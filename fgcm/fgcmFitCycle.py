@@ -293,8 +293,9 @@ class FgcmFitCycle(object):
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
             # Compute absolute magnitude starting points (if appropriate)
-            if self.fgcmStars.hasRefstars:
-                self.fgcmPars.compAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
+            #if self.fgcmStars.hasRefstars:
+                #self.fgcmPars.compAbsOffset[:] = self.fgcmStars.estimateAbsMagOffsets()
+            #    self.fgcmPars.compAbsThroughput[:] = self.fgcmStars.estimateAbsThroughputs()
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
@@ -534,13 +535,13 @@ class FgcmFitCycle(object):
         self.fgcmChisq.maxIterations = maxIter
 
         # In the fit, we want to compute the absolute offset if needed.  Otherwise, no.
-        computeAbsOffset = self.fgcmStars.hasRefstars
+        computeAbsThroughput = self.fgcmStars.hasRefstars
 
         try:
             pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
                                                        parInitial,       # initial guess
                                                        fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False,computeAbsOffset,ignoreRef), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsOffset, ignoreRef
+                                                       args=(True,True,False,False,computeAbsThroughput,ignoreRef), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsThroughput, ignoreRef
                                                        approx_grad=False,# don't approx grad
                                                        bounds=parBounds, # boundaries
                                                        m=10,             # "variable metric conditions"
