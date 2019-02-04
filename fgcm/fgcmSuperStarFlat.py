@@ -100,16 +100,17 @@ class FgcmSuperStarFlat(object):
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
-        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
-                   obsMagStd[goodObs])
+        #EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
+        #           obsMagStd[goodObs])
 
-        if onlyObsErr:
+        #if onlyObsErr:
             # only observational error.  Use this option when doing initial guess at superstarFlat
-            EGrayErr2GO = obsMagErr[goodObs]**2.
-        else:
+        #    EGrayErr2GO = obsMagErr[goodObs]**2.
+        #else:
             # take into account correlated average mag error
-            EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                           objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        #    EGrayErr2GO = (obsMagErr[goodObs]**2. -
+        #                   objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, onlyObsErr=onlyObsErr)
 
         # one more cut on the maximum error
         # as well as making sure that it didn't go below zero

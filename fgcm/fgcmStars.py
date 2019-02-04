@@ -1086,6 +1086,80 @@ class FgcmStars(object):
 
         return deltaOffsetRef
 
+    def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
+        """
+        Compute the delta-mag between the observed and true value (EGray) for a set of
+        observations (goodObs).
+
+        EGray == <mstd> - mstd
+        or
+        EGray == mref - mstd
+
+        Parameters
+        ----------
+        goodObs: `np.array`
+           Array of indices of good observations
+        ignoreRef: `bool`, default=False
+           Ignore reference stars.
+        onlyObsErr: `bool`, default=False
+           Only use the observational error (for non-ref stars)
+
+        Returns
+        -------
+        EGrayGO: `np.array`
+           Array of gray residuals for goodObs observations
+        EGrayErr2GO: `np.array`
+           Array of gray residual error squared
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        # First compute EGray for all the observations
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        if onlyObsErr:
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.)
+
+        # And if we need reference stars, replace these
+        if self.hasRefstars and not ignoreRef:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.refMagHandle)
+            refMagErr = snmm.getArray(self.refMagErrHandle)
+
+            goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
+
+            if goodRefObsGO.size > 0:
+                #obsUse, = np.where((objMagStdMean[obsObjIDIndex[goodObs[goodRefObsGO]],
+                #                                  obsBandIndex[goodObs[goodRefObsGO]]] < 90.0) &
+                #                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                #                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+                obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
+                                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+
+                if obsUse.size > 0:
+                    goodRefObsGO = goodRefObsGO[obsUse]
+
+                    EGrayGO[goodRefObsGO] = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                   obsBandIndex[goodObs[goodRefObsGO]]] -
+                                             obsMagStd[goodObs[goodRefObsGO]])
+
+                    EGrayErr2GO[goodRefObsGO] = (obsMagErr[goodObs[goodRefObsGO]]**2. +
+                                                 refMagErr[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                           obsBandIndex[goodObs[goodRefObsGO]]]**2.)
+
+        return EGrayGO, EGrayErr2GO
+
     def performColorCuts(self):
         """
         Make the color cuts that are specified in the config.
