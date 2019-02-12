@@ -103,6 +103,8 @@ class FgcmStars(object):
         self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
         self.approxThroughput = fgcmConfig.approxThroughput
 
+        self.refStarSnMin = fgcmConfig.refStarSnMin
+
         self.hasXY = False
         self.hasRefstars = False
         self.nRefStars = 0
@@ -329,6 +331,17 @@ class FgcmStars(object):
 
         if (refID is not None and refMag is not None and refMagErr is not None):
             self.hasRefstars = True
+
+            # Remove any duplicates...
+            _, refUInd = np.unique(refID, return_index=True)
+
+            if refUInd.size < refID.size:
+                self.fgcmLog.info("Removing %d duplicate reference stars." %
+                                  (refID.size - refUInd.size))
+                refID = refID[refUInd]
+                refMag = refMag[refUInd, :]
+                refMagErr = refMagErr[refUInd, :]
+
             self.nRefstars = refID.size
 
             # refID: matched ID of reference stars
@@ -354,9 +367,19 @@ class FgcmStars(object):
             snmm.getArray(self.obsYHandle)[:] = obsY
 
         if self.hasRefstars:
+            # And filter out bad signal to noise, per band, if desired,
+            # before filling the arrays
+            if self.refStarSnMin > 0.0:
+                for i in range(self.nBands):
+                    maxErr = (2.5 / np.log(10.)) * (1. / self.refStarSnMin)
+                    bad, = np.where(refMagErr[:, i] > maxErr)
+                    refMag[bad, i] = 99.0
+                    refMagErr[bad, i] = 99.0
+
             snmm.getArray(self.refIDHandle)[:] = refID
             snmm.getArray(self.refMagHandle)[:, :] = refMag
             snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
+
 
         self.fgcmLog.info('Applying sigma0Phot = %.4f to mag errs' %
                          (self.sigma0Phot))
@@ -519,6 +542,10 @@ class FgcmStars(object):
             test,=np.where((flagFlag[a] & objFlagDict['RESERVED']) > 0)
             self.fgcmLog.info('Flagging %d stars as reserved from previous cycles.' %
                              (test.size))
+            test, = np.where((flagFlag[a] & objFlagDict['REFSTAR_OUTLIER']) > 0)
+            if test.size > 0:
+                self.fgcmLog.info('Flagging %d stars as reference star outliers from previous cycles.' %
+                                  (test.size))
 
             objFlag[b] = flagFlag[a]
         else:
@@ -761,14 +788,20 @@ class FgcmStars(object):
         goodStars: np.array of good star indices
         """
 
-        mask = 255
+        #mask = 255
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'] |
+                objFlagDict['RESERVED'])
 
-        if includeReserve:
+        if includeReserve or onlyReserve:
             mask &= ~objFlagDict['RESERVED']
 
         if onlyReserve:
-            mask = objFlagDict['RESERVED']
-            goodFlag = ((snmm.getArray(self.objFlagHandle) & mask) > 0)
+            resMask = objFlagDict['RESERVED']
+            goodFlag = (((snmm.getArray(self.objFlagHandle) & resMask) > 0) &
+                        ((snmm.getArray(self.objFlagHandle) & mask) == 0))
         else:
             goodFlag = ((snmm.getArray(self.objFlagHandle) & mask) == 0)
 
@@ -871,7 +904,12 @@ class FgcmStars(object):
             self.fgcmLog.info("Map plotting not available.  Sorry!")
             return
 
-        goodStars,=np.where(snmm.getArray(self.objFlagHandle)[:] == 0.0)
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'])
+
+        goodStars, = np.where((snmm.getArray(self.objFlagHandle) & mask) == 0)
 
         theta = (90.0-snmm.getArray(self.objDecHandle)[goodStars])*np.pi/180.
         phi = snmm.getArray(self.objRAHandle)[goodStars]*np.pi/180.
@@ -1084,7 +1122,39 @@ class FgcmStars(object):
         ok, = np.where(deltaOffsetWtRef > 0.0)
         deltaOffsetRef[ok] /= deltaOffsetWtRef[ok]
 
+        # And any bands that we do not have a measurement will be a weighted mean
+        # of the other bands...
+        noRef, = np.where(deltaOffsetWtRef == 0)
+        if noRef.size > 0:
+            # there are bands to fill in...
+            deltaOffsetRef[noRef] = (np.sum(deltaOffsetRef[ok] * deltaOffsetWtRef[ok]) /
+                                     np.sum(deltaOffsetWtRef[ok]))
+
         return deltaOffsetRef
+
+    def applyAbsOffset(self, deltaAbsOffset):
+        """
+        Apply the absolute offsets.  Used for initial fit cycle.
+
+        Parameters
+        ----------
+        deltaAbsOffset: `np.array`
+           Float array with nbands offsets
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=True)
+        _, goodObs = self.getGoodObsIndices(goodStars, expFlag=None)
+
+        # need goodObs
+        obsMagStd[goodObs] -= deltaAbsOffset[obsBandIndex[goodObs]]
+
+        gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
+        objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= deltaAbsOffset[gdMeanBand]
 
     def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
         """
@@ -1139,10 +1209,6 @@ class FgcmStars(object):
             goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
 
             if goodRefObsGO.size > 0:
-                #obsUse, = np.where((objMagStdMean[obsObjIDIndex[goodObs[goodRefObsGO]],
-                #                                  obsBandIndex[goodObs[goodRefObsGO]]] < 90.0) &
-                #                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
-                #                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
                 obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
                                    (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
                                            obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
@@ -1385,7 +1451,12 @@ class FgcmStars(object):
         obsSkyBrightness = fgcmPars.expSkyBrightness[obsExpIndex]
 
         # we will compute all stars that are possibly good, including reserved
-        resMask = 255 & ~objFlagDict['RESERVED']
+        resMask = (objFlagDict['TOO_FEW_OBS'] |
+                   objFlagDict['BAD_COLOR'] |
+                   objFlagDict['VARIABLE'] |
+                   objFlagDict['TEMPORARY_BAD_STAR'])
+
+        #resMask = 255 & ~objFlagDict['RESERVED']
         goodStars, = np.where((objFlag & resMask) == 0)
 
         goodStarsSub, goodObs = esutil.numpy_util.match(goodStars,
@@ -1419,89 +1490,6 @@ class FgcmStars(object):
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
-    #def estimateAbsThroughputs(self):
-    #    """
-    #    Estimate the absolute throughput of the system from mean mags
-
-    #    Returns
-    #    -------
-    #    absThroughputs: `np.array`
-    #       Float array of estimated absolute throughputs
-    #    """
-
-    #    absThroughputs = np.zeros(self.nBands)
-        # Set to the default values...
-    #    if len(self.approxThroughput) == 1:
-    #        absThroughputs[:] = self.approxThroughput[0]
-    #    else:
-    #        absThroughputs[:] = np.array(self.approxThroughput)
-
-    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-
-    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-    #    refMag = snmm.getArray(self.refMagHandle)
-
-    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
-
-    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
-    #    goodRefStars = goodStars[use]
-
-    #    for bandIndex, band in enumerate(self.bands):
-    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
-    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
-
-    #        if refUse.size == 0:
-    #            self.fgcmLog.info("No reference stars in %s band." % (band))
-    #            continue
-
-    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
-    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
-
-    #        absThroughputs[bandIndex] = 10.**(-np.median(delta) / 2.5)
-
-    #        self.fgcmLog.info("Estimated absolute throughput in %s band = %.4f" % (band, absThroughputs[bandIndex]))
-
-    #    return absThroughputs
-
-    #def estimateAbsMagOffsets(self):
-    #    """
-    #    Estimate the absolute magnitude offsets from the mean mags
-
-    #    Returns
-    #    -------
-    #    absOffsets: `np.array`
-    #       Float array of estimated absolute offsets
-    #    """
-
-    #    absOffsets = np.zeros(self.nBands)
-
-    #    objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-
-    #    objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-    #    refMag = snmm.getArray(self.refMagHandle)
-
-    #    goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
-
-    #    use, = np.where(objRefIDIndex[goodStars] >= 0)
-    #    goodRefStars = goodStars[use]
-
-    #    for bandIndex, band in enumerate(self.bands):
-    #        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
-    #                           (objMagStdMean[goodRefStars, bandIndex] < 90.0))
-
-    #        if refUse.size == 0:
-    #            self.fgcmLog.info("No reference stars in %s band." % (band))
-    #            continue
-
-    #        delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
-    #                 refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
-
-    #        absOffsets[bandIndex] = -1.0 * np.median(delta)
-
-    #        self.fgcmLog.info("Estimated absolute offset in %s band = %.4f" % (band, absOffsets[bandIndex]))
-
-    #    return absOffsets
-
     def saveFlagStarIndices(self,flagStarFile):
         """
         Save flagged stars to fits.
@@ -1533,7 +1521,8 @@ class FgcmStars(object):
         # we only store VARIABLE and RESERVED stars
         # everything else should be recomputed based on the good exposures, calibrations, etc
         flagMask = (objFlagDict['VARIABLE'] |
-                    objFlagDict['RESERVED'])
+                    objFlagDict['RESERVED'] |
+                    objFlagDict['REFSTAR_OUTLIER'])
 
         flagged,=np.where((objFlag & flagMask) > 0)
 

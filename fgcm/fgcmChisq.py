@@ -8,10 +8,10 @@ import esutil
 import time
 
 from .fgcmUtilities import _pickle_method
-from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import objFlagDict
 
 import types
 try:
@@ -261,8 +261,8 @@ class FgcmChisq(object):
 
             if self.computeAbsThroughput:
                 self.applyDelta = True
-                self.deltaAbsThroughput = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsThroughput *= 10.0**(-self.deltaAbsThroughput / 2.5)
+                self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
 
             if not self.allExposures:
                 self._chisqWorker((goodStars, goodObs))
@@ -322,12 +322,6 @@ class FgcmChisq(object):
                 self.applyDelta = True
                 self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
                 self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
-                #self.fgcmLog.info('Throughputs are: %.5f,  %.5f, %.5f, %.5f, %.5f' %
-                #                  (self.fgcmPars.compAbsThroughput[0],
-                #                   self.fgcmPars.compAbsThroughput[1],
-                #                   self.fgcmPars.compAbsThroughput[2],
-                #                   self.fgcmPars.compAbsThroughput[3],
-                #                   self.fgcmPars.compAbsThroughput[4]))
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
@@ -648,6 +642,7 @@ class FgcmChisq(object):
         objMagStdMeanNoChrom = snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
 
@@ -754,7 +749,8 @@ class FgcmChisq(object):
                 # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
-                goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
+                goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndexGO] >= 0) &
+                                         ((objFlag[obsObjIDIndexGO] & objFlagDict['REFSTAR_OUTLIER']) == 0))
 
                 # And check that these are all quality observations
                 tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
@@ -774,7 +770,7 @@ class FgcmChisq(object):
                     # This means that a star that has a reference mag in only one band
                     # will be used in the regular way in the other bands.
                     maskGO = np.ones(goodObs.size, dtype=np.bool)
-                    maskGO[goodRefObsGO[tempUse]] = False
+                    maskGO[goodRefObsGO] = False
                     obsFitUseGO = obsFitUseGO[maskGO]
 
         # Now we can compute delta and chisq for non-reference stars

@@ -313,7 +313,6 @@ class FgcmMakeStars(object):
 
             # loop over bands...
             for primaryBand in self.starConfig['primaryBands']:
-                print("Working on %s" % (primaryBand))
                 # We first need to select based on the band, not on the filter name
                 useFlag = None
                 for filterName in self.filterNames:
@@ -327,7 +326,7 @@ class FgcmMakeStars(object):
                 decArrayUse = decArray[p1a[useFlag]]
 
                 if raArrayUse.size == 0:
-                    print("Nothing found for pixel %d" % (ipring[p1a[0]]))
+                    self.fgcmLog.info("Nothing found for pixel %d" % (ipring[p1a[0]]))
                     continue
 
                 if hasSmatch:
@@ -399,7 +398,7 @@ class FgcmMakeStars(object):
                 if bandPixelCat is None:
                     # First time through, these are all new objects
                     bandPixelCat = bandPixelCatTemp
-                    print(" Found %d primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
+                    self.fgcmLog.info(" Found %d primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
                 else:
                     # We already have objects, need to match/append
                     if hasSmatch:
@@ -419,7 +418,7 @@ class FgcmMakeStars(object):
 
                     # Remove all matches from the temp catalog
                     bandPixelCatTemp = np.delete(bandPixelCatTemp, i2b)
-                    print(" Found %d new primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
+                    self.fgcmLog.info(" Found %d new primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
 
                     bandPixelCat = np.append(bandPixelCat, bandPixelCatTemp)
 
@@ -428,7 +427,7 @@ class FgcmMakeStars(object):
                 pixelCats.append(bandPixelCat)
 
                 self.fgcmLog.info("Found %d unique objects in pixel %d (%d of %d)." %
-                                  (bandPixelCat.size, ipring[p1a[0]], ii, gdpix.size))
+                                  (bandPixelCat.size, ipring[p1a[0]], ii, gdpix.size - 1))
 
         # now assemble into a total objCat
         count = 0
@@ -685,10 +684,31 @@ class FgcmMakeStars(object):
         for ii, gpix in enumerate(gdpix):
             p1a = revpix[revpix[gpix]: revpix[gpix + 1]]
 
-            # Load in reference catalog
-            refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
-                                                            ipring[p1a[0]],
-                                                            self.starConfig['referenceBands'])
+            # Choose the center of the stars...
+            raWrap = self.objIndexCat['ra'][p1a]
+            if (raWrap.min() < 10.0) and (raWrap.max() > 350.0):
+                hi, = np.where(raWrap > 180.0)
+                raWrap[hi] -= 360.0
+                meanRA = np.mean(raWrap)
+                if meanRA < 0.0:
+                    meanRA += 360.0
+            else:
+                meanRA = np.mean(raWrap)
+            meanDec = np.mean(self.objIndexCat['dec'][p1a])
+
+            dist = esutil.coords.sphdist(meanRA, meanDec,
+                                         self.objIndexCat['ra'][p1a], self.objIndexCat['dec'][p1a])
+            rad = dist.max()
+
+            if rad < np.sqrt(hp.nside2resol(self.starConfig['coarseNSide'])):
+                # If it's a smaller radius, read the circle
+                refCat = refLoader.getFgcmReferenceStarsSkyCircle(meanRA, meanDec, rad,
+                                                                  self.starConfig['referenceBands'])
+            else:
+                # Otherwise, this will always work
+                refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
+                                                                ipring[p1a[0]],
+                                                                self.starConfig['referenceBands'])
 
             if refCat.size == 0:
                 # No stars in this pixel.  That's okay.
@@ -733,7 +753,7 @@ class FgcmMakeStars(object):
             pixelCats.append(pixelCat)
 
             self.fgcmLog.info("Found %d reference matches in pixel %d (%d of %d)." %
-                              (pixelCat.size, ipring[p1a[0]], ii, gdpix.size))
+                              (pixelCat.size, ipring[p1a[0]], ii, gdpix.size - 1))
 
         # Now assemble
         count = 0

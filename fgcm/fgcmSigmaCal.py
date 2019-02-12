@@ -8,7 +8,6 @@ import esutil
 import time
 
 from .fgcmUtilities import _pickle_method
-from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
 
 import types

@@ -596,7 +596,6 @@ class FgcmZeropoints(object):
                 zpStruct['FGCM_FILTER'][indices] +  # includes throughput correction
                 zpStruct['FGCM_APERCORR'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
-                #self.zptAB +
                 self.zptABNoThroughput +
                 grayValue)
 

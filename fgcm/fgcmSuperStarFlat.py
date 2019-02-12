@@ -78,7 +78,6 @@ class FgcmSuperStarFlat(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
@@ -100,16 +99,6 @@ class FgcmSuperStarFlat(object):
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
-        #EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
-        #           obsMagStd[goodObs])
-
-        #if onlyObsErr:
-            # only observational error.  Use this option when doing initial guess at superstarFlat
-        #    EGrayErr2GO = obsMagErr[goodObs]**2.
-        #else:
-            # take into account correlated average mag error
-        #    EGrayErr2GO = (obsMagErr[goodObs]**2. -
-        #                   objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
         EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, onlyObsErr=onlyObsErr)
 
         # one more cut on the maximum error
@@ -172,10 +161,14 @@ class FgcmSuperStarFlat(object):
             # This cut maybe should be larger, huh.
             gd = (superStarNGoodStars > 2)
             superStarOffset[gd] /= superStarWt[gd]
-            superStarOffset[~gd] = 0.0
+            superStarOffset[~gd] = self.illegalValue
 
             # The superstar for the center is always in magnitude space
-            superStarFlatCenter[:,:,:] = superStarOffset[:, :, :]
+            # And this can be set to "illegal value"
+            superStarFlatCenter[:, :, :] = superStarOffset[:, :, :]
+
+            # And for signaling here, we're going to set to a large value
+            superStarOffset[~gd] = 100.0
 
             # And the central parameter should be in flux or mag space depending
             self.fgcmPars.parSuperStarFlat[:, :, :, 0] = 10.**(superStarOffset / (-2.5))
@@ -185,16 +178,6 @@ class FgcmSuperStarFlat(object):
 
             # we will need the ccd offset signs
             self._computeCCDOffsetSigns(goodObs)
-
-            # Scale X and Y
-            # We assume that ccd goes from 0 to X_SIZE, 0 to Y_SIZE
-            #xSize = self.ccdOffsets['X_SIZE'][obsCCDIndex]
-            #ySize = self.ccdOffsets['Y_SIZE'][obsCCDIndex]
-            #obsXScaled = (snmm.getArray(self.fgcmStars.obsXHandle) - xSize/2.) / (xSize/2.)
-            #obsYScaled = (snmm.getArray(self.fgcmStars.obsYHandle) - ySize/2.) / (ySize/2.)
-
-            #obsXScaledGO = obsXScaled[goodObs]
-            #obsYScaledGO = obsYScaled[goodObs]
 
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
@@ -293,6 +276,12 @@ class FgcmSuperStarFlat(object):
 
                 # and record the fit
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = fit
+
+            # And we need to flag those that have bad observations
+            bad = np.where(superStarNGoodStars == 0)
+            if bad[0].size > 0:
+                superStarFlatCenter[bad] = self.illegalValue
+                self.fgcmPars.parSuperStarFlat[bad[0], bad[1], bad[2], 0] = 100.0
 
         # compute the delta...
         deltaSuperStarFlatCenter = superStarFlatCenter - prevSuperStarFlatCenter
