@@ -240,12 +240,6 @@ class FgcmChisq(object):
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
 
-        #self.nSums = 2  # chisq, nobs
-        #if (self.computeDerivatives):
-            # we have one for each of the derivatives
-            # and a duplicate set to track which parameters were "touched"
-        #    self.nSums += 2*self.fgcmPars.nFitPars
-
         self.nSums = 4 # chisq, chisq_ref, nobs, nobs_ref
         if self.computeDerivatives:
             # 0: nFitPars -> derivative for regular chisq
@@ -276,7 +270,6 @@ class FgcmChisq(object):
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
             # regular multi-core
-
 
             # make a dummy process to discover starting child number
             proc = multiprocessing.Process()
@@ -329,12 +322,12 @@ class FgcmChisq(object):
                 self.applyDelta = True
                 self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
                 self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
-                self.fgcmLog.info('Throughputs are: %.5f,  %.5f, %.5f, %.5f, %.5f' %
-                                  (self.fgcmPars.compAbsThroughput[0],
-                                   self.fgcmPars.compAbsThroughput[1],
-                                   self.fgcmPars.compAbsThroughput[2],
-                                   self.fgcmPars.compAbsThroughput[3],
-                                   self.fgcmPars.compAbsThroughput[4]))
+                #self.fgcmLog.info('Throughputs are: %.5f,  %.5f, %.5f, %.5f, %.5f' %
+                #                  (self.fgcmPars.compAbsThroughput[0],
+                #                   self.fgcmPars.compAbsThroughput[1],
+                #                   self.fgcmPars.compAbsThroughput[2],
+                #                   self.fgcmPars.compAbsThroughput[3],
+                #                   self.fgcmPars.compAbsThroughput[4]))
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
@@ -758,15 +751,12 @@ class FgcmChisq(object):
                 # There are no reference stars in this list of stars.  That's okay!
                 useRefstars = False
             else:
-                # Get the good reference stars
-                goodRefStars = goodStars[use]
-
-                # And the good observations of reference stars
+                # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
                 goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
 
-                # And check that these are all quality stars
+                # And check that these are all quality observations
                 tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
                                                    obsBandIndexGO[goodRefObsGO]] < 90.0) &
                                     (refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
@@ -779,13 +769,13 @@ class FgcmChisq(object):
                 if useRefstars:
                     # At this point, we have to "down-select" obsFitUseGO to remove reference stars...
                     # This will only be run when we actually have reference stars!
-                    # Note that when a star is used as a reference star it will be removed from
-                    # the summation in all bands, even if we only have the reference in one
-                    # band.  FIXME
-                    # We can overwrite the index here.
 
-                    tempUse, = np.where((objRefIDIndex[obsObjIDIndexGO[obsFitUseGO]] < 0))
-                    obsFitUseGO = obsFitUseGO[tempUse]
+                    # Only remove specific observations that have reference observations.
+                    # This means that a star that has a reference mag in only one band
+                    # will be used in the regular way in the other bands.
+                    maskGO = np.ones(goodObs.size, dtype=np.bool)
+                    maskGO[goodRefObsGO[tempUse]] = False
+                    obsFitUseGO = obsFitUseGO[maskGO]
 
         # Now we can compute delta and chisq for non-reference stars
 
