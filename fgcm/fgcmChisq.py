@@ -776,7 +776,7 @@ class FgcmChisq(object):
                     # This means that a star that has a reference mag in only one band
                     # will be used in the regular way in the other bands.
                     maskGO = np.ones(goodObs.size, dtype=np.bool)
-                    maskGO[goodRefObsGO[tempUse]] = False
+                    maskGO[goodRefObsGO] = False
                     obsFitUseGO = obsFitUseGO[maskGO]
 
         # Now we can compute delta and chisq for non-reference stars
