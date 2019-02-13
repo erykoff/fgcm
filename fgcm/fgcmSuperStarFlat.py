@@ -78,7 +78,6 @@ class FgcmSuperStarFlat(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)

@@ -315,13 +315,14 @@ class FgcmParameters(object):
                 self.parFilterOffsetFitFlag[i] = True
 
         # And absolute offset parameters (used if reference mags are supplied)
-        #self.compAbsOffset = np.zeros(self.nBands, dtype=np.float64)
-
         self.compAbsThroughput = np.zeros(self.nBands, dtype=np.float64)
         if len(self.approxThroughput) == 1:
             self.compAbsThroughput[:] = self.approxThroughput[0]
         else:
             self.compAbsThroughput[:] = np.array(self.approxThroughput)
+
+        self.compRefOffset = np.zeros(self.nBands, dtype=np.float64)
+        self.compRefSigma = np.zeros_like(self.compRefOffset)
 
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
@@ -454,8 +455,9 @@ class FgcmParameters(object):
         self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
         self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
-        #self.compAbsOffset = np.atleast_1d(inParams['COMPABSOFFSET'][0])
         self.compAbsThroughput = np.atleast_1d(inParams['COMPABSTHROUGHPUT'][0])
+        self.compRefOffset = np.atleast_1d(inParams['COMPREFOFFSET'][0])
+        self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -934,6 +936,8 @@ class FgcmParameters(object):
                ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
                ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
                ('COMPABSTHROUGHPUT', 'f8', self.compAbsThroughput.size),
+               ('COMPREFOFFSET', 'f8', self.compRefOffset.size),
+               ('COMPREFSIGMA', 'f8', self.compRefSigma.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -978,6 +982,8 @@ class FgcmParameters(object):
         pars['PARFILTEROFFSET'][:] = self.parFilterOffset
         pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
         pars['COMPABSTHROUGHPUT'][:] = self.compAbsThroughput
+        pars['COMPREFOFFSET'][:] = self.compRefOffset
+        pars['COMPREFSIGMA'][:] = self.compRefSigma
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale

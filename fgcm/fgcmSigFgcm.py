@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
-from .fgcmUtilities import objFlagDict
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -82,7 +81,6 @@ class FgcmSigFgcm(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)

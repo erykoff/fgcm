@@ -40,6 +40,7 @@ class FgcmSigmaRef(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
+        self.refStarOutlierNSig = fgcmConfig.refStarOutlierNSig
 
         if not self.fgcmStars.hasRefstars:
             raise RuntimeError("Cannot use FgcmSigmaRef without reference stars!")
@@ -70,7 +71,9 @@ class FgcmSigmaRef(object):
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
         # Select only stars that have reference magnitudes
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        # and that are not flagged as outliers
+        use, = np.where((objRefIDIndex[goodStars] >= 0) &
+                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
         goodRefStars = goodStars[use]
 
         # We need to have a branch of "small-number" and "large number" of reference stars
@@ -83,6 +86,7 @@ class FgcmSigmaRef(object):
             self.fgcmLog.info('Fewer than 100 reference stars, so computing "small-number" statistics:')
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
+                # Filter on previous bad refstars
                 refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
                                    (objMagStdMean[goodRefStars, bandIndex] < 90.0))
 
@@ -95,6 +99,8 @@ class FgcmSigmaRef(object):
 
                 offsetRef[bandIndex] = np.median(delta)
                 sigmaRef[bandIndex] = 1.4826 * np.median(np.abs(delta - offsetRef[bandIndex]))
+
+                # We don't look for outliers with small-number statistics (for now)
 
                 self.fgcmLog.info('offsetRef (%s) = %.4f +/- %.4f' % (band, offsetRef[bandIndex], sigmaRef[bandIndex]))
 
@@ -165,6 +171,14 @@ class FgcmSigmaRef(object):
                     self.fgcmLog.info("offsetRef (%s) (%s) = %.4f +/- %0.4f" %
                                       (band, name, offsetRef[bandIndex], sigmaRef[bandIndex]))
 
+                    # Compute outliers, if desired.
+                    if (c == 0) and (self.refStarOutlierNSig > 0.0):
+                        bad, = np.where(np.abs(delta - offsetRef[bandIndex]) >
+                                        self.refStarOutlierNSig * sigmaRef[bandIndex])
+                        if bad.size > 0:
+                            self.fgcmLog.info("Marking %d reference stars as REFSTAR_OUTLIER from observations in the %s band." % (bad.size, band))
+                            objFlag[goodRefStars[refUse[bad]]] |= objFlagDict['REFSTAR_OUTLIER']
+
                     if not doPlots:
                         continue
 
@@ -189,9 +203,10 @@ class FgcmSigmaRef(object):
                                                        self.outfileBaseWithCycle,
                                                        band))
 
-
-                # Might want to record these numbers, but might be fine to just log
-                # them.
+        # Record these numbers because they are useful to have saved and
+        # not just logged.
+        self.fgcmPars.compRefOffset[:] = offsetRef
+        self.fgcmPars.compRefSigma[:] = sigmaRef
 
         self.fgcmLog.info('Done computing sigmaRef in %.2f sec.' %
                           (time.time() - startTime))

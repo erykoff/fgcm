@@ -8,10 +8,10 @@ import esutil
 import time
 
 from .fgcmUtilities import _pickle_method
-from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import objFlagDict
 
 import types
 try:
@@ -648,6 +648,7 @@ class FgcmChisq(object):
         objMagStdMeanNoChrom = snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
 
@@ -754,7 +755,8 @@ class FgcmChisq(object):
                 # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
-                goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndexGO] >= 0)
+                goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndexGO] >= 0) &
+                                         ((objFlag[obsObjIDIndexGO] & objFlagDict['REFSTAR_OUTLIER']) == 0))
 
                 # And check that these are all quality observations
                 tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],

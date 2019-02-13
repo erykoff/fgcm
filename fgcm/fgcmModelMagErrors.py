@@ -67,7 +67,6 @@ class FgcmModelMagErrors(object):
 
         self.fgcmLog.info('Computing magnitude error models...')
 
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
 
