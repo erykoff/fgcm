@@ -684,10 +684,31 @@ class FgcmMakeStars(object):
         for ii, gpix in enumerate(gdpix):
             p1a = revpix[revpix[gpix]: revpix[gpix + 1]]
 
-            # Load in reference catalog
-            refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
-                                                            ipring[p1a[0]],
-                                                            self.starConfig['referenceBands'])
+            # Choose the center of the stars...
+            raWrap = self.objIndexCat['ra'][p1a]
+            if (raWrap.min() < 10.0) and (raWrap.max() > 350.0):
+                hi, = np.where(raWrap > 180.0)
+                raWrap[hi] -= 360.0
+                meanRA = np.mean(raWrap)
+                if meanRA < 0.0:
+                    meanRA += 360.0
+            else:
+                meanRA = np.mean(raWrap)
+            meanDec = np.mean(self.objIndexCat['dec'][p1a])
+
+            dist = esutil.coords.sphdist(meanRA, meanDec,
+                                         self.objIndexCat['ra'][p1a], self.objIndexCat['dec'][p1a])
+            rad = dist.max()
+
+            if rad < np.sqrt(hp.nside2resol(self.starConfig['coarseNSide'])):
+                # If it's a smaller radius, read the circle
+                refCat = refLoader.getFgcmReferenceStarsSkyCircle(meanRA, meanDec, rad,
+                                                                  self.starConfig['referenceBands'])
+            else:
+                # Otherwise, this will always work
+                refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
+                                                                ipring[p1a[0]],
+                                                                self.starConfig['referenceBands'])
 
             if refCat.size == 0:
                 # No stars in this pixel.  That's okay.
