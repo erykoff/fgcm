@@ -331,6 +331,17 @@ class FgcmStars(object):
 
         if (refID is not None and refMag is not None and refMagErr is not None):
             self.hasRefstars = True
+
+            # Remove any duplicates...
+            _, refUInd = np.unique(refID, return_index=True)
+
+            if refUInd.size < refID.size:
+                self.fgcmLog.info("Removing %d duplicate reference stars." %
+                                  (refID.size - refUInd.size))
+                refID = refID[refUInd]
+                refMag = refMag[refUInd, :]
+                refMagErr = refMagErr[refUInd, :]
+
             self.nRefstars = refID.size
 
             # refID: matched ID of reference stars
@@ -1110,6 +1121,14 @@ class FgcmStars(object):
         # Make sure we have a measurement in the band
         ok, = np.where(deltaOffsetWtRef > 0.0)
         deltaOffsetRef[ok] /= deltaOffsetWtRef[ok]
+
+        # And any bands that we do not have a measurement will be a weighted mean
+        # of the other bands...
+        noRef, = np.where(deltaOffsetWtRef == 0)
+        if noRef.size > 0:
+            # there are bands to fill in...
+            deltaOffsetRef[noRef] = (np.sum(deltaOffsetRef[ok] * deltaOffsetWtRef[ok]) /
+                                     np.sum(deltaOffsetWtRef[ok]))
 
         return deltaOffsetRef
 
