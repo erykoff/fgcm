@@ -1569,7 +1569,7 @@ class FgcmParameters(object):
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
 
         # This is the signifier
-        bad = np.where(superStarFlatCenter > 1e30)
+        bad = np.where(superStarFlatCenter < -4.0)
         if bad[0].size > 0:
             superStarFlatCenter[bad] = self.illegalValue
 
