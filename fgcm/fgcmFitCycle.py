@@ -340,26 +340,12 @@ class FgcmFitCycle(object):
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
-            #if self.initialCycle:
-            #    self._doFit(ignoreRef=True)
-            #else:
-            #    self._doFit(ignoreRef=False)
-
             self._doFit(ignoreRef=False)
-
-            # FIXME hack here
-            #self.fgcmPars.parAbsOffset += np.array([0.0159, 0.0087, 0.0160, 0.0101, 0.0279])
-            #_ = self.fgcmChisq(self.fgcmPars.getParArray(fitterUnits=True), fitterUnits=True, computeDerivatives=True, computeSEDSlopes=False, useMatchCache=False)
-
-            # Will want to configure what is a "small number" of reference stars.
-            # Is it fraction of total?  Leave this for now.
-            #if self.fgcmStars.hasRefstars and self.fgcmStars.nRefstars < 100:
-                # do a second fit with only reference stars, only abs terms
-            #    self._doFit(doPlots=False, refOnly=True, absOnly=True)
-
-            self.fgcmPars.plotParameters()
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
+
+        # Plot the parameters whether or not we did a fit!
+        self.fgcmPars.plotParameters()
 
         self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
 
