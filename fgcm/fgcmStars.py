@@ -1142,10 +1142,10 @@ class FgcmStars(object):
            Float array with nbands offsets
         """
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
 
         goodStars = self.getGoodStarIndices(includeReserve=True)
         _, goodObs = self.getGoodObsIndices(goodStars, expFlag=None)
