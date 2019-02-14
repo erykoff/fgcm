@@ -152,6 +152,7 @@ class FgcmParameters(object):
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
+        self.illegalValue = fgcmConfig.illegalValue
 
         # and the default unit dict
         self.unitDictOnes = {'lnPwvUnit':1.0,
@@ -1566,6 +1567,11 @@ class FgcmParameters(object):
                                         self.ccdOffsets['Y_SIZE'][c],
                                         self.parSuperStarFlat[e, f, c, :])
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
+
+        # This is the signifier
+        bad = np.where(superStarFlatCenter > 1e30)
+        if bad[0].size > 0:
+            superStarFlatCenter[bad] = self.illegalValue
 
         return superStarFlatCenter
 
