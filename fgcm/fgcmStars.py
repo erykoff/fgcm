@@ -372,7 +372,7 @@ class FgcmStars(object):
             if self.refStarSnMin > 0.0:
                 for i in range(self.nBands):
                     maxErr = (2.5 / np.log(10.)) * (1. / self.refStarSnMin)
-                    bad, = np.where(refMagErr[:, i] < maxErr)
+                    bad, = np.where(refMagErr[:, i] > maxErr)
                     refMag[bad, i] = 99.0
                     refMagErr[bad, i] = 99.0
 
