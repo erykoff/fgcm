@@ -261,8 +261,8 @@ class FgcmChisq(object):
 
             if self.computeAbsThroughput:
                 self.applyDelta = True
-                self.deltaAbsThroughput = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsThroughput *= 10.0**(-self.deltaAbsThroughput / 2.5)
+                self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
 
             if not self.allExposures:
                 self._chisqWorker((goodStars, goodObs))
@@ -322,12 +322,6 @@ class FgcmChisq(object):
                 self.applyDelta = True
                 self.deltaAbsOffset = self.fgcmStars.computeAbsOffset()
                 self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
-                #self.fgcmLog.info('Throughputs are: %.5f,  %.5f, %.5f, %.5f, %.5f' %
-                #                  (self.fgcmPars.compAbsThroughput[0],
-                #                   self.fgcmPars.compAbsThroughput[1],
-                #                   self.fgcmPars.compAbsThroughput[2],
-                #                   self.fgcmPars.compAbsThroughput[3],
-                #                   self.fgcmPars.compAbsThroughput[4]))
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:

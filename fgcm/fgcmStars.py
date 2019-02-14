@@ -1132,6 +1132,30 @@ class FgcmStars(object):
 
         return deltaOffsetRef
 
+    def applyAbsOffset(self, deltaAbsOffset):
+        """
+        Apply the absolute offsets.  Used for initial fit cycle.
+
+        Parameters
+        ----------
+        deltaAbsOffset: `np.array`
+           Float array with nbands offsets
+        """
+
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+
+        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=True)
+        _, goodObs = self.getGoodObsIndices(goodStars, expFlag=None)
+
+        # need goodObs
+        obsMagStd[goodObs] -= deltaAbsOffset[obsBandIndex[goodObs]]
+
+        gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
+        objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= deltaAbsOffset[gdMeanBand]
+
     def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
         """
         Compute the delta-mag between the observed and true value (EGray) for a set of
