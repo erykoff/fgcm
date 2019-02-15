@@ -104,6 +104,7 @@ class FgcmStars(object):
         self.approxThroughput = fgcmConfig.approxThroughput
 
         self.refStarSnMin = fgcmConfig.refStarSnMin
+        self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
         self.hasXY = False
         self.hasRefstars = False
@@ -1250,7 +1251,7 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
-        if self.hasRefstars:
+        if self.hasRefstars and not self.applyRefStarColorCuts:
             objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
             cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
                                (objRefIDIndex >= 0))
