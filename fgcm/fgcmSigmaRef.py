@@ -176,8 +176,10 @@ class FgcmSigmaRef(object):
                         bad, = np.where(np.abs(delta - offsetRef[bandIndex]) >
                                         self.refStarOutlierNSig * sigmaRef[bandIndex])
                         if bad.size > 0:
-                            self.fgcmLog.info("Marking %d reference stars as REFSTAR_OUTLIER from observations in the %s band." % (bad.size, band))
+                            message = "Marked %d reference stars as REFSTAR_OUTLIER from observations in the %s band." % (bad.size, band)
                             objFlag[goodRefStars[refUse[bad]]] |= objFlagDict['REFSTAR_OUTLIER']
+                        else:
+                            message = None
 
                     if not doPlots:
                         continue
@@ -202,6 +204,9 @@ class FgcmSigmaRef(object):
                 fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle,
                                                        band))
+
+                if message is not None:
+                    self.fgcmLog.info(message)
 
         # Record these numbers because they are useful to have saved and
         # not just logged.
