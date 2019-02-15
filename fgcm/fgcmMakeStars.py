@@ -701,7 +701,7 @@ class FgcmMakeStars(object):
             rad = dist.max()
 
             # Note nside2resol returns radians of the pixel along a side...
-            if rad < np.degrees(hp.nside2resol(self.starConfig['coarseNSide'])):
+            if rad < np.degrees(hp.nside2resol(self.starConfig['coarseNSide'])/2.):
                 # If it's a smaller radius, read the circle
                 refCat = refLoader.getFgcmReferenceStarsSkyCircle(meanRA, meanDec, rad,
                                                                   self.starConfig['referenceBands'])
