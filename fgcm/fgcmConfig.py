@@ -162,6 +162,7 @@ class FgcmConfig(object):
 
     refStarSnMin = ConfigField(float, default=20.0)
     refStarOutlierNSig = ConfigField(float, default=4.0)
+    applyRefStarColorCuts = ConfigField(bool, default=True)
 
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
