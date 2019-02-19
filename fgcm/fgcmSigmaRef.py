@@ -111,22 +111,22 @@ class FgcmSigmaRef(object):
             # and we do 4 runs: full, blue 25%, middle 50%, red 25%
 
             # Compute "g-i" based on the configured colorSplitIndices
-            gmiGO = (objMagStdMean[goodRefStars, self.colorSplitIndices[0]] -
-                     objMagStdMean[goodRefStars, self.colorSplitIndices[1]])
+            gmiGRS = (objMagStdMean[goodRefStars, self.colorSplitIndices[0]] -
+                      objMagStdMean[goodRefStars, self.colorSplitIndices[1]])
 
             okColor, = np.where((objMagStdMean[goodRefStars, self.colorSplitIndices[0]] < 90.0) &
                                 (objMagStdMean[goodRefStars, self.colorSplitIndices[1]] < 90.0))
 
             # sort these
-            st = np.argsort(gmiGO[okColor])
+            st = np.argsort(gmiGRS[okColor])
             gmiCutLow = np.array([0.0,
-                                  gmiGO[okColor[st[0]]],
-                                  gmiGO[okColor[st[int(0.25 * st.size)]]],
-                                  gmiGO[okColor[st[int(0.75 * st.size)]]]])
+                                  gmiGRS[okColor[st[0]]],
+                                  gmiGRS[okColor[st[int(0.25 * st.size)]]],
+                                  gmiGRS[okColor[st[int(0.75 * st.size)]]]])
             gmiCutHigh = np.array([0.0,
-                                   gmiGO[okColor[st[int(0.25 * st.size)]]],
-                                   gmiGO[okColor[st[int(0.75 * st.size)]]],
-                                   gmiGO[okColor[st[-1]]]])
+                                   gmiGRS[okColor[st[int(0.25 * st.size)]]],
+                                   gmiGRS[okColor[st[int(0.75 * st.size)]]],
+                                   gmiGRS[okColor[st[-1]]]])
             gmiCutNames = ['All', 'Blue25', 'Middle50', 'Red25']
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
@@ -141,10 +141,12 @@ class FgcmSigmaRef(object):
                         refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
                                            (objMagStdMean[goodRefStars, bandIndex] < 90.0))
                     else:
-                        refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
-                                           (objMagStdMean[goodRefStars, bandIndex] < 90.0) &
-                                           (gmiGO[okColor] > gmiCutLow[c]) &
-                                           (gmiGO[okColor] < gmiCutHigh[c]))
+                        refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]],
+                                                   bandIndex] < 90.0) &
+                                           (objMagStdMean[goodRefStars[okColor],
+                                                          bandIndex] < 90.0) &
+                                           (gmiGRS[okColor] > gmiCutLow[c]) &
+                                           (gmiGRS[okColor] < gmiCutHigh[c]))
                         refUse = okColor[refUse]
 
                     if refUse.size == 0:

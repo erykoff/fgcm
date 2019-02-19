@@ -506,15 +506,15 @@ class FgcmStars(object):
             objRefIDIndex[b] = a
 
             # Compute the fraction of stars that are reference stars
-            self.fracStarsWithRef = (float(len(snmm.getArray(self.refIDHandle))) /
-                                     float(len(snmm.getArray(self.objIDHandle))))
+            for i, band in enumerate(self.bands):
+                gd, = np.where(refMag[:, i] < 90.0)
+                fracRef = float(gd.size) / float(len(snmm.getArray(self.objIDHandle)))
 
-            self.fgcmLog.info('%.5f%% of stars have a reference match.' % (self.fracStarsWithRef * 100.0))
+                self.fgcmLog.info("%.5f%% stars have a reference match in the %s band."
+                                  % (fracRef * 100.0, band))
 
             self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
                               (time.time() - startTime))
-        else:
-            self.fracStarsWithRef = 0.0
 
         obsObjIDIndex = None
         objID = None
@@ -1099,12 +1099,14 @@ class FgcmStars(object):
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
         objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
         refMag = snmm.getArray(self.refMagHandle)
         refMagErr = snmm.getArray(self.refMagErrHandle)
 
         goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        use, = np.where((objRefIDIndex[goodStars] >= 0) &
+                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
         goodRefStars = goodStars[use]
 
         deltaOffsetRef = np.zeros(self.nBands)
