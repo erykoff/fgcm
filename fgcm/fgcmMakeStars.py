@@ -52,7 +52,7 @@ class FgcmMakeStars(object):
     def __init__(self,starConfig):
         self.starConfig = starConfig
 
-        requiredKeys=['filterToBand','requiredBands','referenceBands',
+        requiredKeys=['filterToBand','requiredBands','referenceFilterNames',
                       'minPerBand','matchRadius',
                       'isolationRadius','densNSide',
                       'densMaxPerPixel','primaryBands',
@@ -77,14 +77,14 @@ class FgcmMakeStars(object):
             if not found:
                 raise ValueError("requiredBand %s not in filterToBand!" % (reqBand))
 
-        for referenceBand in starConfig['referenceBands']:
+        for referenceFilterName in starConfig['referenceFilterNames']:
             found = False
             for filterName in self.filterNames:
-                if (starConfig['filterToBand'][filterName] == referenceBand):
+                if (starConfig['filterToBand'][filterName] == referenceFilterName):
                     found = True
                     break
             if not found:
-                raise ValueError("band %s not in filterToBand!" % (referenceBand))
+                raise ValueError("band %s not in filterToBand!" % (referenceFilterName))
 
         if 'logger' in starConfig:
             self.fgcmLog = starConfig['logger']
@@ -674,7 +674,7 @@ class FgcmMakeStars(object):
         hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         pixelCats = []
-        nBands = len(self.starConfig['referenceBands'])
+        nBands = len(self.starConfig['referenceFilterNames'])
 
         dtype = [('fgcm_id', 'i4'),
                  ('refMag', 'f4', nBands),
@@ -704,12 +704,12 @@ class FgcmMakeStars(object):
             if rad < np.degrees(hp.nside2resol(self.starConfig['coarseNSide'])/2.):
                 # If it's a smaller radius, read the circle
                 refCat = refLoader.getFgcmReferenceStarsSkyCircle(meanRA, meanDec, rad,
-                                                                  self.starConfig['referenceBands'])
+                                                                  self.starConfig['referenceFilterNames'])
             else:
                 # Otherwise, this will always work
                 refCat = refLoader.getFgcmReferenceStarsHealpix(self.starConfig['coarseNSide'],
                                                                 ipring[p1a[0]],
-                                                                self.starConfig['referenceBands'])
+                                                                self.starConfig['referenceFilterNames'])
 
             if refCat.size == 0:
                 # No stars in this pixel.  That's okay.
