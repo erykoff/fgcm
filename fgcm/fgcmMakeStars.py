@@ -78,13 +78,8 @@ class FgcmMakeStars(object):
                 raise ValueError("requiredBand %s not in filterToBand!" % (reqBand))
 
         for referenceFilterName in starConfig['referenceFilterNames']:
-            found = False
-            for filterName in self.filterNames:
-                if (starConfig['filterToBand'][filterName] == referenceFilterName):
-                    found = True
-                    break
-            if not found:
-                raise ValueError("band %s not in filterToBand!" % (referenceFilterName))
+            if referenceFilterName not in starConfig['filterToBand']:
+                raise ValueError("referenceFilterName %s not in filterToBand filters!" % (referenceFilterName))
 
         if 'logger' in starConfig:
             self.fgcmLog = starConfig['logger']
