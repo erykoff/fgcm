@@ -377,6 +377,12 @@ class FgcmStars(object):
                     refMag[bad, i] = 99.0
                     refMagErr[bad, i] = 99.0
 
+                    fracRef = (float(len(snmm.getArray(self.refIDHandle) - bad.size)) /
+                               float(len(snmm.getArray(self.objIDHandle))))
+
+                    self.fgcmLog.info("After s/n cuts, %.5f%% stars have a reference match in the %s band"
+                                      % (fracRef * 100.0, self.bands[i]))
+
             snmm.getArray(self.refIDHandle)[:] = refID
             snmm.getArray(self.refMagHandle)[:, :] = refMag
             snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
