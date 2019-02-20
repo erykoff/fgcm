@@ -299,12 +299,18 @@ class FgcmFitCycle(object):
                 # and need to apply this offset to the mags...
                 self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
+                for i, band in enumerate(self.fgcmPars.bands):
+                    self.fgcmLog.info("Initial abs throughput in %s band = %.4f" %
+                                      (band, self.fgcmPars.compAbsThroughput[i]))
+
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
                 self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
                 # Flag superstar outliers here before computing superstar...
                 self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
+                # Might need option here for no ref stars!
+                # Something with the > 1.0.  WTF?
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True)
 
