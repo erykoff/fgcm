@@ -1410,8 +1410,10 @@ class FgcmChisq(object):
 
             if useRefstars:
                 np.add.at(partialArray[2*self.fgcmPars.nFitPars +
-                                       (self.fgcmPars.parFilterOffsetLoc +
-                                        self.fgcmPars.nLUTFilter)],
+                                       self.fgcmPars.parFilterOffsetLoc:
+                                           (2*self.fgcmPars.nFitPars +
+                                            self.fgcmPars.parFilterOffsetLoc +
+                                            self.fgcmPars.nLUTFilter)],
                           obsLUTFilterIndexGO[goodRefObsGOF],
                           2.0 * deltaRefMagWeightedGROF)
 
