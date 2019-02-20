@@ -1833,7 +1833,7 @@ class FgcmParameters(object):
             ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], self.parFilterOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
         ax.set_ylabel('Filter Offset (mag)')
-        ax.set_ylim(np.min(self.parFilterOffset[i] - 0.02), np.max(self.parFilterOffset[i] + 0.02))
+        ax.set_ylim(np.min(self.parFilterOffset - 0.02), np.max(self.parFilterOffset + 0.02))
 
         fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
