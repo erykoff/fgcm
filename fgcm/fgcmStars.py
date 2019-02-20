@@ -377,12 +377,6 @@ class FgcmStars(object):
                     refMag[bad, i] = 99.0
                     refMagErr[bad, i] = 99.0
 
-                    fracRef = (float(len(snmm.getArray(self.refIDHandle) - bad.size)) /
-                               float(len(snmm.getArray(self.objIDHandle))))
-
-                    self.fgcmLog.info("After s/n cuts, %.5f%% stars have a reference match in the %s band"
-                                      % (fracRef * 100.0, self.bands[i]))
-
             snmm.getArray(self.refIDHandle)[:] = refID
             snmm.getArray(self.refMagHandle)[:, :] = refMag
             snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
@@ -512,15 +506,15 @@ class FgcmStars(object):
             objRefIDIndex[b] = a
 
             # Compute the fraction of stars that are reference stars
-            self.fracStarsWithRef = (float(len(snmm.getArray(self.refIDHandle))) /
-                                     float(len(snmm.getArray(self.objIDHandle))))
+            for i, band in enumerate(self.bands):
+                gd, = np.where(refMag[:, i] < 90.0)
+                fracRef = float(gd.size) / float(len(snmm.getArray(self.objIDHandle)))
 
-            self.fgcmLog.info('%.5f%% of stars have a reference match.' % (self.fracStarsWithRef * 100.0))
+                self.fgcmLog.info("%.5f%% stars have a reference match in the %s band."
+                                  % (fracRef * 100.0, band))
 
             self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
                               (time.time() - startTime))
-        else:
-            self.fracStarsWithRef = 0.0
 
         obsObjIDIndex = None
         objID = None
