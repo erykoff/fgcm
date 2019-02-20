@@ -369,7 +369,10 @@ class FgcmChisq(object):
             self.fgcmLog.info('Chisq/dof = %.6f (%d iterations)' %
                              (fitChisq, len(self.fitChisqs)))
 
-            if self.maxIterations > 0 and self._nIterations > self.maxIterations:
+            # Make sure the final chisq is at or near the minimum.  Otherwise sometimes
+            # we cut out at one of the cray-cray points, and that is bad.
+            if (self.maxIterations > 0 and self._nIterations > self.maxIterations and
+                fitChisq < (np.min(np.array(self.fitChisqs)) + 0.1)):
                 raise MaxFitIterations
 
         else:

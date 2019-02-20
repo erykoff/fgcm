@@ -1099,12 +1099,14 @@ class FgcmStars(object):
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
         objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
         refMag = snmm.getArray(self.refMagHandle)
         refMagErr = snmm.getArray(self.refMagErrHandle)
 
         goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        use, = np.where((objRefIDIndex[goodStars] >= 0) &
+                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
         goodRefStars = goodStars[use]
 
         deltaOffsetRef = np.zeros(self.nBands)
