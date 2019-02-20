@@ -1408,6 +1408,15 @@ class FgcmChisq(object):
                              (self.fgcmPars.parFilterOffsetLoc +
                               self.fgcmPars.nLUTFilter)] /= unitDict['filterOffsetUnit']
 
+            if useRefstars:
+                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
+                                       self.fgcmPars.parFilterOffsetLoc:
+                                           (2*self.fgcmPars.nFitPars +
+                                            self.fgcmPars.parFilterOffsetLoc +
+                                            self.fgcmPars.nLUTFilter)],
+                          obsLUTFilterIndexGO[goodRefObsGOF],
+                          2.0 * deltaRefMagWeightedGROF)
+
             # Now set those to zero the derivatives we aren't using
             partialArray[self.fgcmPars.parFilterOffsetLoc:
                              (self.fgcmPars.parFilterOffsetLoc +
