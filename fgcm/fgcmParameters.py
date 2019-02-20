@@ -1833,6 +1833,7 @@ class FgcmParameters(object):
             ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], self.parFilterOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
         ax.set_ylabel('Filter Offset (mag)')
+        ax.set_ylim(np.min(self.parFilterOffset[i] - 0.02), np.max(self.parFilterOffset[i] + 0.02))
 
         fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
@@ -1851,6 +1852,9 @@ class FgcmParameters(object):
 
         fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
                                                self.outfileBaseWithCycle))
+
+        for i, band in enumerate(self.bands):
+            self.fgcmLog.info('Abs throughput in %s band: %.4f' % (band, self.compAbsThroughput[i]))
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)
