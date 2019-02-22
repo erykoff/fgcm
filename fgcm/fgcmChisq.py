@@ -79,6 +79,7 @@ class FgcmChisq(object):
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -359,8 +360,6 @@ class FgcmChisq(object):
             if self.computeDerivatives:
                 dChisqdP = (partialSums[0:self.fgcmPars.nFitPars] +
                             partialSums[2*self.fgcmPars.nFitPars: 3*self.fgcmPars.nFitPars]) / fitDOF
-
-            self.fgcmLog.info("Total chisq/DOF is %.6f" % ((partialSums[-4] + partialSums[-2]) / (partialSums[-3] + partialSums[-1] - float(self.nActualFitPars))))
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
@@ -1373,8 +1372,23 @@ class FgcmChisq(object):
                          uWashIndex] += 1
 
             # We don't want to use the reference stars for the wash intercept
-            # or slope because if they aren't evenly sampled it can cause the
-            # fitter to go CRAZY.
+            # or slope by default because if they aren't evenly sampled it can
+            # cause the fitter to go CRAZY.
+            if useRefstars and self.useRefStarsWithInstrument:
+                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
+                                       self.fgcmPars.parQESysInterceptLoc:
+                                           (2*self.fgcmPars.nFitPars +
+                                            self.fgcmPars.parQESysInterceptLoc +
+                                            self.fgcmPars.nWashIntervals)],
+                          self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]],
+                          2.0 * deltaRefMagWeightedGROF)
+
+                partialArray[2*self.fgcmPars.nFitPars +
+                             self.fgcmPars.parQESysInterceptLoc +
+                             uWashIndex] /= unitDict['qeSysUnit']
+                partialArray[3*self.fgcmPars.nFitPars +
+                             self.fgcmPars.parQESysInterceptLoc +
+                             uWashIndex] += 1
 
             # Wash Slope
 
@@ -1392,6 +1406,24 @@ class FgcmChisq(object):
             partialArray[self.fgcmPars.nFitPars +
                          self.fgcmPars.parQESysSlopeLoc +
                          uWashIndex] += 1
+
+            if useRefstars and self.useRefStarsWithInstrument:
+                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
+                                       self.fgcmPars.parQESysSlopeLoc:
+                                           (2*self.fgcmPars.nFitPars +
+                                            self.fgcmPars.parQESysSlopeLoc +
+                                            self.fgcmPars.nWashIntervals)],
+                          self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]],
+                          2.0 * deltaRefMagWeightedGROF *
+                          (self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
+                           self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]]))
+
+                partialArray[2*self.fgcmPars.nFitPars +
+                             self.fgcmPars.parQESysSlopeLoc +
+                             uWashIndex] /= unitDict['qeSysSlopeUnit']
+                partialArray[3*self.fgcmPars.nFitPars +
+                             self.fgcmPars.parQESysSlopeLoc +
+                             uWashIndex] += 1
 
             #################
             ## Filter offset
@@ -1416,6 +1448,12 @@ class FgcmChisq(object):
                                             self.fgcmPars.nLUTFilter)],
                           obsLUTFilterIndexGO[goodRefObsGOF],
                           2.0 * deltaRefMagWeightedGROF)
+
+                partialArray[2*self.fgcmPars.nFitPars +
+                             self.fgcmPars.parFilterOffsetLoc:
+                                 (2*self.fgcmPars.nFitPars +
+                                  self.fgcmPars.parFilterOffsetLoc +
+                                  self.fgcmPars.nLUTFilter)] /= unitDict['filterOffsetUnit']
 
             # Now set those to zero the derivatives we aren't using
             partialArray[self.fgcmPars.parFilterOffsetLoc:
