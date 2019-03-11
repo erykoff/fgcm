@@ -28,6 +28,7 @@ from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
+from .fgcmQeSysSlope import FgcmQeSysSlope
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -197,6 +198,9 @@ class FgcmFitCycle(object):
         # And the Gray code
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
+        # And the qeSysSlope code
+        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+
         self.setupComplete = True
         self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
 
@@ -302,6 +306,10 @@ class FgcmFitCycle(object):
                 for i, band in enumerate(self.fgcmPars.bands):
                     self.fgcmLog.info("Initial abs throughput in %s band = %.4f" %
                                       (band, self.fgcmPars.compAbsThroughput[i]))
+
+            # Compute the slopes (initial guess).  Don't plot here, offsets make no sense.
+            self.fgcmQeSysSlope.computeQeSysSlope(doPlots=False)
+            self.fgcmQeSysSlope.plotQeSysRefStars('initial')
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
@@ -431,6 +439,12 @@ class FgcmFitCycle(object):
         aperCorr.computeApertureCorrections()
 
         self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
+
+        self.fgcmLog.debug('FitCycle computing qe sys slope')
+        self.fgcmQeSysSlope.computeQeSysSlope()
+        self.fgcmQeSysSlope.plotQeSysRefStars('final')
+
+        self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
 
         # Compute mag error model (if configured)
         self.fgcmModelMagErrs.computeMagErrorModel('postfit')
