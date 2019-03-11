@@ -37,4 +37,4 @@ from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
-
+from .fgcmQeSysSlope import FgcmQeSysSlope

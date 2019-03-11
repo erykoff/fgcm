@@ -27,7 +27,7 @@ class FgcmMakeStars(object):
        e.g. {'g':'g', 'r':'r', 'i':'i', 'i2':'i'}
     requiredBands: string list
        List of required bands
-    referenceBands: string list
+    referenceFilterNames: string list
        List of reference bands, in wavelength order
     minPerBand: int
        Minimum number of observations per required band for a star to be considered

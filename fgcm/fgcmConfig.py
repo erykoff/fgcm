@@ -160,6 +160,9 @@ class FgcmConfig(object):
     autoPhotometricCutStep = ConfigField(float, default=0.0025)
     autoHighCutNSig = ConfigField(float, default=4.0)
 
+    instrumentParsPerBand = ConfigField(bool, default=False)
+    instrumentSlopeMinDeltaT = ConfigField(float, default=5.0)
+
     refStarSnMin = ConfigField(float, default=20.0)
     refStarOutlierNSig = ConfigField(float, default=4.0)
     applyRefStarColorCuts = ConfigField(bool, default=True)

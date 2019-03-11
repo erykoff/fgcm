@@ -80,6 +80,7 @@ class FgcmChisq(object):
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
+        self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -187,9 +188,10 @@ class FgcmChisq(object):
         if (self.allExposures and (self.computeDerivatives or
                                    self.computeSEDSlopes)):
             raise ValueError("Cannot set allExposures and computeDerivatives or computeSEDSlopes")
+
+        # When we're doing the fitting, we want to fill in the missing qe sys values if needed
         self.fgcmPars.reloadParArray(fitParams, fitterUnits=self.fitterUnits)
         self.fgcmPars.parsToExposures()
-
 
         # and reset numbers if necessary
         if (not self.allExposures):
@@ -257,7 +259,6 @@ class FgcmChisq(object):
             self.totalHandleDict = {}
             self.totalHandleDict[0] = snmm.createArray(self.nSums,dtype='f8')
 
-            #self._worker((goodStars,goodObs))
             self._magWorker((goodStars, goodObs))
 
             if self.computeAbsThroughput:
@@ -308,13 +309,12 @@ class FgcmChisq(object):
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
             self.fgcmLog.info('Using %d sections (%.1f seconds)' %
-                             (nSections,time.time()-prepStartTime))
+                              (nSections,time.time()-prepStartTime))
 
             self.fgcmLog.info('Running chisq on %d cores' % (self.nCore))
 
             # make a pool
             pool = Pool(processes=self.nCore)
-            #pool.map(self._worker,workerList,chunksize=1)
             # Compute magnitudes
             pool.map(self._magWorker, workerList, chunksize=1)
 
@@ -731,9 +731,8 @@ class FgcmChisq(object):
         #  Compute deltas and chisq for non-reference stars
         #  Compute derivatives...
 
-        # which observations are actually used in the fit?
-        _, obsFitUseGO = esutil.numpy_util.match(self.bandFitIndex,
-                                                 obsBandIndexGO)
+        # Default mask is not to mask
+        maskGO = np.ones(goodObs.size, dtype=np.bool)
 
         useRefstars = False
         if self.fgcmStars.hasRefstars and not self.ignoreRef:
@@ -765,15 +764,14 @@ class FgcmChisq(object):
                     goodRefObsGO = goodRefObsGO[tempUse]
 
                 if useRefstars:
-                    # At this point, we have to "down-select" obsFitUseGO to remove reference stars...
-                    # This will only be run when we actually have reference stars!
-
-                    # Only remove specific observations that have reference observations.
-                    # This means that a star that has a reference mag in only one band
-                    # will be used in the regular way in the other bands.
-                    maskGO = np.ones(goodObs.size, dtype=np.bool)
+                    # Down-select to remove reference stars
                     maskGO[goodRefObsGO] = False
-                    obsFitUseGO = obsFitUseGO[maskGO]
+
+        # which observations are actually used in the fit?
+        useGO, = np.where(maskGO)
+        _, obsFitUseGO = esutil.numpy_util.match(self.bandFitIndex,
+                                                 obsBandIndexGO[useGO])
+        obsFitUseGO = useGO[obsFitUseGO]
 
         # Now we can compute delta and chisq for non-reference stars
 
@@ -1354,76 +1352,93 @@ class FgcmChisq(object):
             # Note that we do this derivative even if we've frozen the atmosphere.
 
             expWashIndexGOF = self.fgcmPars.expWashIndex[obsExpIndexGO[obsFitUseGO]]
-            uWashIndex = np.unique(expWashIndexGOF)
 
             # Wash Intercept
 
-            np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
-                                       (self.fgcmPars.parQESysInterceptLoc +
-                                        self.fgcmPars.nWashIntervals)],
-                      expWashIndexGOF,
-                      2.0 * deltaMagWeightedGOF * (
-                    errSummandGOF))
+            if self.instrumentParsPerBand:
+                # We have per-band intercepts
+                # Non-fit bands will be given the mean of the others (in fgcmParameters),
+                # because they aren't in the chi2.
+                #uWashBandIndex = np.unique(expWashIndexGOF * self.fgcmPars.nBands +
+                #                           obsBandIndexGO[obsFitUseGO])
+                uWashBandIndex = np.unique(np.ravel_multi_index((obsBandIndexGO[obsFitUseGO],
+                                                                 expWashIndexGOF),
+                                                                self.fgcmPars.parQESysIntercept.shape))
 
-            partialArray[self.fgcmPars.parQESysInterceptLoc +
-                         uWashIndex] /= unitDict['qeSysUnit']
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parQESysInterceptLoc +
-                         uWashIndex] += 1
+                np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
+                                           (self.fgcmPars.parQESysInterceptLoc +
+                                            self.fgcmPars.parQESysIntercept.size)],
+                          np.ravel_multi_index((obsBandIndexGO[obsFitUseGO],
+                                                expWashIndexGOF),
+                                               self.fgcmPars.parQESysIntercept.shape),
+                          #expWashIndexGOF * self.fgcmPars.nBands +
+                          #obsBandIndexGO[obsFitUseGO],
+                          2.0 * deltaMagWeightedGOF * (
+                        errSummandGOF))
 
-            # We don't want to use the reference stars for the wash intercept
-            # or slope by default because if they aren't evenly sampled it can
-            # cause the fitter to go CRAZY.
-            if useRefstars and self.useRefStarsWithInstrument:
-                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
-                                       self.fgcmPars.parQESysInterceptLoc:
-                                           (2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parQESysInterceptLoc +
-                                            self.fgcmPars.nWashIntervals)],
-                          self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]],
-                          2.0 * deltaRefMagWeightedGROF)
-
-                partialArray[2*self.fgcmPars.nFitPars +
+                partialArray[self.fgcmPars.parQESysInterceptLoc +
+                             uWashBandIndex] /= unitDict['qeSysUnit']
+                partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parQESysInterceptLoc +
+                             uWashBandIndex] += 1
+
+                # And reference stars
+                if useRefstars and self.useRefStarsWithInstrument:
+                    np.add.at(partialArray[2*self.fgcmPars.nFitPars +
+                                           self.fgcmPars.parQESysInterceptLoc:
+                                               (2*self.fgcmPars.nFitPars +
+                                                self.fgcmPars.parQESysInterceptLoc +
+                                                self.fgcmPars.parQESysIntercept.size)],
+                              np.ravel_multi_index((obsBandIndexGO[goodRefObsGOF],
+                                                    self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]),
+                                                   self.fgcmPars.parQESysIntercept.shape),
+                              #self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]] * self.fgcmPars.nBands +
+                              #obsBandIndexGO[goodRefObsGOF],
+                              2.0 * deltaRefMagWeightedGROF)
+
+                    partialArray[2*self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parQESysInterceptLoc +
+                                 uWashBandIndex] /= unitDict['qeSysUnit']
+                    partialArray[3*self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parQESysInterceptLoc +
+                                 uWashBandIndex] += 1
+
+            else:
+                # We have one gray mirror term for all bands
+                uWashIndex = np.unique(expWashIndexGOF)
+
+                np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
+                                           (self.fgcmPars.parQESysInterceptLoc +
+                                            self.fgcmPars.nWashIntervals)],
+                          expWashIndexGOF,
+                          2.0 * deltaMagWeightedGOF * (
+                        errSummandGOF))
+
+                partialArray[self.fgcmPars.parQESysInterceptLoc +
                              uWashIndex] /= unitDict['qeSysUnit']
-                partialArray[3*self.fgcmPars.nFitPars +
+                partialArray[self.fgcmPars.nFitPars +
                              self.fgcmPars.parQESysInterceptLoc +
                              uWashIndex] += 1
 
-            # Wash Slope
+                # We don't want to use the reference stars for the wash intercept
+                # or slope by default because if they aren't evenly sampled it can
+                # cause the fitter to go CRAZY.  Though improvements in slope computation
+                # means this should be revisited.
+                if useRefstars and self.useRefStarsWithInstrument:
+                    np.add.at(partialArray[2*self.fgcmPars.nFitPars +
+                                           self.fgcmPars.parQESysInterceptLoc:
+                                               (2*self.fgcmPars.nFitPars +
+                                                self.fgcmPars.parQESysInterceptLoc +
+                                                self.fgcmPars.nWashIntervals)],
+                              self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]],
+                              2.0 * deltaRefMagWeightedGROF)
 
-            np.add.at(partialArray[self.fgcmPars.parQESysSlopeLoc:
-                                       (self.fgcmPars.parQESysSlopeLoc +
-                                        self.fgcmPars.nWashIntervals)],
-                      expWashIndexGOF,
-                      2.0 * deltaMagWeightedGOF * (
-                    errSummandGOF *
-                    (self.fgcmPars.expMJD[obsExpIndexGO[obsFitUseGO]] -
-                     self.fgcmPars.washMJDs[expWashIndexGOF])))
-
-            partialArray[self.fgcmPars.parQESysSlopeLoc +
-                         uWashIndex] /= unitDict['qeSysSlopeUnit']
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parQESysSlopeLoc +
-                         uWashIndex] += 1
-
-            if useRefstars and self.useRefStarsWithInstrument:
-                np.add.at(partialArray[2*self.fgcmPars.nFitPars +
-                                       self.fgcmPars.parQESysSlopeLoc:
-                                           (2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parQESysSlopeLoc +
-                                            self.fgcmPars.nWashIntervals)],
-                          self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]],
-                          2.0 * deltaRefMagWeightedGROF *
-                          (self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGOF]] -
-                           self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]]))
-
-                partialArray[2*self.fgcmPars.nFitPars +
-                             self.fgcmPars.parQESysSlopeLoc +
-                             uWashIndex] /= unitDict['qeSysSlopeUnit']
-                partialArray[3*self.fgcmPars.nFitPars +
-                             self.fgcmPars.parQESysSlopeLoc +
-                             uWashIndex] += 1
+                    partialArray[2*self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parQESysInterceptLoc +
+                                 uWashIndex] /= unitDict['qeSysUnit']
+                    partialArray[3*self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parQESysInterceptLoc +
+                                 uWashIndex] += 1
 
             #################
             ## Filter offset
