@@ -185,7 +185,7 @@ class FgcmQeSysSlope(object):
 
                 if deltaTAll.size < 500:
                     slopeMeanAll = 0.0
-                    slopeErrAll = 0.0
+                    slopeMeanErrAll = 0.0
                 else:
                     slopeAll = deltaMagAll / deltaTAll
                     slopeErr2All = deltaMagErr2All / np.abs(deltaTAll)**2.
