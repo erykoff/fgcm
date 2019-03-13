@@ -1,4 +1,5 @@
 from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import numpy as np
 import os
@@ -23,6 +24,8 @@ class FgcmQeSysSlope(object):
        Parameter object
     fgcmStars: FgcmStars
        Stars object
+    initialCycle: `bool`
+       Is this the initial cycle? (Force gray computation)
     """
     def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
         self.fgcmLog = fgcmConfig.fgcmLog
@@ -39,13 +42,16 @@ class FgcmQeSysSlope(object):
         self.instrumentSlopeMinDeltaT = fgcmConfig.instrumentSlopeMinDeltaT
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
 
-    def computeQeSysSlope(self, doPlots=True):
+    def computeQeSysSlope(self, name, doPlots=True):
         """
         Compute QE system slope
 
         Parameters
         ----------
-        None
+        name: `str`
+           Name to put on filenames
+        doPlots: `bool`, optional
+           Make the plots.  Default is True.
         """
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -86,8 +92,6 @@ class FgcmQeSysSlope(object):
             i1a = washRev[washRev[washIndex]: washRev[washIndex + 1]]
 
             # Split per band, and compute the delta-T and delta-Mag
-            # This will require doing an ID histogram unfortunately
-            # But we definitely need this per band
 
             bandH, bandRev = esutil.stat.histogram(obsBandIndex[goodObs[i1a]], rev=True, min=0)
             bandIndices, = np.where(bandH > 0)
@@ -124,30 +128,6 @@ class FgcmQeSysSlope(object):
                 deltaMag = thisMag - firstMag[thisObjID - minID]
                 deltaMagErr2 = thisMagErr2 + firstMagErr2[thisObjID - minID]
 
-                """
-                starH, starRev = esutil.stat.histogram(objID[obsObjIDIndex[goodObs[i1a[i2a]]]], rev=True)
-                # Make sure we have at least two observations in this wash interval
-                starIndices, = np.where(starH > 1)
-
-                deltaT = np.zeros((starH[starIndices] - 1).sum())
-                deltaMag = np.zeros_like(deltaT, dtype='f4')
-                deltaMagErr2 = np.zeros_like(deltaMag)
-
-                ctr = 0
-                for j, starIndex in enumerate(starIndices):
-                    i3a = starRev[starRev[starIndex]: starRev[starIndex + 1]]
-
-                    mjd = self.fgcmPars.expMJD[obsExpIndexGO[i1a[i2a[i3a]]]]
-                    st = np.argsort(mjd)
-
-                    deltaT[ctr: ctr + i3a.size - 1] = mjd[st[1:]] - mjd[st[0]]
-                    deltaMag[ctr: ctr + i3a.size - 1] = (obsMagStdGO[i1a[i2a[i3a[st[1:]]]]] -
-                                                         obsMagStdGO[i1a[i2a[i3a[st[0]]]]])
-                    deltaMagErr2[ctr: ctr + i3a.size - 1] = (obsMagErr2GO[i1a[i2a[i3a[st[1:]]]]] +
-                                                             obsMagErr2GO[i1a[i2a[i3a[st[0]]]]])
-                    ctr += (i3a.size - 1)
-                """
-
                 okDelta, = np.where((deltaT > self.instrumentSlopeMinDeltaT) &
                                     (deltaMagErr2 < self.ccdGrayMaxStarErr))
 
@@ -170,53 +150,50 @@ class FgcmQeSysSlope(object):
                 else:
                     # Do per band
 
-                    #okDelta, = np.where((deltaT > self.instrumentSlopeMinDeltaT) &
-                    #                    (np.isfinite(deltaMagErr2)) &
-                    #                    (np.nan_to_num(deltaMagErr2) > 0.0) &
-                    #                    (np.nan_to_num(deltaMagErr2) < self.ccdGrayMaxStarErr))
-
-                    #if okDelta.size < 1000:
                     if deltaT.size < 500:
                         # Just do no slope
                         slopeMean = 0.0
-                        slopeErr = 0.0
+                        slopeMeanErr = 0.0
                     else:
-                        #slope = deltaMag[okDelta] / deltaT[okDelta]
-                        #slopeMean = np.clip(-1 * np.sum(slope / deltaMagErr2[okDelta]) / np.sum(1. / deltaMagErr2[okDelta]), -0.001, 0.001)
-                        #slopeErr = np.sqrt(1. / np.sum(1. / deltaMagErr2[okDelta]))
                         slope = deltaMag / deltaT
-                        slopeMean = np.clip(-1 * np.sum(slope / deltaMagErr2) / np.sum(1. / deltaMagErr2), -0.001, 0.001)
-                        slopeErr = np.sqrt(1. / np.sum(1. / deltaMagErr2))
+                        slopeErr2 = deltaMagErr2 / np.abs(deltaT)**2.
+                        slopeMean = np.clip(-1 * np.sum(slope / slopeErr2) / np.sum(1. / slopeErr2), -0.001, 0.0)
+                        slopeMeanErr = np.sqrt(1. / np.sum(1. / slopeErr2))
 
+                    """
+                    # Make an output file here...
+                    if deltaT.size > 500:
+                        import fitsio
+                        tempCat = np.zeros(slope.size, dtype=[('deltaMag', 'f4'),
+                                                              ('deltaT', 'f4'),
+                                                              ('deltaMagErr2', 'f4')])
+                        tempCat['deltaMag'] = deltaMag
+                        tempCat['deltaT'] = deltaT
+                        tempCat['deltaMagErr2'] = deltaMagErr2
+
+                        fitsio.write('%s_slopestuff_%s_%s_%02d.fits' % (self.outfileBaseWithCycle,
+                                                                        name,
+                                                                        self.fgcmPars.bands[bandIndex],
+                                                                        washIndex), tempCat)
+                                                                        """
                     self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.8f +/- %.8f" %
-                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeErr))
+                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeMeanErr))
                     self.fgcmPars.compQESysSlope[washIndex, bandIndex] = slopeMean
 
             if not self.instrumentParsPerBand:
                 # Compute all together
-                #okDeltaAll, = np.where((deltaTAll > self.instrumentSlopeMinDeltaT) &
-                #                       (np.isfinite(deltaMagErr2All)) &
-                #                       (np.nan_to_num(deltaMagErr2All) > 0.0) &
-                #                       (np.nan_to_num(deltaMagErr2All) < self.ccdGrayMaxStarErr))
-
-                #if okDeltaAll.size < 1000:
-                #    slopeMeanAll = 0.0
-                #    slopeErrAll = 0.0
-                #else:
-                #    slopeAll = deltaMagAll[okDeltaAll] / deltaTAll[okDeltaAll]
-                #    slopeMeanAll = np.clip(-1 * np.sum(slopeAll / deltaMagErr2All[okDeltaAll]) / np.sum(1. / deltaMagErr2All[okDeltaAll]), -0.001, 0.001)
-                #    slopeErrAll = np.sqrt(1. / np.sum(1. / deltaMagErr2All[okDeltaAll]))
 
                 if deltaTAll.size < 500:
                     slopeMeanAll = 0.0
                     slopeErrAll = 0.0
                 else:
                     slopeAll = deltaMagAll / deltaTAll
-                    slopeMeanAll = np.clip(-1 * np.sum(slopeAll / deltaMagErr2All) / np.sum(1. / deltaMagErr2All), -0.001, 0.001)
-                    slopeErrAll = np.sqrt(1. / np.sum(1. / deltaMagErr2All))
+                    slopeErr2All = deltaMagErr2All / np.abs(deltaTAll)**2.
+                    slopeMeanAll = np.clip(-1 * np.sum(slopeAll / slopeErr2All) / np.sum(1. / slopeErr2All), -0.001, 0.0)
+                    slopeMeanErrAll = np.sqrt(1. / np.sum(1. / slopeErr2All))
 
                 self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.8f +/- %.8f" %
-                                  (washIndex, slopeMeanAll, slopeErrAll))
+                                  (washIndex, slopeMeanAll, slopeMeanErrAll))
                 self.fgcmPars.compQESysSlope[washIndex, :] = slopeMeanAll
 
         if doPlots:
@@ -247,7 +224,7 @@ class FgcmQeSysSlope(object):
                 else:
                     ax.plot(washMJDRange - firstMJD,
                             (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[i, 0] +
-                            self.fgcmPars.parQESysIntercept[i], 'r--', linewidth=3)
+                            self.fgcmPars.parQESysIntercept[i, 0], 'r--', linewidth=3)
                 started = True
 
             if self.instrumentParsPerBand:
@@ -263,7 +240,9 @@ class FgcmQeSysSlope(object):
                 ax.plot([self.fgcmPars.washMJDs[i] - firstMJD, self.fgcmPars.washMJDs[i]-firstMJD],
                         ylim, 'k--')
 
-            fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath, self.outfileBaseWithCycle))
+            fig.savefig('%s/%s_qesys_washes_%s.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle,
+                                                       name))
 
             plt.close(fig)
 

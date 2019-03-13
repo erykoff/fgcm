@@ -85,6 +85,8 @@ class FgcmFitCycle(object):
         self.initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
             self.initialCycle = True
+            # Override, do not do instrument per band on initial cycle
+            self.fgcmConfig.instrumentParsPerBand = False
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -204,8 +206,6 @@ class FgcmFitCycle(object):
         self.setupComplete = True
         self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
 
-
-
     def run(self):
         """
         Run the FGCM Fit Cycle.  If setup with useFits==True then files for the
@@ -308,7 +308,7 @@ class FgcmFitCycle(object):
                                       (band, self.fgcmPars.compAbsThroughput[i]))
 
             # Compute the slopes (initial guess).  Don't plot here, offsets make no sense.
-            self.fgcmQeSysSlope.computeQeSysSlope(doPlots=False)
+            self.fgcmQeSysSlope.computeQeSysSlope('initial')
             self.fgcmQeSysSlope.plotQeSysRefStars('initial')
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
@@ -441,7 +441,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
         self.fgcmLog.debug('FitCycle computing qe sys slope')
-        self.fgcmQeSysSlope.computeQeSysSlope()
+        self.fgcmQeSysSlope.computeQeSysSlope('final')
         self.fgcmQeSysSlope.plotQeSysRefStars('final')
 
         self.fgcmLog.info(getMemoryString('After computing qe sys slope'))

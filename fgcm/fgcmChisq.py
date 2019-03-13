@@ -1357,14 +1357,14 @@ class FgcmChisq(object):
 
             if self.instrumentParsPerBand:
                 # We have per-band intercepts
-                # Non-fit bands will be given the mean of the others (where?), because
-                # they aren't in the chi2.
+                # Non-fit bands will be given the mean of the others (in fgcmParameters),
+                # because they aren't in the chi2.
                 uWashBandIndex = np.unique(expWashIndexGOF * self.fgcmPars.nBands +
                                            obsBandIndexGO[obsFitUseGO])
 
                 np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
                                            (self.fgcmPars.parQESysInterceptLoc +
-                                            self.fgcmPars.nQESysInterceptPars)],
+                                            self.fgcmPars.parQESysIntercept.size)],
                           expWashIndexGOF * self.fgcmPars.nBands +
                           obsBandIndexGO[obsFitUseGO],
                           2.0 * deltaMagWeightedGOF * (
@@ -1382,7 +1382,7 @@ class FgcmChisq(object):
                                            self.fgcmPars.parQESysInterceptLoc:
                                                (2*self.fgcmPars.nFitPars +
                                                 self.fgcmPars.parQESysInterceptLoc +
-                                                self.fgcmPars.nQESysInterceptPars)],
+                                                self.fgcmPars.parQESysIntercept.size)],
                               self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]] * self.fgcmPars.nBands +
                               obsBandIndexGO[goodRefObsGOF],
                               2.0 * deltaRefMagWeightedGROF)
