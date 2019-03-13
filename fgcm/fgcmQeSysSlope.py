@@ -211,9 +211,6 @@ class FgcmQeSysSlope(object):
             colors = ['g', 'b', 'r', 'c', 'm', 'y', 'k']
             started = False
 
-            if self.instrumentParsPerBand:
-                parQESysIntercept = self.fgcmPars.parQESysIntercept.reshape((self.fgcmPars.nWashIntervals, self.fgcmPars.nBands))
-
             for i in xrange(self.fgcmPars.nWashIntervals):
                 use, = np.where(self.fgcmPars.expWashIndex == i)
                 washMJDRange = [np.min(self.fgcmPars.expMJD[use]), np.max(self.fgcmPars.expMJD[use])]
@@ -224,7 +221,7 @@ class FgcmQeSysSlope(object):
                         label = self.fgcmPars.bands[j] if not started else None
                         ax.plot(washMJDRange - firstMJD,
                                 (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[i, j] +
-                                parQESysIntercept[i, j], linestyle='--', color=colors[j], linewidth=2, label=label)
+                                self.fgcmPars.parQESysIntercept[i, j], linestyle='--', color=colors[j], linewidth=2, label=label)
                 else:
                     ax.plot(washMJDRange - firstMJD,
                             (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[i, 0] +
@@ -346,7 +343,7 @@ class FgcmQeSysSlope(object):
                 if self.instrumentParsPerBand:
                     intercept = self.fgcmPars.parQESysIntercept[washIndex, i]
                 else:
-                    intercept = self.fgcmPars.parQESysIntercept[washIndex]
+                    intercept = self.fgcmPars.parQESysIntercept[washIndex, 0]
 
                 ax.plot(washMJDRange - minMjd,
                         (washMJDRange -
