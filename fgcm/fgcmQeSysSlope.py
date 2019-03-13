@@ -266,11 +266,11 @@ class FgcmQeSysSlope(object):
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
 
-        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.refMagHandle)
+        objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
+        refMag = snmm.getArray(self.fgcmStars.refMagHandle)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
