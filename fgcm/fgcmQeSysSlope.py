@@ -260,7 +260,7 @@ class FgcmQeSysSlope(object):
            name to give the files
         """
 
-        if not self.fgcmStars.hasRefStars:
+        if not self.fgcmStars.hasRefstars:
             self.fgcmLog.info("No reference stars for QE sys plots.")
             return
 
