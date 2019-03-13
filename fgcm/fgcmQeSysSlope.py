@@ -152,9 +152,11 @@ class FgcmQeSysSlope(object):
 
                     if deltaT.size < 500:
                         # Just do no slope
+                        extraString = ' (Not enough observations)'
                         slopeMean = 0.0
                         slopeMeanErr = 0.0
                     else:
+                        extraString = ''
                         slope = deltaMag / deltaT
                         slopeErr2 = deltaMagErr2 / np.abs(deltaT)**2.
                         slopeMean = np.clip(-1 * np.sum(slope / slopeErr2) / np.sum(1. / slopeErr2), -0.001, 0.0)
@@ -176,24 +178,26 @@ class FgcmQeSysSlope(object):
                                                                         self.fgcmPars.bands[bandIndex],
                                                                         washIndex), tempCat)
                                                                         """
-                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.8f +/- %.8f" %
-                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeMeanErr))
+                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.8f +/- %.8f%s" %
+                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeMeanErr, extraString))
                     self.fgcmPars.compQESysSlope[washIndex, bandIndex] = slopeMean
 
             if not self.instrumentParsPerBand:
                 # Compute all together
 
                 if deltaTAll.size < 500:
+                    extraString = ' (Not enough observations)'
                     slopeMeanAll = 0.0
                     slopeMeanErrAll = 0.0
                 else:
+                    extraString = ''
                     slopeAll = deltaMagAll / deltaTAll
                     slopeErr2All = deltaMagErr2All / np.abs(deltaTAll)**2.
                     slopeMeanAll = np.clip(-1 * np.sum(slopeAll / slopeErr2All) / np.sum(1. / slopeErr2All), -0.001, 0.0)
                     slopeMeanErrAll = np.sqrt(1. / np.sum(1. / slopeErr2All))
 
-                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.8f +/- %.8f" %
-                                  (washIndex, slopeMeanAll, slopeMeanErrAll))
+                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.8f +/- %.8f%s" %
+                                  (washIndex, slopeMeanAll, slopeMeanErrAll, extraString))
                 self.fgcmPars.compQESysSlope[washIndex, :] = slopeMeanAll
 
         if doPlots:
@@ -351,7 +355,7 @@ class FgcmQeSysSlope(object):
                         linestyle='-', color='b', linewidth=2)
 
             ax.set_title('%s band' % (band))
-            ax.set_xlabel('Days since %s' % (startString), fontsize=14)
+            ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
             ax.set_ylabel('m_ref - m_obs', fontsize=14)
 
             fig.savefig('%s/%s_qesys_refstars_%s_%s.png' % (self.plotPath,
