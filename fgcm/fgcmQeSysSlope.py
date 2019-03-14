@@ -310,8 +310,8 @@ class FgcmQeSysSlope(object):
 
         st = np.argsort(EGrayGRO)
 
-        xMin = minMjd
-        xMax = maxMjd
+        xMin = 0
+        xMax = maxMjd - minMjd
         yMin = EGrayGRO[st[int(0.001 * st.size)]]
         yMax = EGrayGRO[st[int(0.999 * st.size)]]
 
@@ -332,7 +332,7 @@ class FgcmQeSysSlope(object):
             fig = plt.figure(1, figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
+            ax.hexbin(mjdGRO[use] - minMjd, EGrayGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
