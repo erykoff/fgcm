@@ -319,9 +319,6 @@ class FgcmQeSysSlope(object):
         washInRange, = np.where((self.fgcmPars.washMJDs >= minMjd) &
                                 (self.fgcmPars.washMJDs <= maxMjd))
 
-        tempWashMJDs = self.fgcmPars.washMJDs
-        tempWashMJDs = np.append(self.fgcmPars.washMJDs, xMax)
-
         for i, band in enumerate(self.fgcmPars.bands):
 
             use, = np.where(obsBandIndex[goodObs[goodRefObsGO]] == i)
@@ -332,24 +329,10 @@ class FgcmQeSysSlope(object):
             fig = plt.figure(1, figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use] - minMjd, EGrayGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
+            ax.hexbin(mjdGRO[use], EGrayGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
-
-                # And plot the corresponding slope line thing
-                washMJDRange = np.clip([tempWashMJDs[washIndex], tempWashMJDs[washIndex + 1]], xMin, xMax)
-                slope = self.fgcmPars.compQESysSlope[washIndex, i]
-                if self.instrumentParsPerBand:
-                    intercept = self.fgcmPars.parQESysIntercept[washIndex, i]
-                else:
-                    intercept = self.fgcmPars.parQESysIntercept[washIndex, 0]
-
-                ax.plot(washMJDRange - minMjd,
-                        (washMJDRange -
-                         self.fgcmPars.washMJDs[washIndex]) * slope +
-                        intercept,
-                        linestyle='-', color='b', linewidth=2)
 
             ax.set_title('%s band' % (band))
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
