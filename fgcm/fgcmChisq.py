@@ -1359,14 +1359,20 @@ class FgcmChisq(object):
                 # We have per-band intercepts
                 # Non-fit bands will be given the mean of the others (in fgcmParameters),
                 # because they aren't in the chi2.
-                uWashBandIndex = np.unique(expWashIndexGOF * self.fgcmPars.nBands +
-                                           obsBandIndexGO[obsFitUseGO])
+                #uWashBandIndex = np.unique(expWashIndexGOF * self.fgcmPars.nBands +
+                #                           obsBandIndexGO[obsFitUseGO])
+                uWashBandIndex = np.unique(np.ravel_multi_index((obsBandIndexGO[obsFitUseGO],
+                                                                 expWashIndexGOF),
+                                                                self.fgcmPars.parQESysIntercept.shape))
 
                 np.add.at(partialArray[self.fgcmPars.parQESysInterceptLoc:
                                            (self.fgcmPars.parQESysInterceptLoc +
                                             self.fgcmPars.parQESysIntercept.size)],
-                          expWashIndexGOF * self.fgcmPars.nBands +
-                          obsBandIndexGO[obsFitUseGO],
+                          np.ravel_multi_index((obsBandIndexGO[obsFitUseGO],
+                                                expWashIndexGOF),
+                                               self.fgcmPars.parQESysIntercept.shape),
+                          #expWashIndexGOF * self.fgcmPars.nBands +
+                          #obsBandIndexGO[obsFitUseGO],
                           2.0 * deltaMagWeightedGOF * (
                         errSummandGOF))
 
@@ -1383,8 +1389,11 @@ class FgcmChisq(object):
                                                (2*self.fgcmPars.nFitPars +
                                                 self.fgcmPars.parQESysInterceptLoc +
                                                 self.fgcmPars.parQESysIntercept.size)],
-                              self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]] * self.fgcmPars.nBands +
-                              obsBandIndexGO[goodRefObsGOF],
+                              np.ravel_multi_index((obsBandIndexGO[goodRefObsGOF],
+                                                    self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]]),
+                                                   self.fgcmPars.parQESysIntercept.shape),
+                              #self.fgcmPars.expWashIndex[obsExpIndexGO[goodRefObsGOF]] * self.fgcmPars.nBands +
+                              #obsBandIndexGO[goodRefObsGOF],
                               2.0 * deltaRefMagWeightedGROF)
 
                     partialArray[2*self.fgcmPars.nFitPars +

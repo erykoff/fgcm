@@ -79,7 +79,10 @@ class FgcmQeSysSlope(object):
         obsExpIndexGO = obsExpIndex[goodObs]
 
         # Remove the previously applied slope
-        deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
+        #deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
+        #                  (self.fgcmPars.expMJD[obsExpIndexGO] -
+        #                   self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
+        deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
                           (self.fgcmPars.expMJD[obsExpIndexGO] -
                            self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
         obsMagStdGO -= deltaQESlopeGO
@@ -180,7 +183,8 @@ class FgcmQeSysSlope(object):
                                                                         """
                     self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.8f +/- %.8f%s" %
                                       (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeMeanErr, extraString))
-                    self.fgcmPars.compQESysSlope[washIndex, bandIndex] = slopeMean
+                    #self.fgcmPars.compQESysSlope[washIndex, bandIndex] = slopeMean
+                    self.fgcmPars.compQESysSlope[bandIndex, washIndex] = slopeMean
 
             if not self.instrumentParsPerBand:
                 # Compute all together
@@ -198,7 +202,8 @@ class FgcmQeSysSlope(object):
 
                 self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.8f +/- %.8f%s" %
                                   (washIndex, slopeMeanAll, slopeMeanErrAll, extraString))
-                self.fgcmPars.compQESysSlope[washIndex, :] = slopeMeanAll
+                #self.fgcmPars.compQESysSlope[washIndex, :] = slopeMeanAll
+                self.fgcmPars.compQESysSlope[:, washIndex] = slopeMeanAll
 
         if doPlots:
             # Make the plots
@@ -220,12 +225,12 @@ class FgcmQeSysSlope(object):
                     for j in xrange(self.fgcmPars.nBands):
                         label = self.fgcmPars.bands[j] if not started else None
                         ax.plot(washMJDRange - firstMJD,
-                                (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[i, j] +
-                                self.fgcmPars.parQESysIntercept[i, j], linestyle='--', color=colors[j], linewidth=2, label=label)
+                                (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[j, i] +
+                                self.fgcmPars.parQESysIntercept[j, i], linestyle='--', color=colors[j], linewidth=2, label=label)
                 else:
                     ax.plot(washMJDRange - firstMJD,
-                            (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[i, 0] +
-                            self.fgcmPars.parQESysIntercept[i, 0], 'r--', linewidth=3)
+                            (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[0, i] +
+                            self.fgcmPars.parQESysIntercept[0, i], 'r--', linewidth=3)
                 started = True
 
             if self.instrumentParsPerBand:
@@ -276,7 +281,8 @@ class FgcmQeSysSlope(object):
         obsMagStdGO = obsMagStd[goodObs]
         obsExpIndexGO = obsExpIndex[goodObs]
 
-        deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
+        #deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
+        deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
                           (self.fgcmPars.expMJD[obsExpIndexGO] -
                            self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
         obsMagStdGO -= deltaQESlopeGO

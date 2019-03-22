@@ -304,8 +304,10 @@ class FgcmParameters(object):
         # We always have these parameters, even if we don't fit them
         #self.nQESysInterceptPars = self.nWashIntervals * self.nBands
         #self.parQESysIntercept = np.zeros(self.nQESysInterceptPars, dtype=np.float32)
-        self.parQESysIntercept = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
-        self.compQESysSlope = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
+        #self.parQESysIntercept = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
+        self.parQESysIntercept = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
+        #self.compQESysSlope = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
+        self.compQESysSlope = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
         self.compQESysSlopeApplied = np.zeros_like(self.compQESysSlope)
 
         # parameters for "absolute" offsets (and relative between filters)
@@ -460,8 +462,10 @@ class FgcmParameters(object):
         self.parLnPwvQuadratic = np.atleast_1d(inParams['PARLNPWVQUADRATIC'][0])
         #self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
         #self.nQESysInterceptPars = self.parQESysIntercept.size
-        self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nWashIntervals, self.nBands))
-        self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nWashIntervals, self.nBands))
+        #self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nWashIntervals, self.nBands))
+        self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nBands, self.nWashIntervals))
+        #self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nWashIntervals, self.nBands))
+        self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nBands, self.nWashIntervals))
         self.compQESysSlopeApplied = self.compQESysSlope.copy()
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
         self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
@@ -1135,6 +1139,18 @@ class FgcmParameters(object):
             else:
                 self.parRetrievedLnPwvOffset = parArray[self.parRetrievedLnPwvOffsetLoc] / unitDict['lnPwvGlobalUnit']
 
+        if not self.instrumentParsPerBand:
+            # Set the same number for all the bands
+            for bandIndex in xrange(self.nBands):
+                self.parQESysIntercept[bandIndex, :] = parArray[self.parQESysInterceptLoc:
+                                                                    self.parQESysInterceptLoc + self.nWashIntervals] / unitDict['qeSysUnit']
+        else:
+            self.parQESysIntercept[:, :] = parArray[self.parQESysInterceptLoc:
+                                                        self.parQESysInterceptLoc +
+                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) / unitDict['qeSysUnit']
+
+
+        """
         # We need to unpack this, and how that works depends on whether this is per band
         if not self.instrumentParsPerBand:
             # Set the same number for all the bands
@@ -1145,11 +1161,18 @@ class FgcmParameters(object):
             # Reshape this into place
             self.parQESysIntercept[:, :] = parArray[self.parQESysInterceptLoc:
                                                         self.parQESysInterceptLoc +
-                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape)
-
+                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) / unitDict['qeSysUnit']
+                                                    """
         #self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
         #                                         self.parQESysInterceptLoc + self.nQESysInterceptPars] / unitDict['qeSysUnit']
 
+        # Clean up any missing bands if necessary
+        if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
+            temp = np.sum(self.parQESysIntercept[self.bandFitIndex, :], axis=0)
+            for notFitIndex in self.bandNotFitIndex:
+                self.parQESysIntercept[notFitIndex, :] = temp / self.bandFitIndex.size
+
+        """
         # Clean up any missing bands if necessary
         if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
             temp = np.sum(self.parQESysIntercept[:, self.bandFitIndex], axis=1)
@@ -1159,6 +1182,7 @@ class FgcmParameters(object):
             #temp = np.sum(parQESysIntercept[:, self.bandFitIndex], axis=1)
             #for notFitIndex in self.bandNotFitIndex:
             #    parQESysIntercept[:, notFitIndex] = temp / self.bandFitIndex.size
+            """
 
         self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
                                                self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
@@ -1234,21 +1258,18 @@ class FgcmParameters(object):
         self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
 
         # and QESys
-        #if self.instrumentParsPerBand:
-        #    parQESysIntercept = self.parQESysIntercept.reshape((self.nWashIntervals, self.nBands))
-        #    self.expQESys = (parQESysIntercept[self.expWashIndex, self.expBandIndex] +
-        #                     self.compQESysSlope[self.expWashIndex, self.expBandIndex] *
-        #                     (self.expMJD - self.washMJDs[self.expWashIndex]))
-        #else:
-        #    self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
-        #                     self.compQESysSlope[self.expWashIndex, self.expBandIndex] *
-        #                     (self.expMJD - self.washMJDs[self.expWashIndex]))
+        """
         self.expQESys = (self.parQESysIntercept[self.expWashIndex, self.expBandIndex] +
                          self.compQESysSlope[self.expWashIndex, self.expBandIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
+                         """
+        self.expQESys = (self.parQESysIntercept[self.expBandIndex, self.expWashIndex] +
+                         self.compQESysSlope[self.expBandIndex, self.expWashIndex] *
+                         (self.expMJD - self.washMJDs[self.expWashIndex]))
+
 
         # Record that these were the values that were applied
-        self.compQESysSlopeApplied[:] = self.compQESysSlope
+        self.compQESysSlopeApplied[:, :] = self.compQESysSlope
 
         # and FilterOffset + abs offset
         expAbsThroughput = self.compAbsThroughput[self.expBandIndex]
@@ -1312,6 +1333,7 @@ class FgcmParameters(object):
             else:
                 parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
 
+        """
         #parArray[self.parQESysInterceptLoc:
         #             self.parQESysInterceptLoc + self.nQESysInterceptPars] = self.parQESysIntercept * unitDict['qeSysUnit']
         if not self.instrumentParsPerBand:
@@ -1322,6 +1344,17 @@ class FgcmParameters(object):
             # This is per band
             parArray[self.parQESysInterceptLoc:
                          self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten()
+                         """
+
+        if not self.instrumentParsPerBand:
+            for bandIndex in xrange(self.nBands):
+                inds = np.ravel_multi_index((bandIndex, np.arange(self.nWashIntervals)),
+                                            self.parQESysIntercept.shape)
+                parArray[self.parQESysInterceptLoc
+                         + inds] = self.parQESysIntercept[0, :] * unitDict['qeSysUnit']
+        else:
+            parArray[self.parQESysInterceptLoc:
+                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten() * unitDict['qeSysUnit']
 
         parArray[self.parFilterOffsetLoc:
                      self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
@@ -1485,8 +1518,10 @@ class FgcmParameters(object):
                 0.05 * unitDict['qeSysUnit'])
 
             # And for the first interval the intercept is zero for all bands
-            parLow[self.parQESysInterceptLoc: self.parQESysInterceptLoc + self.nBands] = 0.0
-            parHigh[self.parQESysInterceptLoc: self.parQESysInterceptLoc + self.nBands] = 0.0
+            inds = np.ravel_multi_index((np.arange(self.nBands), 0),
+                                        self.parQESysIntercept.shape)
+            parLow[self.parQESysInterceptLoc + inds] = 0.0
+            parHigh[self.parQESysInterceptLoc + inds] = 0.0
 
         """
         parLow[self.parQESysInterceptLoc: \
