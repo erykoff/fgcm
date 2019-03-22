@@ -254,7 +254,7 @@ class FgcmQeSysSlope(object):
 
     def plotQeSysRefStars(self, name):
         """
-        Plot reference stars (if available) and compare to QE sys slopes.
+        Plot reference stars (if available).  Compare residuals.
 
         Parameters
         ----------
@@ -281,11 +281,12 @@ class FgcmQeSysSlope(object):
         obsMagStdGO = obsMagStd[goodObs]
         obsExpIndexGO = obsExpIndex[goodObs]
 
-        #deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
-        deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
-                          (self.fgcmPars.expMJD[obsExpIndexGO] -
-                           self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
-        obsMagStdGO -= deltaQESlopeGO
+        deltaQESysGO = (self.fgcmPars.parQESysIntercept[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] +
+                        self.fgcmPars.parQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
+                        (self.fgcmPars.expMJD[obsExpIndexGO] -
+                         self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
+
+        obsMagObsGO = obsMagStdGO - deltaQESysGO
 
         goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
         if goodRefObsGO.size < 100:
@@ -303,6 +304,10 @@ class FgcmQeSysSlope(object):
         EGrayGRO = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
                            obsBandIndex[goodObs[goodRefObsGO]]] -
                     obsMagStdGO[goodRefObsGO])
+
+        EGrayObsGRO = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                           obsBandIndex[goodObs[goodRefObsGO]]] -
+                       obsMagObsGO[goodRefObsGO])
 
         mjdGRO = self.fgcmPars.expMJD[obsExpIndexGO[goodRefObsGO]]
         minMjd = mjdGRO.min() - 5.0
@@ -342,10 +347,28 @@ class FgcmQeSysSlope(object):
 
             ax.set_title('%s band' % (band))
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
+            ax.set_ylabel('m_ref - m_std', fontsize=14)
+
+            fig.savefig('%s/%s_qesys_refstars-ref_%s_%s.png' % (self.plotPath,
+                                                                self.outfileBaseWithCycle,
+                                                                name, band))
+            plt.close(fig)
+
+            fig = plt.figure(1, figsize=(8, 6))
+            ax = fig.add_subplot(111)
+
+            ax.hexbin(mjdGRO[use], EGrayObsGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
+
+            for washIndex in washInRange:
+                ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
+
+            ax.set_title('%s band' % (band))
+            ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
             ax.set_ylabel('m_ref - m_obs', fontsize=14)
 
-            fig.savefig('%s/%s_qesys_refstars_%s_%s.png' % (self.plotPath,
-                                                            self.outfileBaseWithCycle,
-                                                            name, band))
+            fig.savefig('%s/%s_qesys_refstars-obs_%s_%s.png' % (self.plotPath,
+                                                                self.outfileBaseWithCycle,
+                                                                name, band))
             plt.close(fig)
+
 
