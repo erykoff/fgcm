@@ -282,7 +282,7 @@ class FgcmQeSysSlope(object):
         obsExpIndexGO = obsExpIndex[goodObs]
 
         deltaQESysGO = (self.fgcmPars.parQESysIntercept[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] +
-                        self.fgcmPars.parQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
+                        self.fgcmPars.compQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
                         (self.fgcmPars.expMJD[obsExpIndexGO] -
                          self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
 
