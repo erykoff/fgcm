@@ -326,6 +326,10 @@ class FgcmQeSysSlope(object):
         yMin = EGrayGRO[st[int(0.001 * st.size)]]
         yMax = EGrayGRO[st[int(0.999 * st.size)]]
 
+        st = np.argsort(EGrayObsGRO)
+        yMinObs = EGrayObsGRO[st[int(0.001 * st.size)]]
+        yMaxObs = EGrayObsGRO[st[int(0.999 * st.size)]]
+
         # which wash dates are within the range...
         washInRange, = np.where((self.fgcmPars.washMJDs >= minMjd) &
                                 (self.fgcmPars.washMJDs <= maxMjd))
@@ -357,10 +361,10 @@ class FgcmQeSysSlope(object):
             fig = plt.figure(1, figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayObsGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
+            ax.hexbin(mjdGRO[use], EGrayObsGRO[use], bins='log', extent=[xMin, xMax, yMinObs, yMaxObs])
 
             for washIndex in washInRange:
-                ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
+                ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMinObs, yMaxObs], 'r--', linewidth=2)
 
             ax.set_title('%s band' % (band))
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
