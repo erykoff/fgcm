@@ -29,6 +29,7 @@ from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
+from .fgcmComputeStepUnits import FgcmComputeStepUnits
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -194,6 +195,10 @@ class FgcmFitCycle(object):
         self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
                                    self.fgcmStars,self.fgcmLUT)
 
+        # The step unit calculator
+        self.fgcmComputeStepUnits = FgcmComputeStepUnits(self.fgcmConfig, self.fgcmPars,
+                                                         self.fgcmStars, self.fgcmLUT)
+
         # And the exposure selector
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
@@ -341,6 +346,10 @@ class FgcmFitCycle(object):
         # Reset the superstar outlier flags and compute them now that we have
         # flagged good exposures, good nights, etc.
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
+
+        # And compute the step units
+        parArray = self.fgcmPars.getParArray(fitterUnits=False)
+        self.fgcmComputeStepUnits.run(parArray)
 
         # Make connectivity maps with what we know about photometric selection
         fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
@@ -555,8 +564,8 @@ class FgcmFitCycle(object):
                                                        m=10,             # "variable metric conditions"
                                                        #factr=1e2,        # highish accuracy
                                                        factr=10.0,
-                                                       #pgtol=1e-9,       # gradient tolerance
-                                                       pgtol=1e-12,
+                                                       pgtol=self.fgcmConfig.fitGradientTolerance,
+                                                       #pgtol=1e-12,
                                                        maxfun=maxIter,
                                                        maxiter=maxIter,
                                                        iprint=0,         # only one output
