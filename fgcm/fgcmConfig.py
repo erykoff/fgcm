@@ -198,8 +198,8 @@ class FgcmConfig(object):
     externalPwvDeltaT = ConfigField(float, default=0.1)
     tauFile = ConfigField(str, required=False)
     externalTauDeltaT = ConfigField(float, default=0.1)
-    stepUnitReference = ConfigField(float, default=0.001)
-    stepGrain = ConfigField(float, default=10.0)
+    fitGradientTolerance = ConfigField(float, default=1e-5)
+    stepUnitReference = ConfigField(float, default=0.0001)
     experimentalMode = ConfigField(bool, default=False)
     resetParameters = ConfigField(bool, default=True)
     noChromaticCorrections = ConfigField(bool, default=False)
@@ -509,7 +509,7 @@ class FgcmConfig(object):
         """
 
         with open(configFile) as f:
-            configDict = yaml.load(f)
+            configDict = yaml.load(f, Loader=yaml.SafeLoader)
 
         print("Configuration read from %s" % (configFile))
 

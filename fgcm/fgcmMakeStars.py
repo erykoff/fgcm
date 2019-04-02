@@ -324,14 +324,19 @@ class FgcmMakeStars(object):
                     self.fgcmLog.info("Nothing found for pixel %d" % (ipring[p1a[0]]))
                     continue
 
+                esutil.numpy_util.to_native(raArrayUse, inplace=True)
+                esutil.numpy_util.to_native(decArrayUse, inplace=True)
+
                 if hasSmatch:
                     # faster match...
+                    self.fgcmLog.info("Starting smatch...")
                     matches = smatch.match(raArrayUse, decArrayUse,
                                            self.starConfig['matchRadius'] / 3600.0,
                                            raArrayUse, decArrayUse,
                                            nside=self.starConfig['matchNSide'], maxmatch=0)
                     i1 = matches['i1']
                     i2 = matches['i2']
+                    self.fgcmLog.info("Finished smatch.")
                 else:
                     # slower htm matching...
                     htm = esutil.htm.HTM(11)
@@ -342,6 +347,30 @@ class FgcmMakeStars(object):
                                             maxmatch=0)
                     i1 = matches[1]
                     i2 = matches[0]
+
+                # Try this instead...
+
+                counter = np.zeros(raArrayUse.size, dtype=np.int64)
+                minId = np.zeros(raArrayUse.size, dtype=np.int64) + raArrayUse.size + 1
+                raMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
+                decMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
+
+                # Count the number of observations of each matched observation
+                np.add.at(counter, i1, 1)
+                # Find the minimum id of the match to key on a unique value
+                # for each
+                np.fmin.at(minId, i2, i1)
+                # Compute the mean ra/dec
+                np.add.at(raMeanAll, i1, raArrayUse[i2])
+                raMeanAll /= counter
+                np.add.at(decMeanAll, i1, decArrayUse[i2])
+                decMeanAll /= counter
+
+                uId = np.unique(minId)
+
+                bandPixelCatTemp = np.zeros(uId.size, dtype=dtype)
+                bandPixelCatTemp['ra'] = raMeanAll[uId]
+                bandPixelCatTemp['dec'] = decMeanAll[uId]
 
                 fakeId = np.arange(p1a.size)
                 hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)

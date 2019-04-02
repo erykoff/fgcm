@@ -133,7 +133,6 @@ class FgcmParameters(object):
         self.washMJDs = fgcmConfig.washMJDs
 
         self.stepUnitReference = fgcmConfig.stepUnitReference
-        self.stepGrain = fgcmConfig.stepGrain
 
         self.pwvFile = fgcmConfig.pwvFile
         self.tauFile = fgcmConfig.tauFile
@@ -154,18 +153,6 @@ class FgcmParameters(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.illegalValue = fgcmConfig.illegalValue
-
-        # and the default unit dict
-        self.unitDictOnes = {'lnPwvUnit':1.0,
-                             'lnPwvSlopeUnit':1.0,
-                             'lnPwvQuadraticUnit':1.0,
-                             'lnPwvGlobalUnit':1.0,
-                             'o3Unit':1.0,
-                             'lnTauUnit':1.0,
-                             'lnTauSlopeUnit':1.0,
-                             'alphaUnit':1.0,
-                             'qeSysUnit':1.0,
-                             'filterOffsetUnit':1.0}
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -387,15 +374,6 @@ class FgcmParameters(object):
         self.compRetrievedTauNight = np.zeros(self.campaignNights.size,dtype='f8') + self.tauStd
         self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
 
-        # compute the units
-        self.unitDictSteps = fgcmLUT.computeStepUnits(self.stepUnitReference,
-                                                      self.stepGrain,
-                                                      self.meanNightDuration,
-                                                      self.meanWashIntervalDuration,
-                                                      self.fitBands,
-                                                      self.bands,
-                                                      self.nCampaignNights)
-
         # do lookups on parameter array
         self._arrangeParArray()
 
@@ -419,35 +397,6 @@ class FgcmParameters(object):
 
         self._loadEpochAndWashInfo()
 
-        # set the units from the inParInfo
-        self.unitDictSteps = {'lnTauUnit': inParInfo['LNTAUUNIT'][0],
-                              'lnTauSlopeUnit': inParInfo['LNTAUSLOPEUNIT'][0],
-                              'alphaUnit': inParInfo['ALPHAUNIT'][0],
-                              'lnPwvUnit': inParInfo['LNPWVUNIT'][0],
-                              'lnPwvSlopeUnit': inParInfo['LNPWVSLOPEUNIT'][0],
-                              'lnPwvQuadraticUnit': inParInfo['LNPWVQUADRATICUNIT'][0],
-                              'lnPwvGlobalUnit': inParInfo['LNPWVGLOBALUNIT'][0],
-                              'o3Unit': inParInfo['O3UNIT'][0],
-                              'qeSysUnit': inParInfo['QESYSUNIT'][0],
-                              'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0]}
-
-        # and log
-        self.fgcmLog.info('lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
-        self.fgcmLog.info('lnTau slope step unit set to %f' %
-                         (self.unitDictSteps['lnTauSlopeUnit']))
-        self.fgcmLog.info('alpha step unit set to %f' % (self.unitDictSteps['alphaUnit']))
-        self.fgcmLog.info('lnPwv step unit set to %f' % (self.unitDictSteps['lnPwvUnit']))
-        self.fgcmLog.info('lnPwv slope step unit set to %f' %
-                         (self.unitDictSteps['lnPwvSlopeUnit']))
-        self.fgcmLog.info('lnPwv quadratic step unit set to %f' %
-                          (self.unitDictSteps['lnPwvQuadraticUnit']))
-        self.fgcmLog.info('lnPwv global step unit set to %f' %
-                          (self.unitDictSteps['lnPwvGlobalUnit']))
-        self.fgcmLog.info('O3 step unit set to %f' % (self.unitDictSteps['o3Unit']))
-        self.fgcmLog.info('wash step unit set to %f' % (self.unitDictSteps['qeSysUnit']))
-        self.fgcmLog.info('filter offset step unit set to %f' %
-                          (self.unitDictSteps['filterOffsetUnit']))
-
         # look at external...
         self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
         self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
@@ -460,11 +409,7 @@ class FgcmParameters(object):
         self.parLnPwvIntercept = np.atleast_1d(inParams['PARLNPWVINTERCEPT'][0])
         self.parLnPwvSlope = np.atleast_1d(inParams['PARLNPWVSLOPE'][0])
         self.parLnPwvQuadratic = np.atleast_1d(inParams['PARLNPWVQUADRATIC'][0])
-        #self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
-        #self.nQESysInterceptPars = self.parQESysIntercept.size
-        #self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nWashIntervals, self.nBands))
         self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nBands, self.nWashIntervals))
-        #self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nWashIntervals, self.nBands))
         self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nBands, self.nWashIntervals))
         self.compQESysSlopeApplied = self.compQESysSlope.copy()
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
@@ -527,24 +472,6 @@ class FgcmParameters(object):
 
         # need to load the superstarflats
         self.parSuperStarFlat = inSuperStar
-        """
-        # check if we have an "old-old-style" superstar for compatibility
-        if (len(inSuperStar.shape) == 3):
-            # we have an old-style superstar
-            self.fgcmLog.info("Reading old-style superStarFlat")
-            self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
-            self.parSuperStarFlat[:,:,:,0] = inSuperStar
-        else:
-            # Old and new style.
-            # Check if we are reading in an older 2nd order polynomial file
-            if inSuperStar.shape[-1] == self.superStarNParOld:
-                self.fgcmLog.info("Old polynomial2d superstar flat detected")
-                self.superStarPoly2d = True
-                self.superStarNPar = self.superStarNParOld
-
-            # Use the superstar as read in, raw
-            self.parSuperStarFlat = inSuperStar
-            """
 
     def resetAtmosphereParameters(self):
         self.fgcmLog.info("Resetting atmosphere parameters.")
@@ -842,6 +769,8 @@ class FgcmParameters(object):
         self.parFilterOffsetLoc = ctr
         ctr += self.nLUTFilter
 
+        self.stepUnits = np.ones(self.nFitPars)
+
     def saveParsFits(self, parFile):
         """
         Save parameters to fits file
@@ -914,17 +843,6 @@ class FgcmParameters(object):
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
         parInfo['NOTFITBANDS'] = self.notFitBands
-
-        parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
-        parInfo['LNTAUSLOPEUNIT'] = self.unitDictSteps['lnTauSlopeUnit']
-        parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
-        parInfo['LNPWVUNIT'] = self.unitDictSteps['lnPwvUnit']
-        parInfo['LNPWVSLOPEUNIT'] = self.unitDictSteps['lnPwvSlopeUnit']
-        parInfo['LNPWVQUADRATICUNIT'] = self.unitDictSteps['lnPwvQuadraticUnit']
-        parInfo['LNPWVGLOBALUNIT'] = self.unitDictSteps['lnPwvGlobalUnit']
-        parInfo['O3UNIT'] = self.unitDictSteps['o3Unit']
-        parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
-        parInfo['FILTEROFFSETUNIT'] = self.unitDictSteps['filterOffsetUnit']
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
@@ -1090,8 +1008,6 @@ class FgcmParameters(object):
            Array with all fit parameters
         fitterUnits: bool, default=False
            Is the parArray in normalized fitter units?
-        #fillInQESys: bool, default=False
-        #   Fill in missing qeSysIntercept parameters if necessary
         """
 
         # takes in a parameter array and loads the local split copies?
@@ -1100,92 +1016,91 @@ class FgcmParameters(object):
         if (parArray.size != self.nFitPars):
             raise ValueError("parArray must have %d elements." % (self.nFitPars))
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         if not self.useRetrievedPwv:
-            self.parLnPwvIntercept[:] = parArray[self.parLnPwvInterceptLoc:
-                                                     self.parLnPwvInterceptLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
-            self.parLnPwvSlope[:] = parArray[self.parLnPwvSlopeLoc:
-                                                 self.parLnPwvSlopeLoc + self.nCampaignNights] / unitDict['lnPwvSlopeUnit']
-            self.parLnPwvQuadratic[:] = parArray[self.parLnPwvQuadraticLoc:
-                                                     self.parLnPwvQuadraticLoc + self.nCampaignNights] / unitDict['lnPwvQuadraticUnit']
+            self.parLnPwvIntercept[:] = (parArray[self.parLnPwvInterceptLoc:
+                                                     self.parLnPwvInterceptLoc+self.nCampaignNights] /
+                                         units[self.parLnPwvInterceptLoc:
+                                                   self.parLnPwvInterceptLoc+self.nCampaignNights])
+            self.parLnPwvSlope[:] = (parArray[self.parLnPwvSlopeLoc:
+                                                 self.parLnPwvSlopeLoc + self.nCampaignNights] /
+                                     units[self.parLnPwvSlopeLoc:
+                                               self.parLnPwvSlopeLoc + self.nCampaignNights])
+            self.parLnPwvQuadratic[:] = (parArray[self.parLnPwvQuadraticLoc:
+                                                     self.parLnPwvQuadraticLoc + self.nCampaignNights] /
+                                         units[self.parLnPwvQuadraticLoc:
+                                                   self.parLnPwvQuadraticLoc + self.nCampaignNights])
 
-        self.parO3[:] = parArray[self.parO3Loc:
-                                     self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
-        self.parLnTauIntercept[:] = parArray[self.parLnTauInterceptLoc:
-                                                 self.parLnTauInterceptLoc+self.nCampaignNights] / unitDict['lnTauUnit']
+        self.parO3[:] = (parArray[self.parO3Loc:
+                                     self.parO3Loc+self.nCampaignNights] /
+                         units[self.parO3Loc:
+                                   self.parO3Loc+self.nCampaignNights])
+        self.parLnTauIntercept[:] = (parArray[self.parLnTauInterceptLoc:
+                                                 self.parLnTauInterceptLoc+self.nCampaignNights] /
+                                     units[self.parLnTauInterceptLoc:
+                                               self.parLnTauInterceptLoc+self.nCampaignNights])
         self.parLnTauSlope[:] = (parArray[self.parLnTauSlopeLoc:
                                                self.parLnTauSlopeLoc + self.nCampaignNights] /
-                                 unitDict['lnTauSlopeUnit'])
+                                 units[self.parLnTauSlopeLoc:
+                                           self.parLnTauSlopeLoc + self.nCampaignNights])
 
-        self.parAlpha[:] = parArray[self.parAlphaLoc:
-                                        self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
+        self.parAlpha[:] = (parArray[self.parAlphaLoc:
+                                        self.parAlphaLoc+self.nCampaignNights] /
+                            units[self.parAlphaLoc:
+                                        self.parAlphaLoc+self.nCampaignNights])
+
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            self.parExternalLnPwvScale = parArray[self.parExternalLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
-            self.parExternalLnPwvOffset = parArray[self.parExternalLnPwvOffsetLoc:
-                                                       self.parExternalLnPwvOffsetLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
+            self.parExternalLnPwvScale = (parArray[self.parExternalLnPwvScaleLoc] /
+                                          units[self.parExternalLnPwvScaleLoc])
+            self.parExternalLnPwvOffset = (parArray[self.parExternalLnPwvOffsetLoc:
+                                                       self.parExternalLnPwvOffsetLoc+self.nCampaignNights] /
+                                           units[self.parExternalLnPwvOffsetLoc:
+                                                     self.parExternalLnPwvOffsetLoc+self.nCampaignNights])
 
         if (self.hasExternalTau):
             raise NotImplementedError("Not implemented")
-            #self.parExternalLnTauScale = parArray[self.parExternalLnTauScaleLoc] / unitDict['tauUnit']
-            #self.parExternalLnTauOffset = parArray[self.parExternalLnTauOffsetLoc:
-            #                                         self.parExternalLnTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
 
         if self.useRetrievedPwv:
-            self.parRetrievedLnPwvScale = parArray[self.parRetrievedLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
+            self.parRetrievedLnPwvScale = (parArray[self.parRetrievedLnPwvScaleLoc] /
+                                           units[self.parRetrievedLnPwvScaleLoc])
             if self.useNightlyRetrievedPwv:
-                self.parRetrievedLnPwvNightlyOffset = parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
-                                                                   self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights] / unitDict['lnPwvUnit']
+                self.parRetrievedLnPwvNightlyOffset = (parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
+                                                                   self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights] /
+                                                       units[self.parRetrievedLnPwvNightlyOffsetLoc:
+                                                                 self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights])
             else:
-                self.parRetrievedLnPwvOffset = parArray[self.parRetrievedLnPwvOffsetLoc] / unitDict['lnPwvGlobalUnit']
+                self.parRetrievedLnPwvOffset = (parArray[self.parRetrievedLnPwvOffsetLoc] /
+                                                units[self.parRetrievedLnPwvOffsetLoc])
 
         if not self.instrumentParsPerBand:
             # Set the same number for all the bands
             for bandIndex in xrange(self.nBands):
-                self.parQESysIntercept[bandIndex, :] = parArray[self.parQESysInterceptLoc:
-                                                                    self.parQESysInterceptLoc + self.nWashIntervals] / unitDict['qeSysUnit']
+                self.parQESysIntercept[bandIndex, :] = (parArray[self.parQESysInterceptLoc:
+                                                                    self.parQESysInterceptLoc + self.nWashIntervals] /
+                                                        units[self.parQESysInterceptLoc:
+                                                                  self.parQESysInterceptLoc + self.nWashIntervals])
         else:
-            self.parQESysIntercept[:, :] = parArray[self.parQESysInterceptLoc:
+            self.parQESysIntercept[:, :] = (parArray[self.parQESysInterceptLoc:
                                                         self.parQESysInterceptLoc +
-                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) / unitDict['qeSysUnit']
+                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) /
+                                            units[self.parQESysInterceptLoc:
+                                                      self.parQESysInterceptLoc +
+                                                  self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape))
 
-
-        """
-        # We need to unpack this, and how that works depends on whether this is per band
-        if not self.instrumentParsPerBand:
-            # Set the same number for all the bands
-            for bandIndex in xrange(self.nBands):
-                self.parQESysIntercept[:, bandIndex] = parArray[self.parQESysInterceptLoc:
-                                                                    self.parQESysInterceptLoc + self.nWashIntervals] / unitDict['qeSysUnit']
-        else:
-            # Reshape this into place
-            self.parQESysIntercept[:, :] = parArray[self.parQESysInterceptLoc:
-                                                        self.parQESysInterceptLoc +
-                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) / unitDict['qeSysUnit']
-                                                    """
-        #self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
-        #                                         self.parQESysInterceptLoc + self.nQESysInterceptPars] / unitDict['qeSysUnit']
-
-        # Clean up any missing bands if necessary
-        if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
-            temp = np.sum(self.parQESysIntercept[self.bandFitIndex, :], axis=0)
-            for notFitIndex in self.bandNotFitIndex:
-                self.parQESysIntercept[notFitIndex, :] = temp / self.bandFitIndex.size
-
-        """
         # Clean up any missing bands if necessary
         if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
             temp = np.sum(self.parQESysIntercept[:, self.bandFitIndex], axis=1)
             for notFitIndex in self.bandNotFitIndex:
                 self.parQESysIntercept[:, notFitIndex] = temp / self.bandFitIndex.size
-            #parQESysIntercept = self.parQESysIntercept.reshape((self.nWashIntervals, self.nBands))
-            #temp = np.sum(parQESysIntercept[:, self.bandFitIndex], axis=1)
-            #for notFitIndex in self.bandNotFitIndex:
-            #    parQESysIntercept[:, notFitIndex] = temp / self.bandFitIndex.size
-            """
 
-        self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
-                                               self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
+        self.parFilterOffset[:] = (parArray[self.parFilterOffsetLoc:
+                                               self.parFilterOffsetLoc + self.nLUTFilter] /
+                                   units[self.parFilterOffsetLoc:
+                                               self.parFilterOffsetLoc + self.nLUTFilter])
 
         # done
 
@@ -1249,10 +1164,6 @@ class FgcmParameters(object):
 
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            # replace where we have these
-            #self.expLnTau[self.externalTauFlag] = (self.parExternalLnTauOffset[self.expNightIndex[self.externalTauFlag]] +
-            #                                     self.parExternalLnTauScale *
-            #                                     self.externalTau[self.externalTauFlag])
 
         # and clip to make sure it doesn't go negative
         self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
@@ -1298,66 +1209,80 @@ class FgcmParameters(object):
         # extracts parameters into a linearized array
         parArray = np.zeros(self.nFitPars,dtype=np.float64)
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         if not self.useRetrievedPwv:
+            u = units[self.parLnPwvInterceptLoc:
+                          self.parLnPwvInterceptLoc+self.nCampaignNights]
             parArray[self.parLnPwvInterceptLoc:
-                         self.parLnPwvInterceptLoc+self.nCampaignNights] = self.parLnPwvIntercept[:] * unitDict['lnPwvUnit']
+                         self.parLnPwvInterceptLoc+self.nCampaignNights] = self.parLnPwvIntercept[:] * u
+            u = units[self.parLnPwvSlopeLoc:
+                          self.parLnPwvSlopeLoc + self.nCampaignNights]
             parArray[self.parLnPwvSlopeLoc:
-                         self.parLnPwvSlopeLoc + self.nCampaignNights] = self.parLnPwvSlope[:] * unitDict['lnPwvSlopeUnit']
+                         self.parLnPwvSlopeLoc + self.nCampaignNights] = self.parLnPwvSlope[:] * u
+            u = units[self.parLnPwvQuadraticLoc:
+                          self.parLnPwvQuadraticLoc + self.nCampaignNights]
             parArray[self.parLnPwvQuadraticLoc:
-                         self.parLnPwvQuadraticLoc + self.nCampaignNights] = self.parLnPwvQuadratic[:] * unitDict['lnPwvQuadraticUnit']
+                         self.parLnPwvQuadraticLoc + self.nCampaignNights] = self.parLnPwvQuadratic[:] * u
 
+        u = units[self.parO3Loc:
+                      self.parO3Loc+self.nCampaignNights]
         parArray[self.parO3Loc:
-                     self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
+                     self.parO3Loc+self.nCampaignNights] = self.parO3[:] * u
+        u = units[self.parLnTauInterceptLoc:
+                      self.parLnTauInterceptLoc+self.nCampaignNights]
         parArray[self.parLnTauInterceptLoc:
-                     self.parLnTauInterceptLoc+self.nCampaignNights] = self.parLnTauIntercept[:] * unitDict['lnTauUnit']
+                     self.parLnTauInterceptLoc+self.nCampaignNights] = self.parLnTauIntercept[:] * u
+        u = units[self.parLnTauSlopeLoc:
+                      self.parLnTauSlopeLoc + self.nCampaignNights]
         parArray[self.parLnTauSlopeLoc:
-                     self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * unitDict['lnTauSlopeUnit']
+                     self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * u
+        u = units[self.parAlphaLoc:
+                      self.parAlphaLoc+self.nCampaignNights]
         parArray[self.parAlphaLoc:
-                     self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
+                     self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * u
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            parArray[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
+            u = units[self.parExternalLnPwvScaleLoc]
+            parArray[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+            u = units[self.parExternalLnPwvOffsetLoc:
+                          self.parExternalLnPwvOffsetLoc+self.nCampaignNights]
             parArray[self.parExternalLnPwvOffsetLoc:
-                         self.parExternalLnPwvOffsetLoc+self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
+                         self.parExternalLnPwvOffsetLoc+self.nCampaignNights] = self.parExternalLnPwvOffset * u
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            #parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['lnTauUnit']
-            #parArray[self.parExternalTauOffsetLoc:
-            #             self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
-        if self.useRetrievedPwv:
-            parArray[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
-            if self.useNightlyRetrievedPwv:
-                parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
-                             self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
-            else:
-                parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
 
-        """
-        #parArray[self.parQESysInterceptLoc:
-        #             self.parQESysInterceptLoc + self.nQESysInterceptPars] = self.parQESysIntercept * unitDict['qeSysUnit']
-        if not self.instrumentParsPerBand:
-            # This is just gray
-            parArray[self.parQESysInterceptLoc:
-                         self.parQESysInterceptLoc + self.nWashIntervals] = self.parQESysIntercept[:, 0] * unitDict['qeSysUnit']
-        else:
-            # This is per band
-            parArray[self.parQESysInterceptLoc:
-                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten()
-                         """
+        if self.useRetrievedPwv:
+            u = units[self.parRetrievedLnPwvScaleLoc]
+            parArray[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
+            if self.useNightlyRetrievedPwv:
+                u = units[self.parRetrievedLnPwvNightlyOffsetLoc:
+                              self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights]
+                parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
+                             self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
+            else:
+                u = units[self.parRetrievedLnPwvOffsetLoc]
+                parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
 
         if not self.instrumentParsPerBand:
             for bandIndex in xrange(self.nBands):
                 inds = np.ravel_multi_index((bandIndex, np.arange(self.nWashIntervals)),
                                             self.parQESysIntercept.shape)
+                u = units[self.parQESysInterceptLoc + inds]
                 parArray[self.parQESysInterceptLoc
-                         + inds] = self.parQESysIntercept[0, :] * unitDict['qeSysUnit']
+                         + inds] = self.parQESysIntercept[0, :] * u
         else:
+            u = units[self.parQESysInterceptLoc:
+                          self.parQESysInterceptLoc + self.parQESysIntercept.size]
             parArray[self.parQESysInterceptLoc:
-                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten() * unitDict['qeSysUnit']
+                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten() * u
 
+        u = units[self.parFilterOffsetLoc:
+                     self.parFilterOffsetLoc + self.nLUTFilter]
         parArray[self.parFilterOffsetLoc:
-                     self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
+                     self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * u
 
         return parArray
 
@@ -1379,31 +1304,40 @@ class FgcmParameters(object):
 
         self.fgcmLog.debug('Retrieving parameter bounds')
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
         if not self.useRetrievedPwv:
+            u = units[self.parLnPwvInterceptLoc:
+                          self.parLnPwvInterceptLoc+self.nCampaignNights]
             parLow[self.parLnPwvInterceptLoc: \
                        self.parLnPwvInterceptLoc + \
                        self.nCampaignNights] = ( \
-                self.lnPwvRange[0] * unitDict['lnPwvUnit'])
+                self.lnPwvRange[0] * u)
             parHigh[self.parLnPwvInterceptLoc: \
                         self.parLnPwvInterceptLoc + \
                         self.nCampaignNights] = ( \
-                self.lnPwvRange[1] * unitDict['lnPwvUnit'])
+                self.lnPwvRange[1] * u)
+            u = units[self.parLnPwvSlopeLoc:
+                          self.parLnPwvSlopeLoc + self.nCampaignNights]
             parLow[self.parLnPwvSlopeLoc: \
                        self.parLnPwvSlopeLoc + \
                        self.nCampaignNights] = ( \
-                -4.0 * unitDict['lnPwvSlopeUnit'])
+                -4.0 * u)
             parHigh[self.parLnPwvSlopeLoc: \
                        self.parLnPwvSlopeLoc + \
                        self.nCampaignNights] = ( \
-                4.0 * unitDict['lnPwvSlopeUnit'])
+                4.0 * u)
             if self.useQuadraticPwv:
-                qlo = -4.0 * unitDict['lnPwvQuadraticUnit']
-                qhi = 4.0 * unitDict['lnPwvQuadraticUnit']
+                u = units[self.parLnPwvQuadraticLoc:
+                              self.parLnPwvQuadraticLoc + self.nCampaignNights]
+                qlo = -4.0 * u
+                qhi = 4.0 * u
             else:
                 qlo = 0.0
                 qhi = 0.0
@@ -1414,78 +1348,88 @@ class FgcmParameters(object):
                        self.parLnPwvQuadraticLoc + \
                        self.nCampaignNights] = qhi
         else:
-            parLow[self.parRetrievedLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
-            parHigh[self.parRetrievedLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+            u = units[self.parRetrievedLnPwvScaleLoc]
+            parLow[self.parRetrievedLnPwvScaleLoc] = 0.5 * u
+            parHigh[self.parRetrievedLnPwvScaleLoc] = 1.5 * u
 
             if self.useNightlyRetrievedPwv:
+                u = units[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                              self.parRetrievedLnPwvNightlyOffsetLoc + \
+                              self.nCampaignNights]
                 parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
                            self.parRetrievedLnPwvNightlyOffsetLoc + \
                            self.nCampaignNights] = ( \
-                    -0.5 * unitDict['lnPwvUnit'])
+                    -0.5 * u)
                 parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
                            self.parRetrievedLnPwvNightlyOffsetLoc + \
                            self.nCampaignNights] = ( \
-                    0.5 * unitDict['lnPwvUnit'])
+                    0.5 * u)
             else:
-                parLow[self.parRetrievedLnPwvOffsetLoc] = -0.5 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
+                u = units[self.parRetrievedLnPwvOffsetLoc]
+                parLow[self.parRetrievedLnPwvOffsetLoc] = -0.5 * u
+                parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.5 * u
 
+        u = units[self.parO3Loc: \
+                      self.parO3Loc + \
+                      self.nCampaignNights]
         parLow[self.parO3Loc: \
                    self.parO3Loc + \
                    self.nCampaignNights] = ( \
-            self.O3Range[0] * unitDict['o3Unit'])
+            self.O3Range[0] * u)
         parHigh[self.parO3Loc: \
                     self.parO3Loc + \
                     self.nCampaignNights] = ( \
-            self.O3Range[1] * unitDict['o3Unit'])
+            self.O3Range[1] * u)
+        u = units[self.parLnTauInterceptLoc: \
+                      self.parLnTauInterceptLoc + \
+                      self.nCampaignNights]
         parLow[self.parLnTauInterceptLoc: \
                    self.parLnTauInterceptLoc + \
                    self.nCampaignNights] = ( \
-            self.lnTauRange[0] * unitDict['lnTauUnit'])
+            self.lnTauRange[0] * u)
         parHigh[self.parLnTauInterceptLoc: \
                     self.parLnTauInterceptLoc + \
                 self.nCampaignNights] = ( \
-            self.lnTauRange[1] * unitDict['lnTauUnit'])
+            self.lnTauRange[1] * u)
+        u = units[self.parLnTauSlopeLoc: \
+                      self.parLnTauSlopeLoc + \
+                      self.nCampaignNights]
         parLow[self.parLnTauSlopeLoc: \
                    self.parLnTauSlopeLoc + \
                    self.nCampaignNights] = ( \
-            -4.0 * unitDict['lnTauSlopeUnit'])
+            -4.0 * u)
         parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
                     self.nCampaignNights] = ( \
-            4.0 * unitDict['lnTauSlopeUnit'])
+            4.0 * u)
+        u = units[self.parAlphaLoc: \
+                      self.parAlphaLoc + \
+                      self.nCampaignNights]
         parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
                    self.nCampaignNights] = ( \
-            0.25 * unitDict['alphaUnit'])
+            0.25 * u)
         parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
                     self.nCampaignNights] = ( \
-            1.75 * unitDict['alphaUnit'])
+            1.75 * u)
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            parLow[self.parExternalLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
-            parHigh[self.parExternalLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+            u = units[self.parExternalLnPwvScaleLoc]
+            parLow[self.parExternalLnPwvScaleLoc] = 0.5 * u
+            parHigh[self.parExternalLnPwvScaleLoc] = 1.5 * u
+            u = units[self.parExternalLnPwvOffsetLoc: \
+                          self.parExternalLnPwvOffsetLoc + \
+                          self.nCampaignNights]
             parLow[self.parExternalLnPwvOffsetLoc: \
                        self.parExternalLnPwvOffsetLoc + \
                        self.nCampaignNights] = ( \
-                -0.5 * unitDict['lnPwvUnit'])
+                -0.5 * u)
             parHigh[self.parExternalLnPwvOffsetLoc: \
                        self.parExternalLnPwvOffsetLoc + \
                         self.nCampaignNights] = ( \
-                0.5 * unitDict['lnPwvUnit'])
+                0.5 * u)
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            #parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
-            #parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
-            #parLow[self.parExternalTauOffsetLoc: \
-            #           self.parExternalTauOffsetLoc + \
-            #       self.nCampaignNights] = ( \
-            #    0.0 * unitDict['tauUnit'])
-            #parHigh[self.parExternalTauOffsetLoc: \
-            #            self.parExternalTauOffsetLoc + \
-            #            self.nCampaignNights] = ( \
-            #    0.03 * unitDict['tauUnit'])
-            ## FIXME: set bounds per night?  Or clip?
 
         if not self.instrumentParsPerBand:
             # We are doing gray ... set all the bounds to zero and then override
@@ -1496,26 +1440,32 @@ class FgcmParameters(object):
                         self.parQESysInterceptLoc + \
                         self.parQESysIntercept.size] = 0.0
 
+            u = units[self.parQESysInterceptLoc: \
+                          self.parQESysInterceptLoc + \
+                          self.nWashIntervals]
             parLow[self.parQESysInterceptLoc: \
                        self.parQESysInterceptLoc + \
-                       self.nWashIntervals] = -0.4 * unitDict['qeSysUnit']
+                       self.nWashIntervals] = -0.4 * u
             parHigh[self.parQESysInterceptLoc: \
                         self.parQESysInterceptLoc + \
-                        self.nWashIntervals] = 0.05 * unitDict['qeSysUnit']
+                        self.nWashIntervals] = 0.4 * u
 
             # And the first interval should be set to 0
             parLow[self.parQESysInterceptLoc] = 0.0
             parHigh[self.parQESysInterceptLoc] = 0.0
         else:
             # Per-band fits
+            u = units[self.parQESysInterceptLoc: \
+                          self.parQESysInterceptLoc + \
+                          self.parQESysIntercept.size]
             parLow[self.parQESysInterceptLoc: \
                        self.parQESysInterceptLoc + \
                        self.parQESysIntercept.size] = ( \
-                -0.4 * unitDict['qeSysUnit'])
+                -0.4 * u)
             parHigh[self.parQESysInterceptLoc: \
                         self.parQESysInterceptLoc + \
                         self.parQESysIntercept.size] = ( \
-                0.05 * unitDict['qeSysUnit'])
+                0.4 * u)
 
             # And for the first interval the intercept is zero for all bands
             inds = np.ravel_multi_index((np.arange(self.nBands), 0),
@@ -1523,126 +1473,124 @@ class FgcmParameters(object):
             parLow[self.parQESysInterceptLoc + inds] = 0.0
             parHigh[self.parQESysInterceptLoc + inds] = 0.0
 
-        """
-        parLow[self.parQESysInterceptLoc: \
-                   self.parQESysInterceptLoc + \
-                   self.nQESysInterceptPars] = ( \
-            -0.4 * unitDict['qeSysUnit'])
-        parHigh[self.parQESysInterceptLoc: \
-                    self.parQESysInterceptLoc + \
-                    self.nQESysInterceptPars] = ( \
-            0.05 * unitDict['qeSysUnit'])
-
-        # and for the first interval, the intercept will set to zero
-        if self.instrumentParsPerBand:
-            parLow[self.parQESysInterceptLoc: self.parQESysInterceptLoc + self.nBands] = 0.0
-            parHigh[self.parQESysInterceptLoc: self.parQESysInterceptLoc + self.nBands] = 0.0
-        else:
-            parLow[self.parQESysInterceptLoc] = 0.0
-            parHigh[self.parQESysInterceptLoc] = 0.0
-        """
-
         parLow[self.parFilterOffsetLoc: \
                    self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
         parHigh[self.parFilterOffsetLoc: \
                     self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
+        u = units[self.parFilterOffsetLoc: \
+                      self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag]
         parLow[self.parFilterOffsetLoc: \
                    self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
-                   -100.0 * unitDict['filterOffsetUnit']
+                   -100.0 * u
         parHigh[self.parFilterOffsetLoc: \
                     self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
-                    100.0 * unitDict['filterOffsetUnit']
+                    100.0 * u
 
         # This should be self.freezeAtmosphere...
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
             if not self.useRetrievedPwv:
+                u = units[self.parLnPwvInterceptLoc: \
+                              self.parLnPwvInterceptLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvInterceptLoc: \
                            self.parLnPwvInterceptLoc + \
-                           self.nCampaignNights] = self.parLnPwvIntercept * unitDict['lnPwvUnit']
+                           self.nCampaignNights] = self.parLnPwvIntercept * u
                 parHigh[self.parLnPwvInterceptLoc: \
                             self.parLnPwvInterceptLoc + \
-                            self.nCampaignNights] = self.parLnPwvIntercept * unitDict['lnPwvUnit']
+                            self.nCampaignNights] = self.parLnPwvIntercept * u
+                u = units[self.parLnPwvSlopeLoc: \
+                              self.parLnPwvSlopeLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvSlopeLoc: \
                            self.parLnPwvSlopeLoc + \
-                           self.nCampaignNights] = self.parLnPwvSlope * unitDict['lnPwvSlopeUnit']
+                           self.nCampaignNights] = self.parLnPwvSlope * u
                 parHigh[self.parLnPwvSlopeLoc: \
                             self.parLnPwvSlopeLoc + \
-                            self.nCampaignNights] = self.parLnPwvSlope * unitDict['lnPwvSlopeUnit']
+                            self.nCampaignNights] = self.parLnPwvSlope * u
+                u = units[self.parLnPwvQuadraticLoc: \
+                              self.parLnPwvQuadraticLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvQuadraticLoc: \
                            self.parLnPwvQuadraticLoc + \
-                           self.nCampaignNights] = self.parLnPwvQuadratic * unitDict['lnPwvQuadraticUnit']
+                           self.nCampaignNights] = self.parLnPwvQuadratic * u
                 parHigh[self.parLnPwvQuadraticLoc: \
                             self.parLnPwvQuadraticLoc + \
-                            self.nCampaignNights] = self.parLnPwvQuadratic * unitDict['lnPwvQuadraticUnit']
+                            self.nCampaignNights] = self.parLnPwvQuadratic * u
             else:
-                parLow[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
+                u = units[self.parRetrievedLnPwvScaleLoc]
+                parLow[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
+                parHigh[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
                 if self.useNightlyRetrievedPwv:
+                    u = units[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                                  self.parRetrievedLnPwvNightlyOffsetLoc + \
+                                  self.nCampaignNights]
                     parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                self.parRetrievedLnPwvNightlyOffsetLoc + \
-                               self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
+                               self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
                     parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                 self.parRetrievedLnPwvNightlyOffsetLoc + \
-                                self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
+                                self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
                 else:
-                    parLow[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
-                    parHigh[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
+                    u = units[self.parRetrievedLnPwvOffsetLoc]
+                    parLow[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
+                    parHigh[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
 
             if self.hasExternalPwv and not self.useRetrievedPwv:
-                parLow[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
+                u = units[self.parExternalLnPwvScaleLoc]
+                parLow[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+                parHigh[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+                u = units[self.parExternalLnPwvOffsetLoc: \
+                              self.parExternalLnPwvOffsetLoc + \
+                              self.nCampaignNights]
                 parLow[self.parExternalLnPwvOffsetLoc: \
                            self.parExternalLnPwvOffsetLoc + \
-                           self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
+                           self.nCampaignNights] = self.parExternalLnPwvOffset * u
                 parHigh[self.parExternalLnPwvOffsetLoc: \
                             self.parExternalLnPwvOffsetLoc + \
-                            self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
+                            self.nCampaignNights] = self.parExternalLnPwvOffset * u
 
+            u = units[self.parO3Loc: \
+                          self.parO3Loc + \
+                          self.nCampaignNights]
             parLow[self.parO3Loc: \
                    self.parO3Loc + \
-                   self.nCampaignNights] = self.parO3 * unitDict['o3Unit']
+                   self.nCampaignNights] = self.parO3 * u
             parHigh[self.parO3Loc: \
                     self.parO3Loc + \
-                    self.nCampaignNights] = self.parO3 * unitDict['o3Unit']
+                    self.nCampaignNights] = self.parO3 * u
+            u = units[self.parLnTauInterceptLoc: \
+                          self.parLnTauInterceptLoc + \
+                          self.nCampaignNights]
             parLow[self.parLnTauInterceptLoc: \
                    self.parLnTauInterceptLoc + \
-                   self.nCampaignNights] = self.parLnTauIntercept * unitDict['lnTauUnit']
+                   self.nCampaignNights] = self.parLnTauIntercept * u
             parHigh[self.parLnTauInterceptLoc: \
                     self.parLnTauInterceptLoc + \
-                self.nCampaignNights] = self.parLnTauIntercept * unitDict['lnTauUnit']
+                self.nCampaignNights] = self.parLnTauIntercept * u
+            u = units[self.parLnTauSlopeLoc: \
+                          self.parLnTauSlopeLoc + \
+                          self.nCampaignNights]
             parLow[self.parLnTauSlopeLoc: \
                    self.parLnTauSlopeLoc + \
-                   self.nCampaignNights] = self.parLnTauSlope * unitDict['lnTauSlopeUnit']
+                   self.nCampaignNights] = self.parLnTauSlope * u
             parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
-                    self.nCampaignNights] = self.parLnTauSlope * unitDict['lnTauSlopeUnit']
+                    self.nCampaignNights] = self.parLnTauSlope * u
+            u = units[self.parAlphaLoc: \
+                          self.parAlphaLoc + \
+                          self.nCampaignNights]
             parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
-                   self.nCampaignNights] = self.parAlpha * unitDict['alphaUnit']
+                   self.nCampaignNights] = self.parAlpha * u
             parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
-                    self.nCampaignNights] = self.parAlpha * unitDict['alphaUnit']
+                    self.nCampaignNights] = self.parAlpha * u
 
         # zip these into a list of tuples
         parBounds = list(zip(parLow, parHigh))
 
         return parBounds
-
-    def getUnitDict(self,fitterUnits=False):
-        """
-        Get dictionary of unit conversions.
-
-        parameters
-        ----------
-        fitterUnits: bool, default=False
-           Return with normalized fitter units or just 1.0s?
-        """
-
-        if (fitterUnits):
-            return self.unitDictSteps
-        else:
-            return self.unitDictOnes
 
     @property
     def superStarFlatCenter(self):
