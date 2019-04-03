@@ -72,6 +72,8 @@ class FgcmComputeStepUnits(object):
 
         self.illegalValue = fgcmConfig.illegalValue
 
+        self.maxParStepFraction = 0.1 # hard code this
+
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
         else:
@@ -151,7 +153,7 @@ class FgcmComputeStepUnits(object):
             partialSums[:] += snmm.getArray(
                 self.totalHandleDict[workerIndex + thisCore])[:]
 
-        nonZero, = np.where(partialSums[0: self.fgcmPars.nFitPars] > 0)
+        nonZero, = np.where(partialSums[self.fgcmPars.nFitPars: 2*self.fgcmPars.nFitPars] > 0)
         nActualFitPars = nonZero.size
 
         # Get the number of degrees of freedom
@@ -164,6 +166,28 @@ class FgcmComputeStepUnits(object):
 
         # And the actual step size for good pars
         self.fgcmPars.stepUnits[nonZero] = np.abs(dChisqdPNZ) / self.fitGradientTolerance
+
+        # Leave these in temporarily...
+        print('O3:')
+        print(self.fgcmPars.stepUnits[self.fgcmPars.parO3Loc:
+                                          (self.fgcmPars.parO3Loc +
+                                           self.fgcmPars.nCampaignNights)])
+        print('Alpha:')
+        print(self.fgcmPars.stepUnits[self.fgcmPars.parAlphaLoc:
+                                          (self.fgcmPars.parAlphaLoc +
+                                           self.fgcmPars.nCampaignNights)])
+        print('PWV intercept:')
+        print(self.fgcmPars.stepUnits[self.fgcmPars.parLnPwvInterceptLoc:
+                                          (self.fgcmPars.parLnPwvInterceptLoc +
+                                           self.fgcmPars.nCampaignNights)])
+        print('Tau intercept:')
+        print(self.fgcmPars.stepUnits[self.fgcmPars.parLnTauInterceptLoc:
+                                          (self.fgcmPars.parLnTauInterceptLoc +
+                                           self.fgcmPars.nCampaignNights)])
+        print('Washes:')
+        print(self.fgcmPars.stepUnits[self.fgcmPars.parQESysInterceptLoc:
+                                          (self.fgcmPars.parQESysInterceptLoc +
+                                           self.fgcmPars.nWashIntervals)])
 
         self.fgcmLog.info('Step size computation took %.2f seconds.' %
                           (time.time() - startTime))
@@ -264,240 +288,296 @@ class FgcmComputeStepUnits(object):
             dLdLnTauGO += dLdLnTauI1GO
             dLdAlphaGO += dLdAlphaI1GO
 
-            ##########
-            ## O3
-            ##########
+        ##########
+        ## O3
+        ##########
 
-            expNightIndexGOF = self.fgcmPars.expNightIndex[obsExpIndexGO[obsFitUseGO]]
-            uNightIndex = np.unique(expNightIndexGOF)
+        expNightIndexGOF = self.fgcmPars.expNightIndex[obsExpIndexGO[obsFitUseGO]]
+        uNightIndex = np.unique(expNightIndexGOF)
 
-            np.add.at(partialArray[self.fgcmPars.parO3Loc:
-                                       (self.fgcmPars.parO3Loc +
+        # First, we compute the maximum change in magnitude expected from a (10%) shift
+        # in the given parameter
+        # And then we say the test summation (to compute units) should assume the configured
+        # convergence criteria OR this shift, whichever is smaller.  That way we don't
+        # go crazy and try to the ozone to incorrectly move when no amount of ozone is
+        # going to get the z-band to budge (for example).
+
+        #maxDeltaO3GO = np.abs(dLdO3GO) * (self.fgcmLUT.o3[-1] - self.fgcmLUT.o3[0]) * self.maxParStepFraction
+        #deltaMagGO = np.clip(maxDeltaO3GO, None, self.stepUnitReference)
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+        np.add.at(partialArray[self.fgcmPars.parO3Loc:
+                                   (self.fgcmPars.parO3Loc +
+                                    self.fgcmPars.nCampaignNights)],
+                  expNightIndexGOF,
+                  2.0 * (deltaMagWeightedGOF) * (
+                dLdO3GO[obsFitUseGO]))
+
+        partialArray[self.fgcmPars.nFitPars +
+                     self.fgcmPars.parO3Loc +
+                     uNightIndex] += 1
+
+        ###########
+        ## Alpha
+        ###########
+
+        #maxDeltaAlphaGO = np.abs(dLdAlphaGO) * (self.fgcmLUT.alpha[-1] - self.fgcmLUT.alpha[0]) * self.maxParStepFraction
+        #deltaMagGO = np.clip(maxDeltaAlphaGO, None, self.stepUnitReference)
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+        np.add.at(partialArray[self.fgcmPars.parAlphaLoc:
+                                   (self.fgcmPars.parAlphaLoc+
+                                    self.fgcmPars.nCampaignNights)],
+                  expNightIndexGOF,
+                  2.0 * (deltaMagWeightedGOF) * (
+                dLdAlphaGO[obsFitUseGO]))
+
+        partialArray[self.fgcmPars.nFitPars +
+                     self.fgcmPars.parAlphaLoc +
+                     uNightIndex] += 1
+
+        ###########
+        ## PWV External
+        ###########
+
+        if (self.fgcmPars.hasExternalPwv and not self.fgcmPars.useRetrievedPwv):
+            hasExtGOF,=np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGO[obsFitUseGO]])
+            uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+
+            # PWV Nightly Offset
+
+            # This can be used for both of those below
+            #maxDeltaLnPwvGO = np.abs(dLdLnPwvGO) * (self.fgcmLUT.lnPwv[-1] - self.fgcmLUT.lnPwv[0]) * self.maxParStepFraction
+            #deltaMagGO = np.clip(maxDeltaLnPwvGO, None, self.stepUnitReference)
+            #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+            np.add.at(partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
+                                       (self.fgcmPars.parExternalLnPwvOffsetLoc+
                                         self.fgcmPars.nCampaignNights)],
-                      expNightIndexGOF,
-                      2.0 * deltaMagWeightedGOF * (
-                    dLdO3GO[obsFitUseGO]))
+                      expNightIndexGOF[hasExtGOF],
+                      2.0 * deltaMagWeightedGOF[hasExtGOF] * (
+                    dLdLnPwvGO[obsFitUseGO[hasExtGOF]]))
 
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parO3Loc +
-                         uNightIndex] += 1
+                         self.fgcmPars.parExternalLnPwvOffsetLoc +
+                         uNightIndexHasExt] += 1
 
-            ###########
-            ## Alpha
-            ###########
+            # PWV Global Scale
 
-            np.add.at(partialArray[self.fgcmPars.parAlphaLoc:
-                                       (self.fgcmPars.parAlphaLoc+
-                                        self.fgcmPars.nCampaignNights)],
-                      expNightIndexGOF,
-                      2.0 * deltaMagWeightedGOF * (
-                    dLdAlphaGO[obsFitUseGO]))
+            partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] = 2.0 * (
+                np.sum(deltaMagWeightedGOF[hasExtGOF] * (
+                        self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasExtGOF]]] *
+                        dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
 
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parAlphaLoc +
-                         uNightIndex] += 1
+                         self.fgcmPars.parExternalLnPwvScaleLoc] += 1
 
-            ###########
-            ## PWV External
-            ###########
+        ################
+        ## PWV Retrieved
+        ################
 
-            if (self.fgcmPars.hasExternalPwv and not self.fgcmPars.useRetrievedPwv):
-                hasExtGOF,=np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGO[obsFitUseGO]])
-                uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+        if (self.fgcmPars.useRetrievedPwv):
+            hasRetrievedPwvGOF, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGO[obsFitUseGO]] &
+                                            retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
-                # PWV Nightly Offset
+            if hasRetrievedPwvGOF.size > 0:
+                # note this might be zero-size on first run
 
-                np.add.at(partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
-                                           (self.fgcmPars.parExternalLnPwvOffsetLoc+
-                                            self.fgcmPars.nCampaignNights)],
-                          expNightIndexGOF[hasExtGOF],
-                          2.0 * deltaMagWeightedGOF[hasExtGOF] * (
-                        dLdLnPwvGO[obsFitUseGO[hasExtGOF]]))
+                # PWV Retrieved Global Scale
 
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parExternalLnPwvOffsetLoc +
-                             uNightIndexHasExt] += 1
+                # This can be used for all of the ones below
+                #maxDeltaLnPwvGO = np.abs(dLdLnPwvGO) * (self.fgcmLUT.lnPwv[-1] - self.fgcmLUT.lnPwv[0]) * self.maxParStepFraction
+                #deltaMagGO = np.clip(maxDeltaLnPwvGO, None, self.stepUnitReference)
+                #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
 
-                # PWV Global Scale
-
-                partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] = 2.0 * (
-                    np.sum(deltaMagWeightedGOF[hasExtGOF] * (
-                            self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasExtGOF]]] *
-                            dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
+                partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] = 2.0 * (
+                    np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
+                            self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasRetreivedPwvGOF]]] *
+                            dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
 
                 partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parExternalLnPwvScaleLoc] += 1
+                             self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
 
-            ################
-            ## PWV Retrieved
-            ################
+                if self.fgcmPars.useNightlyRetrievedPwv:
+                    # PWV Retrieved Nightly Offset
 
-            if (self.fgcmPars.useRetrievedPwv):
-                hasRetrievedPwvGOF, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGO[obsFitUseGO]] &
-                                                retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+                    uNightIndexHasRetrievedPwv = np.unique(expNightIndexGOF[hasRetrievedPwvGOF])
 
-                if hasRetrievedPwvGOF.size > 0:
-                    # note this might be zero-size on first run
+                    np.add.at(partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
+                                               (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
+                                                self.fgcmPars.nCampaignNights)],
+                              expNightIndexGOF[hasRetrievedPwvGOF],
+                              2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
+                            dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]]))
 
-                    # PWV Retrieved Global Scale
+                    partialArray[self.fgcmPars.nFitPars +
+                                 self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
+                                 uNightIndexHasRetrievedPwv] += 1
 
-                    partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] = 2.0 * (
+                else:
+                    # PWV Retrieved Global Offset
+
+                    partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
                         np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasRetreivedPwvGOF]]] *
                                 dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
 
                     partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
+                                 self.fgcmPars.parRetrievedLnPwvOffsetLoc] += 1
 
-                    if self.fgcmPars.useNightlyRetrievedPwv:
-                        # PWV Retrieved Nightly Offset
-
-                        uNightIndexHasRetrievedPwv = np.unique(expNightIndexGOF[hasRetrievedPwvGOF])
-
-                        np.add.at(partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
-                                                   (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
-                                                    self.fgcmPars.nCampaignNights)],
-                                  expNightIndexGOF[hasRetrievedPwvGOF],
-                                  2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]]))
-
-                        partialArray[self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
-                                     uNightIndexHasRetrievedPwv] += 1
-
-                    else:
-                        # PWV Retrieved Global Offset
-
-                        partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
-                            np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                    dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
-
-                        partialArray[self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parRetrievedLnPwvOffsetLoc] += 1
-
-            else:
-                ###########
-                ## Pwv No External
-                ###########
-
-                noExtGOF, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGO[obsFitUseGO]])
-                uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
-
-                # Pwv Nightly Intercept
-
-                np.add.at(partialArray[self.fgcmPars.parLnPwvInterceptLoc:
-                                           (self.fgcmPars.parLnPwvInterceptLoc+
-                                            self.fgcmPars.nCampaignNights)],
-                          expNightIndexGOF[noExtGOF],
-                          2.0 * deltaMagWeightedGOF[noExtGOF] * (
-                        dLdLnPwvGO[obsFitUseGO[noExtGOF]]))
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parLnPwvInterceptLoc +
-                             uNightIndexNoExt] += 1
-
-                # lnPwv Nightly Slope
-
-                np.add.at(partialArray[self.fgcmPars.parLnPwvSlopeLoc:
-                                           (self.fgcmPars.parLnPwvSlopeLoc+
-                                            self.fgcmPars.nCampaignNights)],
-                          expNightIndexGOF[noExtGOF],
-                          2.0 * deltaMagWeightedGOF[noExtGOF] * (
-                        (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
-                         dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parLnPwvSlopeLoc +
-                             uNightIndexNoExt] += 1
-
-                # lnPwv Nightly Quadratic
-                if self.useQuadraticPwv:
-
-                    np.add.at(partialArray[self.fgcmPars.parLnPwvQuadraticLoc:
-                                               (self.fgcmPars.parLnPwvQuadraticLoc+
-                                                self.fgcmPars.nCampaignNights)],
-                              expNightIndexGOF[noExtGOF],
-                              2.0 * deltaMagWeightedGOF[noExtGOF] * (
-                            (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]]**2. * dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
-
-                    partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parLnPwvQuadraticLoc +
-                                 uNightIndexNoExt] += 1
-
-            #############
-            ## Tau External
-            #############
-
-            if (self.fgcmPars.hasExternalTau):
-                hasExtGOF,=np.where(self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
-                uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
-
-                # Tau Nightly Offset
-
-                np.add.at(partialArray[self.fgcmPars.parExternalLnTauOffsetLoc:
-                                           (self.fgcmPars.parExternalLnTauOffsetLoc+
-                                            self.fgcmPars.nCampaignNights)],
-                          expNightIndexGOF[hasExtGOF],
-                          2.0 * deltaMagWeightedGOF[hasExtGOF] * (
-                        dLdLnTauGO[obsFitUseGO[hasExtGOF]]))
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parExternalLnTauOffsetLoc +
-                             uNightIndexHasExt] += 1
-
-                # Tau Global Scale
-                ## MAYBE: is this correct with the logs?
-
-                partialArray[self.fgcmPars.parExternalLnTauScaleLoc] = 2.0 * (
-                    np.sum(deltaMagWeightedGOF[hasExtGOF] * (
-                            dLdLnTauGO[obsFitUseGO[hasExtGOF]])))
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parExternalLnTauScaleLoc] += 1
-
+        else:
             ###########
-            ## Tau No External
+            ## Pwv No External
             ###########
 
-            noExtGOF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
+            noExtGOF, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGO[obsFitUseGO]])
             uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
 
-            # lnTau Nightly Intercept
+            # Pwv Nightly Intercept
 
-            np.add.at(partialArray[self.fgcmPars.parLnTauInterceptLoc:
-                                       (self.fgcmPars.parLnTauInterceptLoc+
+            #maxDeltaLnPwvGO = np.abs(dLdLnPwvGO) * (self.fgcmLUT.lnPwv[-1] - self.fgcmLUT.lnPwv[0]) * self.maxParStepFraction
+            #deltaMagGO = np.clip(maxDeltaLnPwvGO, None, self.stepUnitReference)
+            #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+            np.add.at(partialArray[self.fgcmPars.parLnPwvInterceptLoc:
+                                       (self.fgcmPars.parLnPwvInterceptLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       2.0 * deltaMagWeightedGOF[noExtGOF] * (
-                    dLdLnTauGO[obsFitUseGO[noExtGOF]]))
+                    dLdLnPwvGO[obsFitUseGO[noExtGOF]]))
 
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parLnTauInterceptLoc +
+                         self.fgcmPars.parLnPwvInterceptLoc +
                          uNightIndexNoExt] += 1
 
-            # lnTau nightly slope
+            # lnPwv Nightly Slope
 
-            np.add.at(partialArray[self.fgcmPars.parLnTauSlopeLoc:
-                                       (self.fgcmPars.parLnTauSlopeLoc+
+            #maxDeltaLnPwvSlopeGO = (np.abs(dLdLnPwvGO * self.fgcmPars.expDeltaUT[obsExpIndexGO]) *
+            #                        (self.fgcmLUT.lnPwv[-1] - self.fgcmLUT.lnPwv[0]) *
+            #                        self.maxParStepFraction)
+            #deltaMagGO = np.clip(maxDeltaLnPwvSlopeGO, None, self.stepUnitReference)
+            #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+            np.add.at(partialArray[self.fgcmPars.parLnPwvSlopeLoc:
+                                       (self.fgcmPars.parLnPwvSlopeLoc+
                                         self.fgcmPars.nCampaignNights)],
                       expNightIndexGOF[noExtGOF],
                       2.0 * deltaMagWeightedGOF[noExtGOF] * (
                     (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
-                     dLdLnTauGO[obsFitUseGO[noExtGOF]])))
+                     dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
 
             partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parLnTauSlopeLoc +
+                         self.fgcmPars.parLnPwvSlopeLoc +
                          uNightIndexNoExt] += 1
+
+            # lnPwv Nightly Quadratic
+            if self.useQuadraticPwv:
+
+                #maxDeltaLnPwvQuadraticGO = (np.abs(dLdLnPwvGO * self.fgcmPars.expDeltaUT[obsExpIndexGO]**2.) *
+                #                            (self.fgcmLUT.lnPwv[-1] - self.fgcmLUT.lnPwv[0]) *
+                #                            self.maxParStepFraction)
+                #deltaMagGO = np.clip(maxDeltaLnPwvQuadraticGO, None, self.stepUnitReference)
+                #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+                np.add.at(partialArray[self.fgcmPars.parLnPwvQuadraticLoc:
+                                           (self.fgcmPars.parLnPwvQuadraticLoc+
+                                            self.fgcmPars.nCampaignNights)],
+                          expNightIndexGOF[noExtGOF],
+                          2.0 * deltaMagWeightedGOF[noExtGOF] * (
+                        (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]]**2. * dLdLnPwvGO[obsFitUseGO[noExtGOF]])))
+
+                partialArray[self.fgcmPars.nFitPars +
+                             self.fgcmPars.parLnPwvQuadraticLoc +
+                             uNightIndexNoExt] += 1
+
+        #############
+        ## Tau External
+        #############
+
+        if (self.fgcmPars.hasExternalTau):
+            # NOT IMPLEMENTED PROPERLY YET
+
+            hasExtGOF,=np.where(self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
+            uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+
+            # Tau Nightly Offset
+
+            np.add.at(partialArray[self.fgcmPars.parExternalLnTauOffsetLoc:
+                                       (self.fgcmPars.parExternalLnTauOffsetLoc+
+                                        self.fgcmPars.nCampaignNights)],
+                      expNightIndexGOF[hasExtGOF],
+                      2.0 * deltaMagWeightedGOF[hasExtGOF] * (
+                    dLdLnTauGO[obsFitUseGO[hasExtGOF]]))
+
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parExternalLnTauOffsetLoc +
+                         uNightIndexHasExt] += 1
+
+            # Tau Global Scale
+            ## MAYBE: is this correct with the logs?
+
+            partialArray[self.fgcmPars.parExternalLnTauScaleLoc] = 2.0 * (
+                np.sum(deltaMagWeightedGOF[hasExtGOF] * (
+                        dLdLnTauGO[obsFitUseGO[hasExtGOF]])))
+
+            partialArray[self.fgcmPars.nFitPars +
+                         self.fgcmPars.parExternalLnTauScaleLoc] += 1
+
+        ###########
+        ## Tau No External
+        ###########
+
+        noExtGOF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
+        uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
+
+        # lnTau Nightly Intercept
+
+        #maxDeltaLnTauGO = np.abs(dLdLnTauGO) * (self.fgcmLUT.lnTau[-1] - self.fgcmLUT.lnTau[0]) * self.maxParStepFraction
+        #deltaMagGO = np.clip(maxDeltaLnTauGO, None, self.stepUnitReference)
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+        np.add.at(partialArray[self.fgcmPars.parLnTauInterceptLoc:
+                                   (self.fgcmPars.parLnTauInterceptLoc+
+                                    self.fgcmPars.nCampaignNights)],
+                  expNightIndexGOF[noExtGOF],
+                  2.0 * deltaMagWeightedGOF[noExtGOF] * (
+                dLdLnTauGO[obsFitUseGO[noExtGOF]]))
+
+        partialArray[self.fgcmPars.nFitPars +
+                     self.fgcmPars.parLnTauInterceptLoc +
+                     uNightIndexNoExt] += 1
+
+        # lnTau nightly slope
+
+        #maxDeltaLnTauSlopeGO = (np.abs(dLdLnTauGO * self.fgcmPars.expDeltaUT[obsExpIndexGO]) *
+        #                        (self.fgcmLUT.lnTau[-1] - self.fgcmLUT.lnTau[0]) *
+        #                        self.maxParStepFraction)
+        #deltaMagGO = np.clip(maxDeltaLnTauSlopeGO, None, self.stepUnitReference)
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+        np.add.at(partialArray[self.fgcmPars.parLnTauSlopeLoc:
+                                   (self.fgcmPars.parLnTauSlopeLoc+
+                                    self.fgcmPars.nCampaignNights)],
+                  expNightIndexGOF[noExtGOF],
+                  2.0 * deltaMagWeightedGOF[noExtGOF] * (
+                (self.fgcmPars.expDeltaUT[obsExpIndexGO[obsFitUseGO[noExtGOF]]] *
+                 dLdLnTauGO[obsFitUseGO[noExtGOF]])))
+
+        partialArray[self.fgcmPars.nFitPars +
+                     self.fgcmPars.parLnTauSlopeLoc +
+                     uNightIndexNoExt] += 1
 
         ##################
         ## Washes (QE Sys)
         ##################
 
-        # Note that we do this derivative even if we've frozen the atmosphere.
+        # The washes don't need to worry about the limits ... 0.1 mag is 0.1 mag here.
 
         expWashIndexGOF = self.fgcmPars.expWashIndex[obsExpIndexGO[obsFitUseGO]]
 
         # Wash Intercept
+
+        #deltaMagGO = np.zeros(goodObs.size) + self.stepUnitReference
+        #deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
 
         if self.instrumentParsPerBand:
             # We have per-band intercepts
