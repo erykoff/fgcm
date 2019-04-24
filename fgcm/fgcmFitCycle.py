@@ -6,7 +6,7 @@ import os
 import sys
 import esutil
 import scipy.optimize as optimize
-from iminuit import minimize as iminimize
+# from iminuit import minimize as iminimize
 
 import matplotlib.pyplot as plt
 
