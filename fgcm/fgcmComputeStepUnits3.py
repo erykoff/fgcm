@@ -205,7 +205,8 @@ class FgcmComputeStepUnits3(object):
                                           (self.fgcmPars.parQESysInterceptLoc +
                                            self.fgcmPars.nWashIntervals)])
 
-        import fitsio
+        #import fitsio
+        import astropy.io.fits as pyfits
         tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
@@ -239,7 +240,8 @@ class FgcmComputeStepUnits3(object):
                                                                       (self.fgcmPars.parQESysInterceptLoc +
                                                                        self.fgcmPars.nWashIntervals)]
 
-        fitsio.write('%s_stepUnits3.fits' % (self.outfileBaseWithCycle), tempCat, clobber=True)
+        #fitsio.write('%s_stepUnits3.fits' % (self.outfileBaseWithCycle), tempCat, clobber=True)
+        pyfits.writeto('%s_stepUnits3.fits' % (self.outfileBaseWithCycle), tempCat, overwrite=True)
 
         self.fgcmLog.info('Step size computation took %.2f seconds.' %
                           (time.time() - startTime))

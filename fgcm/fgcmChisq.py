@@ -201,7 +201,8 @@ class FgcmChisq(object):
         # HACK
         # put in saving of the parameters...
         # this will be in both units
-        import fitsio
+        # import fitsio
+        import astropy.io.fits as pyfits
         tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
@@ -235,7 +236,8 @@ class FgcmChisq(object):
                                                         (self.fgcmPars.parQESysInterceptLoc +
                                                          self.fgcmPars.nWashIntervals)]
 
-        fitsio.write('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+        #fitsio.write('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+        pyfits.writeto('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
         tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
@@ -254,7 +256,8 @@ class FgcmChisq(object):
         tempCat['lnPwvQuadratic'][0][:] = self.fgcmPars.parLnPwvQuadratic
         tempCat['qeSysIntercept'][0][:, :] = self.fgcmPars.parQESysIntercept
 
-        fitsio.write('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+        #fitsio.write('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+        pyfits.writeto('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
         #############
 
@@ -427,7 +430,8 @@ class FgcmChisq(object):
                             partialSums[2*self.fgcmPars.nFitPars: 3*self.fgcmPars.nFitPars]) / fitDOF
 
                 # And record this
-                import fitsio
+                #import fitsio
+                import astropy.io.fits as pyfits
                 tempCat = np.zeros(1, dtype=[('chisq', 'f8'),
                                              ('o3', 'f8', self.fgcmPars.nCampaignNights),
                                              ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
@@ -463,7 +467,8 @@ class FgcmChisq(object):
                                                                 self.fgcmPars.nWashIntervals)]
                 tempCat['chisq'][0] = fitChisq
 
-                fitsio.write('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+                #fitsio.write('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
+                pyfits.writeto('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
@@ -1594,7 +1599,7 @@ class FgcmChisq(object):
                 test = np.where(nStarTot == 0)
                 nStarTot[test] = 1000
 
-                factorGOF[:] = 0.0
+                factorGOF = np.zeros(obsFitUseGO.size)
                 factorGOF[indGOF] = 1.0 - nStarPar[gsGOF, obsBandIndexGO[obsFitUseGO[indGOF]], ravelIndexGOF[indGOF]] / nStarTot[gsGOF, obsBandIndexGO[obsFitUseGO[indGOF]]]
 
                 # ****
@@ -1650,7 +1655,7 @@ class FgcmChisq(object):
                 test = np.where(nStarTot == 0)
                 nStarTot[test] = 1000
 
-                factorGOF[:] = 0.0
+                factorGOF = np.zeros(obsFitUseGO.size)
                 factorGOF[indGOF] = 1.0 - nStarPar[gsGOF, obsBandIndexGO[obsFitUseGO[indGOF]], expWashIndexGOF[indGOF]] / nStarTot[gsGOF, obsBandIndexGO[obsFitUseGO[indGOF]]]
 
                 # ***
