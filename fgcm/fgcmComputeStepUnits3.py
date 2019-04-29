@@ -854,7 +854,7 @@ class FgcmComputeStepUnits3(object):
         ## Filter offset
         #################
 
-        sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.nFitBands))
+        sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.nLUTFilter))
         add_at_3d(sumNumerator,
                   (gsGOF, obsBandIndexGOFI, obsLUTFilterIndexGO[obsFitUseGOI]),
                   1.0 / obsMagErr2GOFI)
