@@ -13,17 +13,6 @@ if has_numba:
         for ind in indices:
             array[ind] += value
 
-    @jit
-    def add_at(array, indices, values):
-        if isinstance(indices, tuple):
-            ctr = 0
-            for ind in zip(*indices):
-                array[ind] += values[ctr]
-                ctr += 1
-        else:
-            for i in range(indices.size):
-                array[indices[i]] += values[i]
-
     @jit(nopython=True)
     def add_at_1d(array, indices, values):
         for i in range(indices.size):
