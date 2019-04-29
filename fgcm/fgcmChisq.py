@@ -210,7 +210,7 @@ class FgcmChisq(object):
                                      ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
                                      ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('qeSysIntercept', 'f8', self.fgcmPars.nWashIntervals)])
+                                     ('qeSysIntercept', 'f8', self.fgcmPars.parQESysIntercept.size)])
         tempCat['o3'][0][:] = fitParams[self.fgcmPars.parO3Loc:
                                             (self.fgcmPars.parO3Loc +
                                              self.fgcmPars.nCampaignNights)]
@@ -234,7 +234,7 @@ class FgcmChisq(object):
                                                          self.fgcmPars.nCampaignNights)]
         tempCat['qeSysIntercept'][0][:] = fitParams[self.fgcmPars.parQESysInterceptLoc:
                                                         (self.fgcmPars.parQESysInterceptLoc +
-                                                         self.fgcmPars.nWashIntervals)]
+                                                         self.fgcmPars.parQESysIntercept.size)]
 
         #fitsio.write('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
         pyfits.writeto('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
