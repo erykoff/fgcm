@@ -171,23 +171,14 @@ class FgcmComputeStepUnits3(object):
         dChisqdPNZ = partialSums[nonZero] / fitDOF
 
         # default step is 1.0
-        #self.fgcmPars.stepUnits[:] = 1.0 / nActualFitPars
+        self.fgcmPars.stepUnits[:] = 1.0
 
         # And the actual step size for good pars
-        self.fgcmPars.stepUnits[nonZero] = np.abs(dChisqdPNZ) / self.fitGradientTolerance / (2.0 * nActualFitPars)
-        self.fgcmPars.stepUnits[nonZero] = np.abs(dChisqdPNZ) / self.fitGradientTolerance / (2.0 * nActualFitPars)
+        self.fgcmPars.stepUnits[nonZero] = np.abs(dChisqdPNZ) / self.fitGradientTolerance
 
-        #self.fgcmPars.stepUnits[self.fgcmPars.parO3Loc:
-        #                            (self.fgcmPars.parO3Loc +
-        #                             self.fgcmPars.nCampaignNights)] *= 5.0
-
-        #self.fgcmPars.stepUnits[self.fgcmPars.parAlphaLoc:
-        #                            (self.fgcmPars.parAlphaLoc +
-        #                             self.fgcmPars.nCampaignNights)] *= 5.0
-
-        #self.fgcmPars.stepUnits[self.fgcmPars.parQESysInterceptLoc:
-        #                            (self.fgcmPars.parQESysInterceptLoc +
-        #                             self.fgcmPars.nWashIntervals)] /= 5.0
+        if not self.freezeStdAtmosphere:
+            # This provides a bit more wiggle room when fitting lots of parameters
+            self.fgcmPars.stepUnits[nonZero] /= (2.0 * nActualFitPars)
 
         # And reset to median value for each class of steps
 
