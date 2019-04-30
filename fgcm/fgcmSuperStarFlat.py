@@ -57,7 +57,7 @@ class FgcmSuperStarFlat(object):
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
-    def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False):
+    def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False, forceZeroMean=False):
         """
         Compute the SuperStar Flats
 
@@ -68,6 +68,8 @@ class FgcmSuperStarFlat(object):
            Override any setting of superStarSubCCD (used for initial guess)
         onlyObsErr: bool, default=False
            Only use observation error (used for initial guess)
+        forceZeroMean: bool, default=False
+           Force the mean superstar to be zero in each epoch/band
         """
 
         startTime = time.time()
@@ -296,6 +298,16 @@ class FgcmSuperStarFlat(object):
 
                 superStarFlatFPMean[e, f] = np.mean(superStarFlatCenter[e, f, use])
                 superStarFlatFPSigma[e, f] = np.std(superStarFlatCenter[e, f, use])
+
+                if forceZeroMean:
+                    # Subtract off the mag
+                    superStarFlatCenter[e, f, use] -= superStarFlatFPMean[e, f]
+                    # Divide the flux parameter
+                    self.fgcmPars.parSuperStarFlat[e, f, use, 0] /= 10.**(superStarFlatFPMean[e, f] / (-2.5))
+                    # And reset the mean and delta
+                    deltaSuperStarFlatCenter[e, f, use] -= superStarFlatFPMean[e, f]
+                    superStarFlatFPMean[e, f] -= superStarFlatFPMean[e, f]
+
                 deltaSuperStarFlatFPMean[e, f] = np.mean(deltaSuperStarFlatCenter[e, f, use])
                 deltaSuperStarFlatFPSigma[e, f] = np.std(deltaSuperStarFlatCenter[e, f, use])
 
