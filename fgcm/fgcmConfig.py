@@ -193,6 +193,7 @@ class FgcmConfig(object):
     outputStars = ConfigField(bool, default=False)
     outputZeropoints = ConfigField(bool, default=False)
     outputPath = ConfigField(str, required=False)
+    saveParsForDebugging = ConfigField(bool, default=False)
 
     pwvFile = ConfigField(str, required=False)
     externalPwvDeltaT = ConfigField(float, default=0.1)

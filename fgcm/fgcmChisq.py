@@ -83,6 +83,7 @@ class FgcmChisq(object):
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
+        self.saveParsForDebugging = fgcmConfig.saveParsForDebugging
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
@@ -100,7 +101,6 @@ class FgcmChisq(object):
 
         # this is the default number of parameters
         self.nActualFitPars = self.fgcmPars.nFitPars
-        #self.fgcmLog.log('INFO','Default: fit %d parameters.' % (self.nActualFitPars))
         self.fgcmLog.info('Default: fit %d parameters.' % (self.nActualFitPars))
 
         self.clearMatchCache()
@@ -198,66 +198,63 @@ class FgcmChisq(object):
         self.fgcmPars.reloadParArray(fitParams, fitterUnits=self.fitterUnits)
         self.fgcmPars.parsToExposures()
 
-        # HACK
-        # put in saving of the parameters...
-        # this will be in both units
-        # import fitsio
-        import astropy.io.fits as pyfits
-        tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('qeSysIntercept', 'f8', self.fgcmPars.parQESysIntercept.size)])
-        tempCat['o3'][0][:] = fitParams[self.fgcmPars.parO3Loc:
-                                            (self.fgcmPars.parO3Loc +
-                                             self.fgcmPars.nCampaignNights)]
-        tempCat['lnTauIntercept'][0][:] = fitParams[self.fgcmPars.parLnTauInterceptLoc:
-                                                        (self.fgcmPars.parLnTauInterceptLoc +
+        if self.saveParsForDebugging:
+            # put in saving of the parameters...
+            # this will be in both units
+            import astropy.io.fits as pyfits
+            tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('alpha', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('qeSysIntercept', 'f8', self.fgcmPars.parQESysIntercept.size)])
+            tempCat['o3'][0][:] = fitParams[self.fgcmPars.parO3Loc:
+                                                (self.fgcmPars.parO3Loc +
+                                                 self.fgcmPars.nCampaignNights)]
+            tempCat['lnTauIntercept'][0][:] = fitParams[self.fgcmPars.parLnTauInterceptLoc:
+                                                            (self.fgcmPars.parLnTauInterceptLoc +
+                                                             self.fgcmPars.nCampaignNights)]
+            tempCat['lnTauSlope'][0][:] = fitParams[self.fgcmPars.parLnTauSlopeLoc:
+                                                        (self.fgcmPars.parLnTauSlopeLoc +
                                                          self.fgcmPars.nCampaignNights)]
-        tempCat['lnTauSlope'][0][:] = fitParams[self.fgcmPars.parLnTauSlopeLoc:
-                                                    (self.fgcmPars.parLnTauSlopeLoc +
-                                                     self.fgcmPars.nCampaignNights)]
-        tempCat['alpha'][0][:] = fitParams[self.fgcmPars.parAlphaLoc:
-                                               (self.fgcmPars.parAlphaLoc +
-                                                self.fgcmPars.nCampaignNights)]
-        tempCat['lnPwvIntercept'][0][:] = fitParams[self.fgcmPars.parLnPwvInterceptLoc:
-                                                        (self.fgcmPars.parLnPwvInterceptLoc +
+            tempCat['alpha'][0][:] = fitParams[self.fgcmPars.parAlphaLoc:
+                                                   (self.fgcmPars.parAlphaLoc +
+                                                    self.fgcmPars.nCampaignNights)]
+            tempCat['lnPwvIntercept'][0][:] = fitParams[self.fgcmPars.parLnPwvInterceptLoc:
+                                                            (self.fgcmPars.parLnPwvInterceptLoc +
+                                                             self.fgcmPars.nCampaignNights)]
+            tempCat['lnPwvSlope'][0][:] = fitParams[self.fgcmPars.parLnPwvSlopeLoc:
+                                                        (self.fgcmPars.parLnPwvSlopeLoc +
                                                          self.fgcmPars.nCampaignNights)]
-        tempCat['lnPwvSlope'][0][:] = fitParams[self.fgcmPars.parLnPwvSlopeLoc:
-                                                    (self.fgcmPars.parLnPwvSlopeLoc +
-                                                     self.fgcmPars.nCampaignNights)]
-        tempCat['lnPwvQuadratic'][0][:] = fitParams[self.fgcmPars.parLnPwvQuadraticLoc:
-                                                        (self.fgcmPars.parLnPwvQuadraticLoc +
-                                                         self.fgcmPars.nCampaignNights)]
-        tempCat['qeSysIntercept'][0][:] = fitParams[self.fgcmPars.parQESysInterceptLoc:
-                                                        (self.fgcmPars.parQESysInterceptLoc +
-                                                         self.fgcmPars.parQESysIntercept.size)]
+            tempCat['lnPwvQuadratic'][0][:] = fitParams[self.fgcmPars.parLnPwvQuadraticLoc:
+                                                            (self.fgcmPars.parLnPwvQuadraticLoc +
+                                                             self.fgcmPars.nCampaignNights)]
+            tempCat['qeSysIntercept'][0][:] = fitParams[self.fgcmPars.parQESysInterceptLoc:
+                                                            (self.fgcmPars.parQESysInterceptLoc +
+                                                             self.fgcmPars.parQESysIntercept.size)]
 
-        #fitsio.write('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
-        pyfits.writeto('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
+            pyfits.writeto('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
-        tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                     ('qeSysIntercept', 'f8', (self.fgcmPars.nBands, self.fgcmPars.nWashIntervals))])
-        tempCat['o3'][0][:] = self.fgcmPars.parO3
-        tempCat['lnTauIntercept'][0][:] = self.fgcmPars.parLnTauIntercept
-        tempCat['lnTauSlope'][0][:] = self.fgcmPars.parLnTauSlope
-        tempCat['alpha'][0][:] = self.fgcmPars.parAlpha
-        tempCat['lnPwvIntercept'][0][:] = self.fgcmPars.parLnPwvIntercept
-        tempCat['lnPwvSlope'][0][:] = self.fgcmPars.parLnPwvSlope
-        tempCat['lnPwvQuadratic'][0][:] = self.fgcmPars.parLnPwvQuadratic
-        tempCat['qeSysIntercept'][0][:, :] = self.fgcmPars.parQESysIntercept
+            tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('alpha', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
+                                         ('qeSysIntercept', 'f8', (self.fgcmPars.nBands, self.fgcmPars.nWashIntervals))])
+            tempCat['o3'][0][:] = self.fgcmPars.parO3
+            tempCat['lnTauIntercept'][0][:] = self.fgcmPars.parLnTauIntercept
+            tempCat['lnTauSlope'][0][:] = self.fgcmPars.parLnTauSlope
+            tempCat['alpha'][0][:] = self.fgcmPars.parAlpha
+            tempCat['lnPwvIntercept'][0][:] = self.fgcmPars.parLnPwvIntercept
+            tempCat['lnPwvSlope'][0][:] = self.fgcmPars.parLnPwvSlope
+            tempCat['lnPwvQuadratic'][0][:] = self.fgcmPars.parLnPwvQuadratic
+            tempCat['qeSysIntercept'][0][:, :] = self.fgcmPars.parQESysIntercept
 
-        #fitsio.write('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
-        pyfits.writeto('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
+            pyfits.writeto('%s_fitParams_%s_parunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
         #############
 
@@ -429,46 +426,45 @@ class FgcmChisq(object):
                 dChisqdP = (partialSums[0:self.fgcmPars.nFitPars] +
                             partialSums[2*self.fgcmPars.nFitPars: 3*self.fgcmPars.nFitPars]) / fitDOF
 
-                # And record this
-                #import fitsio
-                import astropy.io.fits as pyfits
-                tempCat = np.zeros(1, dtype=[('chisq', 'f8'),
-                                             ('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                             ('qeSysIntercept', 'f8', self.fgcmPars.nWashIntervals)])
-                tempCat['o3'][0][:] = dChisqdP[self.fgcmPars.parO3Loc:
-                                                   (self.fgcmPars.parO3Loc +
-                                                    self.fgcmPars.nCampaignNights)]
-                tempCat['lnTauIntercept'][0][:] = dChisqdP[self.fgcmPars.parLnTauInterceptLoc:
-                                                               (self.fgcmPars.parLnTauInterceptLoc +
-                                                                self.fgcmPars.nCampaignNights)]
-                tempCat['lnTauSlope'][0][:] = dChisqdP[self.fgcmPars.parLnTauSlopeLoc:
-                                                           (self.fgcmPars.parLnTauSlopeLoc +
-                                                            self.fgcmPars.nCampaignNights)]
-                tempCat['alpha'][0][:] = dChisqdP[self.fgcmPars.parAlphaLoc:
-                                                      (self.fgcmPars.parAlphaLoc +
-                                                       self.fgcmPars.nCampaignNights)]
-                tempCat['lnPwvIntercept'][0][:] = dChisqdP[self.fgcmPars.parLnPwvInterceptLoc:
-                                                               (self.fgcmPars.parLnPwvInterceptLoc +
-                                                                self.fgcmPars.nCampaignNights)]
-                tempCat['lnPwvSlope'][0][:] = dChisqdP[self.fgcmPars.parLnPwvSlopeLoc:
-                                                           (self.fgcmPars.parLnPwvSlopeLoc +
-                                                            self.fgcmPars.nCampaignNights)]
-                tempCat['lnPwvQuadratic'][0][:] = dChisqdP[self.fgcmPars.parLnPwvQuadraticLoc:
-                                                               (self.fgcmPars.parLnPwvQuadraticLoc +
-                                                                self.fgcmPars.nCampaignNights)]
-                tempCat['qeSysIntercept'][0][:] = dChisqdP[self.fgcmPars.parQESysInterceptLoc:
-                                                               (self.fgcmPars.parQESysInterceptLoc +
-                                                                self.fgcmPars.nWashIntervals)]
-                tempCat['chisq'][0] = fitChisq
+                if self.saveParsForDebugging:
 
-                #fitsio.write('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, clobber=True)
-                pyfits.writeto('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
+                    import astropy.io.fits as pyfits
+                    tempCat = np.zeros(1, dtype=[('chisq', 'f8'),
+                                                 ('o3', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('alpha', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
+                                                 ('qeSysIntercept', 'f8', self.fgcmPars.nWashIntervals)])
+                    tempCat['o3'][0][:] = dChisqdP[self.fgcmPars.parO3Loc:
+                                                       (self.fgcmPars.parO3Loc +
+                                                        self.fgcmPars.nCampaignNights)]
+                    tempCat['lnTauIntercept'][0][:] = dChisqdP[self.fgcmPars.parLnTauInterceptLoc:
+                                                                   (self.fgcmPars.parLnTauInterceptLoc +
+                                                                    self.fgcmPars.nCampaignNights)]
+                    tempCat['lnTauSlope'][0][:] = dChisqdP[self.fgcmPars.parLnTauSlopeLoc:
+                                                               (self.fgcmPars.parLnTauSlopeLoc +
+                                                                self.fgcmPars.nCampaignNights)]
+                    tempCat['alpha'][0][:] = dChisqdP[self.fgcmPars.parAlphaLoc:
+                                                          (self.fgcmPars.parAlphaLoc +
+                                                           self.fgcmPars.nCampaignNights)]
+                    tempCat['lnPwvIntercept'][0][:] = dChisqdP[self.fgcmPars.parLnPwvInterceptLoc:
+                                                                   (self.fgcmPars.parLnPwvInterceptLoc +
+                                                                    self.fgcmPars.nCampaignNights)]
+                    tempCat['lnPwvSlope'][0][:] = dChisqdP[self.fgcmPars.parLnPwvSlopeLoc:
+                                                               (self.fgcmPars.parLnPwvSlopeLoc +
+                                                                self.fgcmPars.nCampaignNights)]
+                    tempCat['lnPwvQuadratic'][0][:] = dChisqdP[self.fgcmPars.parLnPwvQuadraticLoc:
+                                                                   (self.fgcmPars.parLnPwvQuadraticLoc +
+                                                                    self.fgcmPars.nCampaignNights)]
+                    tempCat['qeSysIntercept'][0][:] = dChisqdP[self.fgcmPars.parQESysInterceptLoc:
+                                                                   (self.fgcmPars.parQESysInterceptLoc +
+                                                                    self.fgcmPars.nWashIntervals)]
+                    tempCat['chisq'][0] = fitChisq
+
+                    pyfits.writeto('%s_dChisqdP_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
             # want to append this...
             self.fitChisqs.append(fitChisq)
@@ -709,27 +705,6 @@ class FgcmChisq(object):
                (obsObjIDIndexGO,obsBandIndexGO),
                obsMagGO/obsMagErr2GO)
 
-        """
-        import fitsio
-        import os
-        fname = 'temp_writeout.fit'
-        if not os.path.isfile(fname):
-            tempCat = np.zeros(1, dtype=[('wtSum_shape', 'f8', len(wtSum.shape)),
-                                         ('obsObjIDIndexGO', 'i4', obsObjIDIndexGO.size),
-                                         ('obsBandIndexGO', 'i4', obsBandIndexGO.size),
-                                         ('obsMagErr2GO', 'f8', obsMagErr2GO.size),
-                                         ('obsMagStdGO', 'f8', obsMagStdGO.size),
-                                         ('obsMagGO', 'f8', obsMagGO.size)])
-            tempCat['wtSum_shape'][0][:] = wtSum.shape
-            tempCat['obsObjIDIndexGO'][0][:] = obsObjIDIndexGO
-            tempCat['obsBandIndexGO'][0][:] = obsBandIndexGO
-            tempCat['obsMagErr2GO'][0][:] = obsMagErr2GO
-            tempCat['obsMagStdGO'][0][:] = obsMagStdGO
-            tempCat['obsMagGO'][0][:] = obsMagGO
-
-            fitsio.write(fname, tempCat, clobber=False)
-            raise RuntimeError("Kick out here")
-            """
         # which objects/bands have observations?
         gd=np.where(wtSum > 0.0)
 
@@ -1094,20 +1069,32 @@ class FgcmChisq(object):
                 ###########
 
                 if (self.fgcmPars.hasExternalPwv and not self.fgcmPars.useRetrievedPwv):
-                    hasExtGOF,=np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGO[obsFitUseGO]])
+                    hasExtGOF, = np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGOF])
                     uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+                    hasExtGOFG, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGOF[indGOF]])
 
-                    # PWV Nightly Offset
+                    # lnPw Nightly Offset
 
-                    # FIXME
+                    sumNumerator[:, :, :] = 0.0
+                    add_at_3d(sumNumerator,
+                              (gsGOF[hasExtGOFG],
+                               obsBandIndexGOFI[hasExtGOFG],
+                               expNightIndexGOFI[hasExtGOFG]),
+                              dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] /
+                              obsMagErr2GOFI[hasExtGOFG])
+
+                    innerTermGOF[:] = 0.0
+                    innerTermGOF[indGOF[hasExtGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] -
+                                                        sumNumerator[gsGOF[hasExtGOFG],
+                                                                     obsBandIndexGOFI[hasExtGOFG],
+                                                                     expNightIndexGOFI[hasExtGOFG]] *
+                                                        objMagStdMeanErr2GO[obsFitUseGOI[hasExtGOFG]])
 
                     add_at_1d(partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
-                                            (self.fgcmPars.parExternalLnPwvOffsetLoc+
-                                             self.fgcmPars.nCampaignNights)],
-                           expNightIndexGOF[hasExtGOF],
-                           2.0 * deltaMagWeightedGOF[hasExtGOF] * (
-                            errSummandGOF[hasExtGOF] *
-                            dLdLnPwvGO[obsFitUseGO[hasExtGOF]]))
+                                               (self.fgcmPars.parExternalLnPwvOffsetLoc+
+                                                self.fgcmPars.nCampaignNights)],
+                              expNightIndexGOF[hasExtGOF],
+                              2.0 * deltaMagWeightedGOF[hasExtGOF] * innerTermGOF[hasExtGOF])
 
                     partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc +
                                  uNightIndexHasExt] /= units[self.fgcmPars.parExternalLnPwvOffsetLoc +
@@ -1137,21 +1124,19 @@ class FgcmChisq(object):
                                      self.fgcmPars.parExternalLnPwvOffsetLoc +
                                      uRefNightIndexHasExt] += 1
 
-                    # PWV Global Scale
+                    # lnPwv Global Scale
 
-                    # FIXME
+                    # NOTE: this may be wrong.  Needs thought.
 
                     partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] = 2.0 * (
                         np.sum(deltaMagWeightedGOF[hasExtGOF] * (
-                                self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasExtGOF]]] *
-                                errSummandGOF[hasExtGOF] *
+                                self.fgcmPars.expLnPwv[obsExpIndexGOF[hasExtGOF]] *
                                 dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
 
                     partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] /= units[self.fgcmPars.parExternalLnPwvScaleLoc]
 
                     partialArray[self.fgcmPars.nFitPars +
                                  self.fgcmPars.parExternalLnPwvScaleLoc] += 1
-
 
                     if useRefstars:
                         temp = np.sum(2.0 * deltaRefMagWeightedGROF[hasExtGROF] *
@@ -1167,27 +1152,27 @@ class FgcmChisq(object):
                 ################
 
                 if (self.fgcmPars.useRetrievedPwv):
-                    hasRetrievedPwvGOF, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGO[obsFitUseGO]] &
+                    hasRetrievedPwvGOF, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF] &
                                                     retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+                    hasRetrievedPWVGOFG, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF[indGOF]] &
+                                                     retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
                     if hasRetrievedPwvGOF.size > 0:
                         # note this might be zero-size on first run
 
-                        # PWV Retrieved Global Scale
+                        # lnPwv Retrieved Global Scale
 
-                        # FIXME
+                        # This may be wrong
 
                         partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] = 2.0 * (
                             np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                    self.fgcmPars.expLnPwv[obsExpIndexGO[obsFitUseGO[hasRetreivedPwvGOF]]] *
-                                    errSummandGOF[hasRetrievedPwvGOF] *
+                                    self.fgcmPars.expLnPwv[obsExpIndexGOF[hasRetreivedPwvGOF]] *
                                     dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
 
                         partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] /= units[self.fgcmPars.parRetrievedLnPwvScaleLoc]
 
                         partialArray[self.fgcmPars.nFitPars +
                                      self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
-
 
                         if useRefstars:
                             hasRetrievedPwvGROF, = np.where((self.fgcmPars.computeRetrievedLnPwvFlag[obsExpIndexGO[goodRefObsGOF]] &
@@ -1201,19 +1186,29 @@ class FgcmChisq(object):
                                          self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
 
                         if self.fgcmPars.useNightlyRetrievedPwv:
-                            # PWV Retrieved Nightly Offset
+                            # lnPwv Retrieved Nightly Offset
 
                             uNightIndexHasRetrievedPwv = np.unique(expNightIndexGOF[hasRetrievedPwvGOF])
 
-                            # FIXME
+                            sumNumerator[:, :, :] = 0.0
+                            add_at_3d(sumNumerator,
+                                      (gsGOF[hasRetrievedPwvGOFG],
+                                       obsBandIndexGOFI[hasRetrievedPwvGOFG],
+                                       expNightIndexGOFI[hasRetrievedPwvGOFG]),
+                                      dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] /
+                                      obsMagErr2GOFI[hasRetrievedPwvGOFG])
+
+                            innerTermGOF[:] = 0.0
+                            innerTermGOF[indGOF[hasRetrievedPwvGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] -
+                                                                         sumNumerator[gsGOF[hasRetrievedPwvGOFG],
+                                                                                      obsBandIndexGOFI[hasRetrievedPwvGOFG],
+                                                                                      expNightIndexGOFI[hasRetrievedPwvGOFG]] *
+                                                                         objMagStdMeanErr2GO[obsFitUseGOI[hasRetrievedPwvGOFG]])
 
                             add_at_1d(partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
-                                                    (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
-                                                     self.fgcmPars.nCampaignNights)],
-                                   expNightIndexGOF[hasRetrievedPwvGOF],
-                                   2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                    errSummandGOF[hasRetrievedPwvGOF] *
-                                    dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]]))
+                                                       (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
+                                                        self.fgcmPars.nCampaignNights)],
+                                      2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * innerTermGOF[hasRetrievedPwvGOF])
 
                             partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
                                          uNightIndexHasRetrievedPwv] /= units[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
@@ -1243,13 +1238,12 @@ class FgcmChisq(object):
                                              uRefNightIndexHasRetrievedPwv] += 1
 
                         else:
-                            # PWV Retrieved Global Offset
+                            # lnPwv Retrieved Global Offset
 
-                            # FIXME
+                            # This may be wrong
 
                             partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
                                 np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                        errSummandGOF[hasRetrievedPwvGOF] *
                                         dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
 
                             partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] /= units[self.fgcmPars.parRetrievedLnPwvOffsetLoc]
@@ -1430,72 +1424,9 @@ class FgcmChisq(object):
                 #############
 
                 if (self.fgcmPars.hasExternalTau):
-                    hasExtGOF,=np.where(self.fgcmPars.externalTauFlag[obsExpIndexGO[obsFitUseGO]])
-                    uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+                    # NOT IMPLEMENTED PROPERLY YET
 
-                    # Tau Nightly Offset
-
-                    # FIXME
-
-                    add_at_1d(partialArray[self.fgcmPars.parExternalLnTauOffsetLoc:
-                                            (self.fgcmPars.parExternalLnTauOffsetLoc+
-                                             self.fgcmPars.nCampaignNights)],
-                           expNightIndexGOF[hasExtGOF],
-                           2.0 * deltaMagWeightedGOF[hasExtGOF] * (
-                            errSummandGOF[hasExtGOF] *
-                            dLdLnTauGO[obsFitUseGO[hasExtGOF]]))
-
-                    partialArray[self.fgcmPars.parExternalLnTauOffsetLoc +
-                                 uNightIndexHasExt] /= units[self.fgcmPars.parExternalLnTauOffsetLoc +
-                                                             uNightIndexHasExt]
-                    partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parExternalLnTauOffsetLoc +
-                                 uNightIndexHasExt] += 1
-
-                    if useRefstars:
-                        hasExtGROF, = np.where(self.fgcmPars.externalTauFlag[obsExpIndexGO[goodRefObsGOF]])
-                        uRefNightIndexHasExt = np.unique(expNightIndexGROF[hasExtGROF])
-
-                        # FIXME
-
-                        add_at_1d(partialArray[2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parExternalLnTauOffsetLoc:
-                                                (2*self.fgcmPars.nFitPars +
-                                                 self.fgcmPars.parExternalLnTauOffsetLoc+
-                                                 self.fgcmPars.nCampaignNights)],
-                               expNightIndexGROF[hasExtGROF],
-                               2.0 * deltaRefMagWeightedGROF[hasExtGROF] *
-                               dLdLnTauGO[goodRefObsGOF[hasExtGROF]])
-
-                        partialArray[2*self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parExternalLnTauOffsetLoc +
-                                     uRefNightIndexHasExt] /= units[self.fgcmPars.parExternalLnTauOffsetLoc +
-                                                                    uRefNightIndexHasExt]
-                        partialArray[3*self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parExternalLnTauOffsetLoc +
-                                     uRefNightIndexHasExt] += 1
-
-                    # Tau Global Scale
-                    ## MAYBE: is this correct with the logs?
-
-                    # FIXME
-
-                    partialArray[self.fgcmPars.parExternalLnTauScaleLoc] = 2.0 * (
-                        np.sum(deltaMagWeightedGOF[hasExtGOF] * (
-                                errSummandGOF[hasExtGOF] *
-                                dLdLnTauGO[obsFitUseGO[hasExtGOF]])))
-
-                    partialArray[self.fgcmPars.parExternalLnTauScaleLoc] /= units[self.fgcmPars.parExternalLnTauScaleLoc]
-                    partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parExternalLnTauScaleLoc] += 1
-
-                    if useRefstars:
-                        temp = np.sum(2.0 * deltaRefMagWeightedGROF[hasExtGROF] *
-                                      dLdLnTauGO[goodRefObsGOF[hasExtGROF]])
-                        partialArray[2*self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parExternalLnTauScaleLoc] = temp / units[self.fgcmPars.parExternalLnTauScaleLoc]
-                        partialArray[3*self.fgcmPars.nFitPars +
-                                     self.fgcmPars.parExternalLnTauScaleLoc] += 1
+                    raise NotImplementedError("external tau not implemented.")
 
                 ###########
                 ## Tau No External
@@ -1738,13 +1669,13 @@ class FgcmChisq(object):
                                         self.fgcmPars.nLUTFilter)],
                       obsLUTFilterIndexGO[obsFitUseGO],
                       2.0 * deltaMagWeightedGOF * innerTermGOF)
-
             partialArray[self.fgcmPars.parFilterOffsetLoc:
                              (self.fgcmPars.parFilterOffsetLoc +
                               self.fgcmPars.nLUTFilter)] /= units[self.fgcmPars.parFilterOffsetLoc:
                                                                       (self.fgcmPars.parFilterOffsetLoc +
                                                                        self.fgcmPars.nLUTFilter)]
-
+            # This next part makes things not work
+            """
             if useRefstars:
                 add_at_1d(partialArray[2*self.fgcmPars.nFitPars +
                                        self.fgcmPars.parFilterOffsetLoc:
@@ -1761,6 +1692,7 @@ class FgcmChisq(object):
                                   self.fgcmPars.nLUTFilter)] /= units[self.fgcmPars.parFilterOffsetLoc:
                                                                           (self.fgcmPars.parFilterOffsetLoc +
                                                                            self.fgcmPars.nLUTFilter)]
+                                                                           """
 
             # Now set those to zero the derivatives we aren't using
             partialArray[self.fgcmPars.parFilterOffsetLoc:

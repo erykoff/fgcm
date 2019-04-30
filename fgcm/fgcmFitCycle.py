@@ -328,7 +328,7 @@ class FgcmFitCycle(object):
                 # Might need option here for no ref stars!
                 # Something with the > 1.0.  WTF?
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
-                preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True)
+                preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True, forceZeroMean=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
