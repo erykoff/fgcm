@@ -1032,20 +1032,18 @@ class FgcmLUT(object):
         sedSlope: float array, fnuprime
         """
 
-        # dL(i,j|p) += d/dp(2.5*log10((1+F'*I10^obs) / (1+F'*I10^std)))
-        #  the std part cancels...
-        #            = 1.086*(F'/(1+F'*I10)*((I0*LUT1' - I1*LUT0')/(I0^2))
+        # dmag_ij/dpar += 1.086 * (F' / (1 + F'*I10) * (1 / I0) * (LUT1' - I10 * LUT')
 
-        preFactor = (self.magConstant * (sedSlope / (1 + sedSlope*I10))) / I0**2.
+        preFactor = self.magConstant * (sedSlope / (1. + sedSlope * I10)) * (1. / I0)
 
-        return (preFactor * (I0 * snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]]),
-                preFactor * (I0 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDO3I1Handle)[indices[:-1]]),
-                preFactor * (I0 * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]]),
-                preFactor * (I0 * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] -
-                             I10 * I0 * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]]))
+        return (preFactor * (snmm.getArray(self.lutDLnPwvI1Handle)[indices[: -1]] -
+                             I10 * snmm.getArray(self.lutDLnPwvHandle)[indices[: -1]]),
+                preFactor * (snmm.getArray(self.lutDO3I1Handle)[indices[: -1]] -
+                             I10 * snmm.getArray(self.lutDO3Handle)[indices[: -1]]),
+                preFactor * (snmm.getArray(self.lutDLnTauI1Handle)[indices[: -1]] -
+                             I10 * snmm.getArray(self.lutDLnTauHandle)[indices[: -1]]),
+                preFactor * (snmm.getArray(self.lutDAlphaI1Handle)[indices[: -1]] -
+                             I10 * snmm.getArray(self.lutDAlphaHandle)[indices[: -1]]))
 
     def computeSEDSlopes(self, objectSedColor):
         """
