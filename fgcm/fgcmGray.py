@@ -696,6 +696,10 @@ class FgcmGray(object):
                                                   self.fgcmPars.bands[i]))
             plt.close(fig)
 
+            self.fgcmLog.info("sigExpGray (%s) = %.5f" % (
+                    self.fgcmPars.bands[i],
+                    coeff[2]))
+
             # plot EXP^gray as a function of secZenith (airmass)
             secZenith = 1./(np.sin(self.fgcmPars.expTelDec[expUse[inBand]]) *
                             self.fgcmPars.sinLatitude +
