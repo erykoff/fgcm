@@ -48,14 +48,9 @@ class FgcmApertureCorrection(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
-    def computeApertureCorrections(self,doPlots=True):
+    def computeApertureCorrections(self):
         """
         Compute aperture corrections if aperCorrFitNBins > 0
-
-        parameters
-        ----------
-        doPlots: bool, default=True
-           Make output plots
         """
 
         if (self.aperCorrFitNBins == 0):
@@ -170,12 +165,12 @@ class FgcmApertureCorrection(object):
                 self.fgcmPars.compAperCorrSlope[i] = fit[0]
                 self.fgcmPars.compAperCorrSlopeErr[i] = np.sqrt(cov[0,0])
 
-                self.fgcmLog.info('Aperture correction slope in band %s is %.4f +/- %.4f' %
+                self.fgcmLog.info('Aperture correction slope in band %s is %.2f +/- %.2f mmag/seeingUnit' %
                                  (self.fgcmPars.bands[i],
-                                  self.fgcmPars.compAperCorrSlope[i],
-                                  self.fgcmPars.compAperCorrSlopeErr[i]))
+                                  self.fgcmPars.compAperCorrSlope[i]*1000.0,
+                                  self.fgcmPars.compAperCorrSlopeErr[i]*1000.0))
 
-            if (doPlots):
+            if self.plotPath is not None:
                 plt.set_cmap('viridis')
 
                 fig=plt.figure(1,figsize=(8,6))
@@ -184,11 +179,11 @@ class FgcmApertureCorrection(object):
                 ax=fig.add_subplot(111)
 
                 ax.hexbin(self.fgcmPars.expSeeingVariable[expIndexUse[use]],
-                          expGrayTemp[expIndexUse[use]],
+                          expGrayTemp[expIndexUse[use]]*1000.0,
                           rasterized=True)
 
-                ax.errorbar(binStruct['X_BIN'],binStruct['Y'],
-                            yerr=binStruct['Y_ERR'],fmt='r.',markersize=10)
+                ax.errorbar(binStruct['X_BIN'],binStruct['Y']*1000.0,
+                            yerr=binStruct['Y_ERR']*1000.0,fmt='r.',markersize=10)
                 ax.set_xlim(self.fgcmPars.compAperCorrRange[0,i],
                             self.fgcmPars.compAperCorrRange[1,i])
                 ax.locator_params(axis='x',nbins=6)
@@ -196,16 +191,18 @@ class FgcmApertureCorrection(object):
                 ax.tick_params(axis='both',which='major',labelsize=14)
 
                 ax.set_xlabel(r'$\mathrm{ExpSeeingVariable}$',fontsize=16)
-                ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+                ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
                 text=r'$(%s)$' % (self.fgcmPars.bands[i])
                 ax.annotate(text,(0.9,0.93),xycoords='axes fraction',
                             ha='right',va='top',color='r',fontsize=16)
 
                 ax.plot(self.fgcmPars.compAperCorrRange[:,i],
-                        self.fgcmPars.compAperCorrSlope[i] *
+                        1000.0 * self.fgcmPars.compAperCorrSlope[i] *
                         (self.fgcmPars.compAperCorrRange[:,i] -
                          self.fgcmPars.compAperCorrPivot[i]),'r--')
+
+                fig.tight_layout()
 
                 fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle,

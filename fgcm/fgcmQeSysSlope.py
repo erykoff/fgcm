@@ -42,7 +42,7 @@ class FgcmQeSysSlope(object):
         self.instrumentSlopeMinDeltaT = fgcmConfig.instrumentSlopeMinDeltaT
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
 
-    def computeQeSysSlope(self, name, doPlots=True):
+    def computeQeSysSlope(self, name):
         """
         Compute QE system slope
 
@@ -50,8 +50,6 @@ class FgcmQeSysSlope(object):
         ----------
         name: `str`
            Name to put on filenames
-        doPlots: `bool`, optional
-           Make the plots.  Default is True.
         """
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -79,9 +77,6 @@ class FgcmQeSysSlope(object):
         obsExpIndexGO = obsExpIndex[goodObs]
 
         # Remove the previously applied slope
-        #deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[self.fgcmPars.expWashIndex[obsExpIndexGO], obsBandIndex[goodObs]] *
-        #                  (self.fgcmPars.expMJD[obsExpIndexGO] -
-        #                   self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
         deltaQESlopeGO = (self.fgcmPars.compQESysSlopeApplied[obsBandIndex[goodObs], self.fgcmPars.expWashIndex[obsExpIndexGO]] *
                           (self.fgcmPars.expMJD[obsExpIndexGO] -
                            self.fgcmPars.washMJDs[self.fgcmPars.expWashIndex[obsExpIndexGO]]))
@@ -165,25 +160,8 @@ class FgcmQeSysSlope(object):
                         slopeMean = np.clip(-1 * np.sum(slope / slopeErr2) / np.sum(1. / slopeErr2), -0.001, 0.0)
                         slopeMeanErr = np.sqrt(1. / np.sum(1. / slopeErr2))
 
-                    """
-                    # Make an output file here...
-                    if deltaT.size > 500:
-                        import fitsio
-                        tempCat = np.zeros(slope.size, dtype=[('deltaMag', 'f4'),
-                                                              ('deltaT', 'f4'),
-                                                              ('deltaMagErr2', 'f4')])
-                        tempCat['deltaMag'] = deltaMag
-                        tempCat['deltaT'] = deltaT
-                        tempCat['deltaMagErr2'] = deltaMagErr2
-
-                        fitsio.write('%s_slopestuff_%s_%s_%02d.fits' % (self.outfileBaseWithCycle,
-                                                                        name,
-                                                                        self.fgcmPars.bands[bandIndex],
-                                                                        washIndex), tempCat)
-                                                                        """
-                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.8f +/- %.8f%s" %
-                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean, slopeMeanErr, extraString))
-                    #self.fgcmPars.compQESysSlope[washIndex, bandIndex] = slopeMean
+                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.6f +/- %.6f mmag/day%s" %
+                                      (washIndex, self.fgcmPars.bands[bandIndex], slopeMean*1000.0, slopeMeanErr*1000.0, extraString))
                     self.fgcmPars.compQESysSlope[bandIndex, washIndex] = slopeMean
 
             if not self.instrumentParsPerBand:
@@ -200,12 +178,11 @@ class FgcmQeSysSlope(object):
                     slopeMeanAll = np.clip(-1 * np.sum(slopeAll / slopeErr2All) / np.sum(1. / slopeErr2All), -0.001, 0.0)
                     slopeMeanErrAll = np.sqrt(1. / np.sum(1. / slopeErr2All))
 
-                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.8f +/- %.8f%s" %
-                                  (washIndex, slopeMeanAll, slopeMeanErrAll, extraString))
-                #self.fgcmPars.compQESysSlope[washIndex, :] = slopeMeanAll
+                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.6f +/- %.6f mmag/day%s" %
+                                  (washIndex, slopeMeanAll*1000.0, slopeMeanErrAll*1000.0, extraString))
                 self.fgcmPars.compQESysSlope[:, washIndex] = slopeMeanAll
 
-        if doPlots:
+        if self.plotPath is not None:
             # Make the plots
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
@@ -225,19 +202,19 @@ class FgcmQeSysSlope(object):
                     for j in xrange(self.fgcmPars.nBands):
                         label = self.fgcmPars.bands[j] if not started else None
                         ax.plot(washMJDRange - firstMJD,
-                                (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[j, i] +
-                                self.fgcmPars.parQESysIntercept[j, i], linestyle='--', color=colors[j], linewidth=2, label=label)
+                                1000.0*((washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[j, i] +
+                                self.fgcmPars.parQESysIntercept[j, i]), linestyle='--', color=colors[j], linewidth=2, label=label)
                 else:
                     ax.plot(washMJDRange - firstMJD,
-                            (washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[0, i] +
-                            self.fgcmPars.parQESysIntercept[0, i], 'r--', linewidth=3)
+                            1000.0*((washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[0, i] +
+                            self.fgcmPars.parQESysIntercept[0, i]), 'r--', linewidth=3)
                 started = True
 
             if self.instrumentParsPerBand:
                 ax.legend(loc=3)
 
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD), fontsize=16)
-            ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})$', fontsize=16)
+            ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})\,(\mathrm{mmag})$', fontsize=16)
             ax.tick_params(axis='both', which='major', labelsize=14)
 
             # Make the vertical wash markers
@@ -264,6 +241,9 @@ class FgcmQeSysSlope(object):
 
         if not self.fgcmStars.hasRefstars:
             self.fgcmLog.info("No reference stars for QE sys plots.")
+            return
+
+        if self.plotPath is None:
             return
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
@@ -323,12 +303,12 @@ class FgcmQeSysSlope(object):
 
         xMin = 0
         xMax = maxMjd - minMjd
-        yMin = EGrayGRO[st[int(0.001 * st.size)]]
-        yMax = EGrayGRO[st[int(0.999 * st.size)]]
+        yMin = EGrayGRO[st[int(0.001 * st.size)]]*1000.0
+        yMax = EGrayGRO[st[int(0.999 * st.size)]]*1000.0
 
         st = np.argsort(EGrayObsGRO)
-        yMinObs = EGrayObsGRO[st[int(0.001 * st.size)]]
-        yMaxObs = EGrayObsGRO[st[int(0.999 * st.size)]]
+        yMinObs = EGrayObsGRO[st[int(0.001 * st.size)]]*1000.0
+        yMaxObs = EGrayObsGRO[st[int(0.999 * st.size)]]*1000.0
 
         # which wash dates are within the range...
         washInRange, = np.where((self.fgcmPars.washMJDs >= minMjd) &
@@ -344,16 +324,16 @@ class FgcmQeSysSlope(object):
             fig = plt.figure(1, figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayGRO[use], bins='log', extent=[xMin, xMax, yMin, yMax])
+            ax.hexbin(mjdGRO[use], EGrayGRO[use]*1000.0, bins='log', extent=[xMin, xMax, yMin, yMax])
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
 
             ax.set_title('%s band' % (band))
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
-            ax.set_ylabel('m_ref - m_std', fontsize=14)
+            ax.set_ylabel('m_ref - m_std (mmag)', fontsize=14)
 
-            fig.savefig('%s/%s_qesys_refstars-ref_%s_%s.png' % (self.plotPath,
+            fig.savefig('%s/%s_qesys_refstars-std_%s_%s.png' % (self.plotPath,
                                                                 self.outfileBaseWithCycle,
                                                                 name, band))
             plt.close(fig)
@@ -361,14 +341,14 @@ class FgcmQeSysSlope(object):
             fig = plt.figure(1, figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayObsGRO[use], bins='log', extent=[xMin, xMax, yMinObs, yMaxObs])
+            ax.hexbin(mjdGRO[use], EGrayObsGRO[use]*1000.0, bins='log', extent=[xMin, xMax, yMinObs, yMaxObs])
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMinObs, yMaxObs], 'r--', linewidth=2)
 
             ax.set_title('%s band' % (band))
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
-            ax.set_ylabel('m_ref - m_obs', fontsize=14)
+            ax.set_ylabel('m_ref - m_obs (mmag)', fontsize=14)
 
             fig.savefig('%s/%s_qesys_refstars-obs_%s_%s.png' % (self.plotPath,
                                                                 self.outfileBaseWithCycle,

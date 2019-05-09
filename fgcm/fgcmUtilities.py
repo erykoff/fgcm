@@ -506,7 +506,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
 
     for i in xrange(ccdOffsets.size):
         field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[i, :])
-        centralValues[i] = -2.5 * np.log10(field.evaluateCenter())
+        centralValues[i] = -2.5 * np.log10(field.evaluateCenter()) * 1000.0
 
     if (loHi is None):
         st=np.argsort(centralValues)
@@ -540,7 +540,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         yGrid = np.tile(yValues, xValues.size)
 
         field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[k, :])
-        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None))
+        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None)) * 1000.0
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -

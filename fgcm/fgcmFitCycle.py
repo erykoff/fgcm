@@ -6,7 +6,6 @@ import os
 import sys
 import esutil
 import scipy.optimize as optimize
-# from iminuit import minimize as iminimize
 
 import matplotlib.pyplot as plt
 
@@ -31,8 +30,6 @@ from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
 from .fgcmComputeStepUnits import FgcmComputeStepUnits
-#from .fgcmComputeStepUnits2 import FgcmComputeStepUnits2
-from .fgcmComputeStepUnits3 import FgcmComputeStepUnits3
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -89,8 +86,6 @@ class FgcmFitCycle(object):
         self.initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
             self.initialCycle = True
-            # Override, do not do instrument per band on initial cycle
-            self.fgcmConfig.instrumentParsPerBand = False
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -199,8 +194,8 @@ class FgcmFitCycle(object):
                                    self.fgcmStars,self.fgcmLUT)
 
         # The step unit calculator
-        self.fgcmComputeStepUnits = FgcmComputeStepUnits3(self.fgcmConfig, self.fgcmPars,
-                                                          self.fgcmStars, self.fgcmLUT)
+        self.fgcmComputeStepUnits = FgcmComputeStepUnits(self.fgcmConfig, self.fgcmPars,
+                                                         self.fgcmStars, self.fgcmLUT)
 
         # And the exposure selector
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
@@ -355,8 +350,9 @@ class FgcmFitCycle(object):
         self.fgcmComputeStepUnits.run(parArray)
 
         # Make connectivity maps with what we know about photometric selection
-        fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
-        fgcmCon.plotConnectivity()
+        # This code doesn't work properly, skip it for now.
+        # fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        # fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
@@ -369,6 +365,15 @@ class FgcmFitCycle(object):
             self._doFit(ignoreRef=False)
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
+
+            # However, we do recompute the absolute offset at this point for
+            # total consistency
+
+            if self.fgcmStars.hasRefstars:
+                self.fgcmLog.info("Final computation of absolute offset.")
+                deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
+                self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
         # Plot the parameters whether or not we did a fit!
         self.fgcmPars.plotParameters()
@@ -402,8 +407,8 @@ class FgcmFitCycle(object):
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
         # first compute with all...(better stats)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=False,doPlots=True,save=True)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
 
         self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
@@ -480,7 +485,7 @@ class FgcmFitCycle(object):
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval)
+                                       self.fgcmRetrieval, self.fgcmStars)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
@@ -489,7 +494,7 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
 
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False,crunch=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
 
         self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
@@ -558,66 +563,6 @@ class FgcmFitCycle(object):
         computeAbsThroughput = self.fgcmStars.hasRefstars
 
         try:
-            """
-            pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
-                                                       parInitial,       # initial guess
-                                                       fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False,computeAbsThroughput,ignoreRef), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsThroughput, ignoreRef
-                                                       approx_grad=False,# don't approx grad
-                                                       bounds=parBounds, # boundaries
-                                                       m=10,             # "variable metric conditions"
-                                                       #factr=1e2,        # highish accuracy
-                                                       factr=10.0,
-                                                       pgtol=self.fgcmConfig.fitGradientTolerance,
-                                                       #pgtol=1e-12,
-                                                       maxfun=maxIter,
-                                                       maxiter=maxIter,
-                                                       iprint=0,         # only one output
-                                                       callback=None)    # no callback
-                                                       """
-            """
-            retvals = optimize.fmin_bfgs(self.fgcmChisq.computeChi2,
-                                         parInitial,
-                                         fprime=self.fgcmChisq.computeChi2Derivative,
-                                         args=(True, True, False, False, computeAbsThroughput, ignoreRef, False),
-                                         maxiter=maxIter,
-                                         gtol=self.fgcmConfig.fitGradientTolerance,
-                                         full_output=False,
-                                         disp=False)
-            pars = retvals[0]
-            """
-            """
-            pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq.computeChi2,   # chisq function
-                                                       parInitial,       # initial guess
-                                                       fprime=self.fgcmChisq.computeChi2Derivative,      # in fgcmChisq()
-                                                       args=(True,True,False,False,computeAbsThroughput,ignoreRef), # fitterUnits, deriv, computeSEDSlopes, useMatchCache, compAbsThroughput, ignoreRef
-                                                       approx_grad=False,# don't approx grad
-                                                       bounds=parBounds, # boundaries
-                                                       m=10,             # "variable metric conditions"
-                                                       #factr=1e2,        # highish accuracy
-                                                       factr=10.0,
-                                                       pgtol=self.fgcmConfig.fitGradientTolerance,
-                                                       #pgtol=1e-12,
-                                                       maxfun=maxIter,
-                                                       maxiter=maxIter,
-                                                       iprint=0,         # only one output
-                                                       callback=None)    # no callback
-                                                       """
-            """
-            res = optimize.minimize(self.fgcmChisq.computeChi2,
-                                    parInitial,
-                                    args=(True,True,False,False,computeAbsThroughput,ignoreRef),
-                                    method='L-BFGS-B',
-                                    jac=self.fgcmChisq.computeChi2Derivative,
-                                    bounds=parBounds,
-                                    options={'maxfun': maxIter,
-                                             'maxiter': maxIter,
-                                             'maxcor': 20,
-                                             'gtol': self.fgcmConfig.fitGradientTolerance},
-                                    callback=None)
-            pars = res.x
-            """
-
             fun = optimize.optimize.MemoizeJac(self.fgcmChisq)
             jac = fun.derivative
 
@@ -633,17 +578,6 @@ class FgcmFitCycle(object):
                                              'gtol': self.fgcmConfig.fitGradientTolerance},
                                     callback=None)
             pars = res.x
-
-            """
-            res = iminimize(self.fgcmChisq.computeChi2,
-                            parInitial,
-                            args=(True,True,False,False,computeAbsThroughput,ignoreRef),
-                            jac=self.fgcmChisq.computeChi2Derivative,
-                            bounds=parBounds,
-                            options={'maxfev': maxIter},
-                            callback=None)
-            pars = res.x
-            """
 
             chisq = self.fgcmChisq.fitChisqs[-1]
         except MaxFitIterations:

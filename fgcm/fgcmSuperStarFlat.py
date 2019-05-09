@@ -311,19 +311,17 @@ class FgcmSuperStarFlat(object):
                 deltaSuperStarFlatFPMean[e, f] = np.mean(deltaSuperStarFlatCenter[e, f, use])
                 deltaSuperStarFlatFPSigma[e, f] = np.std(deltaSuperStarFlatCenter[e, f, use])
 
-                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4f  Delta: %.4f +/- %.4f' %
+                self.fgcmLog.info('Superstar epoch %d filter %s: %.2f +/- %.2f  Delta: %.2f +/- %.2f mmag' %
                                   (e, self.fgcmPars.lutFilterNames[f],
-                                   superStarFlatFPMean[e, f], superStarFlatFPSigma[e, f],
-                                   deltaSuperStarFlatFPMean[e, f], deltaSuperStarFlatFPSigma[e, f]))
+                                   superStarFlatFPMean[e, f] * 1000.0, superStarFlatFPSigma[e, f] * 1000.0,
+                                   deltaSuperStarFlatFPMean[e, f] * 1000.0, deltaSuperStarFlatFPSigma[e, f] * 1000.0))
 
         self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
                           (time.time() - startTime))
 
-        if doPlots:
+        if doPlots and self.plotPath is not None:
             self.fgcmLog.info('Making SuperStarFlat plots')
 
-            # can we do a combined plot?  Two panel?  I think that would be
-            #  better, but I'm worried about the figure sizes
             self.plotSuperStarFlatsAndDelta(self.fgcmPars.parSuperStarFlat,
                                             deltaSuperStarFlatCenter,
                                             superStarNGoodStars,
@@ -373,17 +371,17 @@ class FgcmSuperStarFlat(object):
 
                 if not self.superStarSubCCD:
                     # New flux parameters
-                    plotCCDMap(ax, self.ccdOffsets[use], -2.5 * np.log10(superStarPars[e, f, use, 0]),
-                               'SuperStar (mag)')
+                    plotCCDMap(ax, self.ccdOffsets[use], -2.5 * np.log10(superStarPars[e, f, use, 0]) * 1000.0,
+                               'SuperStar (mmag)')
                 else:
                     plotCCDMap2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
-                                 'SuperStar (mag)')
+                                 'SuperStar (mmag)')
 
                 # and annotate
 
                 text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
-                    r'%.4f +/- %.4f' % (superStarFlatFPMean[e,f],
-                                        superStarFlatFPSigma[e,f])
+                    r'%.2f +/- %.2f' % (superStarFlatFPMean[e,f]*1000.0,
+                                        superStarFlatFPSigma[e,f]*1000.0)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
@@ -391,13 +389,13 @@ class FgcmSuperStarFlat(object):
                 # right side plot the deltas
                 ax=fig.add_subplot(122)
 
-                plotCCDMap(ax, self.ccdOffsets[use], deltaSuperStar[e,f,use],
-                           'Central Delta-SuperStar (mag)')
+                plotCCDMap(ax, self.ccdOffsets[use], deltaSuperStar[e,f,use]*1000.0,
+                           'Central Delta-SuperStar (mmag)')
 
                 # and annotate
                 text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
-                    r'%.4f +/- %.4f' % (deltaSuperStarFlatFPMean[e,f],
-                                        deltaSuperStarFlatFPSigma[e,f])
+                    r'%.2f +/- %.2f' % (deltaSuperStarFlatFPMean[e,f]*1000.0,
+                                        deltaSuperStarFlatFPSigma[e,f]*1000.0)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
@@ -486,155 +484,5 @@ class FgcmSuperStarFlat(object):
                     else:
                         self.ccdOffsets['DECSIGN'][cInd] = 1
 
-    def computeSuperStarFlatsOrig(self,fgcmGray,doPlots=True):
-        """
-        Old-school superStarFlat computed from CCDGray
-
-        parameters
-        ----------
-        fgcmGray: FgcmGray
-        doPlots: bool, default=True
-        """
-
-        startTime = time.time()
-        self.fgcmLog.info('Computing superstarflats')
-
-        ## FIXME: need to filter out SN (deep) exposures.  Hmmm.
-
-        deltaSuperStarFlat = np.zeros((self.fgcmPars.nEpochs,
-                                       self.fgcmPars.nLUTFilter,
-                                       self.fgcmPars.nCCD))
-        deltaSuperStarFlatNCCD = np.zeros_like(deltaSuperStarFlat, dtype='i4')
-
-        ccdGray = snmm.getArray(fgcmGray.ccdGrayHandle)
-        ccdGrayErr = snmm.getArray(fgcmGray.ccdGrayErrHandle)
-        ccdNGoodStars = snmm.getArray(fgcmGray.ccdNGoodStarsHandle)
-
-        # only select those CCDs that we have an adequate gray calculation
-        expIndexUse,ccdIndexUse=np.where((ccdNGoodStars >= self.minStarPerCCD))
-
-        # and only select exposures that should go into the SuperStarFlat
-        gd,=np.where(self.fgcmPars.expFlag[expIndexUse] == 0)
-        expIndexUse=expIndexUse[gd]
-        ccdIndexUse=ccdIndexUse[gd]
-
-        self.fgcmLog.info('SuperStarFlats based on %d exposures' % (gd.size))
-
-        # sum up ccdGray values
-        #  note that this is done per *filter* not per *band*
-        np.add.at(deltaSuperStarFlat,
-                  (self.fgcmPars.expEpochIndex[expIndexUse],
-                   self.fgcmPars.expLUTFilterIndex[expIndexUse],
-                   ccdIndexUse),
-                  ccdGray[expIndexUse,ccdIndexUse])
-        np.add.at(deltaSuperStarFlatNCCD,
-                  (self.fgcmPars.expEpochIndex[expIndexUse],
-                   self.fgcmPars.expLUTFilterIndex[expIndexUse],
-                   ccdIndexUse),
-                  1)
-
-        # only use exp/ccd where we have at least one observation
-        gd=np.where(deltaSuperStarFlatNCCD > 0)
-        deltaSuperStarFlat[gd] /= deltaSuperStarFlatNCCD[gd]
-
-        # this accumulates onto the input parameters
-        # self.fgcmPars.parSuperStarFlat += deltaSuperStarFlat
-        self.fgcmPars.parSuperStarFlat[:,:,:,0] += deltaSuperStarFlat
-
-        self.deltaSuperStarFlatMean = np.zeros((self.fgcmPars.nEpochs,
-                                                self.fgcmPars.nLUTFilter),dtype='f8')
-        self.deltaSuperStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
-        self.superStarFlatMean = np.zeros_like(self.deltaSuperStarFlatMean)
-        self.superStarFlatSigma = np.zeros_like(self.deltaSuperStarFlatMean)
-
-        for i in xrange(self.fgcmPars.nEpochs):
-            for j in xrange(self.fgcmPars.nLUTFilter):
-                use,=np.where(deltaSuperStarFlatNCCD[i,j,:] > 0)
-
-                if use.size < 3:
-                    continue
-
-                self.deltaSuperStarFlatMean[i,j] = np.mean(deltaSuperStarFlat[i,j,use])
-                self.deltaSuperStarFlatSigma[i,j] = np.std(deltaSuperStarFlat[i,j,use])
-                self.superStarFlatMean[i,j] = np.mean(self.fgcmPars.parSuperStarFlat[i,j,use,0])
-                self.superStarFlatSigma[i,j] = np.std(self.fgcmPars.parSuperStarFlat[i,j,use,0])
-                self.fgcmLog.info('Superstar epoch %d filter %s: %.4f +/- %.4f' %
-                                 (i,self.fgcmPars.lutFilterNames[j],
-                                  self.superStarFlatMean[i,j],
-                                  self.superStarFlatSigma[i,j]))
-                self.fgcmLog.info('DeltaSuperStar epoch %d filter %s: %.4f +/- %.4f' %
-                                 (i,self.fgcmPars.lutFilterNames[j],
-                                  self.deltaSuperStarFlatMean[i,j],
-                                  self.deltaSuperStarFlatSigma[i,j]))
-
-        self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
-                         (time.time() - startTime))
-
-        if (doPlots):
-            self.fgcmLog.info('Making SuperStarFlat plots')
-            self.plotSuperStarFlats(deltaSuperStarFlat,
-                                    self.deltaSuperStarFlatMean,
-                                    self.deltaSuperStarFlatSigma,
-                                    nCCDArray=deltaSuperStarFlatNCCD,
-                                    name='deltasuperstar')
-            self.plotSuperStarFlats(self.fgcmPars.parSuperStarFlat[:,:,:,0],
-                                    self.superStarFlatMean,
-                                    self.superStarFlatSigma,
-                                    nCCDArray=deltaSuperStarFlatNCCD,
-                                    name='superstar')
-
-        # and we're done.
-
-    def plotSuperStarFlats(self, superStarArray, superStarMean, superStarSigma,
-                            nCCDArray=None, name='superstar'):
-        """
-        Old-school plotting of superStarFlats
-
-        parameters
-        ----------
-        superStarArray: float array (nEpochs, nLUTFilter, nCCD)
-        superStarMean: float array (nEpochs, nLUTFilter)
-           Focal plane average for plot scaling
-        superStarSigma: float array (nEpochs, nLUTFilter)
-           Focal plane sigma for plot scaling
-        nCCDArray: float array, optional (nEpochs, nLUTFilter, nCCD)
-           Number of good CCDs per superstar
-        name: string, default='superstar'
-           What name to put on the files/plots
-        """
-
-        from .fgcmUtilities import plotCCDMap
-
-        for i in xrange(self.fgcmPars.nEpochs):
-            for j in xrange(self.fgcmPars.nLUTFilter):
-                # only do those that had a non-zero number of CCDs to fit in this epoch
-                if (nCCDArray is not None):
-                    use,=np.where(nCCDArray[i,j,:] > 0)
-                else:
-                    use,=np.where(superStarArray[i,j,:] > self.illegalValue)
-
-                if use.size == 0:
-                    continue
-
-                fig=plt.figure(1,figsize=(8,6))
-                fig.clf()
-
-                ax=fig.add_subplot(111)
-
-                plotCCDMap(ax, self.ccdOffsets[use], superStarArray[i,j,use],
-                           'Superflat Correction (mag)')
-
-                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[j]) + '\n' + \
-                    r'%.4f +/- %.4f' % (superStarMean[i,j],superStarSigma[i,j])
-                ax.annotate(text,
-                            (0.1,0.93),xycoords='axes fraction',
-                            ha='left',va='top',fontsize=18)
-
-                fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
-                                                    self.outfileBaseWithCycle,
-                                                    name,
-                                                    self.fgcmPars.lutFilterNames[j],
-                                                    self.epochNames[i]))
-                plt.close(fig)
 
 

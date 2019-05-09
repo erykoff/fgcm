@@ -123,14 +123,10 @@ class FgcmGray(object):
         self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
 
-    def computeExpGrayForInitialSelection(self,doPlots=True):
+    def computeExpGrayForInitialSelection(self):
         """
         Compute exposure gray using bright star magnitudes to get initial estimates.
 
-        parameters
-        ----------
-        doPlots: bool, default=True
-           Make check plots
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -206,7 +202,7 @@ class FgcmGray(object):
         self.fgcmLog.info('Computed ExpGray for initial selection in %.2f seconds.' %
                          (time.time() - startTime))
 
-        if (not doPlots):
+        if self.plotPath is None:
             return
 
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
@@ -226,18 +222,20 @@ class FgcmGray(object):
 
             ax=fig.add_subplot(111)
 
-            coeff = histoGauss(ax, expGrayForInitialSelection[expUse[inBand]])
+            coeff = histoGauss(ax, expGrayForInitialSelection[expUse[inBand]] * 1000.0)
+            coeff[1] /= 1000.0
+            coeff[2] /= 1000.0
 
             ax.tick_params(axis='both',which='major',labelsize=14)
             ax.locator_params(axis='x',nbins=5)
 
             text=r'$(%s)$' % (self.fgcmPars.bands[i]) + '\n' + \
                 r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
-                r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
-                r'$\sigma = %.4f$' % (coeff[2])
+                r'$\mu = %.2f$' % (coeff[1]*1000.0) + '\n' + \
+                r'$\sigma = %.2f$' % (coeff[2]*1000.0)
 
             ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
-            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}} (\mathrm{initial})$',fontsize=16)
+            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{initial})\,(\mathrm{mmag})$',fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
             fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
@@ -245,14 +243,12 @@ class FgcmGray(object):
                                                           self.fgcmPars.bands[i]))
             plt.close(fig)
 
-    def computeCCDAndExpGray(self,doPlots=True,onlyObsErr=False):
+    def computeCCDAndExpGray(self, onlyObsErr=False):
         """
         Compute CCD and exposure gray using calibrated magnitudes.
 
         parameters
         ----------
-        doPlots: bool, default=True
-           Make check plots
         onlyObsErr: bool, default=False
            Only use observational error.  Used when making initial superstarflat estimate.
         """
@@ -328,7 +324,6 @@ class FgcmGray(object):
         ## ccdGray = Sum(EGray/EGrayErr^2) / Sum(1./EGrayErr^2)
         ## ccdGrayRMS = Sqrt((Sum(EGray^2/EGrayErr^2) / Sum(1./EGrayErr^2)) - ccdGray^2)
         ## ccdGrayErr = Sqrt(1./Sum(1./EGrayErr^2))
-
 
         ccdGray[:,:] = 0.0
         ccdGrayRMS[:,:] = 0.0
@@ -534,11 +529,11 @@ class FgcmGray(object):
         self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
                          (time.time() - startTime))
 
-        if (doPlots):
-            self.makeExpGrayPlots()
+        self.makeExpGrayPlots()
 
-    def computeExpGrayColorSplit(self, doPlots=True):
+    def computeExpGrayColorSplit(self):
         """
+        Do a comparison of expGray splitting red/blue stars
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -565,15 +560,17 @@ class FgcmGray(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
-        EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
-                           obsMagStd[obsIndex])
+        #EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
+        #EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
+        #                   obsMagStd[obsIndex])
 
         # This should check that every star used has a valid g-i color
         # We also want to filter only photometric observations, because
         # that's what we're going to be using
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
+
+        EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, ignoreRef=True)
 
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                  objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
@@ -598,10 +595,10 @@ class FgcmGray(object):
 
             np.add.at(expGrayColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGray[goodObs[use]])
+                      EGrayGO[use])
             np.add.at(expGrayRMSColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGray[goodObs[use]]**2.)
+                      EGrayGO[use]**2.)
             np.add.at(expGrayNGoodStarsColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
                       1)
@@ -615,8 +612,7 @@ class FgcmGray(object):
             expGrayColorSplit[bd, c] = self.illegalValue
             expGrayRMSColorSplit[bd, c] = self.illegalValue
 
-
-        if doPlots:
+        if self.plotPath is not None:
             # main plots:
             #  per band, plot expGray for red vs blue stars!
 
@@ -637,25 +633,46 @@ class FgcmGray(object):
                 fig.clf()
 
                 ax = fig.add_subplot(111)
-                ax.hexbin(expGrayColorSplit[use, 0], expGrayColorSplit[use, 2], bins='log')
-                ax.set_xlabel('EXP_GRAY (%s) (%s)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
-                ax.set_ylabel('EXP_GRAY (%s) (%s)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
-                ax.plot([-0.01, 0.01], [-0.01, 0.01], 'r--')
+                ax.hexbin(expGrayColorSplit[use, 0]*1000.0, expGrayColorSplit[use, 2]*1000.0, bins='log')
+                ax.set_xlabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
+                ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
+                ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
 
                 fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
                                                                       self.outfileBaseWithCycle,
                                                                       self.fgcmPars.bands[bandIndex]))
                 plt.close(fig)
 
+                # And a plot as function of time
+
+                fig = plt.figure(1, figsize=(8, 6))
+                fig.clf()
+
+                ax = fig.add_subplot(111)
+                ax.hexbin(self.fgcmPars.expMJD[use],
+                          (expGrayColorSplit[use, 2] - expGrayColorSplit[use, 0]) * 1000.,
+                          bins='log')
+                ax.set_xlabel('MJD')
+                ax.set_ylabel('EXP_GRAY (%s) (%s) - EXP_GRAY (%s) (%s) (mmag)' %
+                              (self.fgcmPars.bands[bandIndex], gmiCutNames[2],
+                               self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
+                ax.plot([self.fgcmPars.expMJD[use].min(), self.fgcmPars.expMJD[use].max()],
+                        [0.0, 0.0], 'r--')
+
+                plt.savefig('%s/%s_compare-redblue-expgray-mjd_%s.png' % (self.plotPath,
+                                                                          self.outfileBaseWithCycle,
+                                                                          self.fgcmPars.bands[bandIndex]))
+                plt.close(fig)
+
         # and we're done...
-
-
-
 
     def makeExpGrayPlots(self):
         """
         Make exposure gray plots.
         """
+
+        # We run this all the time because it has useful logging, but
+        # we might not save the image
 
         # arrays we need
         expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
@@ -677,28 +694,31 @@ class FgcmGray(object):
 
             ax=fig.add_subplot(111)
 
-            coeff = histoGauss(ax, expGray[expUse[inBand]])
+            coeff = histoGauss(ax, expGray[expUse[inBand]] * 1000.0)
+            coeff[1] /= 1000.0
+            coeff[2] /= 1000.0
 
             ax.tick_params(axis='both',which='major',labelsize=14)
             ax.locator_params(axis='x',nbins=5)
 
             text=r'$(%s)$' % (self.fgcmPars.bands[i]) + '\n' + \
                 r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
-                r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
-                r'$\sigma = %.4f$' % (coeff[2])
+                r'$\mu = %.2f$' % (coeff[1]*1000.0) + '\n' + \
+                r'$\sigma = %.2f$' % (coeff[2]*1000.0)
 
             ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
-            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
-            fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
-                                                  self.outfileBaseWithCycle,
-                                                  self.fgcmPars.bands[i]))
+            if self.plotPath is not None:
+                fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
+                                                      self.outfileBaseWithCycle,
+                                                      self.fgcmPars.bands[i]))
             plt.close(fig)
 
-            self.fgcmLog.info("sigExpGray (%s) = %.5f" % (
+            self.fgcmLog.info("sigExpGray (%s) = %.2f mmag" % (
                     self.fgcmPars.bands[i],
-                    coeff[2]))
+                    coeff[2] * 1000.0))
 
             # plot EXP^gray as a function of secZenith (airmass)
             secZenith = 1./(np.sin(self.fgcmPars.expTelDec[expUse[inBand]]) *
@@ -715,17 +735,18 @@ class FgcmGray(object):
 
             ax=fig.add_subplot(111)
 
-            ax.hexbin(secZenith[ok],expGray[expUse[inBand[ok]]],rasterized=True)
+            ax.hexbin(secZenith[ok],expGray[expUse[inBand[ok]]]*1000.0,rasterized=True)
 
             text = r'$(%s)$' % (self.fgcmPars.bands[i])
             ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
 
             ax.set_xlabel(r'$\mathrm{sec}(\mathrm{zd})$',fontsize=16)
-            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
-            fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
-                                                          self.outfileBaseWithCycle,
-                                                          self.fgcmPars.bands[i]))
+            if self.plotPath is not None:
+                fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
+                                                              self.outfileBaseWithCycle,
+                                                              self.fgcmPars.bands[i]))
             plt.close(fig)
 
             # plot EXP^gray as a function of UT
@@ -736,16 +757,17 @@ class FgcmGray(object):
             ax=fig.add_subplot(111)
 
             ax.hexbin(self.fgcmPars.expDeltaUT[expUse[inBand]],
-                      expGray[expUse[inBand]],
+                      expGray[expUse[inBand]]*1000.0,
                       rasterized=True)
             ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
 
             ax.set_xlabel(r'$\Delta \mathrm{UT}$',fontsize=16)
-            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
-            fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
-                                                     self.outfileBaseWithCycle,
-                                                     self.fgcmPars.bands[i]))
+            if self.plotPath is not None:
+                fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
+                                                         self.outfileBaseWithCycle,
+                                                         self.fgcmPars.bands[i]))
             plt.close(fig)
 
         # and plot EXP^gray vs MJD for all bands for deep fields
@@ -758,15 +780,16 @@ class FgcmGray(object):
 
         deepUse,=np.where(self.fgcmPars.expDeepFlag[expUse] == 1)
 
-        ax.plot(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
-                expGray[expUse[deepUse]],'k.')
+        ax.hexbin(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
+                  expGray[expUse[deepUse]]*1000.0, bins='log')
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}$',fontsize=16)
+        ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
         ax.set_title(r'$\mathrm{Deep Fields}$')
 
-        fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
-                                                     self.outfileBaseWithCycle))
+        if self.plotPath is not None:
+            fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
+                                                        self.outfileBaseWithCycle))
         plt.close(fig)
 
         # And plot correlations of EXP^gray between pairs of bands
@@ -805,15 +828,16 @@ class FgcmGray(object):
             ax=fig.add_subplot(111)
 
             ax.hexbin(expGray[use0[matchInd[ok]]],
-                      expGray[use1[ok]], bins='log')
-            ax.set_xlabel('EXP_GRAY (%s)' % (self.fgcmPars.bands[bandIndex0]))
-            ax.set_ylabel('EXP_GRAY (%s)' % (self.fgcmPars.bands[bandIndex1]))
+                      expGray[use1[ok]]*1000.0, bins='log')
+            ax.set_xlabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex0]))
+            ax.set_ylabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex1]))
             ax.plot([-0.01,0.01],[-0.01,0.01],'r--')
 
-            fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,
-                                                             self.outfileBaseWithCycle,
-                                                             self.fgcmPars.bands[bandIndex0],
-                                                             self.fgcmPars.bands[bandIndex1]))
+            if self.plotPath is not None:
+                fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,
+                                                                 self.outfileBaseWithCycle,
+                                                                 self.fgcmPars.bands[bandIndex0],
+                                                                 self.fgcmPars.bands[bandIndex1]))
             plt.close(fig)
 
     def computeExpGrayCuts(self):

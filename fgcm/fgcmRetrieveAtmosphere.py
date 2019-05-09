@@ -43,14 +43,13 @@ class FgcmRetrieveAtmosphere(object):
         self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
-    def r1ToPwv(self, fgcmRetrieval, doPlots=True):
+    def r1ToPwv(self, fgcmRetrieval):
         """
         Convert R1 values to Pwv.  Experimental.
 
         parameters
         ----------
         fgcmRetrieval: FgcmRetrieval
-        doPlots: bool, default=True
         """
 
         self.fgcmLog.info('Retrieving PWV Values...')
@@ -212,7 +211,7 @@ class FgcmRetrieveAtmosphere(object):
             self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
             self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
 
-        if doPlots:
+        if self.plotPath is not None:
             # if there are fewer than ... 3000 do points, more than do hexbin
             plt.set_cmap('viridis')
 
@@ -236,8 +235,8 @@ class FgcmRetrieveAtmosphere(object):
             plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
                                   np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV_INPUT')
-            ax.set_ylabel('RPWV')
+            ax.set_xlabel('RPWV_INPUT (mm)')
+            ax.set_ylabel('RPWV (mm)')
 
             fig.savefig('%s/%s_rpwv_vs_rpwv_in.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
@@ -259,8 +258,8 @@ class FgcmRetrieveAtmosphere(object):
             plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv].min())+0.001,
                                   np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV_SMOOTH')
-            ax.set_ylabel('RPWV_RAW')
+            ax.set_xlabel('RPWV_SMOOTH (mm)')
+            ax.set_ylabel('RPWV_RAW (mm)')
 
             fig.savefig('%s/%s_rpwv_vs_rpwv_smooth.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
@@ -282,8 +281,8 @@ class FgcmRetrieveAtmosphere(object):
             plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
                                   np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV')
-            ax.set_ylabel('PWV_MODEL')
+            ax.set_xlabel('RPWV (mm)')
+            ax.set_ylabel('PWV_MODEL (mm)')
 
             fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
@@ -314,8 +313,8 @@ class FgcmRetrieveAtmosphere(object):
             plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
                                   np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
             ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV_SCALED')
-            ax.set_ylabel('PWV_MODEL')
+            ax.set_xlabel('RPWV_SCALED (mm)')
+            ax.set_ylabel('PWV_MODEL (mm)')
 
 
             fig.savefig('%s/%s_pwv_vs_rpwv_scaled.png' % (self.plotPath,
@@ -326,14 +325,13 @@ class FgcmRetrieveAtmosphere(object):
         # and we're done!  Everything is filled in!
         self.fgcmLog.info('Done computing retrieved PWV values')
 
-    def r0ToNightlyTau(self, fgcmRetrieval, doPlots=True):
+    def r0ToNightlyTau(self, fgcmRetrieval):
         """
         Convert R0 values to nightly Tau, using airmass.  Experimental.
 
         parameters
         ----------
         fgcmRetrieval: FgcmRetrieval
-        doPlots: bool, default=True
         """
 
         self.fgcmLog.info('Retrieving Nightly Tau Values...')
@@ -414,7 +412,7 @@ class FgcmRetrieveAtmosphere(object):
                                                          self.fgcmLUT.tau[-1]-0.0001)
 
         # And the plots
-        if doPlots:
+        if self.plotPath is not None:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
             fig = plt.figure(1, figsize=(8, 6))
@@ -449,14 +447,13 @@ class FgcmRetrieveAtmosphere(object):
                                                            self.outfileBaseWithCycle))
             plt.close(fig)
 
-    def expGrayToNightlyTau(self, fgcmGray, doPlots=True):
+    def expGrayToNightlyTau(self, fgcmGray):
         """
         Convert exposure gray to nightly Tau, using airmass.  Experimental.
 
         parameters
         ----------
         fgcmGray: FgcmGray
-        doPlots: bool, defaults=True
         """
 
         self.fgcmLog.info( 'Retrieving nightly Tau values...')
@@ -566,7 +563,7 @@ class FgcmRetrieveAtmosphere(object):
                                                          self.fgcmLUT.tau[-1]-0.0001)
 
         # And the plots
-        if doPlots:
+        if self.plotPath is not None:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
             fig = plt.figure(1, figsize=(8, 6))

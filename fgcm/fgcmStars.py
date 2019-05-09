@@ -898,6 +898,10 @@ class FgcmStars(object):
            A key for labeling the map.
         """
 
+        if self.plotPath is None:
+            # Requested not to do plots
+            return
+
         import healpy as hp
         try:
             from .fgcmPlotmaps import plot_hpxmap
