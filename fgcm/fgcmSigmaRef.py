@@ -45,13 +45,9 @@ class FgcmSigmaRef(object):
         if not self.fgcmStars.hasRefstars:
             raise RuntimeError("Cannot use FgcmSigmaRef without reference stars!")
 
-    def computeSigmaRef(self, doPlots=True):
+    def computeSigmaRef(self):
         """
         Compute sigmaRef for all bands
-
-        Parameters
-        ----------
-        doPlots: bool, default=True
         """
 
         startTime = time.time()
@@ -102,7 +98,7 @@ class FgcmSigmaRef(object):
 
                 # We don't look for outliers with small-number statistics (for now)
 
-                self.fgcmLog.info('offsetRef (%s) = %.4f +/- %.4f' % (band, offsetRef[bandIndex], sigmaRef[bandIndex]))
+                self.fgcmLog.info('offsetRef (%s) = %.2f +/- %.2f mmag' % (band, offsetRef[bandIndex] * 1000.0, sigmaRef[bandIndex] * 1000.0))
 
         else:
             # Large numbers
@@ -159,7 +155,9 @@ class FgcmSigmaRef(object):
                     ax = fig.add_subplot(2, 2, c + 1)
 
                     try:
-                        coeff = histoGauss(ax, delta)
+                        coeff = histoGauss(ax, delta*1000.0)
+                        coeff[1] /= 1000.0
+                        coeff[2] /= 1000.0
                     except Exception as inst:
                         coeff = np.array([np.inf, np.inf, np.inf])
 
@@ -170,8 +168,8 @@ class FgcmSigmaRef(object):
                     offsetRef[bandIndex] = coeff[1]
                     sigmaRef[bandIndex] = coeff[2]
 
-                    self.fgcmLog.info("offsetRef (%s) (%s) = %.4f +/- %0.4f" %
-                                      (band, name, offsetRef[bandIndex], sigmaRef[bandIndex]))
+                    self.fgcmLog.info("offsetRef (%s) (%s) = %.2f +/- %0.2f mmag" %
+                                      (band, name, offsetRef[bandIndex]*1000.0, sigmaRef[bandIndex]*1000.0))
 
                     # Compute outliers, if desired.
                     if (c == 0) and (self.refStarOutlierNSig > 0.0):
@@ -183,19 +181,19 @@ class FgcmSigmaRef(object):
                         else:
                             message = None
 
-                    if not doPlots:
+                    if self.plotPath is None:
                         continue
 
                     ax.tick_params(axis='both', which='major', labelsize=14)
 
                     text=r'$(%s)$' % (band) + '\n' + \
                         r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
-                        r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
-                        r'$\sigma_\mathrm{ref} = %.4f$' % (coeff[2]) + '\n' + \
+                        r'$\mu = %.2f$' % (coeff[1]*1000.0) + '\n' + \
+                        r'$\sigma_\mathrm{ref} = %.2f$' % (coeff[2]*1000.0) + '\n' + \
                         name
 
                     ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=14)
-                    ax.set_xlabel(r'$\overline{m_\mathrm{std}} - m_\mathrm{ref}$', fontsize=14)
+                    ax.set_xlabel(r'$\overline{m_\mathrm{std}} - m_\mathrm{ref}\,(\mathrm{mmag})$', fontsize=14)
                     if not started:
                         started = True
                         plotXRange = ax.get_xlim()

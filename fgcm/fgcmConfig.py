@@ -194,6 +194,7 @@ class FgcmConfig(object):
     outputZeropoints = ConfigField(bool, default=False)
     outputPath = ConfigField(str, required=False)
     saveParsForDebugging = ConfigField(bool, default=False)
+    doPlots = ConfigField(bool, default=True)
 
     pwvFile = ConfigField(str, required=False)
     externalPwvDeltaT = ConfigField(float, default=0.1)
@@ -257,11 +258,13 @@ class FgcmConfig(object):
         if os.path.isfile(logFile) and not self.clobber:
             raise RuntimeError("Found logFile %s, but clobber == False." % (logFile))
 
-        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
-        if os.path.isdir(self.plotPath) and not self.clobber:
-            # check if directory is empty
-            if len(os.listdir(self.plotPath)) > 0:
-                raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
+        self.plotPath = None
+        if self.doPlots:
+            self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
+            if os.path.isdir(self.plotPath) and not self.clobber:
+                # check if directory is empty
+                if len(os.listdir(self.plotPath)) > 0:
+                    raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
 
         # set up logger are we get the name...
         if ('logger' not in configDict):

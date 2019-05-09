@@ -355,8 +355,9 @@ class FgcmFitCycle(object):
         self.fgcmComputeStepUnits.run(parArray)
 
         # Make connectivity maps with what we know about photometric selection
-        fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
-        fgcmCon.plotConnectivity()
+        # This code doesn't work properly, skip it for now.
+        # fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        # fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
@@ -402,8 +403,8 @@ class FgcmFitCycle(object):
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
         # first compute with all...(better stats)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=False,doPlots=True,save=True)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
 
         self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
@@ -480,7 +481,7 @@ class FgcmFitCycle(object):
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval)
+                                       self.fgcmRetrieval, self.fgcmStars)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
@@ -489,7 +490,7 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
 
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False,crunch=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
 
         self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 

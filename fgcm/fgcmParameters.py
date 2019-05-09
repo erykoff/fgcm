@@ -1699,6 +1699,10 @@ class FgcmParameters(object):
         Plot nightly average parameters
         """
 
+        if self.plotPath is None:
+            # configured not to make plots
+            return
+
         # want nightly averages, on calibratable nights (duh)
 
         # this is fixed here
@@ -1821,7 +1825,7 @@ class FgcmParameters(object):
 
             ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-            ax.set_ylabel(r'$\mathrm{PWV}$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{PWV}$ (mm)',fontsize=16)
 
             fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
@@ -1843,52 +1847,25 @@ class FgcmParameters(object):
 
             ax.plot(mjdNight[O3Gd] - firstMJD, O3Night[O3Gd],'r.')
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-            ax.set_ylabel(r'$O_3$',fontsize=16)
+            ax.set_ylabel(r'$O_3$ (Dob)',fontsize=16)
 
             fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
             plt.close(fig)
 
-
-        """
-        # mirror gray
-        fig=plt.figure(1,figsize=(8,6))
-        fig.clf()
-        ax=fig.add_subplot(111)
-
-        for i in xrange(self.nWashIntervals):
-            use,=np.where(self.expWashIndex == i)
-            washMJDRange = [np.min(self.expMJD[use]),np.max(self.expMJD[use])]
-
-            # FIXME: change to mean of the slopes, or plot all of them?
-            ax.plot(washMJDRange - firstMJD,
-                    (washMJDRange - self.washMJDs[i])*self.compQESysSlope[i, 0] +
-                    self.parQESysIntercept[i],'r--',linewidth=3)
-
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})$',fontsize=16)
-        ax.tick_params(axis='both',which='major',labelsize=14)
-
-        ylim = ax.get_ylim()
-        for i in xrange(self.nWashIntervals):
-            ax.plot([self.washMJDs[i]-firstMJD,self.washMJDs[i]-firstMJD],
-                    ylim,'k--')
-
-        fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
-                                                self.outfileBaseWithCycle))
-        plt.close(fig)
-        """
         # Filter Offset
         fig = plt.figure(1, figsize=(8, 6))
         fig.clf()
         ax = fig.add_subplot(111)
 
-        ax.plot(self.lambdaStdFilter, self.parFilterOffset, 'r.')
+        parFilterOffsetMmag = self.parFilterOffset * 1000.0
+
+        ax.plot(self.lambdaStdFilter, parFilterOffsetMmag, 'r.')
         for i, f in enumerate(self.lutFilterNames):
-            ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], self.parFilterOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
+            ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], parFilterOffsetMmag[i] - 10.0), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
-        ax.set_ylabel('Filter Offset (mag)')
-        ax.set_ylim(np.min(self.parFilterOffset - 0.02), np.max(self.parFilterOffset + 0.02))
+        ax.set_ylabel('Filter Offset (mmag)')
+        ax.set_ylim(np.min(parFilterOffsetMmag - 20.0), np.max(parFilterOffsetMmag + 20.0))
 
         fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))

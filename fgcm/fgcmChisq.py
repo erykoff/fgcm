@@ -947,7 +947,6 @@ class FgcmChisq(object):
                 dLdLnTauGO += dLdLnTauI1GO
                 dLdAlphaGO += dLdAlphaI1GO
 
-
             # we have objMagStdMeanErr[objIndex,:] = \Sum_{i"} 1/\sigma^2_{i"j}
             #   note that this is summed over all observations of an object in a band
             #   so that this is already done
@@ -1674,25 +1673,9 @@ class FgcmChisq(object):
                               self.fgcmPars.nLUTFilter)] /= units[self.fgcmPars.parFilterOffsetLoc:
                                                                       (self.fgcmPars.parFilterOffsetLoc +
                                                                        self.fgcmPars.nLUTFilter)]
-            # This next part makes things not work
-            """
-            if useRefstars:
-                add_at_1d(partialArray[2*self.fgcmPars.nFitPars +
-                                       self.fgcmPars.parFilterOffsetLoc:
-                                           (2*self.fgcmPars.nFitPars +
-                                            self.fgcmPars.parFilterOffsetLoc +
-                                            self.fgcmPars.nLUTFilter)],
-                          obsLUTFilterIndexGO[goodRefObsGOF],
-                          2.0 * deltaRefMagWeightedGROF)
 
-                partialArray[2*self.fgcmPars.nFitPars +
-                             self.fgcmPars.parFilterOffsetLoc:
-                                 (2*self.fgcmPars.nFitPars +
-                                  self.fgcmPars.parFilterOffsetLoc +
-                                  self.fgcmPars.nLUTFilter)] /= units[self.fgcmPars.parFilterOffsetLoc:
-                                                                          (self.fgcmPars.parFilterOffsetLoc +
-                                                                           self.fgcmPars.nLUTFilter)]
-                                                                           """
+            # Note that using the refstars with the filter offset derivative
+            # seems to make things go haywire, so don't do that.
 
             # Now set those to zero the derivatives we aren't using
             partialArray[self.fgcmPars.parFilterOffsetLoc:
