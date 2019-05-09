@@ -38,4 +38,4 @@ from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
-from .fgcmComputeStepUnits3 import FgcmComputeStepUnits3
+from .fgcmComputeStepUnits import FgcmComputeStepUnits

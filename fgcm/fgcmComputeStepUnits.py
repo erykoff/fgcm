@@ -25,7 +25,7 @@ from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 copyreg.pickle(types.MethodType, _pickle_method)
 
-class FgcmComputeStepUnits3(object):
+class FgcmComputeStepUnits(object):
     """
     Class which computes the step units for each parameter.
 
@@ -379,19 +379,6 @@ class FgcmComputeStepUnits3(object):
         deltaMagGO = np.zeros(goodObs.size) + self.stepUnitReference
         obsWeightGO = 1. / obsMagErr2GO
         deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
-
-        """
-        fname = 'test_indices.fits'
-        doPrint = False
-        if not os.path.isfile(fname) and thisCore == self._testing:
-            import fitsio
-            tempCat = np.zeros(1, dtype=[('goodStars', 'i4', goodStars.size),
-                                         ('obsObjIDIndexGOF', 'i4', obsFitUseGO.size)])
-            tempCat['goodStars'][:] = goodStars
-            tempCat['obsObjIDIndexGOF'][:] = obsObjIDIndexGO[obsFitUseGO]
-            fitsio.write(fname, tempCat, clobber=True)
-            doPrint = True
-            """
 
         gsGOF, indGOF = esutil.numpy_util.match(goodStars, obsObjIDIndexGO[obsFitUseGO])
 
