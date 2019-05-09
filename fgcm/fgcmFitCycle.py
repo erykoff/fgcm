@@ -89,8 +89,6 @@ class FgcmFitCycle(object):
         self.initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
             self.initialCycle = True
-            # Override, do not do instrument per band on initial cycle
-            self.fgcmConfig.instrumentParsPerBand = False
 
         self.fgcmLUT = None
         self.fgcmPars = None
