@@ -366,6 +366,14 @@ class FgcmFitCycle(object):
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
 
+            # However, we do recompute the absolute offset at this point for
+            # total consistency
+
+            if self.fgcmStars.hasRefstars:
+                deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
+                self.fgcmStars.applyAbsOffset(deltaAbsOffset)
+
         # Plot the parameters whether or not we did a fit!
         self.fgcmPars.plotParameters()
 
