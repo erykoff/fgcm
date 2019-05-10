@@ -831,22 +831,6 @@ class FgcmZeropointPlotter(object):
 
         deltaI1 = 1.0
 
-        import fitsio
-        tempCat = np.zeros(1, dtype=[('objMagStdMean', 'f4', objMagStdMean.shape),
-                                     ('objSEDSlope', 'f4', objSEDSlope.shape),
-                                     ('goodStars', 'i4', goodStars.size),
-                                     ('I0Std', 'f4', self.I0Std.size),
-                                     ('I1Std', 'f4', self.I1Std.size),
-                                     ('I10Std', 'f4', self.I10Std.size)])
-        tempCat['objMagStdMean'][:, :] = objMagStdMean
-        tempCat['objSEDSlope'][:, :] = objSEDSlope
-        tempCat['goodStars'][:] = goodStars
-        tempCat['I0Std'][:] = self.I0Std
-        tempCat['I1Std'][:] = self.I1Std
-        tempCat['I10Std'][:] = self.I10Std
-
-        fitsio.write('temp_conversion_cat.fits', tempCat, clobber=True)
-
         for i, band in enumerate(fgcmStars.bands):
             sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
             sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])

@@ -160,7 +160,7 @@ class FgcmQeSysSlope(object):
                         slopeMean = np.clip(-1 * np.sum(slope / slopeErr2) / np.sum(1. / slopeErr2), -0.001, 0.0)
                         slopeMeanErr = np.sqrt(1. / np.sum(1. / slopeErr2))
 
-                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.4f +/- %.4f mmag/day%s" %
+                    self.fgcmLog.info("Wash interval %d, computed qe slope in %s band: %.6f +/- %.6f mmag/day%s" %
                                       (washIndex, self.fgcmPars.bands[bandIndex], slopeMean*1000.0, slopeMeanErr*1000.0, extraString))
                     self.fgcmPars.compQESysSlope[bandIndex, washIndex] = slopeMean
 
@@ -178,7 +178,7 @@ class FgcmQeSysSlope(object):
                     slopeMeanAll = np.clip(-1 * np.sum(slopeAll / slopeErr2All) / np.sum(1. / slopeErr2All), -0.001, 0.0)
                     slopeMeanErrAll = np.sqrt(1. / np.sum(1. / slopeErr2All))
 
-                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.4f +/- %.4f mmag/day%s" %
+                self.fgcmLog.info("Wash interval %d, computed qe slope in all bands: %.6f +/- %.6f mmag/day%s" %
                                   (washIndex, slopeMeanAll*1000.0, slopeMeanErrAll*1000.0, extraString))
                 self.fgcmPars.compQESysSlope[:, washIndex] = slopeMeanAll
 

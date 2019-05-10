@@ -177,9 +177,9 @@ class FgcmComputeStepUnits(object):
         # And the actual step size for good pars
         self.fgcmPars.stepUnits[nonZero] = np.abs(dChisqdPNZ) / self.fitGradientTolerance
 
-        #if not self.freezeStdAtmosphere:
+        if not self.freezeStdAtmosphere:
             # This provides a bit more wiggle room when fitting lots of parameters
-        self.fgcmPars.stepUnits[nonZero] /= (2.0 * nActualFitPars)
+            self.fgcmPars.stepUnits[nonZero] /= (2.0 * nActualFitPars)
 
         # And reset to median value for each class of steps
 
