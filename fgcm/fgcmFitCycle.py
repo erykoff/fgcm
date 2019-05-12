@@ -371,7 +371,7 @@ class FgcmFitCycle(object):
 
             if self.fgcmStars.hasRefstars:
                 deltaAbsOffset = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsThroughput *= 10.**(-self.deltaAbsOffset / 2.5)
+                self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
                 self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
         # Plot the parameters whether or not we did a fit!

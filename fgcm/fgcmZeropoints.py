@@ -803,7 +803,6 @@ class FgcmZeropointPlotter(object):
         self.I10Std = fgcmLUT.I10Std
 
         self.i1Conversions = self.computeI1Conversions(fgcmStars)
-        print(self.i1Conversions)
 
     def computeI1Conversions(self, fgcmStars):
         """
@@ -992,6 +991,8 @@ class FgcmZeropointPlotter(object):
 
         if self.plotPath is None:
             return
+
+        plt.set_cmap('viridis')
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
