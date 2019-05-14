@@ -1418,9 +1418,9 @@ class FgcmStars(object):
             # Per exposure
             obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
-    def computeModelMagErrors(self, fgcmPars):
+    def applyModelMagErrorModel(self, fgcmPars):
         """
-        Compute model magnitude errors.
+        Apply magnitude error model.
 
         parameters
         ----------
@@ -1496,6 +1496,38 @@ class FgcmStars(object):
                            pars[6] * obsMagADUMeanGOu * np.log10(obsSkyBrightness[goodObs[use]] / skyPivot))
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
+
+    def applyMirrorChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False):
+        """
+        Apply mirror chromaticity model
+
+        Parameters
+        ----------
+        fgcmPars: `fgcmParameters`
+        returnCorrections: `bool`, optional
+           Just return the corrections, don't apply them.  Default is False.
+        """
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+
+        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+
+        cAl = fgcmPars.expCTrans[obsExpIndex]
+
+        termOne = 1.0 + (cAl / fgcmLUT.lambdaStd[obsBandIndex]) * fgcmLUT.I10Std[obsBandIndex]
+        obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
+        termTwo = 1.0 + (((cAl / fgcmLUT.lambdaStd[obsBandIndex]) * (fgcmLUT.I1Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I2Std[obsBandIndex])) /
+                         (fgcmLUT.I0Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I1Std[obsBandIndex]))
+        deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
+
+        if returnCorrections:
+            return deltaMag
+
+        obsMagADU += deltaMag
 
     def saveFlagStarIndices(self,flagStarFile):
         """

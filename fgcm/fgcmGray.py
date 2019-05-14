@@ -121,6 +121,7 @@ class FgcmGray(object):
 
         self.expGrayColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
+        self.expGrayErrColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
 
     def computeExpGrayForInitialSelection(self):
@@ -142,7 +143,6 @@ class FgcmGray(object):
         expGrayRMSForInitialSelection = snmm.getArray(self.expGrayRMSForInitialSelectionHandle)
         expNGoodStarForInitialSelection = snmm.getArray(self.expNGoodStarForInitialSelectionHandle)
 
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -280,7 +280,6 @@ class FgcmGray(object):
         expNGoodTilings = snmm.getArray(self.expNGoodTilingsHandle)
 
         # input numbers
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -543,10 +542,10 @@ class FgcmGray(object):
         self.fgcmLog.info('Computing ExpGrayColorSplit')
 
         expGrayColorSplit = snmm.getArray(self.expGrayColorSplitHandle)
+        expGrayErrColorSplit = snmm.getArray(self.expGrayErrColorSplitHandle)
         expGrayRMSColorSplit = snmm.getArray(self.expGrayRMSColorSplitHandle)
         expGrayNGoodStarsColorSplit = snmm.getArray(self.expGrayNGoodStarsColorSplitHandle)
 
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -559,10 +558,6 @@ class FgcmGray(object):
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-
-        #EGray = np.zeros(self.fgcmStars.nStarObs,dtype='f8')
-        #EGray[obsIndex] = (objMagStdMean[obsObjIDIndex[obsIndex],obsBandIndex[obsIndex]] -
-        #                   obsMagStd[obsIndex])
 
         # This should check that every star used has a valid g-i color
         # We also want to filter only photometric observations, because
@@ -586,8 +581,10 @@ class FgcmGray(object):
         gmiCutNames = ['Blue25', 'Middle50', 'Red25']
 
         expGrayColorSplit[:, :] = 0.0
+        expGrayErrColorSplit[:, :] = 0.0
         expGrayRMSColorSplit[:, :] = 0.0
         expGrayNGoodStarsColorSplit[:, :] = 0
+        expGrayWtColorSplit = np.zeros_like(expGrayColorSplit)
 
         for c in xrange(gmiCutLow.size):
             use, = np.where((gmiGO > gmiCutLow[c]) &
@@ -595,22 +592,26 @@ class FgcmGray(object):
 
             np.add.at(expGrayColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use])
+                      EGrayGO[use] / EGrayErr2GO[use])
+            np.add.at(expGrayWtColorSplit[:, c],
+                      obsExpIndex[goodObs[use]],
+                      1. / EGrayErr2GO[use])
             np.add.at(expGrayRMSColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use]**2.)
+                      EGrayGO[use]**2. / EGrayErr2GO[use])
             np.add.at(expGrayNGoodStarsColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
                       1)
 
             gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp / 4)
-            expGrayColorSplit[gd, c] /= expGrayNGoodStarsColorSplit[gd, c]
-            expGrayRMSColorSplit[gd, c] = np.sqrt((expGrayRMSColorSplit[gd, c] / expGrayNGoodStarsColorSplit[gd, c]) -
-                                                  (expGrayColorSplit[gd, c])**2.)
+            expGrayColorSplit[gd, c] /= expGrayWtColorSplit[gd, c]
+            expGrayErrColorSplit[gd, c] = np.sqrt(1. / expGrayWtColorSplit[gd, c])
+            expGrayRMSColorSplit[gd, c] = np.sqrt((expGrayRMSColorSplit[gd, c] / expGrayWtColorSplit[gd, c]) - expGrayColorSplit[gd, c]**2.)
 
             bd, = np.where(expGrayNGoodStarsColorSplit[:, c] < self.minStarPerExp / 4)
             expGrayColorSplit[bd, c] = self.illegalValue
             expGrayRMSColorSplit[bd, c] = self.illegalValue
+            expGrayErrColorSplit[bd, c] = self.illegalValue
 
         if self.plotPath is not None:
             # main plots:
@@ -618,9 +619,8 @@ class FgcmGray(object):
 
             plt.set_cmap('viridis')
 
-            #for ind in xrange(self.fgcmStars.bandRequiredIndex.size):
-            #    bandIndex = self.fgcmStars.bandRequiredIndex[ind]
-            for bandIndex in self.bandFitIndex:
+            #for bandIndex in self.bandFitIndex:
+            for bandIndex, band in enumerate(self.fgcmPars.bands):
                 use, = np.where((self.fgcmPars.expBandIndex == bandIndex) &
                                 (self.fgcmPars.expFlag == 0) &
                                 (expGrayColorSplit[:, 0] > self.illegalValue) &
@@ -638,6 +638,9 @@ class FgcmGray(object):
                 ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
 
+                text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
+                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+
                 fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
                                                                       self.outfileBaseWithCycle,
                                                                       self.fgcmPars.bands[bandIndex]))
@@ -645,19 +648,31 @@ class FgcmGray(object):
 
                 # And a plot as function of time
 
+                deltaColor = (expGrayColorSplit[use, 2] - expGrayColorSplit[use, 0]) * 1000.
+                firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
+
+                st = np.argsort(deltaColor)
+                extent = [np.min(self.fgcmPars.expMJD[use] - firstMJD),
+                          np.max(self.fgcmPars.expMJD[use] - firstMJD),
+                          deltaColor[st[int(0.01*deltaColor.size)]],
+                          deltaColor[st[int(0.99*deltaColor.size)]]]
+
                 fig = plt.figure(1, figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
-                ax.hexbin(self.fgcmPars.expMJD[use],
+                ax.hexbin(self.fgcmPars.expMJD[use] - firstMJD,
                           (expGrayColorSplit[use, 2] - expGrayColorSplit[use, 0]) * 1000.,
-                          bins='log')
-                ax.set_xlabel('MJD')
+                          bins='log', extent=extent)
+                ax.set_xlabel('MJD - %.0f' % (firstMJD))
                 ax.set_ylabel('EXP_GRAY (%s) (%s) - EXP_GRAY (%s) (%s) (mmag)' %
                               (self.fgcmPars.bands[bandIndex], gmiCutNames[2],
                                self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
-                ax.plot([self.fgcmPars.expMJD[use].min(), self.fgcmPars.expMJD[use].max()],
+                ax.plot([extent[0], extent[1]],
                         [0.0, 0.0], 'r--')
+
+                text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
+                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
 
                 plt.savefig('%s/%s_compare-redblue-expgray-mjd_%s.png' % (self.plotPath,
                                                                           self.outfileBaseWithCycle,
@@ -827,11 +842,11 @@ class FgcmGray(object):
 
             ax=fig.add_subplot(111)
 
-            ax.hexbin(expGray[use0[matchInd[ok]]],
+            ax.hexbin(expGray[use0[matchInd[ok]]]*1000.0,
                       expGray[use1[ok]]*1000.0, bins='log')
             ax.set_xlabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex0]))
             ax.set_ylabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex1]))
-            ax.plot([-0.01,0.01],[-0.01,0.01],'r--')
+            ax.plot([-0.01 * 1000, 0.01 * 1000],[-0.01 * 1000, 0.01 * 1000],'r--')
 
             if self.plotPath is not None:
                 fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,

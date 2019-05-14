@@ -75,6 +75,10 @@ class FgcmZeropoints(object):
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
+        self.I10StdBand = fgcmConfig.I10StdBand
+        self.I0StdBand = fgcmConfig.I0StdBand
+        self.I1StdBand = fgcmConfig.I1StdBand
+        self.lambdaStdBand = fgcmConfig.lambdaStdBand
 
     def computeZeropoints(self):
         """
@@ -102,6 +106,7 @@ class FgcmZeropoints(object):
            'FGCM_FILTER': Delta-zeropoint due to the filter offset
            'FGCM_FLAT': Delta-zeropoint due to superStarFlat
            'FGCM_APERCORR': Delta-zeropoint due to aperture correction
+           'FGCM_CTRANS': Transmission curve adjustment constant
            'EXPTIME': Exposure time (seconds)
            'FILTERNAME': Filter name
            'BAND': band name
@@ -122,6 +127,7 @@ class FgcmZeropoints(object):
         expNGoodCCDs = snmm.getArray(self.fgcmGray.expNGoodCCDsHandle)
         expNGoodTilings = snmm.getArray(self.fgcmGray.expNGoodTilingsHandle)
         expGrayColorSplit = snmm.getArray(self.fgcmGray.expGrayColorSplitHandle)
+        expGrayErrColorSplit = snmm.getArray(self.fgcmGray.expGrayErrColorSplitHandle)
         expGrayRMSColorSplit = snmm.getArray(self.fgcmGray.expGrayRMSColorSplitHandle)
 
         ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
@@ -184,11 +190,13 @@ class FgcmZeropoints(object):
                       ('FGCM_FPGRY','f8'),
                       ('FGCM_FPVAR','f8'),
                       ('FGCM_FPGRY_CSPLIT', 'f8', 3),
+                      ('FGCM_FPGRY_CSPLITERR', 'f8', 3),
                       ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
                       ('FGCM_DUST','f8'),
                       ('FGCM_FILTER','f8'),
                       ('FGCM_FLAT','f8'),
                       ('FGCM_APERCORR','f8'),
+                      ('FGCM_CTRANS', 'f4'),
                       ('EXPTIME','f4'),
                       ('FILTERNAME','a2'),
                       ('BAND','a2'),
@@ -204,6 +212,8 @@ class FgcmZeropoints(object):
                                     ('TAU','f8'),
                                     ('ALPHA','f8'),
                                     ('O3','f8'),
+                                    ('CTRANS', 'f8'),
+                                    ('LAMSTD', 'f8'),
                                     ('SECZENITH','f8')])
 
         ## start with zpStruct
@@ -247,6 +257,9 @@ class FgcmZeropoints(object):
         else:
             zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
 
+        # Fill in the transmission adjustment constant
+        zpStruct['FGCM_CTRANS'][:] = self.fgcmPars.expCTrans[zpExpIndex]
+
         # fill in the retrieved values
         zpStruct['FGCM_R0'][:] = r0[zpExpIndex, zpCCDIndex]
         zpStruct['FGCM_R10'][:] = r10[zpExpIndex, zpCCDIndex]
@@ -262,6 +275,7 @@ class FgcmZeropoints(object):
 
         zpStruct['FGCM_FPGRY_CSPLIT'][zpExpOk, :] = expGrayColorSplit[zpExpIndex[zpExpOk], :]
         zpStruct['FGCM_FPGRY_CSPLITVAR'][zpExpOk, :] = expGrayRMSColorSplit[zpExpIndex[zpExpOk], :]**2.
+        zpStruct['FGCM_FPGRY_CSPLITERR'][zpExpOk, :] = expGrayErrColorSplit[zpExpIndex[zpExpOk], :]
 
         self.fgcmLog.info('%d exposure/ccd sets have exposures with >=%d good ccds' %
                          (zpExpOk.size, self.minCCDPerExp))
@@ -493,6 +507,8 @@ class FgcmZeropoints(object):
         atmStruct['TAU'] = np.exp(self.fgcmPars.expLnTau)
         atmStruct['ALPHA'] = self.fgcmPars.expAlpha
         atmStruct['O3'] = self.fgcmPars.expO3
+        atmStruct['CTRANS'] = self.fgcmPars.expCTrans
+        atmStruct['LAMSTD'] = self.lambdaStdBand[self.fgcmPars.expBandIndex]
         atmStruct['SECZENITH'] = 1./(np.sin(self.fgcmPars.expTelDec) *
                                      self.fgcmPars.sinLatitude +
                                      np.cos(self.fgcmPars.expTelDec) *
@@ -510,7 +526,8 @@ class FgcmZeropoints(object):
             self.fgcmLog.info('Making I1/R1 plots...')
 
             plotter = FgcmZeropointPlotter(zpStruct, self.fgcmStars, self.fgcmPars,
-                                           self.fgcmLUT, self.colorSplitIndices,
+                                           self.I0StdBand, self.I1StdBand, self.I10StdBand,
+                                           self.colorSplitIndices,
                                            self.plotPath, self.outfileBaseWithCycle)
 
             plotter.makeR1I1Plots()
@@ -790,7 +807,8 @@ class FgcmZeropointPlotter(object):
     """
 
     def __init__(self, zpStruct, fgcmStars, fgcmPars,
-                 fgcmLUT, colorSplitIndices, plotPath, outfileBase):
+                 I0StdBand, I1StdBand, I10StdBand,
+                 colorSplitIndices, plotPath, outfileBase):
         self.zpStruct = zpStruct
         self.bands = fgcmPars.bands
         self.filterNames = fgcmPars.lutFilterNames
@@ -798,9 +816,9 @@ class FgcmZeropointPlotter(object):
         self.outfileBase = outfileBase
         self.filterToBand = fgcmPars.filterToBand
         self.colorSplitIndices = colorSplitIndices
-        self.I0Std = fgcmLUT.I0Std
-        self.I1Std = fgcmLUT.I1Std
-        self.I10Std = fgcmLUT.I10Std
+        self.I0StdBand = I0StdBand
+        self.I1StdBand = I1StdBand
+        self.I10StdBand = I10StdBand
 
         self.i1Conversions = self.computeI1Conversions(fgcmStars)
 
@@ -834,8 +852,8 @@ class FgcmZeropointPlotter(object):
             sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
             sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])
 
-            deltaMagBlue = 2.5 * np.log10((1.0 + sedSlopeBlue * ((self.I1Std[i] + deltaI1) / self.I0Std[i])) / (1.0 + sedSlopeBlue * self.I10Std[i]))
-            deltaMagRed = 2.5 * np.log10((1.0 + sedSlopeRed * ((self.I1Std[i] + deltaI1) / self.I0Std[i])) / (1.0 + sedSlopeRed * self.I10Std[i]))
+            deltaMagBlue = 2.5 * np.log10((1.0 + sedSlopeBlue * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeBlue * self.I10StdBand[i]))
+            deltaMagRed = 2.5 * np.log10((1.0 + sedSlopeRed * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeRed * self.I10StdBand[i]))
 
             i1Conversions[i] = 1000.0 * (deltaMagRed - deltaMagBlue) / deltaI1
 
@@ -1004,6 +1022,9 @@ class FgcmZeropointPlotter(object):
                             (np.abs(self.zpStruct['FGCM_R0']) < 1000.0) &
                             (np.abs(self.zpStruct['FGCM_I10']) < 1000.0) &
                             (np.abs(self.zpStruct['FGCM_I0']) < 1000.0))
+
+            if use.size == 0:
+                continue
 
             mjd0 = np.floor(np.min(self.zpStruct['MJD'][use]))
 

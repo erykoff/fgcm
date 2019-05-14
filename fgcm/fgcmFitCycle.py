@@ -30,6 +30,7 @@ from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
 from .fgcmComputeStepUnits import FgcmComputeStepUnits
+from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -254,7 +255,6 @@ class FgcmFitCycle(object):
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.debug('FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
-        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='initial')
 
@@ -271,6 +271,11 @@ class FgcmFitCycle(object):
 
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
+
+            # Apply the mirror chromaticity if desired (we require SEDs)
+            if self.fgcmConfig.fitMirrorChromaticity:
+                self.fgcmLog.info("Applying mirror chromaticity corrections...")
+                self.fgcmStars.applyMirrorChromaticityCorrection(self.fgcmPars, self.fgcmLUT)
 
         else:
             # need to go through the bright observations
@@ -339,7 +344,7 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
         # And apply the errors (if configured)
-        self.fgcmStars.computeModelMagErrors(self.fgcmPars)
+        self.fgcmStars.applyModelMagErrorModel(self.fgcmPars)
 
         # Reset the superstar outlier flags and compute them now that we have
         # flagged good exposures, good nights, etc.
@@ -456,6 +461,12 @@ class FgcmFitCycle(object):
         aperCorr.computeApertureCorrections()
 
         self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
+
+        # Compute mirror chromaticity
+        if self.fgcmConfig.fitMirrorChromaticity:
+            self.fgcmLog.debug("FitCycle computing mirror chromaticity")
+            mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+            mirChrom.computeMirrorChromaticity()
 
         self.fgcmLog.debug('FitCycle computing qe sys slope')
         self.fgcmQeSysSlope.computeQeSysSlope('final')

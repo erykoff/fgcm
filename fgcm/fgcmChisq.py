@@ -273,8 +273,6 @@ class FgcmChisq(object):
 
         if self.fgcmStars.hasRefstars:
             objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
-            test, = np.where(objRefIDIndex[goodStars] >= 0)
-            self.fgcmLog.info('Found %d reference stars for chisq' % (test.size))
 
         # do global pre-matching before giving to workers, because
         #  it is faster this way

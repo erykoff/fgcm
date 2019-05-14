@@ -482,7 +482,7 @@ class FgcmAtmosphereTable(object):
 
 
     def interpolateAtmosphere(self, lam=None, pmb=None, pwv=None, o3=None, tau=None,
-                              alpha=None, zenith=None):
+                              alpha=None, zenith=None, ctranslamstd=None):
         """
         Interpolate the atmosphere table to generate an atmosphere without
         requiring MODTRAN be installed.
@@ -503,6 +503,9 @@ class FgcmAtmosphereTable(object):
            Aerosol slope.  Default to alphaStd
         zenith: float, optional
            Zenith angle (degrees).  Default to zenithStd
+        ctranslamstd: [ctrans, lamstd], optional
+           Transmission adjustment constant and lambdastd.
+           Default to [0.0, lamnorm]
 
         returns
         -------
@@ -524,6 +527,8 @@ class FgcmAtmosphereTable(object):
             alpha = self.alphaStd
         if zenith is None:
             zenith = self.zenithStd
+        if ctranslamstd is None:
+            ctranslamstd = [0.0, self.lambdaNorm]
 
         if self.o2Interpolator is None:
             secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
@@ -556,6 +561,7 @@ class FgcmAtmosphereTable(object):
                            self.rayleighInterpolator((_secZenith, lam)) *
                            self.lnPwvInterpolator((np.log(_pwv), _secZenith, lam)) *
                            self.o3Interpolator((_o3, _secZenith, lam)) *
+                           (1.0 + ctranslamstd[0] * (lam - ctranslamstd[1]) / ctranslamstd[1]) *
                            np.exp(-1.0 * tau * _secZenith * (lam / self.lambdaNorm)**(-alpha)))
 
         return atmInterpolated

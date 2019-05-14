@@ -131,6 +131,7 @@ class FgcmParameters(object):
 
         self.epochMJDs = fgcmConfig.epochMJDs
         self.washMJDs = fgcmConfig.washMJDs
+        self.coatingMJDs = fgcmConfig.coatingMJDs
 
         self.stepUnitReference = fgcmConfig.stepUnitReference
 
@@ -283,17 +284,9 @@ class FgcmParameters(object):
         self.parSuperStarFlat[:, :, :, 0] = 1.0
 
         # parameters with per-wash values
-        #if self.instrumentParsPerBand:
-        #    self.nQESysInterceptPars = self.nWashIntervals * self.nBands
-        #else:
-        #    self.nQESysInterceptPars = self.nWashIntervals
 
         # We always have these parameters, even if we don't fit them
-        #self.nQESysInterceptPars = self.nWashIntervals * self.nBands
-        #self.parQESysIntercept = np.zeros(self.nQESysInterceptPars, dtype=np.float32)
-        #self.parQESysIntercept = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
         self.parQESysIntercept = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
-        #self.compQESysSlope = np.zeros((self.nWashIntervals, self.nBands), dtype=np.float32)
         self.compQESysSlope = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
         self.compQESysSlopeApplied = np.zeros_like(self.compQESysSlope)
 
@@ -322,6 +315,9 @@ class FgcmParameters(object):
 
         self.compRefOffset = np.zeros(self.nBands, dtype=np.float64)
         self.compRefSigma = np.zeros_like(self.compRefOffset)
+
+        # Add in the mirror coating...
+        self.compMirrorChromaticity = np.zeros((self.nLUTFilter, self.nCoatingIntervals + 1))
 
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
@@ -417,6 +413,8 @@ class FgcmParameters(object):
         self.compAbsThroughput = np.atleast_1d(inParams['COMPABSTHROUGHPUT'][0])
         self.compRefOffset = np.atleast_1d(inParams['COMPREFOFFSET'][0])
         self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
+        self.compMirrorChromaticity = inParams['COMPMIRRORCHROMATICITY'][0].reshape((self.nLUTFilter, self.nCoatingIntervals + 1))
+        self.mirrorChromaticityPivot = np.atleast_1d(inParams['MIRRORCHROMATICITYPIVOT'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -690,18 +688,28 @@ class FgcmParameters(object):
 
         # record the range in each to get typical length of wash epoch
         washMJDRange = np.zeros((self.nWashIntervals,2))
-        self.expPerWash = np.zeros(self.nWashIntervals,dtype=np.int32)
         for i in xrange(self.nWashIntervals):
             use,=np.where((self.expMJD > tempWashMJDs[i]) &
                           (self.expMJD < tempWashMJDs[i+1]))
             self.expWashIndex[use] = i
-            washMJDRange[i,0] = np.min(self.expMJD[use])
-            washMJDRange[i,1] = np.max(self.expMJD[use])
-            self.expPerWash[i] = use.size
 
-        self.meanWashIntervalDuration = np.mean(washMJDRange[:,1] - washMJDRange[:,0])
-        self.meanExpPerWash = np.mean(self.expPerWash)
+        # And the coating...
+        self.nCoatingIntervals = self.coatingMJDs.size + 1
+        self.coatingMJDs = np.insert(self.coatingMJDs, 0, np.min(self.expMJD) - 1.0)
 
+        self.fgcmLog.info("Compiling indices for %d mirror coating(s)." % (self.nCoatingIntervals))
+
+        self.expCoatingIndex = np.zeros(self.nExp, dtype='i4')
+        self.mirrorChromaticityPivot = np.zeros(self.nCoatingIntervals)
+        tempCoatingMJDs = self.coatingMJDs.copy()
+        tempCoatingMJDs = np.append(tempCoatingMJDs, 1e10)
+
+        for i in xrange(self.nCoatingIntervals):
+            use, = np.where((self.expMJD > tempCoatingMJDs[i]) &
+                            (self.expMJD < tempCoatingMJDs[i + 1]))
+            self.expCoatingIndex[use] = i
+            # The pivot is the median time of all the observations
+            self.mirrorChromaticityPivot[i] = np.median(self.expMJD[use])
 
     def _arrangeParArray(self):
         """
@@ -865,6 +873,8 @@ class FgcmParameters(object):
                ('COMPABSTHROUGHPUT', 'f8', self.compAbsThroughput.size),
                ('COMPREFOFFSET', 'f8', self.compRefOffset.size),
                ('COMPREFSIGMA', 'f8', self.compRefSigma.size),
+               ('COMPMIRRORCHROMATICITY', 'f8', self.compMirrorChromaticity.size),
+               ('MIRRORCHROMATICITYPIVOT', 'f8', self.mirrorChromaticityPivot.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -911,6 +921,8 @@ class FgcmParameters(object):
         pars['COMPABSTHROUGHPUT'][:] = self.compAbsThroughput
         pars['COMPREFOFFSET'][:] = self.compRefOffset
         pars['COMPREFSIGMA'][:] = self.compRefSigma
+        pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.flatten()
+        pars['MIRRORCHROMATICITYPIVOT'][:] = self.mirrorChromaticityPivot
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1169,11 +1181,6 @@ class FgcmParameters(object):
         self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
 
         # and QESys
-        """
-        self.expQESys = (self.parQESysIntercept[self.expWashIndex, self.expBandIndex] +
-                         self.compQESysSlope[self.expWashIndex, self.expBandIndex] *
-                         (self.expMJD - self.washMJDs[self.expWashIndex]))
-                         """
         self.expQESys = (self.parQESysIntercept[self.expBandIndex, self.expWashIndex] +
                          self.compQESysSlope[self.expBandIndex, self.expWashIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
@@ -1693,6 +1700,22 @@ class FgcmParameters(object):
                                             self.compAperCorrPivot[self.expBandIndex]))
 
         return ccdApertureCorrection
+
+    @property
+    def expCTrans(self):
+        """
+        The transmission adjustment c
+
+        Returns
+        -------
+        expCTrans: float array (nExp)
+        """
+
+        deltaT = self.expMJD - self.mirrorChromaticityPivot[self.expCoatingIndex]
+        c0 = self.compMirrorChromaticity[self.expLUTFilterIndex, self.expCoatingIndex + 1]
+        c1 = self.compMirrorChromaticity[self.expLUTFilterIndex, 0]
+
+        return np.clip(c0 + c1 * deltaT, -1.0, 1.0)
 
     def plotParameters(self):
         """

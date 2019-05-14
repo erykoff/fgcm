@@ -105,6 +105,7 @@ class FgcmConfig(object):
     UTBoundary = ConfigField(float, default=0.0)
     washMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
     epochMJDs = ConfigField(np.ndarray, default=np.array((0.0, 1e10)))
+    coatingMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
     epochNames = ConfigField(list, required=False)
     lutFile = ConfigField(str, required=False)
     expField = ConfigField(str, default='EXPNUM')
@@ -182,6 +183,7 @@ class FgcmConfig(object):
     useNightlyRetrievedPwv = ConfigField(bool, default=False)
     useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
+    fitMirrorChromaticity = ConfigField(bool, default=False)
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCD = ConfigField(bool, default=False)
@@ -378,6 +380,9 @@ class FgcmConfig(object):
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
+        self.I0StdBand = lutStd['I0STD'][0][bandStdFilterIndex]
+        self.I1StdBand = lutStd['I1STD'][0][bandStdFilterIndex]
+        self.I2StdBand = lutStd['I2STD'][0][bandStdFilterIndex]
         self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
@@ -447,6 +452,15 @@ class FgcmConfig(object):
         gd,=np.where((self.washMJDs > self.mjdRange[0]) &
                      (self.washMJDs < self.mjdRange[1]))
         self.washMJDs = self.washMJDs[gd]
+
+        # and the coating MJDs
+        st = np.argsort(self.coatingMJDs)
+        if (not np.array_equal(st, np.arange(self.coatingMJDs.size))):
+            raise ValueError("Input coatingMJDs must be in sort order.")
+
+        gd, = np.where((self.coatingMJDs > self.mjdRange[0]) &
+                       (self.coatingMJDs < self.mjdRange[1]))
+        self.coatingMJDs = self.coatingMJDs[gd]
 
         # Deal with fit band, notfit band, required, and notrequired indices
         bandFitFlag = np.zeros(len(self.bands), dtype=np.bool)

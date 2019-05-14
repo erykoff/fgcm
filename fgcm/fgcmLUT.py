@@ -375,13 +375,15 @@ class FgcmLUTMaker(object):
             self.fgcmLog.info("Filter: %s (from %s) lambdaStd = %.3f" %
                               (filterName, self.stdFilterNames[i], self.lambdaStd[i]))
 
-        self.fgcmLog.info("Computing I0Std/I1Std")
+        self.fgcmLog.info("Computing I0Std/I1Std/I2Std")
         self.I0Std = np.zeros(len(self.filterNames))
         self.I1Std = np.zeros(len(self.filterNames))
+        self.I2Std = np.zeros(len(self.filterNames))
 
         for i in xrange(len(self.filterNames)):
             self.I0Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
             self.I1Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+            self.I2Std[i] = integrate.simps(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i])**2. / self.atmLambda, self.atmLambda)
 
         self.I10Std = self.I1Std / self.I0Std
 
@@ -675,6 +677,7 @@ class FgcmLUTMaker(object):
                                     ('I0STD','f8',len(self.filterNames)),
                                     ('I1STD','f8',len(self.filterNames)),
                                     ('I10STD','f8',len(self.filterNames)),
+                                    ('I2STD','f8',len(self.filterNames)),
                                     ('LAMBDAB','f8',len(self.filterNames)),
                                     ('ATMLAMBDA','f8',self.atmLambda.size),
                                     ('ATMSTDTRANS','f8',self.atmStdTrans.size)])
@@ -692,6 +695,7 @@ class FgcmLUTMaker(object):
         stdVals['I0STD'][:] = self.I0Std
         stdVals['I1STD'][:] = self.I1Std
         stdVals['I10STD'][:] = self.I10Std
+        stdVals['I2STD'][:] = self.I2Std
         stdVals['LAMBDAB'][:] = self.lambdaB
         stdVals['ATMLAMBDA'][:] = self.atmLambda
         stdVals['ATMSTDTRANS'][:] = self.atmStdTrans
@@ -819,6 +823,7 @@ class FgcmLUT(object):
         self.I0Std = stdVals['I0STD'][0]
         self.I1Std = stdVals['I1STD'][0]
         self.I10Std = stdVals['I10STD'][0]
+        self.I2Std = stdVals['I2STD'][0]
         self.lambdaB = stdVals['LAMBDAB'][0]
         self.atmLambda = stdVals['ATMLAMBDA'][0]
         self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
@@ -1062,158 +1067,4 @@ class FgcmLUT(object):
         #  but the noise in g-r is going to cause things to bounce around.  Pout.
 
         return self.sedLUT['FPRIME'][indices,:]
-
-    def computeStepUnits(self, stepUnitReference, stepGrain, meanNightDuration,
-                         meanWashIntervalDuration, fitBands, bands, nCampaignNights):
-        """
-        Compute normalization factors for fit step units.  Note that this might need
-         to be tweaked.
-
-        parameters
-        ----------
-        stepUnitReference: float
-           How much should a typical step move things?  0.001 mag is default.
-        stepGrain: float
-           Additional fudge factor to apply to all steps.
-        meanNightDuration: float
-           Mean duration of a night (days).
-        meanWashIntervalDuration: float
-           Mean duration between washes (days).
-        fitBands: string array
-           Which bands are used for the fit?
-        bands: string array
-           What are all the bands?
-        nCampaignNights: int
-           Total number of nights in observing campaign to be calibrated.
-        """
-
-        unitDict = {}
-
-        # bigger unit, smaller step
-
-        # compute tau units
-
-        deltaMagLnTau = (2.5*np.log10(np.exp(-self.secZenithStd*np.exp(self.lnTauStd))) -
-                         2.5*np.log10(np.exp(-self.secZenithStd*np.exp(self.lnTauStd+1.0))))
-
-        unitDict['lnTauUnit'] = np.abs(deltaMagLnTau) / stepUnitReference / stepGrain
-        unitDict['lnTauUnit'] /= 5.0
-
-        # FIXME?
-        unitDict['lnTauSlopeUnit'] = unitDict['lnTauUnit'] * meanNightDuration
-
-        # look for first use of 'g' or 'r' band in filterToBand...
-        #  this is the reference filter for tau/alpha
-
-        alphaFilterIndex = -1
-        for i,filterName in enumerate(self.filterNames):
-            if (self.filterToBand[filterName] == 'g' or
-                self.filterToBand[filterName] == 'r'):
-                alphaFilterIndex = i
-                break
-
-        if alphaFilterIndex == -1:
-            # We don't have anything here...
-            # Just set this to 1.0, since it's not sensitive?
-            unitDict['alphaUnit'] = 1.0 / stepUnitReference / stepGrain
-        else:
-            deltaMagAlpha = (2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**self.alphaStd)) -
-                             2.5*np.log10(np.exp(-self.secZenithStd*self.tauStd*(self.lambdaStd[alphaFilterIndex]/self.lambdaNorm)**(self.alphaStd+1.0))))
-            unitDict['alphaUnit'] = np.abs(deltaMagAlpha) / stepUnitReference / stepGrain
-
-            # and scale these by fraction of bands affected...
-            alphaNAffectedBands = 0
-            for filterName in self.filterNames:
-                if ((self.filterToBand[filterName] == 'u' and
-                     'u' in fitBands) or
-                    (self.filterToBand[filterName] == 'g' and
-                     'g' in fitBands) or
-                    (self.filterToBand[filterName] == 'r' and
-                     'r' in fitBands)):
-                    alphaNAffectedBands += 1
-
-            unitDict['alphaUnit'] *= float(alphaNAffectedBands) / float(len(fitBands))
-
-        # pwv units -- reference to z or y or Y
-        pwvFilterIndex = -1
-        for i,filterName in enumerate(self.filterNames):
-            if (self.filterToBand[filterName] == 'z' or
-                self.filterToBand[filterName] == 'y' or
-                self.filterToBand[filterName] == 'Y'):
-                pwvFilterIndex = i
-                break
-
-        if pwvFilterIndex == -1:
-            unitDict['lnPwvUnit'] = 1.0 / stepUnitReference / stepGrain
-        else:
-            indicesStd = self.getIndices(pwvFilterIndex,np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Std = self.computeI0(np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-
-            # Want the change from one step unit
-            indicesMinus = self.getIndices(pwvFilterIndex,np.log(self.pwvStd)-1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Minus = self.computeI0(np.log(self.pwvStd)-1.0,self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesMinus)
-            deltaMagPwv = 2.5*np.log10(i0Minus) - 2.5*np.log10(i0Std)
-
-            unitDict['lnPwvUnit'] = np.abs(deltaMagPwv) / stepUnitReference / stepGrain
-
-            # scale by fraction of bands affected
-            pwvNAffectedBands = 0
-            for filterName in self.filterNames:
-                if ((self.filterToBand[filterName] == 'z' and
-                     'z' in fitBands) or
-                    (self.filterToBand[filterName] == 'y' and
-                     'y' in fitBands) or
-                    (self.filterToBand[filterName] == 'Y' and
-                     'Y' in fitBands)):
-                    pwvNAffectedBands += 1
-            unitDict['lnPwvUnit'] *= float(pwvNAffectedBands) / float(len(fitBands))
-
-        # PWV slope units
-        unitDict['lnPwvSlopeUnit'] = unitDict['lnPwvUnit'] * meanNightDuration
-        unitDict['lnPwvQuadraticUnit'] = unitDict['lnPwvUnit'] * meanNightDuration**2.
-
-        # PWV Global step units
-        unitDict['lnPwvGlobalUnit'] = unitDict['lnPwvUnit'] * nCampaignNights
-
-        # O3 units -- reference to r
-        o3FilterIndex = -1
-        for i,filterName in enumerate(self.filterNames):
-            if (self.filterToBand[filterName] == 'u' or
-                self.filterToBand[filterName] == 'r'):
-                o3FilterIndex = i
-                break
-
-        if o3FilterIndex == -1:
-            unitDict['o3Unit'] = 1.0 / stepUnitReference / stepGrain
-        else:
-            indicesStd = self.getIndices(o3FilterIndex,np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Std = self.computeI0(np.log(self.pwvStd),self.o3Std,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesStd)
-            indicesPlus = self.getIndices(o3FilterIndex,np.log(self.pwvStd),self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.nCCD,self.pmbStd)
-            i0Plus = self.computeI0(np.log(self.pwvStd),self.o3Std+1.0,np.log(self.tauStd),self.alphaStd,self.secZenithStd,self.pmbStd,indicesPlus)
-            deltaMagO3 = 2.5*np.log10(i0Std) - 2.5*np.log10(i0Plus)
-
-            unitDict['o3Unit'] = np.abs(deltaMagO3) / stepUnitReference / stepGrain
-
-            # scale by fraction of bands that are affected
-            o3NAffectedBands = 0
-            for filterName in self.filterNames:
-                if (self.filterToBand[filterName] == 'u' or
-                    self.filterToBand[filterName] == 'r'):
-                    o3NAffectedBands += 1
-            unitDict['o3Unit'] *= float(o3NAffectedBands) / float(len(fitBands))
-
-        # wash parameters units...
-        unitDict['qeSysUnit'] = 1.0 / stepUnitReference / stepGrain
-
-        # And filter offset units...
-        # Unsure about this, we might need to get fancy per filter about overlaps
-        # But this is going to be roughly in the right direction, I hope.
-        unitDict['filterOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
-
-        # Test this out
-        unitDict['absOffsetUnit'] = 1.0 / stepUnitReference / stepGrain / 1000.
-        unitDict['refOnlyAbsOffsetUnit'] = 1.0 / stepUnitReference / stepGrain
-
-        return unitDict
-
 
