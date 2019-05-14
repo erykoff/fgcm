@@ -370,6 +370,7 @@ class FgcmFitCycle(object):
             # total consistency
 
             if self.fgcmStars.hasRefstars:
+                self.fgcmLog.info("Final computation of absolute offset.")
                 deltaAbsOffset = self.fgcmStars.computeAbsOffset()
                 self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
                 self.fgcmStars.applyAbsOffset(deltaAbsOffset)
