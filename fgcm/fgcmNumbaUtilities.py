@@ -35,7 +35,8 @@ if has_numba:
 
     @jit
     def numba_test(value):
-        print("Using numba")
+        pass
+
 else:
     import numpy as np
 
@@ -47,6 +48,6 @@ else:
     add_at_3d_single = np.add.at
 
     def numba_test(value):
-        print("Not using numba")
+        pass
 
 

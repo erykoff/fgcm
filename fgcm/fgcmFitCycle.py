@@ -371,15 +371,6 @@ class FgcmFitCycle(object):
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
 
-            # However, we do recompute the absolute offset at this point for
-            # total consistency
-
-            if self.fgcmStars.hasRefstars:
-                self.fgcmLog.info("Final computation of absolute offset.")
-                deltaAbsOffset = self.fgcmStars.computeAbsOffset()
-                self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
-                self.fgcmStars.applyAbsOffset(deltaAbsOffset)
-
         # Plot the parameters whether or not we did a fit!
         self.fgcmPars.plotParameters()
 
@@ -389,6 +380,14 @@ class FgcmFitCycle(object):
         # FIXME: look for more efficient way of doing this
         self.fgcmLog.debug('FitCycle computing FgcmChisq all + reserve stars')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
+
+        if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
+            # Redo absolute offset here for total consistency with final
+            # parameters and values
+            self.fgcmLog.info("Final computation of absolute offset.")
+            deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+            self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
+            self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
         # One last run to compute mstd all observations of all exposures
         #  when allExposures is set, mean mags, etc aren't computed

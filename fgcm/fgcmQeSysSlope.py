@@ -246,6 +246,8 @@ class FgcmQeSysSlope(object):
         if self.plotPath is None:
             return
 
+        plt.set_cmap('viridis')
+
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)

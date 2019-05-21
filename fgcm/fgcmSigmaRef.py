@@ -79,7 +79,7 @@ class FgcmSigmaRef(object):
         if goodRefStars.size < 100:
             # Arbitrarily do 100 as the cutoff between small and large number...
 
-            self.fgcmLog.info('Fewer than 100 reference stars, so computing "small-number" statistics:')
+            self.fgcmLog.info('Found %d refstars (< 100), so computing "small-number" statistics:' % (goodRefStars.size))
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
                 # Filter on previous bad refstars
@@ -158,6 +158,9 @@ class FgcmSigmaRef(object):
                         coeff = histoGauss(ax, delta*1000.0)
                         coeff[1] /= 1000.0
                         coeff[2] /= 1000.0
+                        if coeff[3] > 0:
+                            # This was a failed fit ... set to inf
+                            coeff = np.array([np.inf, np.inf, np.inf, coeff[3]])
                     except Exception as inst:
                         coeff = np.array([np.inf, np.inf, np.inf])
 

@@ -1409,8 +1409,7 @@ class FgcmChisq(object):
 
                             partialArray[2*self.fgcmPars.nFitPars +
                                          self.fgcmPars.parLnPwvQuadraticLoc +
-                                         uRefNightIndexNoExt] /= units[2*self.fgcmPars.nFitPars +
-                                                                       self.fgcmPars.parLnPwvQuadraticLoc +
+                                         uRefNightIndexNoExt] /= units[self.fgcmPars.parLnPwvQuadraticLoc +
                                                                        uRefNightIndexNoExt]
                             partialArray[3*self.fgcmPars.nFitPars +
                                          self.fgcmPars.parLnPwvQuadraticLoc +

@@ -188,11 +188,13 @@ def histoGauss(ax,array):
     parameters
     ----------
     ax: Plot axis object
+       If None, return coefficients but do not plot
     array: float array to plot
 
     returns
     -------
-    coeff: tuple (A, mu, sigma)
+    coeff: tuple (A, mu, sigma, fail)
+       Fail is 0 if the fit succeeded
     """
 
     import scipy.optimize
@@ -217,9 +219,11 @@ def histoGauss(ax,array):
             # automated way we'll need to tell the parent that we didn't converge
             coeff, varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
                                                         hist['hist'], p0=p0)
+
+        coeff = np.append(coeff, 0)
     except:
         # set to starting values...
-        coeff = p0
+        coeff = np.append(p0, 1)
 
     hcenter=hist['center']
     hhist=hist['hist']
@@ -239,10 +243,11 @@ def histoGauss(ax,array):
         ax.plot(hcenter[ok],hhist[ok],'b-',linewidth=3)
         ax.set_xlim(rangeLo,rangeHi)
 
-        xvals=np.linspace(rangeLo,rangeHi,1000)
-        yvals=gaussFunction(xvals,*coeff)
+        if coeff[3] == 0:
+            xvals=np.linspace(rangeLo,rangeHi,1000)
+            yvals=gaussFunction(xvals,*coeff[: -1])
 
-        ax.plot(xvals,yvals,'k--',linewidth=3)
+            ax.plot(xvals,yvals,'k--',linewidth=3)
         ax.locator_params(axis='x',nbins=6)  # hmmm
 
     return coeff
