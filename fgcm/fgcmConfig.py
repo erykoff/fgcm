@@ -101,9 +101,11 @@ class FgcmConfig(object):
     ccdOffsetFile = ConfigField(str, required=False)
     obsFile = ConfigField(str, required=False)
     indexFile = ConfigField(str, required=False)
+    refstarFile = ConfigField(str, required=False)
     UTBoundary = ConfigField(float, default=0.0)
     washMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
     epochMJDs = ConfigField(np.ndarray, default=np.array((0.0, 1e10)))
+    coatingMJDs = ConfigField(np.ndarray, default=np.array((0.0)))
     epochNames = ConfigField(list, required=False)
     lutFile = ConfigField(str, required=False)
     expField = ConfigField(str, default='EXPNUM')
@@ -139,7 +141,7 @@ class FgcmConfig(object):
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
     mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
-    approxThroughput = ConfigField(float, default=1.0)
+    approxThroughput = ConfigField(list, default=[1.0])
     ccdStartIndex = ConfigField(int, default=0)
     minExpPerNight = ConfigField(int, default=10)
     expGrayInitialCut = ConfigField(float, default=-0.25)
@@ -159,6 +161,14 @@ class FgcmConfig(object):
     autoPhotometricCutStep = ConfigField(float, default=0.0025)
     autoHighCutNSig = ConfigField(float, default=4.0)
 
+    instrumentParsPerBand = ConfigField(bool, default=False)
+    instrumentSlopeMinDeltaT = ConfigField(float, default=5.0)
+
+    refStarSnMin = ConfigField(float, default=20.0)
+    refStarOutlierNSig = ConfigField(float, default=4.0)
+    applyRefStarColorCuts = ConfigField(bool, default=True)
+    useRefStarsWithInstrument = ConfigField(bool, default=True)
+
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
     nExpPerRun = ConfigField(int, default=1000)
@@ -173,6 +183,7 @@ class FgcmConfig(object):
     useNightlyRetrievedPwv = ConfigField(bool, default=False)
     useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
+    fitMirrorChromaticity = ConfigField(bool, default=False)
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCD = ConfigField(bool, default=False)
@@ -184,13 +195,15 @@ class FgcmConfig(object):
     outputStars = ConfigField(bool, default=False)
     outputZeropoints = ConfigField(bool, default=False)
     outputPath = ConfigField(str, required=False)
+    saveParsForDebugging = ConfigField(bool, default=False)
+    doPlots = ConfigField(bool, default=True)
 
     pwvFile = ConfigField(str, required=False)
     externalPwvDeltaT = ConfigField(float, default=0.1)
     tauFile = ConfigField(str, required=False)
     externalTauDeltaT = ConfigField(float, default=0.1)
-    stepUnitReference = ConfigField(float, default=0.001)
-    stepGrain = ConfigField(float, default=10.0)
+    fitGradientTolerance = ConfigField(float, default=1e-5)
+    stepUnitReference = ConfigField(float, default=0.0001)
     experimentalMode = ConfigField(bool, default=False)
     resetParameters = ConfigField(bool, default=True)
     noChromaticCorrections = ConfigField(bool, default=False)
@@ -247,11 +260,13 @@ class FgcmConfig(object):
         if os.path.isfile(logFile) and not self.clobber:
             raise RuntimeError("Found logFile %s, but clobber == False." % (logFile))
 
-        self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
-        if os.path.isdir(self.plotPath) and not self.clobber:
-            # check if directory is empty
-            if len(os.listdir(self.plotPath)) > 0:
-                raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
+        self.plotPath = None
+        if self.doPlots:
+            self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
+            if os.path.isdir(self.plotPath) and not self.clobber:
+                # check if directory is empty
+                if len(os.listdir(self.plotPath)) > 0:
+                    raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
 
         # set up logger are we get the name...
         if ('logger' not in configDict):
@@ -365,6 +380,9 @@ class FgcmConfig(object):
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
+        self.I0StdBand = lutStd['I0STD'][0][bandStdFilterIndex]
+        self.I1StdBand = lutStd['I1STD'][0][bandStdFilterIndex]
+        self.I2StdBand = lutStd['I2STD'][0][bandStdFilterIndex]
         self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
@@ -435,6 +453,15 @@ class FgcmConfig(object):
                      (self.washMJDs < self.mjdRange[1]))
         self.washMJDs = self.washMJDs[gd]
 
+        # and the coating MJDs
+        st = np.argsort(self.coatingMJDs)
+        if (not np.array_equal(st, np.arange(self.coatingMJDs.size))):
+            raise ValueError("Input coatingMJDs must be in sort order.")
+
+        gd, = np.where((self.coatingMJDs > self.mjdRange[0]) &
+                       (self.coatingMJDs < self.mjdRange[1]))
+        self.coatingMJDs = self.coatingMJDs[gd]
+
         # Deal with fit band, notfit band, required, and notrequired indices
         bandFitFlag = np.zeros(len(self.bands), dtype=np.bool)
         bandNotFitFlag = np.zeros_like(bandFitFlag)
@@ -476,12 +503,19 @@ class FgcmConfig(object):
                 cCut[1] = list(self.bands).index(cCut[1])
 
         # and AB zeropoint
-        hPlanck = 6.6
-        expPlanck = -27.0
-        self.zptAB = (-48.6 - 2.5*expPlanck +
-                       2.5*np.log10((self.mirrorArea * self.approxThroughput) /
-                                    (hPlanck * self.cameraGain)))
-        self.fgcmLog.info("AB offset estimated as %.4f" % (self.zptAB))
+        self.hPlanck = 6.6
+        self.expPlanck = -27.0
+        #self.zptABNoThroughput = (-48.6 - 2.5*self.expPlanck +
+        #                           2.5*np.log10((self.mirrorArea) /
+        #                                        (self.hPlanck * self.cameraGain)))
+        self.zptABNoThroughput = (-48.6 - 2.5 * self.expPlanck +
+                                   2.5 * np.log10(self.mirrorArea) -
+                                   2.5 * np.log10(self.hPlanck * self.cameraGain))
+
+        if len(self.approxThroughput) != 1 and len(self.approxThroughput) != len(self.bands):
+            raise ValueError("approxThroughput must have 1 or nbands elements.")
+
+        self.fgcmLog.info("AB offset (w/o throughput) estimated as %.4f" % (self.zptABNoThroughput))
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
@@ -493,7 +527,7 @@ class FgcmConfig(object):
         """
 
         with open(configFile) as f:
-            configDict = yaml.load(f)
+            configDict = yaml.load(f, Loader=yaml.SafeLoader)
 
         print("Configuration read from %s" % (configFile))
 

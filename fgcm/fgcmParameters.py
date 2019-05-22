@@ -95,6 +95,7 @@ class FgcmParameters(object):
         self.nLUTFilter = len(self.lutFilterNames)
         self.filterToBand = fgcmConfig.filterToBand
         self.lambdaStdFilter = fgcmConfig.lambdaStdFilter
+        self.lambdaStdBand = fgcmConfig.lambdaStdBand
 
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.alphaStd = fgcmConfig.alphaStd
@@ -130,9 +131,9 @@ class FgcmParameters(object):
 
         self.epochMJDs = fgcmConfig.epochMJDs
         self.washMJDs = fgcmConfig.washMJDs
+        self.coatingMJDs = fgcmConfig.coatingMJDs
 
         self.stepUnitReference = fgcmConfig.stepUnitReference
-        self.stepGrain = fgcmConfig.stepGrain
 
         self.pwvFile = fgcmConfig.pwvFile
         self.tauFile = fgcmConfig.tauFile
@@ -143,25 +144,16 @@ class FgcmParameters(object):
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
+        self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
+
+        self.approxThroughput = fgcmConfig.approxThroughput
 
         self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevOrder + 1) *
                               (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
         self.ccdOffsets = fgcmConfig.ccdOffsets
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
-
-        # and the default unit dict
-        self.unitDictOnes = {'lnPwvUnit':1.0,
-                             'lnPwvSlopeUnit':1.0,
-                             'lnPwvQuadraticUnit':1.0,
-                             'lnPwvGlobalUnit':1.0,
-                             'o3Unit':1.0,
-                             'lnTauUnit':1.0,
-                             'lnTauSlopeUnit':1.0,
-                             'alphaUnit':1.0,
-                             'qeSysUnit':1.0,
-                             'qeSysSlopeUnit':1.0,
-                             'filterOffsetUnit':1.0}
+        self.illegalValue = fgcmConfig.illegalValue
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -292,8 +284,11 @@ class FgcmParameters(object):
         self.parSuperStarFlat[:, :, :, 0] = 1.0
 
         # parameters with per-wash values
-        self.parQESysIntercept = np.zeros(self.nWashIntervals,dtype=np.float32)
-        self.parQESysSlope = np.zeros(self.nWashIntervals,dtype=np.float32)
+
+        # We always have these parameters, even if we don't fit them
+        self.parQESysIntercept = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
+        self.compQESysSlope = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
+        self.compQESysSlopeApplied = np.zeros_like(self.compQESysSlope)
 
         # parameters for "absolute" offsets (and relative between filters)
         # Currently, this only will turn on for when there are multiple filters
@@ -310,6 +305,19 @@ class FgcmParameters(object):
             # And when there is a duplicate band and it's not the "Standard", fit the offset
             if nBand > 1 and f not in self.lutStdFilterNames:
                 self.parFilterOffsetFitFlag[i] = True
+
+        # And absolute offset parameters (used if reference mags are supplied)
+        self.compAbsThroughput = np.zeros(self.nBands, dtype=np.float64)
+        if len(self.approxThroughput) == 1:
+            self.compAbsThroughput[:] = self.approxThroughput[0]
+        else:
+            self.compAbsThroughput[:] = np.array(self.approxThroughput)
+
+        self.compRefOffset = np.zeros(self.nBands, dtype=np.float64)
+        self.compRefSigma = np.zeros_like(self.compRefOffset)
+
+        # Add in the mirror coating...
+        self.compMirrorChromaticity = np.zeros((self.nLUTFilter, self.nCoatingIntervals + 1))
 
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
@@ -362,15 +370,6 @@ class FgcmParameters(object):
         self.compRetrievedTauNight = np.zeros(self.campaignNights.size,dtype='f8') + self.tauStd
         self.compRetrievedTauNightInput = self.compRetrievedTauNight.copy()
 
-        # compute the units
-        self.unitDictSteps = fgcmLUT.computeStepUnits(self.stepUnitReference,
-                                                      self.stepGrain,
-                                                      self.meanNightDuration,
-                                                      self.meanWashIntervalDuration,
-                                                      self.fitBands,
-                                                      self.bands,
-                                                      self.nCampaignNights)
-
         # do lookups on parameter array
         self._arrangeParArray()
 
@@ -394,38 +393,6 @@ class FgcmParameters(object):
 
         self._loadEpochAndWashInfo()
 
-        # set the units from the inParInfo
-        self.unitDictSteps = {'lnTauUnit': inParInfo['LNTAUUNIT'][0],
-                              'lnTauSlopeUnit': inParInfo['LNTAUSLOPEUNIT'][0],
-                              'alphaUnit': inParInfo['ALPHAUNIT'][0],
-                              'lnPwvUnit': inParInfo['LNPWVUNIT'][0],
-                              'lnPwvSlopeUnit': inParInfo['LNPWVSLOPEUNIT'][0],
-                              'lnPwvQuadraticUnit': inParInfo['LNPWVQUADRATICUNIT'][0],
-                              'lnPwvGlobalUnit': inParInfo['LNPWVGLOBALUNIT'][0],
-                              'o3Unit': inParInfo['O3UNIT'][0],
-                              'qeSysUnit': inParInfo['QESYSUNIT'][0],
-                              'qeSysSlopeUnit': inParInfo['QESYSSLOPEUNIT'][0],
-                              'filterOffsetUnit': inParInfo['FILTEROFFSETUNIT'][0]}
-
-        # and log
-        self.fgcmLog.info('lnTau step unit set to %f' % (self.unitDictSteps['lnTauUnit']))
-        self.fgcmLog.info('lnTau slope step unit set to %f' %
-                         (self.unitDictSteps['lnTauSlopeUnit']))
-        self.fgcmLog.info('alpha step unit set to %f' % (self.unitDictSteps['alphaUnit']))
-        self.fgcmLog.info('lnPwv step unit set to %f' % (self.unitDictSteps['lnPwvUnit']))
-        self.fgcmLog.info('lnPwv slope step unit set to %f' %
-                         (self.unitDictSteps['lnPwvSlopeUnit']))
-        self.fgcmLog.info('lnPwv quadratic step unit set to %f' %
-                          (self.unitDictSteps['lnPwvQuadraticUnit']))
-        self.fgcmLog.info('lnPwv global step unit set to %f' %
-                          (self.unitDictSteps['lnPwvGlobalUnit']))
-        self.fgcmLog.info('O3 step unit set to %f' % (self.unitDictSteps['o3Unit']))
-        self.fgcmLog.info('wash step unit set to %f' % (self.unitDictSteps['qeSysUnit']))
-        self.fgcmLog.info('wash slope step unit set to %f' %
-                          (self.unitDictSteps['qeSysSlopeUnit']))
-        self.fgcmLog.info('filter offset step unit set to %f' %
-                          (self.unitDictSteps['filterOffsetUnit']))
-
         # look at external...
         self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
         self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
@@ -438,10 +405,16 @@ class FgcmParameters(object):
         self.parLnPwvIntercept = np.atleast_1d(inParams['PARLNPWVINTERCEPT'][0])
         self.parLnPwvSlope = np.atleast_1d(inParams['PARLNPWVSLOPE'][0])
         self.parLnPwvQuadratic = np.atleast_1d(inParams['PARLNPWVQUADRATIC'][0])
-        self.parQESysIntercept = np.atleast_1d(inParams['PARQESYSINTERCEPT'][0])
-        self.parQESysSlope = np.atleast_1d(inParams['PARQESYSSLOPE'][0])
+        self.parQESysIntercept = inParams['PARQESYSINTERCEPT'][0].reshape((self.nBands, self.nWashIntervals))
+        self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nBands, self.nWashIntervals))
+        self.compQESysSlopeApplied = self.compQESysSlope.copy()
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
         self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
+        self.compAbsThroughput = np.atleast_1d(inParams['COMPABSTHROUGHPUT'][0])
+        self.compRefOffset = np.atleast_1d(inParams['COMPREFOFFSET'][0])
+        self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
+        self.compMirrorChromaticity = inParams['COMPMIRRORCHROMATICITY'][0].reshape((self.nLUTFilter, self.nCoatingIntervals + 1))
+        self.mirrorChromaticityPivot = np.atleast_1d(inParams['MIRRORCHROMATICITYPIVOT'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -497,24 +470,6 @@ class FgcmParameters(object):
 
         # need to load the superstarflats
         self.parSuperStarFlat = inSuperStar
-        """
-        # check if we have an "old-old-style" superstar for compatibility
-        if (len(inSuperStar.shape) == 3):
-            # we have an old-style superstar
-            self.fgcmLog.info("Reading old-style superStarFlat")
-            self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
-            self.parSuperStarFlat[:,:,:,0] = inSuperStar
-        else:
-            # Old and new style.
-            # Check if we are reading in an older 2nd order polynomial file
-            if inSuperStar.shape[-1] == self.superStarNParOld:
-                self.fgcmLog.info("Old polynomial2d superstar flat detected")
-                self.superStarPoly2d = True
-                self.superStarNPar = self.superStarNParOld
-
-            # Use the superstar as read in, raw
-            self.parSuperStarFlat = inSuperStar
-            """
 
     def resetAtmosphereParameters(self):
         self.fgcmLog.info("Resetting atmosphere parameters.")
@@ -671,7 +626,6 @@ class FgcmParameters(object):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except Exception as inst:
-                print(inst)
                 self.fgcmLog.info('WARNING: exposures with filter %s not in config' % (filterName))
                 continue
 
@@ -734,18 +688,28 @@ class FgcmParameters(object):
 
         # record the range in each to get typical length of wash epoch
         washMJDRange = np.zeros((self.nWashIntervals,2))
-        self.expPerWash = np.zeros(self.nWashIntervals,dtype=np.int32)
         for i in xrange(self.nWashIntervals):
             use,=np.where((self.expMJD > tempWashMJDs[i]) &
                           (self.expMJD < tempWashMJDs[i+1]))
             self.expWashIndex[use] = i
-            washMJDRange[i,0] = np.min(self.expMJD[use])
-            washMJDRange[i,1] = np.max(self.expMJD[use])
-            self.expPerWash[i] = use.size
 
-        self.meanWashIntervalDuration = np.mean(washMJDRange[:,1] - washMJDRange[:,0])
-        self.meanExpPerWash = np.mean(self.expPerWash)
+        # And the coating...
+        self.nCoatingIntervals = self.coatingMJDs.size + 1
+        self.coatingMJDs = np.insert(self.coatingMJDs, 0, np.min(self.expMJD) - 1.0)
 
+        self.fgcmLog.info("Compiling indices for %d mirror coating(s)." % (self.nCoatingIntervals))
+
+        self.expCoatingIndex = np.zeros(self.nExp, dtype='i4')
+        self.mirrorChromaticityPivot = np.zeros(self.nCoatingIntervals)
+        tempCoatingMJDs = self.coatingMJDs.copy()
+        tempCoatingMJDs = np.append(tempCoatingMJDs, 1e10)
+
+        for i in xrange(self.nCoatingIntervals):
+            use, = np.where((self.expMJD > tempCoatingMJDs[i]) &
+                            (self.expMJD < tempCoatingMJDs[i + 1]))
+            self.expCoatingIndex[use] = i
+            # The pivot is the median time of all the observations
+            self.mirrorChromaticityPivot[i] = np.median(self.expMJD[use])
 
     def _arrangeParArray(self):
         """
@@ -803,19 +767,17 @@ class FgcmParameters(object):
                 self.parRetrievedLnPwvOffsetLoc = ctr
                 ctr+=1
 
-        self.nFitPars += (self.nWashIntervals + # parQESysIntercept
-                          self.nWashIntervals)  # parQESysSlope
-
+        #self.nFitPars += self.nQESysInterceptPars # parQESysIntercept
+        self.nFitPars += self.parQESysIntercept.size # parQESysIntercept
         self.parQESysInterceptLoc = ctr
-        ctr+=self.nWashIntervals
-        self.parQESysSlopeLoc = ctr
-        ctr+=self.nWashIntervals
+        #ctr += self.nQESysInterceptPars
+        ctr += self.parQESysIntercept.size
 
         self.nFitPars += self.nLUTFilter # parFilterOffset
-
         self.parFilterOffsetLoc = ctr
         ctr += self.nLUTFilter
 
+        self.stepUnits = np.ones(self.nFitPars)
 
     def saveParsFits(self, parFile):
         """
@@ -873,7 +835,6 @@ class FgcmParameters(object):
                ('LNPWVGLOBALUNIT','f8'),
                ('O3UNIT','f8'),
                ('QESYSUNIT','f8'),
-               ('QESYSSLOPEUNIT','f8'),
                ('FILTEROFFSETUNIT','f8'),
                ('HASEXTERNALPWV','i2'),
                ('HASEXTERNALTAU','i2')]
@@ -891,18 +852,6 @@ class FgcmParameters(object):
         parInfo['FITBANDS'] = self.fitBands
         parInfo['NOTFITBANDS'] = self.notFitBands
 
-        parInfo['LNTAUUNIT'] = self.unitDictSteps['lnTauUnit']
-        parInfo['LNTAUSLOPEUNIT'] = self.unitDictSteps['lnTauSlopeUnit']
-        parInfo['ALPHAUNIT'] = self.unitDictSteps['alphaUnit']
-        parInfo['LNPWVUNIT'] = self.unitDictSteps['lnPwvUnit']
-        parInfo['LNPWVSLOPEUNIT'] = self.unitDictSteps['lnPwvSlopeUnit']
-        parInfo['LNPWVQUADRATICUNIT'] = self.unitDictSteps['lnPwvQuadraticUnit']
-        parInfo['LNPWVGLOBALUNIT'] = self.unitDictSteps['lnPwvGlobalUnit']
-        parInfo['O3UNIT'] = self.unitDictSteps['o3Unit']
-        parInfo['QESYSUNIT'] = self.unitDictSteps['qeSysUnit']
-        parInfo['QESYSSLOPEUNIT'] = self.unitDictSteps['qeSysSlopeUnit']
-        parInfo['FILTEROFFSETUNIT'] = self.unitDictSteps['filterOffsetUnit']
-
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
             parInfo['PWVFILE'] = self.pwvFile
@@ -918,9 +867,14 @@ class FgcmParameters(object):
                ('PARLNTAUINTERCEPT','f8',self.parLnTauIntercept.size),
                ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
                ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
-               ('PARQESYSSLOPE','f8',self.parQESysSlope.size),
+               ('COMPQESYSSLOPE','f8',self.compQESysSlope.size),
                ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
                ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
+               ('COMPABSTHROUGHPUT', 'f8', self.compAbsThroughput.size),
+               ('COMPREFOFFSET', 'f8', self.compRefOffset.size),
+               ('COMPREFSIGMA', 'f8', self.compRefSigma.size),
+               ('COMPMIRRORCHROMATICITY', 'f8', self.compMirrorChromaticity.size),
+               ('MIRRORCHROMATICITYPIVOT', 'f8', self.mirrorChromaticityPivot.size),
                ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
                ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
                ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
@@ -960,10 +914,15 @@ class FgcmParameters(object):
         pars['PARLNPWVINTERCEPT'][:] = self.parLnPwvIntercept
         pars['PARLNPWVSLOPE'][:] = self.parLnPwvSlope
         pars['PARLNPWVQUADRATIC'][:] = self.parLnPwvQuadratic
-        pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept
-        pars['PARQESYSSLOPE'][:] = self.parQESysSlope
+        pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept.flatten()
+        pars['COMPQESYSSLOPE'][:] = self.compQESysSlope.flatten()
         pars['PARFILTEROFFSET'][:] = self.parFilterOffset
         pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
+        pars['COMPABSTHROUGHPUT'][:] = self.compAbsThroughput
+        pars['COMPREFOFFSET'][:] = self.compRefOffset
+        pars['COMPREFSIGMA'][:] = self.compRefSigma
+        pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.flatten()
+        pars['MIRRORCHROMATICITYPIVOT'][:] = self.mirrorChromaticityPivot
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1069,54 +1028,92 @@ class FgcmParameters(object):
         if (parArray.size != self.nFitPars):
             raise ValueError("parArray must have %d elements." % (self.nFitPars))
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         if not self.useRetrievedPwv:
-            self.parLnPwvIntercept[:] = parArray[self.parLnPwvInterceptLoc:
-                                                     self.parLnPwvInterceptLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
-            self.parLnPwvSlope[:] = parArray[self.parLnPwvSlopeLoc:
-                                                 self.parLnPwvSlopeLoc + self.nCampaignNights] / unitDict['lnPwvSlopeUnit']
-            self.parLnPwvQuadratic[:] = parArray[self.parLnPwvQuadraticLoc:
-                                                     self.parLnPwvQuadraticLoc + self.nCampaignNights] / unitDict['lnPwvQuadraticUnit']
+            self.parLnPwvIntercept[:] = (parArray[self.parLnPwvInterceptLoc:
+                                                     self.parLnPwvInterceptLoc+self.nCampaignNights] /
+                                         units[self.parLnPwvInterceptLoc:
+                                                   self.parLnPwvInterceptLoc+self.nCampaignNights])
+            self.parLnPwvSlope[:] = (parArray[self.parLnPwvSlopeLoc:
+                                                 self.parLnPwvSlopeLoc + self.nCampaignNights] /
+                                     units[self.parLnPwvSlopeLoc:
+                                               self.parLnPwvSlopeLoc + self.nCampaignNights])
+            self.parLnPwvQuadratic[:] = (parArray[self.parLnPwvQuadraticLoc:
+                                                     self.parLnPwvQuadraticLoc + self.nCampaignNights] /
+                                         units[self.parLnPwvQuadraticLoc:
+                                                   self.parLnPwvQuadraticLoc + self.nCampaignNights])
 
-        self.parO3[:] = parArray[self.parO3Loc:
-                                     self.parO3Loc+self.nCampaignNights] / unitDict['o3Unit']
-        self.parLnTauIntercept[:] = parArray[self.parLnTauInterceptLoc:
-                                                 self.parLnTauInterceptLoc+self.nCampaignNights] / unitDict['lnTauUnit']
+        self.parO3[:] = (parArray[self.parO3Loc:
+                                     self.parO3Loc+self.nCampaignNights] /
+                         units[self.parO3Loc:
+                                   self.parO3Loc+self.nCampaignNights])
+        self.parLnTauIntercept[:] = (parArray[self.parLnTauInterceptLoc:
+                                                 self.parLnTauInterceptLoc+self.nCampaignNights] /
+                                     units[self.parLnTauInterceptLoc:
+                                               self.parLnTauInterceptLoc+self.nCampaignNights])
         self.parLnTauSlope[:] = (parArray[self.parLnTauSlopeLoc:
                                                self.parLnTauSlopeLoc + self.nCampaignNights] /
-                                 unitDict['lnTauSlopeUnit'])
+                                 units[self.parLnTauSlopeLoc:
+                                           self.parLnTauSlopeLoc + self.nCampaignNights])
 
-        self.parAlpha[:] = parArray[self.parAlphaLoc:
-                                        self.parAlphaLoc+self.nCampaignNights] / unitDict['alphaUnit']
+        self.parAlpha[:] = (parArray[self.parAlphaLoc:
+                                        self.parAlphaLoc+self.nCampaignNights] /
+                            units[self.parAlphaLoc:
+                                        self.parAlphaLoc+self.nCampaignNights])
+
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            self.parExternalLnPwvScale = parArray[self.parExternalLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
-            self.parExternalLnPwvOffset = parArray[self.parExternalLnPwvOffsetLoc:
-                                                       self.parExternalLnPwvOffsetLoc+self.nCampaignNights] / unitDict['lnPwvUnit']
+            self.parExternalLnPwvScale = (parArray[self.parExternalLnPwvScaleLoc] /
+                                          units[self.parExternalLnPwvScaleLoc])
+            self.parExternalLnPwvOffset = (parArray[self.parExternalLnPwvOffsetLoc:
+                                                       self.parExternalLnPwvOffsetLoc+self.nCampaignNights] /
+                                           units[self.parExternalLnPwvOffsetLoc:
+                                                     self.parExternalLnPwvOffsetLoc+self.nCampaignNights])
 
         if (self.hasExternalTau):
             raise NotImplementedError("Not implemented")
-            #self.parExternalLnTauScale = parArray[self.parExternalLnTauScaleLoc] / unitDict['tauUnit']
-            #self.parExternalLnTauOffset = parArray[self.parExternalLnTauOffsetLoc:
-            #                                         self.parExternalLnTauOffsetLoc+self.nCampaignNights] / unitDict['tauUnit']
 
         if self.useRetrievedPwv:
-            self.parRetrievedLnPwvScale = parArray[self.parRetrievedLnPwvScaleLoc] / unitDict['lnPwvGlobalUnit']
+            self.parRetrievedLnPwvScale = (parArray[self.parRetrievedLnPwvScaleLoc] /
+                                           units[self.parRetrievedLnPwvScaleLoc])
             if self.useNightlyRetrievedPwv:
-                self.parRetrievedLnPwvNightlyOffset = parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
-                                                                   self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights] / unitDict['lnPwvUnit']
+                self.parRetrievedLnPwvNightlyOffset = (parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
+                                                                   self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights] /
+                                                       units[self.parRetrievedLnPwvNightlyOffsetLoc:
+                                                                 self.parRetrievedLnPwvNightlyOffsetLoc + self.nCampaignNights])
             else:
-                self.parRetrievedLnPwvOffset = parArray[self.parRetrievedLnPwvOffsetLoc] / unitDict['lnPwvGlobalUnit']
+                self.parRetrievedLnPwvOffset = (parArray[self.parRetrievedLnPwvOffsetLoc] /
+                                                units[self.parRetrievedLnPwvOffsetLoc])
 
-        self.parQESysIntercept[:] = parArray[self.parQESysInterceptLoc:
-                                                 self.parQESysInterceptLoc+self.nWashIntervals] / unitDict['qeSysUnit']
+        if not self.instrumentParsPerBand:
+            # Set the same number for all the bands
+            for bandIndex in xrange(self.nBands):
+                self.parQESysIntercept[bandIndex, :] = (parArray[self.parQESysInterceptLoc:
+                                                                    self.parQESysInterceptLoc + self.nWashIntervals] /
+                                                        units[self.parQESysInterceptLoc:
+                                                                  self.parQESysInterceptLoc + self.nWashIntervals])
+        else:
+            self.parQESysIntercept[:, :] = (parArray[self.parQESysInterceptLoc:
+                                                        self.parQESysInterceptLoc +
+                                                    self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape) /
+                                            units[self.parQESysInterceptLoc:
+                                                      self.parQESysInterceptLoc +
+                                                  self.parQESysIntercept.size].reshape(self.parQESysIntercept.shape))
 
+        # Clean up any missing bands if necessary
+        if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
+            temp = np.sum(self.parQESysIntercept[:, self.bandFitIndex], axis=1)
+            for notFitIndex in self.bandNotFitIndex:
+                self.parQESysIntercept[:, notFitIndex] = temp / self.bandFitIndex.size
 
-        self.parQESysSlope[:] = parArray[self.parQESysSlopeLoc:
-                                             self.parQESysSlopeLoc+self.nWashIntervals] / unitDict['qeSysSlopeUnit']
+        self.parFilterOffset[:] = (parArray[self.parFilterOffsetLoc:
+                                               self.parFilterOffsetLoc + self.nLUTFilter] /
+                                   units[self.parFilterOffsetLoc:
+                                               self.parFilterOffsetLoc + self.nLUTFilter])
 
-        self.parFilterOffset[:] = parArray[self.parFilterOffsetLoc:
-                                               self.parFilterOffsetLoc + self.nLUTFilter] / unitDict['filterOffsetUnit']
         # done
 
     def parsToExposures(self, retrievedInput=False):
@@ -1179,24 +1176,27 @@ class FgcmParameters(object):
 
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            # replace where we have these
-            #self.expLnTau[self.externalTauFlag] = (self.parExternalLnTauOffset[self.expNightIndex[self.externalTauFlag]] +
-            #                                     self.parExternalLnTauScale *
-            #                                     self.externalTau[self.externalTauFlag])
 
         # and clip to make sure it doesn't go negative
         self.expLnTau = np.clip(self.expLnTau, self.lnTauRange[0], self.lnTauRange[1])
 
         # and QESys
-        self.expQESys = (self.parQESysIntercept[self.expWashIndex] +
-                         self.parQESysSlope[self.expWashIndex] *
+        self.expQESys = (self.parQESysIntercept[self.expBandIndex, self.expWashIndex] +
+                         self.compQESysSlope[self.expBandIndex, self.expWashIndex] *
                          (self.expMJD - self.washMJDs[self.expWashIndex]))
 
-        # and FilterOffset
-        self.expFilterOffset = self.parFilterOffset[self.expLUTFilterIndex]
+
+        # Record that these were the values that were applied
+        self.compQESysSlopeApplied[:, :] = self.compQESysSlope
+
+        # and FilterOffset + abs offset
+        expAbsThroughput = self.compAbsThroughput[self.expBandIndex]
+
+        self.expFilterOffset = (self.parFilterOffset[self.expLUTFilterIndex] +
+                                2.5 * np.log10(expAbsThroughput))
 
     # cannot be a property because of the keywords
-    def getParArray(self,fitterUnits=False):
+    def getParArray(self, fitterUnits=False):
         """
         Take individual parameter attributes and build a parameter array.
 
@@ -1216,53 +1216,85 @@ class FgcmParameters(object):
         # extracts parameters into a linearized array
         parArray = np.zeros(self.nFitPars,dtype=np.float64)
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         if not self.useRetrievedPwv:
+            u = units[self.parLnPwvInterceptLoc:
+                          self.parLnPwvInterceptLoc+self.nCampaignNights]
             parArray[self.parLnPwvInterceptLoc:
-                         self.parLnPwvInterceptLoc+self.nCampaignNights] = self.parLnPwvIntercept[:] * unitDict['lnPwvUnit']
+                         self.parLnPwvInterceptLoc+self.nCampaignNights] = self.parLnPwvIntercept[:] * u
+            u = units[self.parLnPwvSlopeLoc:
+                          self.parLnPwvSlopeLoc + self.nCampaignNights]
             parArray[self.parLnPwvSlopeLoc:
-                         self.parLnPwvSlopeLoc + self.nCampaignNights] = self.parLnPwvSlope[:] * unitDict['lnPwvSlopeUnit']
+                         self.parLnPwvSlopeLoc + self.nCampaignNights] = self.parLnPwvSlope[:] * u
+            u = units[self.parLnPwvQuadraticLoc:
+                          self.parLnPwvQuadraticLoc + self.nCampaignNights]
             parArray[self.parLnPwvQuadraticLoc:
-                         self.parLnPwvQuadraticLoc + self.nCampaignNights] = self.parLnPwvQuadratic[:] * unitDict['lnPwvQuadraticUnit']
+                         self.parLnPwvQuadraticLoc + self.nCampaignNights] = self.parLnPwvQuadratic[:] * u
 
+        u = units[self.parO3Loc:
+                      self.parO3Loc+self.nCampaignNights]
         parArray[self.parO3Loc:
-                     self.parO3Loc+self.nCampaignNights] = self.parO3[:] * unitDict['o3Unit']
+                     self.parO3Loc+self.nCampaignNights] = self.parO3[:] * u
+        u = units[self.parLnTauInterceptLoc:
+                      self.parLnTauInterceptLoc+self.nCampaignNights]
         parArray[self.parLnTauInterceptLoc:
-                     self.parLnTauInterceptLoc+self.nCampaignNights] = self.parLnTauIntercept[:] * unitDict['lnTauUnit']
+                     self.parLnTauInterceptLoc+self.nCampaignNights] = self.parLnTauIntercept[:] * u
+        u = units[self.parLnTauSlopeLoc:
+                      self.parLnTauSlopeLoc + self.nCampaignNights]
         parArray[self.parLnTauSlopeLoc:
-                     self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * unitDict['lnTauSlopeUnit']
+                     self.parLnTauSlopeLoc + self.nCampaignNights] = self.parLnTauSlope[:] * u
+        u = units[self.parAlphaLoc:
+                      self.parAlphaLoc+self.nCampaignNights]
         parArray[self.parAlphaLoc:
-                     self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * unitDict['alphaUnit']
+                     self.parAlphaLoc+self.nCampaignNights] = self.parAlpha[:] * u
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            parArray[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * unitDict['lnPwvGlobalUnit']
+            u = units[self.parExternalLnPwvScaleLoc]
+            parArray[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+            u = units[self.parExternalLnPwvOffsetLoc:
+                          self.parExternalLnPwvOffsetLoc+self.nCampaignNights]
             parArray[self.parExternalLnPwvOffsetLoc:
-                         self.parExternalLnPwvOffsetLoc+self.nCampaignNights] = self.parExternalLnPwvOffset * unitDict['lnPwvUnit']
+                         self.parExternalLnPwvOffsetLoc+self.nCampaignNights] = self.parExternalLnPwvOffset * u
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            #parArray[self.parExternalTauScaleLoc] = self.parExternalTauScale * unitDict['lnTauUnit']
-            #parArray[self.parExternalTauOffsetLoc:
-            #             self.parExternalTauOffsetLoc+self.nCampaignNights] = self.parExternalTauOffset * unitDict['tauUnit']
+
         if self.useRetrievedPwv:
-            parArray[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * unitDict['lnPwvGlobalUnit']
+            u = units[self.parRetrievedLnPwvScaleLoc]
+            parArray[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
             if self.useNightlyRetrievedPwv:
+                u = units[self.parRetrievedLnPwvNightlyOffsetLoc:
+                              self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights]
                 parArray[self.parRetrievedLnPwvNightlyOffsetLoc:
-                             self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * unitDict['lnPwvUnit']
+                             self.parRetrievedLnPwvNightlyOffsetLoc+self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
             else:
-                parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * unitDict['lnPwvGlobalUnit']
+                u = units[self.parRetrievedLnPwvOffsetLoc]
+                parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
 
-        parArray[self.parQESysInterceptLoc:
-                     self.parQESysInterceptLoc+self.nWashIntervals] = self.parQESysIntercept * unitDict['qeSysUnit']
-        parArray[self.parQESysSlopeLoc:
-                     self.parQESysSlopeLoc+self.nWashIntervals] = self.parQESysSlope * unitDict['qeSysSlopeUnit']
+        if not self.instrumentParsPerBand:
+            for bandIndex in xrange(self.nBands):
+                inds = np.ravel_multi_index((bandIndex, np.arange(self.nWashIntervals)),
+                                            self.parQESysIntercept.shape)
+                u = units[self.parQESysInterceptLoc + inds]
+                parArray[self.parQESysInterceptLoc
+                         + inds] = self.parQESysIntercept[0, :] * u
+        else:
+            u = units[self.parQESysInterceptLoc:
+                          self.parQESysInterceptLoc + self.parQESysIntercept.size]
+            parArray[self.parQESysInterceptLoc:
+                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten() * u
 
+        u = units[self.parFilterOffsetLoc:
+                     self.parFilterOffsetLoc + self.nLUTFilter]
         parArray[self.parFilterOffsetLoc:
-                     self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * unitDict['filterOffsetUnit']
+                     self.parFilterOffsetLoc + self.nLUTFilter] = self.parFilterOffset * u
 
         return parArray
 
     # this cannot be a property because it takes units
-    def getParBounds(self,fitterUnits=False):
+    def getParBounds(self, fitterUnits=False):
         """
         Create parameter fit bounds
 
@@ -1279,31 +1311,40 @@ class FgcmParameters(object):
 
         self.fgcmLog.debug('Retrieving parameter bounds')
 
-        unitDict = self.getUnitDict(fitterUnits=fitterUnits)
+        if fitterUnits:
+            units = self.stepUnits
+        else:
+            units = np.ones(self.nFitPars)
 
         parLow = np.zeros(self.nFitPars,dtype=np.float32)
         parHigh = np.zeros(self.nFitPars,dtype=np.float32)
 
         if not self.useRetrievedPwv:
+            u = units[self.parLnPwvInterceptLoc:
+                          self.parLnPwvInterceptLoc+self.nCampaignNights]
             parLow[self.parLnPwvInterceptLoc: \
                        self.parLnPwvInterceptLoc + \
                        self.nCampaignNights] = ( \
-                self.lnPwvRange[0] * unitDict['lnPwvUnit'])
+                self.lnPwvRange[0] * u)
             parHigh[self.parLnPwvInterceptLoc: \
                         self.parLnPwvInterceptLoc + \
                         self.nCampaignNights] = ( \
-                self.lnPwvRange[1] * unitDict['lnPwvUnit'])
+                self.lnPwvRange[1] * u)
+            u = units[self.parLnPwvSlopeLoc:
+                          self.parLnPwvSlopeLoc + self.nCampaignNights]
             parLow[self.parLnPwvSlopeLoc: \
                        self.parLnPwvSlopeLoc + \
                        self.nCampaignNights] = ( \
-                -4.0 * unitDict['lnPwvSlopeUnit'])
+                -4.0 * u)
             parHigh[self.parLnPwvSlopeLoc: \
                        self.parLnPwvSlopeLoc + \
                        self.nCampaignNights] = ( \
-                4.0 * unitDict['lnPwvSlopeUnit'])
+                4.0 * u)
             if self.useQuadraticPwv:
-                qlo = -4.0 * unitDict['lnPwvQuadraticUnit']
-                qhi = 4.0 * unitDict['lnPwvQuadraticUnit']
+                u = units[self.parLnPwvQuadraticLoc:
+                              self.parLnPwvQuadraticLoc + self.nCampaignNights]
+                qlo = -4.0 * u
+                qhi = 4.0 * u
             else:
                 qlo = 0.0
                 qhi = 0.0
@@ -1314,202 +1355,249 @@ class FgcmParameters(object):
                        self.parLnPwvQuadraticLoc + \
                        self.nCampaignNights] = qhi
         else:
-            parLow[self.parRetrievedLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
-            parHigh[self.parRetrievedLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+            u = units[self.parRetrievedLnPwvScaleLoc]
+            parLow[self.parRetrievedLnPwvScaleLoc] = 0.5 * u
+            parHigh[self.parRetrievedLnPwvScaleLoc] = 1.5 * u
 
             if self.useNightlyRetrievedPwv:
+                u = units[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                              self.parRetrievedLnPwvNightlyOffsetLoc + \
+                              self.nCampaignNights]
                 parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
                            self.parRetrievedLnPwvNightlyOffsetLoc + \
                            self.nCampaignNights] = ( \
-                    -0.5 * unitDict['lnPwvUnit'])
+                    -0.5 * u)
                 parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
                            self.parRetrievedLnPwvNightlyOffsetLoc + \
                            self.nCampaignNights] = ( \
-                    0.5 * unitDict['lnPwvUnit'])
+                    0.5 * u)
             else:
-                parLow[self.parRetrievedLnPwvOffsetLoc] = -0.5 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
+                u = units[self.parRetrievedLnPwvOffsetLoc]
+                parLow[self.parRetrievedLnPwvOffsetLoc] = -0.5 * u
+                parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.5 * u
 
+        u = units[self.parO3Loc: \
+                      self.parO3Loc + \
+                      self.nCampaignNights]
         parLow[self.parO3Loc: \
                    self.parO3Loc + \
                    self.nCampaignNights] = ( \
-            self.O3Range[0] * unitDict['o3Unit'])
+            self.O3Range[0] * u)
         parHigh[self.parO3Loc: \
                     self.parO3Loc + \
                     self.nCampaignNights] = ( \
-            self.O3Range[1] * unitDict['o3Unit'])
+            self.O3Range[1] * u)
+        u = units[self.parLnTauInterceptLoc: \
+                      self.parLnTauInterceptLoc + \
+                      self.nCampaignNights]
         parLow[self.parLnTauInterceptLoc: \
                    self.parLnTauInterceptLoc + \
                    self.nCampaignNights] = ( \
-            self.lnTauRange[0] * unitDict['lnTauUnit'])
+            self.lnTauRange[0] * u)
         parHigh[self.parLnTauInterceptLoc: \
                     self.parLnTauInterceptLoc + \
                 self.nCampaignNights] = ( \
-            self.lnTauRange[1] * unitDict['lnTauUnit'])
+            self.lnTauRange[1] * u)
+        u = units[self.parLnTauSlopeLoc: \
+                      self.parLnTauSlopeLoc + \
+                      self.nCampaignNights]
         parLow[self.parLnTauSlopeLoc: \
                    self.parLnTauSlopeLoc + \
                    self.nCampaignNights] = ( \
-            -4.0 * unitDict['lnTauSlopeUnit'])
+            -4.0 * u)
         parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
                     self.nCampaignNights] = ( \
-            4.0 * unitDict['lnTauSlopeUnit'])
+            4.0 * u)
+        u = units[self.parAlphaLoc: \
+                      self.parAlphaLoc + \
+                      self.nCampaignNights]
         parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
                    self.nCampaignNights] = ( \
-            0.25 * unitDict['alphaUnit'])
+            0.25 * u)
         parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
                     self.nCampaignNights] = ( \
-            1.75 * unitDict['alphaUnit'])
+            1.75 * u)
         if self.hasExternalPwv and not self.useRetrievedPwv:
-            parLow[self.parExternalLnPwvScaleLoc] = 0.5 * unitDict['lnPwvGlobalUnit']
-            parHigh[self.parExternalLnPwvScaleLoc] = 1.5 * unitDict['lnPwvGlobalUnit']
+            u = units[self.parExternalLnPwvScaleLoc]
+            parLow[self.parExternalLnPwvScaleLoc] = 0.5 * u
+            parHigh[self.parExternalLnPwvScaleLoc] = 1.5 * u
+            u = units[self.parExternalLnPwvOffsetLoc: \
+                          self.parExternalLnPwvOffsetLoc + \
+                          self.nCampaignNights]
             parLow[self.parExternalLnPwvOffsetLoc: \
                        self.parExternalLnPwvOffsetLoc + \
                        self.nCampaignNights] = ( \
-                -0.5 * unitDict['lnPwvUnit'])
+                -0.5 * u)
             parHigh[self.parExternalLnPwvOffsetLoc: \
                        self.parExternalLnPwvOffsetLoc + \
                         self.nCampaignNights] = ( \
-                0.5 * unitDict['lnPwvUnit'])
+                0.5 * u)
         if (self.hasExternalTau):
             raise NotImplementedError("not implemented")
-            #parLow[self.parExternalTauScaleLoc] = 0.7 * unitDict['tauUnit']
-            #parHigh[self.parExternalTauScaleLoc] = 1.2 * unitDict['tauUnit']
-            #parLow[self.parExternalTauOffsetLoc: \
-            #           self.parExternalTauOffsetLoc + \
-            #       self.nCampaignNights] = ( \
-            #    0.0 * unitDict['tauUnit'])
-            #parHigh[self.parExternalTauOffsetLoc: \
-            #            self.parExternalTauOffsetLoc + \
-            #            self.nCampaignNights] = ( \
-            #    0.03 * unitDict['tauUnit'])
-            ## FIXME: set bounds per night?  Or clip?
 
-        parLow[self.parQESysInterceptLoc: \
-                   self.parQESysInterceptLoc + \
-                   self.nWashIntervals] = ( \
-            -0.2 * unitDict['qeSysUnit'])
-        parHigh[self.parQESysInterceptLoc: \
-                    self.parQESysInterceptLoc + \
-                    self.nWashIntervals] = ( \
-            0.05 * unitDict['qeSysUnit'])
+        if not self.instrumentParsPerBand:
+            # We are doing gray ... set all the bounds to zero and then override
+            parLow[self.parQESysInterceptLoc: \
+                       self.parQESysInterceptLoc + \
+                       self.parQESysIntercept.size] = 0.0
+            parHigh[self.parQESysInterceptLoc: \
+                        self.parQESysInterceptLoc + \
+                        self.parQESysIntercept.size] = 0.0
 
-        # and for the first interval, the intercept will set to zero
-        parLow[self.parQESysInterceptLoc] = 0.0
-        parHigh[self.parQESysInterceptLoc] = 0.0
+            u = units[self.parQESysInterceptLoc: \
+                          self.parQESysInterceptLoc + \
+                          self.nWashIntervals]
+            parLow[self.parQESysInterceptLoc: \
+                       self.parQESysInterceptLoc + \
+                       self.nWashIntervals] = -0.4 * u
+            parHigh[self.parQESysInterceptLoc: \
+                        self.parQESysInterceptLoc + \
+                        self.nWashIntervals] = 0.4 * u
 
-        parLow[self.parQESysSlopeLoc: \
-                   self.parQESysSlopeLoc + \
-                   self.nWashIntervals] = ( \
-            -0.001 * unitDict['qeSysSlopeUnit'])
-        parHigh[self.parQESysSlopeLoc: \
-                    self.parQESysSlopeLoc + \
-                    self.nWashIntervals] = ( \
-            0.001 * unitDict['qeSysSlopeUnit'])
+            # And the first interval should be set to 0
+            parLow[self.parQESysInterceptLoc] = 0.0
+            parHigh[self.parQESysInterceptLoc] = 0.0
+        else:
+            # Per-band fits
+            u = units[self.parQESysInterceptLoc: \
+                          self.parQESysInterceptLoc + \
+                          self.parQESysIntercept.size]
+            parLow[self.parQESysInterceptLoc: \
+                       self.parQESysInterceptLoc + \
+                       self.parQESysIntercept.size] = ( \
+                -0.4 * u)
+            parHigh[self.parQESysInterceptLoc: \
+                        self.parQESysInterceptLoc + \
+                        self.parQESysIntercept.size] = ( \
+                0.4 * u)
+
+            # And for the first interval the intercept is zero for all bands
+            inds = np.ravel_multi_index((np.arange(self.nBands), 0),
+                                        self.parQESysIntercept.shape)
+            parLow[self.parQESysInterceptLoc + inds] = 0.0
+            parHigh[self.parQESysInterceptLoc + inds] = 0.0
 
         parLow[self.parFilterOffsetLoc: \
                    self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
         parHigh[self.parFilterOffsetLoc: \
                     self.parFilterOffsetLoc + self.nLUTFilter] = 0.0
+        u = units[self.parFilterOffsetLoc: \
+                      self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag]
         parLow[self.parFilterOffsetLoc: \
                    self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
-                   -100.0 * unitDict['filterOffsetUnit']
+                   -100.0 * u
         parHigh[self.parFilterOffsetLoc: \
                     self.parFilterOffsetLoc + self.nLUTFilter][self.parFilterOffsetFitFlag] = \
-                    100.0 * unitDict['filterOffsetUnit']
+                    100.0 * u
 
+        # This should be self.freezeAtmosphere...
         if self.freezeStdAtmosphere:
             # atmosphere parameters set to std values
             if not self.useRetrievedPwv:
+                u = units[self.parLnPwvInterceptLoc: \
+                              self.parLnPwvInterceptLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvInterceptLoc: \
                            self.parLnPwvInterceptLoc + \
-                           self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                           self.nCampaignNights] = self.parLnPwvIntercept * u
                 parHigh[self.parLnPwvInterceptLoc: \
                             self.parLnPwvInterceptLoc + \
-                            self.nCampaignNights] = self.lnPwvStd * unitDict['lnPwvUnit']
+                            self.nCampaignNights] = self.parLnPwvIntercept * u
+                u = units[self.parLnPwvSlopeLoc: \
+                              self.parLnPwvSlopeLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvSlopeLoc: \
                            self.parLnPwvSlopeLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parLnPwvSlope * u
                 parHigh[self.parLnPwvSlopeLoc: \
                             self.parLnPwvSlopeLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parLnPwvSlope * u
+                u = units[self.parLnPwvQuadraticLoc: \
+                              self.parLnPwvQuadraticLoc + \
+                              self.nCampaignNights]
                 parLow[self.parLnPwvQuadraticLoc: \
                            self.parLnPwvQuadraticLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parLnPwvQuadratic * u
                 parHigh[self.parLnPwvQuadraticLoc: \
                             self.parLnPwvQuadraticLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parLnPwvQuadratic * u
             else:
-                parLow[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parRetrievedLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                u = units[self.parRetrievedLnPwvScaleLoc]
+                parLow[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
+                parHigh[self.parRetrievedLnPwvScaleLoc] = self.parRetrievedLnPwvScale * u
                 if self.useNightlyRetrievedPwv:
+                    u = units[self.parRetrievedLnPwvNightlyOffsetLoc: \
+                                  self.parRetrievedLnPwvNightlyOffsetLoc + \
+                                  self.nCampaignNights]
                     parLow[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                self.parRetrievedLnPwvNightlyOffsetLoc + \
-                               self.nCampaignNights] = 0.0
+                               self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
                     parHigh[self.parRetrievedLnPwvNightlyOffsetLoc: \
                                 self.parRetrievedLnPwvNightlyOffsetLoc + \
-                                self.nCampaignNights] = 0.0
+                                self.nCampaignNights] = self.parRetrievedLnPwvNightlyOffset * u
                 else:
-                    parLow[self.parRetrievedLnPwvOffsetLoc] = 0.0
-                    parHigh[self.parRetrievedLnPwvOffsetLoc] = 0.0
+                    u = units[self.parRetrievedLnPwvOffsetLoc]
+                    parLow[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
+                    parHigh[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
 
             if self.hasExternalPwv and not self.useRetrievedPwv:
-                parLow[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
-                parHigh[self.parExternalLnPwvScaleLoc] = 1.0 * unitDict['lnPwvGlobalUnit']
+                u = units[self.parExternalLnPwvScaleLoc]
+                parLow[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+                parHigh[self.parExternalLnPwvScaleLoc] = self.parExternalLnPwvScale * u
+                u = units[self.parExternalLnPwvOffsetLoc: \
+                              self.parExternalLnPwvOffsetLoc + \
+                              self.nCampaignNights]
                 parLow[self.parExternalLnPwvOffsetLoc: \
                            self.parExternalLnPwvOffsetLoc + \
-                           self.nCampaignNights] = 0.0
+                           self.nCampaignNights] = self.parExternalLnPwvOffset * u
                 parHigh[self.parExternalLnPwvOffsetLoc: \
                             self.parExternalLnPwvOffsetLoc + \
-                            self.nCampaignNights] = 0.0
+                            self.nCampaignNights] = self.parExternalLnPwvOffset * u
 
+            u = units[self.parO3Loc: \
+                          self.parO3Loc + \
+                          self.nCampaignNights]
             parLow[self.parO3Loc: \
                    self.parO3Loc + \
-                   self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+                   self.nCampaignNights] = self.parO3 * u
             parHigh[self.parO3Loc: \
                     self.parO3Loc + \
-                    self.nCampaignNights] = self.o3Std * unitDict['o3Unit']
+                    self.nCampaignNights] = self.parO3 * u
+            u = units[self.parLnTauInterceptLoc: \
+                          self.parLnTauInterceptLoc + \
+                          self.nCampaignNights]
             parLow[self.parLnTauInterceptLoc: \
                    self.parLnTauInterceptLoc + \
-                   self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+                   self.nCampaignNights] = self.parLnTauIntercept * u
             parHigh[self.parLnTauInterceptLoc: \
                     self.parLnTauInterceptLoc + \
-                self.nCampaignNights] = self.lnTauStd * unitDict['lnTauUnit']
+                self.nCampaignNights] = self.parLnTauIntercept * u
+            u = units[self.parLnTauSlopeLoc: \
+                          self.parLnTauSlopeLoc + \
+                          self.nCampaignNights]
             parLow[self.parLnTauSlopeLoc: \
                    self.parLnTauSlopeLoc + \
-                   self.nCampaignNights] = 0.0
+                   self.nCampaignNights] = self.parLnTauSlope * u
             parHigh[self.parLnTauSlopeLoc: \
                     self.parLnTauSlopeLoc + \
-                    self.nCampaignNights] = 0.0
+                    self.nCampaignNights] = self.parLnTauSlope * u
+            u = units[self.parAlphaLoc: \
+                          self.parAlphaLoc + \
+                          self.nCampaignNights]
             parLow[self.parAlphaLoc: \
                    self.parAlphaLoc + \
-                   self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
+                   self.nCampaignNights] = self.parAlpha * u
             parHigh[self.parAlphaLoc: \
                     self.parAlphaLoc + \
-                    self.nCampaignNights] = self.alphaStd * unitDict['alphaUnit']
-
+                    self.nCampaignNights] = self.parAlpha * u
 
         # zip these into a list of tuples
         parBounds = list(zip(parLow, parHigh))
 
         return parBounds
-
-    def getUnitDict(self,fitterUnits=False):
-        """
-        Get dictionary of unit conversions.
-
-        parameters
-        ----------
-        fitterUnits: bool, default=False
-           Return with normalized fitter units or just 1.0s?
-        """
-
-        if (fitterUnits):
-            return self.unitDictSteps
-        else:
-            return self.unitDictOnes
 
     @property
     def superStarFlatCenter(self):
@@ -1539,6 +1627,11 @@ class FgcmParameters(object):
                                         self.ccdOffsets['Y_SIZE'][c],
                                         self.parSuperStarFlat[e, f, c, :])
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
+
+        # This is the signifier
+        bad = np.where(superStarFlatCenter < -4.0)
+        if bad[0].size > 0:
+            superStarFlatCenter[bad] = self.illegalValue
 
         return superStarFlatCenter
 
@@ -1608,10 +1701,30 @@ class FgcmParameters(object):
 
         return ccdApertureCorrection
 
+    @property
+    def expCTrans(self):
+        """
+        The transmission adjustment c
+
+        Returns
+        -------
+        expCTrans: float array (nExp)
+        """
+
+        deltaT = self.expMJD - self.mirrorChromaticityPivot[self.expCoatingIndex]
+        c0 = self.compMirrorChromaticity[self.expLUTFilterIndex, self.expCoatingIndex + 1]
+        c1 = self.compMirrorChromaticity[self.expLUTFilterIndex, 0]
+
+        return np.clip(c0 + c1 * deltaT, -1.0, 1.0)
+
     def plotParameters(self):
         """
         Plot nightly average parameters
         """
+
+        if self.plotPath is None:
+            # configured not to make plots
+            return
 
         # want nightly averages, on calibratable nights (duh)
 
@@ -1735,7 +1848,7 @@ class FgcmParameters(object):
 
             ax.plot(mjdNight[pwvGd] - firstMJD, pwvNight[pwvGd],'r.')
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-            ax.set_ylabel(r'$\mathrm{PWV}$',fontsize=16)
+            ax.set_ylabel(r'$\mathrm{PWV}$ (mm)',fontsize=16)
 
             fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
                                                    self.outfileBaseWithCycle))
@@ -1757,52 +1870,46 @@ class FgcmParameters(object):
 
             ax.plot(mjdNight[O3Gd] - firstMJD, O3Night[O3Gd],'r.')
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-            ax.set_ylabel(r'$O_3$',fontsize=16)
+            ax.set_ylabel(r'$O_3$ (Dob)',fontsize=16)
 
             fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
             plt.close(fig)
-
-
-        # mirror gray
-        fig=plt.figure(1,figsize=(8,6))
-        fig.clf()
-        ax=fig.add_subplot(111)
-
-        for i in xrange(self.nWashIntervals):
-            use,=np.where(self.expWashIndex == i)
-            washMJDRange = [np.min(self.expMJD[use]),np.max(self.expMJD[use])]
-
-            ax.plot(washMJDRange - firstMJD,
-                    (washMJDRange - self.washMJDs[i])*self.parQESysSlope[i] +
-                    self.parQESysIntercept[i],'r--',linewidth=3)
-
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})$',fontsize=16)
-        ax.tick_params(axis='both',which='major',labelsize=14)
-
-        ylim = ax.get_ylim()
-        for i in xrange(self.nWashIntervals):
-            ax.plot([self.washMJDs[i]-firstMJD,self.washMJDs[i]-firstMJD],
-                    ylim,'k--')
-
-        fig.savefig('%s/%s_qesys_washes.png' % (self.plotPath,
-                                                self.outfileBaseWithCycle))
-        plt.close(fig)
 
         # Filter Offset
         fig = plt.figure(1, figsize=(8, 6))
         fig.clf()
         ax = fig.add_subplot(111)
 
-        ax.plot(self.lambdaStdFilter, self.parFilterOffset, 'r.')
+        parFilterOffsetMmag = self.parFilterOffset * 1000.0
+
+        ax.plot(self.lambdaStdFilter, parFilterOffsetMmag, 'r.')
         for i, f in enumerate(self.lutFilterNames):
-            ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], self.parFilterOffset[i] - 0.01), xycoords='data', ha='center', va='top', fontsize=16)
+            ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], parFilterOffsetMmag[i] - 10.0), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
-        ax.set_ylabel('Filter Offset (mag)')
+        ax.set_ylabel('Filter Offset (mmag)')
+        ax.set_ylim(np.min(parFilterOffsetMmag - 20.0), np.max(parFilterOffsetMmag + 20.0))
 
         fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                   self.outfileBaseWithCycle))
+
+        # Abs Offset
+        fig = plt.figure(1, figsize=(8, 6))
+        fig.clf()
+        ax = fig.add_subplot(111)
+
+        ax.plot(self.lambdaStdBand, self.compAbsThroughput, 'r.')
+        for i, b in enumerate(self.bands):
+            ax.annotate(r'$%s$' % (b), (self.lambdaStdBand[i], self.compAbsThroughput[i] - 0.1), xycoords='data', ha='center', va='top', fontsize=16)
+        ax.set_xlabel('Std Wavelength (A)')
+        ax.set_ylabel('Absolute throughput (fraction)')
+        ax.set_ylim(np.min(self.compAbsThroughput - 0.15), np.max(self.compAbsThroughput + 0.05))
+
+        fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
+                                               self.outfileBaseWithCycle))
+
+        for i, band in enumerate(self.bands):
+            self.fgcmLog.info('Abs throughput in %s band: %.4f' % (band, self.compAbsThroughput[i]))
 
         ## FIXME: add pwv offset plotting routine (if external)
         ## FIXME: add tau offset plotting routing (if external)

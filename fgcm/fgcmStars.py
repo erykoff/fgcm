@@ -55,6 +55,7 @@ class FgcmStars(object):
 
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
+        self.refstarFile = fgcmConfig.refstarFile
 
         self.bands = fgcmConfig.bands
         self.nBands = len(fgcmConfig.bands)
@@ -99,9 +100,15 @@ class FgcmStars(object):
         self.sedSlopeComputed = False
 
         self.magConstant = 2.5/np.log(10)
-        self.zptAB = fgcmConfig.zptAB
+        self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
+        self.approxThroughput = fgcmConfig.approxThroughput
+
+        self.refStarSnMin = fgcmConfig.refStarSnMin
+        self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
         self.hasXY = False
+        self.hasRefstars = False
+        self.nRefStars = 0
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
@@ -148,10 +155,25 @@ class FgcmStars(object):
         startTime = time.time()
         self.fgcmLog.info('Reading in star positions...')
         pos = fitsio.read(self.indexFile, ext='POS', upper=True)
-        self.fgcmLog.info('Done reading in %d unique star positions in %.1f secondds.' %
+        self.fgcmLog.info('Done reading in %d unique star positions in %.1f seconds.' %
                          (pos.size, time.time() - startTime))
 
         obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
+
+        # And refstars if available
+        if self.refstarFile is not None:
+            startTime = time.time()
+            self.fgcmLog.info('Reading in reference stars...')
+            ref = fitsio.read(self.refstarFile, ext=1, lower=True)
+            self.fgcmLog.info('Done reading %d reference starss in %.1f seconds.' %
+                              (ref.size, time.time() - startTime))
+            refID = ref['fgcm_id']
+            refMag = ref['mag']
+            refMagErr = ref['mag_err']
+        else:
+            refID = None
+            refMag = None
+            refMagErr = None
 
         if (self.inFlagStarFile is not None):
             self.fgcmLog.info('Reading in list of previous flagged stars from %s' %
@@ -189,6 +211,9 @@ class FgcmStars(object):
                        pos['NOBS'],
                        obsX=obsX,
                        obsY=obsY,
+                       refID=refID,
+                       refMag=refMag,
+                       refMagErr=refMagErr,
                        flagID=flagID,
                        flagFlag=flagFlag,
                        computeNobs=computeNobs)
@@ -197,10 +222,12 @@ class FgcmStars(object):
         index = None
         obs = None
         pos = None
+        ref = None
 
     def loadStars(self, fgcmPars,
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
+                  refID=None, refMag=None, refMagErr=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
         Load stars from arrays
@@ -232,6 +259,14 @@ class FgcmStars(object):
            For each object, where in the obs table to look
         objNobs: int array
            number of observations of this object (all bands)
+        refID: int array, optional
+           ID of each object that is an absolute reference
+        refMag: float array, optional
+           Absolute mag for each reference object, (nref, nmag).
+           Set to >90 for no magnitude.
+        refMagErr: float array, optional
+           Absolute magnitude error for each reference object (nref, nmag).
+           Set to >90 for no magnitude.
         obsX: float array, optional
            x position for each observation
         obsY: float array, optional
@@ -295,6 +330,28 @@ class FgcmStars(object):
             if self.superStarSubCCD:
                 raise ValueError("Input stars do not have x/y but superStarSubCCD is set.")
 
+        if (refID is not None and refMag is not None and refMagErr is not None):
+            self.hasRefstars = True
+
+            # Remove any duplicates...
+            _, refUInd = np.unique(refID, return_index=True)
+
+            if refUInd.size < refID.size:
+                self.fgcmLog.info("Removing %d duplicate reference stars." %
+                                  (refID.size - refUInd.size))
+                refID = refID[refUInd]
+                refMag = refMag[refUInd, :]
+                refMagErr = refMagErr[refUInd, :]
+
+            self.nRefstars = refID.size
+
+            # refID: matched ID of reference stars
+            self.refIDHandle = snmm.createArray(self.nRefstars, dtype='i4')
+            # refMag: absolute magnitudes of reference stars
+            self.refMagHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+            # refMagErr: absolute magnitude errors of reference stars
+            self.refMagErrHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+
         snmm.getArray(self.obsExpHandle)[:] = obsExp
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
         snmm.getArray(self.obsRAHandle)[:] = obsRA
@@ -302,13 +359,28 @@ class FgcmStars(object):
         # We will apply the approximate AB scaling here, it will make
         # any plots we make have sensible units; will make 99 a sensible sentinal value;
         # and is arbitrary anyway and doesn't enter the fits.
-        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptAB
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
-        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptAB  # same as raw at first
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput  # same as raw at first
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
             snmm.getArray(self.obsYHandle)[:] = obsY
+
+        if self.hasRefstars:
+            # And filter out bad signal to noise, per band, if desired,
+            # before filling the arrays
+            if self.refStarSnMin > 0.0:
+                for i in range(self.nBands):
+                    maxErr = (2.5 / np.log(10.)) * (1. / self.refStarSnMin)
+                    bad, = np.where(refMagErr[:, i] > maxErr)
+                    refMag[bad, i] = 99.0
+                    refMagErr[bad, i] = 99.0
+
+            snmm.getArray(self.refIDHandle)[:] = refID
+            snmm.getArray(self.refMagHandle)[:, :] = refMag
+            snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
+
 
         self.fgcmLog.info('Applying sigma0Phot = %.4f to mag errs' %
                          (self.sigma0Phot))
@@ -416,12 +488,42 @@ class FgcmStars(object):
         self.fgcmLog.info('Done indexing in %.1f seconds.' %
                          (time.time() - startTime))
 
-        #pos=None
+        # And we need to match the reference stars if necessary
+        if self.hasRefstars:
+            # self.refIdHandle
+            startTime = time.time()
+            self.fgcmLog.info('Matching reference star IDs')
+            self.objRefIDIndexHandle = snmm.createArray(self.nStars, dtype='i4')
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+
+            # Set the default to -1 (no match)
+            objRefIDIndex[:] = -1
+
+            objID = snmm.getArray(self.objIDHandle)
+            refID = snmm.getArray(self.refIDHandle)
+
+            a, b = esutil.numpy_util.match(refID, objID)
+            objRefIDIndex[b] = a
+
+            # Compute the fraction of stars that are reference stars
+            for i, band in enumerate(self.bands):
+                gd, = np.where(refMag[:, i] < 90.0)
+                fracRef = float(gd.size) / float(len(snmm.getArray(self.objIDHandle)))
+
+                self.fgcmLog.info("%.5f%% stars have a reference match in the %s band."
+                                  % (fracRef * 100.0, band))
+
+            self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
+                              (time.time() - startTime))
+
         obsObjIDIndex = None
         objID = None
         obsIndex = None
         objObsIndex = None
         objNobs = None
+        refID = None
+        refMag = None
+        refMagErr = None
 
         # and create a objFlag which flags bad stars as they fall out...
 
@@ -441,6 +543,10 @@ class FgcmStars(object):
             test,=np.where((flagFlag[a] & objFlagDict['RESERVED']) > 0)
             self.fgcmLog.info('Flagging %d stars as reserved from previous cycles.' %
                              (test.size))
+            test, = np.where((flagFlag[a] & objFlagDict['REFSTAR_OUTLIER']) > 0)
+            if test.size > 0:
+                self.fgcmLog.info('Flagging %d stars as reference star outliers from previous cycles.' %
+                                  (test.size))
 
             objFlag[b] = flagFlag[a]
         else:
@@ -456,7 +562,16 @@ class FgcmStars(object):
                 self.fgcmLog.info('Reserving %d stars from the fit.' % (nReserve))
                 objFlag[reserve] |= objFlagDict['RESERVED']
 
-
+                # If we have a "small" number of reference stars,
+                # these should not be held in reserve
+                if self.hasRefstars:
+                    if self.nRefstars < 100:
+                        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+                        cancel, = np.where(((objFlag & objFlagDict['RESERVED']) > 0) &
+                                           (objRefIDIndex >= 0))
+                        if cancel.size > 0:
+                            objFlag[cancel] &= ~objFlagDict['RESERVED']
+                            self.fgcmLog.info('Cancelling RESERVED flag on %d reference stars' % (cancel.size))
 
         # And we need to record the mean mag, error, SED slopes...
 
@@ -674,14 +789,20 @@ class FgcmStars(object):
         goodStars: np.array of good star indices
         """
 
-        mask = 255
+        #mask = 255
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'] |
+                objFlagDict['RESERVED'])
 
-        if includeReserve:
+        if includeReserve or onlyReserve:
             mask &= ~objFlagDict['RESERVED']
 
         if onlyReserve:
-            mask = objFlagDict['RESERVED']
-            goodFlag = ((snmm.getArray(self.objFlagHandle) & mask) > 0)
+            resMask = objFlagDict['RESERVED']
+            goodFlag = (((snmm.getArray(self.objFlagHandle) & resMask) > 0) &
+                        ((snmm.getArray(self.objFlagHandle) & mask) == 0))
         else:
             goodFlag = ((snmm.getArray(self.objFlagHandle) & mask) == 0)
 
@@ -777,6 +898,10 @@ class FgcmStars(object):
            A key for labeling the map.
         """
 
+        if self.plotPath is None:
+            # Requested not to do plots
+            return
+
         import healpy as hp
         try:
             from .fgcmPlotmaps import plot_hpxmap
@@ -784,7 +909,12 @@ class FgcmStars(object):
             self.fgcmLog.info("Map plotting not available.  Sorry!")
             return
 
-        goodStars,=np.where(snmm.getArray(self.objFlagHandle)[:] == 0.0)
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'])
+
+        goodStars, = np.where((snmm.getArray(self.objFlagHandle) & mask) == 0)
 
         theta = (90.0-snmm.getArray(self.objDecHandle)[goodStars])*np.pi/180.
         phi = snmm.getArray(self.objRAHandle)[goodStars]*np.pi/180.
@@ -953,7 +1083,155 @@ class FgcmStars(object):
 
         objSEDSlopeLock.release()
 
+    def computeAbsOffset(self):
+        """
+        Compute the absolute offset
 
+        Returns
+        ------
+        deltaOffsetRef: `np.array`
+           Float array (nBands) that is the delta offset in abs mag
+        """
+
+        if not self.hasRefstars:
+            # should this Raise because it's programmer error, or just pass because
+            # it's harmless?
+            self.fgcmLog.info("Warning: cannot compute abs offset without reference stars.")
+            return np.zeros(self.nBands)
+
+        # Set things up
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+        refMag = snmm.getArray(self.refMagHandle)
+        refMagErr = snmm.getArray(self.refMagErrHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
+
+        use, = np.where((objRefIDIndex[goodStars] >= 0) &
+                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+        goodRefStars = goodStars[use]
+
+        deltaOffsetRef = np.zeros(self.nBands)
+        deltaOffsetWtRef = np.zeros(self.nBands)
+
+        gdStarInd, gdBandInd = np.where((objMagStdMean[goodRefStars, :] < 90.0) &
+                                        (refMag[objRefIDIndex[goodRefStars], :] < 90.0))
+        delta = objMagStdMean[goodRefStars, :] - refMag[objRefIDIndex[goodRefStars], :]
+        wt = 1. / (objMagStdMeanErr[goodRefStars, :]**2. +
+                   refMagErr[objRefIDIndex[goodRefStars], :]**2.)
+
+        np.add.at(deltaOffsetRef, gdBandInd, delta[gdStarInd, gdBandInd] * wt[gdStarInd, gdBandInd])
+        np.add.at(deltaOffsetWtRef, gdBandInd, wt[gdStarInd, gdBandInd])
+
+        # Make sure we have a measurement in the band
+        ok, = np.where(deltaOffsetWtRef > 0.0)
+        deltaOffsetRef[ok] /= deltaOffsetWtRef[ok]
+
+        # And any bands that we do not have a measurement will be a weighted mean
+        # of the other bands...
+        noRef, = np.where(deltaOffsetWtRef == 0)
+        if noRef.size > 0:
+            # there are bands to fill in...
+            deltaOffsetRef[noRef] = (np.sum(deltaOffsetRef[ok] * deltaOffsetWtRef[ok]) /
+                                     np.sum(deltaOffsetWtRef[ok]))
+
+        return deltaOffsetRef
+
+    def applyAbsOffset(self, deltaAbsOffset):
+        """
+        Apply the absolute offsets.  Used for initial fit cycle.
+
+        Parameters
+        ----------
+        deltaAbsOffset: `np.array`
+           Float array with nbands offsets
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=True)
+        _, goodObs = self.getGoodObsIndices(goodStars, expFlag=None)
+
+        # need goodObs
+        obsMagStd[goodObs] -= deltaAbsOffset[obsBandIndex[goodObs]]
+
+        gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
+        objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= deltaAbsOffset[gdMeanBand]
+
+    def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
+        """
+        Compute the delta-mag between the observed and true value (EGray) for a set of
+        observations (goodObs).
+
+        EGray == <mstd> - mstd
+        or
+        EGray == mref - mstd
+
+        Parameters
+        ----------
+        goodObs: `np.array`
+           Array of indices of good observations
+        ignoreRef: `bool`, default=False
+           Ignore reference stars.
+        onlyObsErr: `bool`, default=False
+           Only use the observational error (for non-ref stars)
+
+        Returns
+        -------
+        EGrayGO: `np.array`
+           Array of gray residuals for goodObs observations
+        EGrayErr2GO: `np.array`
+           Array of gray residual error squared
+        """
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+
+        # First compute EGray for all the observations
+        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
+                   obsMagStd[goodObs])
+
+        if onlyObsErr:
+            EGrayErr2GO = obsMagErr[goodObs]**2.
+        else:
+            EGrayErr2GO = (obsMagErr[goodObs]**2. -
+                           objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.)
+
+        # And if we need reference stars, replace these
+        if self.hasRefstars and not ignoreRef:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.refMagHandle)
+            refMagErr = snmm.getArray(self.refMagErrHandle)
+
+            goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
+
+            if goodRefObsGO.size > 0:
+                obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
+                                   (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                           obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+
+                if obsUse.size > 0:
+                    goodRefObsGO = goodRefObsGO[obsUse]
+
+                    EGrayGO[goodRefObsGO] = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                   obsBandIndex[goodObs[goodRefObsGO]]] -
+                                             obsMagStd[goodObs[goodRefObsGO]])
+
+                    EGrayErr2GO[goodRefObsGO] = (obsMagErr[goodObs[goodRefObsGO]]**2. +
+                                                 refMagErr[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                                           obsBandIndex[goodObs[goodRefObsGO]]]**2.)
+
+        return EGrayGO, EGrayErr2GO
 
     def performColorCuts(self):
         """
@@ -966,7 +1244,7 @@ class FgcmStars(object):
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
-        # Only cut stars where we have a color
+        # Only cut stars where we have a color, and are *not* reference stars
 
         for cCut in self.starColorCuts:
             ok, = np.where((objMagStdMean[:, cCut[0]] < 90.0) &
@@ -978,6 +1256,14 @@ class FgcmStars(object):
             objFlag[ok[bad]] |= objFlagDict['BAD_COLOR']
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
+
+        if self.hasRefstars and not self.applyRefStarColorCuts:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
+                               (objRefIDIndex >= 0))
+            if cancel.size > 0:
+                objFlag[cancel] &= ~objFlagDict['BAD_COLOR']
+                self.fgcmLog.info('Cancelling BAD_COLOR flag on %d reference stars' % (cancel.size))
 
     def performSuperStarOutlierCuts(self, fgcmPars, reset=False):
         """
@@ -1132,9 +1418,9 @@ class FgcmStars(object):
             # Per exposure
             obsMagADU[:] += fgcmPars.expApertureCorrection[obsExpIndex]
 
-    def computeModelMagErrors(self, fgcmPars):
+    def applyModelMagErrorModel(self, fgcmPars):
         """
-        Compute model magnitude errors.
+        Apply magnitude error model.
 
         parameters
         ----------
@@ -1172,7 +1458,12 @@ class FgcmStars(object):
         obsSkyBrightness = fgcmPars.expSkyBrightness[obsExpIndex]
 
         # we will compute all stars that are possibly good, including reserved
-        resMask = 255 & ~objFlagDict['RESERVED']
+        resMask = (objFlagDict['TOO_FEW_OBS'] |
+                   objFlagDict['BAD_COLOR'] |
+                   objFlagDict['VARIABLE'] |
+                   objFlagDict['TEMPORARY_BAD_STAR'])
+
+        #resMask = 255 & ~objFlagDict['RESERVED']
         goodStars, = np.where((objFlag & resMask) == 0)
 
         goodStarsSub, goodObs = esutil.numpy_util.match(goodStars,
@@ -1206,6 +1497,38 @@ class FgcmStars(object):
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
+    def applyMirrorChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False):
+        """
+        Apply mirror chromaticity model
+
+        Parameters
+        ----------
+        fgcmPars: `fgcmParameters`
+        returnCorrections: `bool`, optional
+           Just return the corrections, don't apply them.  Default is False.
+        """
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+
+        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+
+        cAl = fgcmPars.expCTrans[obsExpIndex]
+
+        termOne = 1.0 + (cAl / fgcmLUT.lambdaStd[obsBandIndex]) * fgcmLUT.I10Std[obsBandIndex]
+        obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
+        termTwo = 1.0 + (((cAl / fgcmLUT.lambdaStd[obsBandIndex]) * (fgcmLUT.I1Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I2Std[obsBandIndex])) /
+                         (fgcmLUT.I0Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I1Std[obsBandIndex]))
+        deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
+
+        if returnCorrections:
+            return deltaMag
+
+        obsMagADU += deltaMag
+
     def saveFlagStarIndices(self,flagStarFile):
         """
         Save flagged stars to fits.
@@ -1237,7 +1560,8 @@ class FgcmStars(object):
         # we only store VARIABLE and RESERVED stars
         # everything else should be recomputed based on the good exposures, calibrations, etc
         flagMask = (objFlagDict['VARIABLE'] |
-                    objFlagDict['RESERVED'])
+                    objFlagDict['RESERVED'] |
+                    objFlagDict['REFSTAR_OUTLIER'])
 
         flagged,=np.where((objFlag & flagMask) > 0)
 
