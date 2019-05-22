@@ -8,7 +8,6 @@ import esutil
 import time
 
 from .fgcmUtilities import _pickle_method
-from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import retrievalFlagDict
 
 import types
@@ -71,9 +70,9 @@ class FgcmSigmaCal(object):
 
         self.objChi2Handle = snmm.createArray((self.fgcmStars.nStars, self.fgcmPars.nBands), dtype='f8')
 
-    def run(self, applyGray=True, doPlots=True):
+    def run(self, applyGray=True):
         """
-
+        Run the sigma_cal computation code.
         """
 
         self.applyGray = applyGray
@@ -141,7 +140,7 @@ class FgcmSigmaCal(object):
 
         sigmaCals = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], nStep)
 
-        if doPlots:
+        if self.plotPath is not None:
             import matplotlib.pyplot as plt
             import matplotlib.colors as colors
             import matplotlib.cm as cmx
@@ -181,7 +180,7 @@ class FgcmSigmaCal(object):
             plotIndices[band] = ok[st[int(self.sigmaCalPlotPercentile[0] * st.size):
                                           int(self.sigmaCalPlotPercentile[1] * st.size)]]
 
-        if doPlots:
+        if self.plotPath is not None:
             plotMags = np.zeros((sigmaCals.size, self.fgcmPars.nBands, nPlotBin))
             plotChi2s = np.zeros_like(plotMags)
 
@@ -199,7 +198,7 @@ class FgcmSigmaCal(object):
                                (objChi2[goodStars[indices[band]], bandIndex] < 1000.0))
                 medChi2s[i, bandIndex] = np.median(objChi2[goodStars[indices[band][ok]], bandIndex])
 
-            if doPlots:
+            if self.plotPath is not None:
                 for bandIndex, band in enumerate(self.fgcmPars.bands):
                     ok, = np.where((objChi2[goodStars[plotIndices[band]], bandIndex] > 0.001) &
                                    (objChi2[goodStars[plotIndices[band]], bandIndex] < 1000.0))
@@ -218,10 +217,10 @@ class FgcmSigmaCal(object):
         for bandIndex, band in enumerate(self.fgcmPars.bands):
             mininds[bandIndex] = np.argmin(np.abs(np.log10(medChi2s[:, bandIndex])))
             self.fgcmPars.compSigmaCal[bandIndex] = sigmaCals[mininds[bandIndex]]
-            self.fgcmLog.info('Best sigmaCal (%s band) = %.4f' % (band, sigmaCals[mininds[bandIndex]]))
+            self.fgcmLog.info('Best sigmaCal (%s band) = %.2f mmag' % (band, sigmaCals[mininds[bandIndex]]*1000.0))
 
         # And do the plots if desired
-        if doPlots:
+        if self.plotPath is not None:
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 fig = plt.figure(figsize=(9, 6))
                 fig.clf()
@@ -247,7 +246,7 @@ class FgcmSigmaCal(object):
 
                 ax.set_xlabel('Magnitude (%s band)' % (band), fontsize=14)
                 ax.set_ylabel('log10(chi2)', fontsize=14)
-                ax.set_title('%s band, sigma_cal = %.4f' % (band, self.fgcmPars.compSigmaCal[bandIndex]))
+                ax.set_title('%s band, sigma_cal = %.2f' % (band, self.fgcmPars.compSigmaCal[bandIndex]*1000.0))
                 ax.tick_params(axis='both', which='major', labelsize=14)
 
                 if use_inset:

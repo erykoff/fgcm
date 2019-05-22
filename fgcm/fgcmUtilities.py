@@ -15,7 +15,8 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
                'BAD_COLOR':2**1,
                'VARIABLE':2**2,
                'TEMPORARY_BAD_STAR':2**3,
-               'RESERVED':2**4}
+               'RESERVED':2**4,
+               'REFSTAR_OUTLIER': 2**5}
 
 # Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE':2**0,
@@ -187,11 +188,13 @@ def histoGauss(ax,array):
     parameters
     ----------
     ax: Plot axis object
+       If None, return coefficients but do not plot
     array: float array to plot
 
     returns
     -------
-    coeff: tuple (A, mu, sigma)
+    coeff: tuple (A, mu, sigma, fail)
+       Fail is 0 if the fit succeeded
     """
 
     import scipy.optimize
@@ -216,9 +219,11 @@ def histoGauss(ax,array):
             # automated way we'll need to tell the parent that we didn't converge
             coeff, varMatrix = scipy.optimize.curve_fit(gaussFunction, hist['center'],
                                                         hist['hist'], p0=p0)
+
+        coeff = np.append(coeff, 0)
     except:
         # set to starting values...
-        coeff = p0
+        coeff = np.append(p0, 1)
 
     hcenter=hist['center']
     hhist=hist['hist']
@@ -238,10 +243,11 @@ def histoGauss(ax,array):
         ax.plot(hcenter[ok],hhist[ok],'b-',linewidth=3)
         ax.set_xlim(rangeLo,rangeHi)
 
-        xvals=np.linspace(rangeLo,rangeHi,1000)
-        yvals=gaussFunction(xvals,*coeff)
+        if coeff[3] == 0:
+            xvals=np.linspace(rangeLo,rangeHi,1000)
+            yvals=gaussFunction(xvals,*coeff[: -1])
 
-        ax.plot(xvals,yvals,'k--',linewidth=3)
+            ax.plot(xvals,yvals,'k--',linewidth=3)
         ax.locator_params(axis='x',nbins=6)  # hmmm
 
     return coeff
@@ -505,7 +511,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
 
     for i in xrange(ccdOffsets.size):
         field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[i, :])
-        centralValues[i] = -2.5 * np.log10(field.evaluateCenter())
+        centralValues[i] = -2.5 * np.log10(field.evaluateCenter()) * 1000.0
 
     if (loHi is None):
         st=np.argsort(centralValues)
@@ -539,7 +545,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
         yGrid = np.tile(yValues, xValues.size)
 
         field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[k, :])
-        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None))
+        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None)) * 1000.0
 
         # This seems to be correct
         extent = [ccdOffsets['DELTA_RA'][k] -

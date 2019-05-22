@@ -482,7 +482,7 @@ class FgcmAtmosphereTable(object):
 
 
     def interpolateAtmosphere(self, lam=None, pmb=None, pwv=None, o3=None, tau=None,
-                              alpha=None, zenith=None):
+                              alpha=None, zenith=None, ctranslamstd=None):
         """
         Interpolate the atmosphere table to generate an atmosphere without
         requiring MODTRAN be installed.
@@ -503,6 +503,9 @@ class FgcmAtmosphereTable(object):
            Aerosol slope.  Default to alphaStd
         zenith: float, optional
            Zenith angle (degrees).  Default to zenithStd
+        ctranslamstd: [ctrans, lamstd], optional
+           Transmission adjustment constant and lambdastd.
+           Default to [0.0, lamnorm]
 
         returns
         -------
@@ -524,6 +527,8 @@ class FgcmAtmosphereTable(object):
             alpha = self.alphaStd
         if zenith is None:
             zenith = self.zenithStd
+        if ctranslamstd is None:
+            ctranslamstd = [0.0, 7750.0]
 
         if self.o2Interpolator is None:
             secZenithPlus = np.append(self.secZenith, self.secZenith[-1] + self.secZenithDelta)
@@ -549,13 +554,14 @@ class FgcmAtmosphereTable(object):
         pmbFactor = pmbMolecularScattering * pmbMolecularAbsorption
 
         _secZenith = np.clip(1./np.cos(np.radians(zenith)), self.secZenith[0], self.secZenith[-1])
-        _pwv = np.clip(pwv, np.exp(self.lnPwv[0]), np.exp(self.lnPwv[-1]))
+        _lnPwv = np.clip(np.log(pwv), self.lnPwv[0], self.lnPwv[-1])
         _o3 = np.clip(o3, self.o3[0], self.o3[-1])
         atmInterpolated = (pmbFactor *
                            self.o2Interpolator((_secZenith, lam)) *
                            self.rayleighInterpolator((_secZenith, lam)) *
-                           self.lnPwvInterpolator((np.log(_pwv), _secZenith, lam)) *
+                           self.lnPwvInterpolator((_lnPwv, _secZenith, lam)) *
                            self.o3Interpolator((_o3, _secZenith, lam)) *
+                           (1.0 + ctranslamstd[0] * (lam - ctranslamstd[1]) / ctranslamstd[1]) *
                            np.exp(-1.0 * tau * _secZenith * (lam / self.lambdaNorm)**(-alpha)))
 
         return atmInterpolated

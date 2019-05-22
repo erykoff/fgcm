@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
-from .fgcmUtilities import objFlagDict
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -56,7 +55,7 @@ class FgcmSigFgcm(object):
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
 
-    def computeSigFgcm(self,reserved=False,doPlots=True,save=True,crunch=False):
+    def computeSigFgcm(self,reserved=False,save=True,crunch=False):
         """
         Compute sigFgcm for all bands
 
@@ -64,7 +63,6 @@ class FgcmSigFgcm(object):
         ----------
         reserved: bool, default=False
            Use reserved stars instead of fit stars?
-        doPlots: bool, default=True
         save: bool, default=True
            Save computed values to fgcmPars?
         crunch: bool, default=False
@@ -82,7 +80,6 @@ class FgcmSigFgcm(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
@@ -93,17 +90,17 @@ class FgcmSigFgcm(object):
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
-        goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
+        if reserved:
+            goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)
+        else:
+            goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
-        # compute EGray, GO for Good Obs
-        EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs],obsBandIndex[goodObs]] -
-                   obsMagStd[goodObs])
-        # and need the error for Egray: sum in quadrature of individual and avg errs
-        EGrayErr2GO = (obsMagErr[goodObs]**2. -
-                       objMagStdMeanErr[obsObjIDIndex[goodObs],obsBandIndex[goodObs]]**2.)
+        # this statistic is internal only, no reference stars.
+        # see fgcmSigmaRef for reference stars
+        EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, ignoreRef=True)
 
         # now we can compute sigFgcm
 
@@ -166,7 +163,9 @@ class FgcmSigFgcm(object):
 
 
                 try:
-                    coeff = histoGauss(ax, EGrayGO[sigUse])
+                    coeff = histoGauss(ax, EGrayGO[sigUse]*1000.0)
+                    coeff[1] /= 1000.0
+                    coeff[2] /= 1000.0
                 except Exception as inst:
                     coeff = np.array([np.inf, np.inf, np.inf])
 
@@ -182,29 +181,29 @@ class FgcmSigFgcm(object):
                     sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
                                                  np.median(EGrayErr2GO[sigUse]))
 
-                self.fgcmLog.info("sigFgcm (%s) (%s) = %.4f" % (
+                self.fgcmLog.info("sigFgcm (%s) (%s) = %.2f mmag" % (
                         self.fgcmPars.bands[bandIndex],
                         name,
-                        sigFgcm[bandIndex]))
+                        sigFgcm[bandIndex]*1000.0))
 
                 if (save and (c==0)):
                     # only save if we're doing the full color range
                     self.fgcmPars.compSigFgcm[bandIndex] = sigFgcm[bandIndex]
 
-                if (not doPlots):
+                if self.plotPath is None:
                     continue
 
                 ax.tick_params(axis='both',which='major',labelsize=14)
 
                 text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n' + \
                     r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
-                    r'$\mu = %.5f$' % (coeff[1]) + '\n' + \
-                    r'$\sigma_\mathrm{tot} = %.4f$' % (coeff[2]) + '\n' + \
-                    r'$\sigma_\mathrm{FGCM} = %.4f$' % (sigFgcm[bandIndex]) + '\n' + \
+                    r'$\mu = %.2f$' % (coeff[1]*1000.0) + '\n' + \
+                    r'$\sigma_\mathrm{tot} = %.2f$' % (coeff[2]*1000.0) + '\n' + \
+                    r'$\sigma_\mathrm{FGCM} = %.2f$' % (sigFgcm[bandIndex]*1000.0) + '\n' + \
                     name
 
                 ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=14)
-                ax.set_xlabel(r'$E^{\mathrm{gray}}$',fontsize=14)
+                ax.set_xlabel(r'$E^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=14)
 
                 if (reserved):
                     extraName = 'reserved-stars'

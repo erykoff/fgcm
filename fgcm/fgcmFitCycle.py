@@ -27,6 +27,10 @@ from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
 from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
+from .fgcmSigmaRef import FgcmSigmaRef
+from .fgcmQeSysSlope import FgcmQeSysSlope
+from .fgcmComputeStepUnits import FgcmComputeStepUnits
+from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -190,16 +194,21 @@ class FgcmFitCycle(object):
         self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
                                    self.fgcmStars,self.fgcmLUT)
 
+        # The step unit calculator
+        self.fgcmComputeStepUnits = FgcmComputeStepUnits(self.fgcmConfig, self.fgcmPars,
+                                                         self.fgcmStars, self.fgcmLUT)
+
         # And the exposure selector
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
         self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
 
+        # And the qeSysSlope code
+        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+
         self.setupComplete = True
         self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
-
-
 
     def run(self):
         """
@@ -246,7 +255,6 @@ class FgcmFitCycle(object):
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.debug('FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
-        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex,doPlots=True)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='initial')
 
@@ -263,6 +271,11 @@ class FgcmFitCycle(object):
 
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
+
+            # Apply the mirror chromaticity if desired (we require SEDs)
+            if self.fgcmConfig.fitMirrorChromaticity:
+                self.fgcmLog.info("Applying mirror chromaticity corrections...")
+                self.fgcmStars.applyMirrorChromaticityCorrection(self.fgcmPars, self.fgcmLUT)
 
         else:
             # need to go through the bright observations
@@ -291,14 +304,31 @@ class FgcmFitCycle(object):
             goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
             self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
+            # Compute absolute magnitude starting points (if appropriate)
+            if self.fgcmStars.hasRefstars:
+                deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+                self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
+                # and need to apply this offset to the mags...
+                self.fgcmStars.applyAbsOffset(deltaAbsOffset)
+
+                for i, band in enumerate(self.fgcmPars.bands):
+                    self.fgcmLog.info("Initial abs throughput in %s band = %.4f" %
+                                      (band, self.fgcmPars.compAbsThroughput[i]))
+
+            # Compute the slopes (initial guess).  Don't plot here, offsets make no sense.
+            self.fgcmQeSysSlope.computeQeSysSlope('initial')
+            self.fgcmQeSysSlope.plotQeSysRefStars('initial')
+
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
                 self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
                 # Flag superstar outliers here before computing superstar...
                 self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
+                # Might need option here for no ref stars!
+                # Something with the > 1.0.  WTF?
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
-                preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True)
+                preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True, forceZeroMean=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
@@ -314,15 +344,20 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
         # And apply the errors (if configured)
-        self.fgcmStars.computeModelMagErrors(self.fgcmPars)
+        self.fgcmStars.applyModelMagErrorModel(self.fgcmPars)
 
         # Reset the superstar outlier flags and compute them now that we have
         # flagged good exposures, good nights, etc.
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
 
+        # And compute the step units
+        parArray = self.fgcmPars.getParArray(fitterUnits=False)
+        self.fgcmComputeStepUnits.run(parArray)
+
         # Make connectivity maps with what we know about photometric selection
-        fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
-        fgcmCon.plotConnectivity()
+        # This code doesn't work properly, skip it for now.
+        # fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        # fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
@@ -332,10 +367,12 @@ class FgcmFitCycle(object):
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
-            self._doFit()
-            self.fgcmPars.plotParameters()
+            self._doFit(ignoreRef=False)
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
+
+        # Plot the parameters whether or not we did a fit!
+        self.fgcmPars.plotParameters()
 
         self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
 
@@ -343,6 +380,14 @@ class FgcmFitCycle(object):
         # FIXME: look for more efficient way of doing this
         self.fgcmLog.debug('FitCycle computing FgcmChisq all + reserve stars')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
+
+        if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
+            # Redo absolute offset here for total consistency with final
+            # parameters and values
+            self.fgcmLog.info("Final computation of absolute offset.")
+            deltaAbsOffset = self.fgcmStars.computeAbsOffset()
+            self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
+            self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
         # One last run to compute mstd all observations of all exposures
         #  when allExposures is set, mean mags, etc aren't computed
@@ -366,8 +411,8 @@ class FgcmFitCycle(object):
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
                                        self.fgcmStars)
         # first compute with all...(better stats)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=False,doPlots=True,save=True)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
 
         self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
@@ -416,6 +461,18 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
+        # Compute mirror chromaticity
+        if self.fgcmConfig.fitMirrorChromaticity:
+            self.fgcmLog.debug("FitCycle computing mirror chromaticity")
+            mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+            mirChrom.computeMirrorChromaticity()
+
+        self.fgcmLog.debug('FitCycle computing qe sys slope')
+        self.fgcmQeSysSlope.computeQeSysSlope('final')
+        self.fgcmQeSysSlope.plotQeSysRefStars('final')
+
+        self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
+
         # Compute mag error model (if configured)
         self.fgcmModelMagErrs.computeMagErrorModel('postfit')
 
@@ -427,13 +484,18 @@ class FgcmFitCycle(object):
         sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
         sigCal.run()
 
+        if self.fgcmStars.hasRefstars:
+            self.fgcmLog.debug('FitCycle computing SigmaRef')
+            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+            sigRef.computeSigmaRef()
+
         # Make Zeropoints
         # We always want to compute these because of the plots
         # In the future we might want to streamline if something is bogging down.
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval)
+                                       self.fgcmRetrieval, self.fgcmStars)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
@@ -442,7 +504,7 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
 
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True,doPlots=True,save=False,crunch=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
 
         self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
@@ -486,13 +548,16 @@ class FgcmFitCycle(object):
 
         self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
-    def _doFit(self,doPlots=True):
+    def _doFit(self, doPlots=True, ignoreRef=False, maxIter=None):
         """
         Internal method to do the fit using fmin_l_bfgs_b
         """
 
         self.fgcmLog.info('Performing fit with %d iterations.' %
                          (self.fgcmConfig.maxIter))
+
+        if maxIter is None:
+            maxIter = self.fgcmConfig.maxIter
 
         # get the initial parameters
         parInitial = self.fgcmPars.getParArray(fitterUnits=True)
@@ -502,29 +567,36 @@ class FgcmFitCycle(object):
         # reset the chisq list (for plotting)
         self.fgcmChisq.resetFitChisqList()
         self.fgcmChisq.clearMatchCache()
-        self.fgcmChisq.maxIterations = self.fgcmConfig.maxIter
+        self.fgcmChisq.maxIterations = maxIter
+
+        # In the fit, we want to compute the absolute offset if needed.  Otherwise, no.
+        computeAbsThroughput = self.fgcmStars.hasRefstars
 
         try:
-            pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
-                                                       parInitial,       # initial guess
-                                                       fprime=None,      # in fgcmChisq()
-                                                       args=(True,True,False,False), # fitterUnits, deriv, computeSEDSlopes, useMatchCache
-                                                       approx_grad=False,# don't approx grad
-                                                       bounds=parBounds, # boundaries
-                                                       m=10,             # "variable metric conditions"
-                                                       factr=1e2,        # highish accuracy
-                                                       pgtol=1e-9,       # gradient tolerance
-                                                       maxfun=self.fgcmConfig.maxIter,
-                                                       maxiter=self.fgcmConfig.maxIter,
-                                                       iprint=0,         # only one output
-                                                       callback=None)    # no callback
+            fun = optimize.optimize.MemoizeJac(self.fgcmChisq)
+            jac = fun.derivative
+
+            res = optimize.minimize(fun,
+                                    parInitial,
+                                    args=(True,True,False,False,computeAbsThroughput,ignoreRef),
+                                    method='L-BFGS-B',
+                                    jac=jac,
+                                    bounds=parBounds,
+                                    options={'maxfun': maxIter,
+                                             'maxiter': maxIter,
+                                             'maxcor': 20,
+                                             'gtol': self.fgcmConfig.fitGradientTolerance},
+                                    callback=None)
+            pars = res.x
+
+            chisq = self.fgcmChisq.fitChisqs[-1]
         except MaxFitIterations:
             # We have exceeded the maximum number of iterations, force a cut
             pars = self.fgcmPars.getParArray(fitterUnits=True)
             chisq = self.fgcmChisq.fitChisqs[-1]
             info = None
 
-        self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
+        self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.6f' % (chisq))
         self.fgcmChisq.clearMatchCache()
         self.fgcmChisq.maxIterations = -1
 
@@ -549,134 +621,4 @@ class FgcmFitCycle(object):
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
-
-    def _doSOpticsFit(self,doPlots=True):
-        """
-        Internal method to only do the optics fit.  Not recommended.
-        """
-
-        raise NotImplementedError("The doSOpticsFit routine does not work correctly.")
-
-        ## FIXME: remove this method, it's not useful
-
-        from .fgcmUtilities import expFlagDict
-        from .fgcmUtilities import objFlagDict
-
-        self.fgcmLog.info('Performing SOptics fit with %d iterations.' %
-                         (self.fgcmConfig.maxIter))
-
-        # get the initial parameters
-        parInitial = self.fgcmPars.getParArray(fitterUnits=True)
-
-        # and the fit bounds
-        parBounds = self.fgcmPars.getParBounds(fitterUnits=True)
-        #unitDict = self.fgcmPars.getUnitDict(fitterUnits=True)
-
-
-        # flag everything that isn't "deep"
-        notDeep, = np.where(self.fgcmPars.expDeepFlag == 0)
-        self.fgcmPars.expFlag[notDeep] |= expFlagDict['TEMPORARY_BAD_EXPOSURE']
-
-        goodExpsIndex,=np.where(self.fgcmPars.expFlag == 0)
-
-        # don't know how to reverse this...make a "temporary" thing"
-        #self.fgcmStars.selectStarsMinObs(goodExpsIndex=goodExpsIndex)
-        self.fgcmStars.selectStarsMinObsExpIndex(goodExpIndex, temporary=True)
-
-        # and bound everything but SOptics ... replace with input numbers
-        # and store backups to refill
-        parArr = np.array(parBounds)
-        parLow = parArr[:,0]
-        parHigh = parArr[:,1]
-
-        parLowStore = parLow.copy()
-        parHighStore = parHigh.copy()
-
-        parLow[:] = parInitial[:]
-        parHigh[:] = parInitial[:]
-
-        parLow[self.fgcmPars.parQESysInterceptLoc: \
-                   self.fgcmPars.parQESysInterceptLoc + \
-                   self.fgcmPars.nWashIntervals] = \
-                   parLowStore[self.fgcmPars.parQESysInterceptLoc: \
-                                   self.fgcmPars.parQESysInterceptLoc + \
-                                   self.fgcmPars.nWashIntervals]
-        parHigh[self.fgcmPars.parQESysInterceptLoc: \
-                    self.fgcmPars.parQESysInterceptLoc + \
-                    self.fgcmPars.nWashIntervals] = \
-                    parHighStore[self.fgcmPars.parQESysInterceptLoc: \
-                                     self.fgcmPars.parQESysInterceptLoc + \
-                                     self.fgcmPars.nWashIntervals]
-        parLow[self.fgcmPars.parQESysSlopeLoc: \
-                   self.fgcmPars.parQESysSlopeLoc + \
-                   self.fgcmPars.nWashIntervals] = \
-                   parLowStore[self.fgcmPars.parQESysSlopeLoc: \
-                                   self.fgcmPars.parQESysSlopeLoc + \
-                                   self.fgcmPars.nWashIntervals]
-        parHigh[self.fgcmPars.parQESysSlopeLoc: \
-                    self.fgcmPars.parQESysSlopeLoc + \
-                    self.fgcmPars.nWashIntervals] = \
-                    parHighStore[self.fgcmPars.parQESysSlopeLoc: \
-                                     self.fgcmPars.parQESysSlopeLoc + \
-                                     self.fgcmPars.nWashIntervals]
-
-        # zip together for new parameter bounds
-        parBounds = list(zip(parLow, parHigh))
-
-
-        # reset chisq list
-        self.fgcmChisq.resetFitChisqList()
-
-        pars, chisq, info = optimize.fmin_l_bfgs_b(self.fgcmChisq,   # chisq function
-                                                   parInitial,       # initial guess
-                                                   fprime=None,      # in fgcmChisq()
-                                                   args=(True,True), # fitterUnits, deriv
-                                                   approx_grad=False,# don't approx grad
-                                                   bounds=parBounds, # boundaries
-                                                   m=10,             # "variable metric conditions"
-                                                   factr=1e2,        # highish accuracy
-                                                   pgtol=1e-9,       # gradient tolerance
-                                                   maxfun=self.fgcmConfig.maxIter,
-                                                   maxiter=self.fgcmConfig.maxIter,
-                                                   iprint=0,         # only one output
-                                                   callback=None)    # no callback
-
-
-        self.fgcmLog.info('Fit completed.  Final chi^2/DOF = %.2f' % (chisq))
-
-        if (doPlots):
-            fig=plt.figure(1,figsize=(8,6))
-            fig.clf()
-            ax=fig.add_subplot(111)
-
-            chisqValues = np.array(self.fgcmChisq.fitChisqs)
-
-            ax.plot(np.arange(chisqValues.size),chisqValues,'k.')
-
-            ax.set_xlabel(r'$\mathrm{Iteration}$',fontsize=16)
-            ax.set_ylabel(r'$\chi^2/\mathrm{DOF}$',fontsize=16)
-
-            ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
-            ax.set_ylim(chisqValues[-1]-0.5,chisqValues[0]+0.5)
-
-            fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
-                                                 self.fgcmConfig.outfileBaseWithCycle))
-            plt.close(fig)
-
-        # record new parameters
-        self.fgcmPars.reloadParArray(pars, fitterUnits=True)
-
-        # compute EXP^gray, and do plots
-        self.fgcmLog.info('Computing CCD and EXP gray for deep exposures')
-        self.fgcmGray.computeCCDAndExpGray()
-
-        # reset the exposure flag
-        self.fgcmPars.expFlag &= ~expFlagDict['TEMPORARY_BAD_EXPOSURE']
-
-        # and the star flag
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
-        objFlag[:] &= ~objFlagDict['TEMPORARY_BAD_STAR']
-
-
-        self.fgcmPars.plotParameters()
 

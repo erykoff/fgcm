@@ -6,6 +6,7 @@ import esutil
 
 import matplotlib.pyplot as plt
 
+from .fgcmUtilities import objFlagDict
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmConnectivity(object):
@@ -57,7 +58,12 @@ class FgcmConnectivity(object):
 
         groupFlag = np.zeros((objID.size, len(self.bands)), dtype=np.int32)
 
-        goodStars, = np.where(objFlag == 0)
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'])
+
+        goodStars, = np.where((objFlag & mask) == 0)
 
         for b, band in enumerate(self.bands):
             # start with group 0
@@ -70,7 +76,7 @@ class FgcmConnectivity(object):
 
             # Find all good (photometric) observations of stars in this band
             goodObs, = np.where((obsBandIndex == b) & (self.fgcmPars.expFlag[obsExpIndex] == 0) &
-                                (objFlag[obsObjIDIndex] == 0))
+                                ((objFlag[obsObjIDIndex] & mask) == 0))
 
             # Split into nights with a histogram
             h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[obsExpIndex[goodObs]],

@@ -20,7 +20,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with open(args.config,'r') as f:
-        lutConfig = yaml.load(f)
+        lutConfig = yaml.load(f, Loader=yaml.SafeLoader)
 
     if 'atmosphereTableFile' not in lutConfig:
         raise ValueError("Must include atmosphereTableFile in config to run makeFgcmAtmosphereTable.py")
