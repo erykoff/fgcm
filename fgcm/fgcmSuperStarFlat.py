@@ -51,6 +51,7 @@ class FgcmSuperStarFlat(object):
         self.epochNames = fgcmConfig.epochNames
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
+        self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
@@ -112,6 +113,7 @@ class FgcmSuperStarFlat(object):
         # unapply input superstar correction here (note opposite sign)
         EGrayGO=EGrayGO[gd] + obsSuperStarApplied[goodObs]
         EGrayErr2GO=EGrayErr2GO[gd]
+        residGO = np.zeros(EGrayGO.size)
 
         # and record the deltas (per ccd)
         prevSuperStarFlatCenter = np.zeros((self.fgcmPars.nEpochs,
@@ -174,6 +176,10 @@ class FgcmSuperStarFlat(object):
 
             # And the central parameter should be in flux or mag space depending
             self.fgcmPars.parSuperStarFlat[:, :, :, 0] = 10.**(superStarOffset / (-2.5))
+
+            residGO = EGrayGO - superStarOffset[self.fgcmPars.expEpochIndex[obsExpIndex[goodObs]],
+                                                self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs]],
+                                                obsCCDIndex[goodObs]]
 
         else:
             # with x/y, new sub-ccd
@@ -279,6 +285,9 @@ class FgcmSuperStarFlat(object):
                 # and record the fit
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = fit
 
+                # and compute the residuals
+                residGO[i1a] = EGrayGO[i1a] + 2.5*np.log10(field.evaluate(obsXGO[i1a], obsYGO[i1a]))
+
             # And we need to flag those that have bad observations
             bad = np.where(superStarNGoodStars == 0)
             if bad[0].size > 0:
@@ -287,6 +296,33 @@ class FgcmSuperStarFlat(object):
 
         # compute the delta...
         deltaSuperStarFlatCenter = superStarFlatCenter - prevSuperStarFlatCenter
+
+        if not forceZeroMean:
+            # we need to save x, y, resid, err, color.  And then we can play with this.
+            import astropy.io.fits as pyfits
+
+            if not self.superStarSubCCD or doNotUseSubCCD:
+                obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
+                obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+
+            tempCat = np.zeros(residGO.size, dtype=[('obsExpIndexGO', 'i4'),
+                                                    ('obsCCDIndexGO', 'i4'),
+                                                    ('obsBandIndexGO', 'i4'),
+                                                    ('obsXGO', 'f4'),
+                                                    ('obsYGO', 'f4'),
+                                                    ('residGO', 'f4'),
+                                                    ('EGrayErr2GO', 'f4'),
+                                                    ('gmiGO', 'f4')])
+            tempCat['obsExpIndexGO'][:] = obsExpIndex[goodObs]
+            tempCat['obsCCDIndexGO'][:] = obsCCDIndex[goodObs]
+            tempCat['obsBandIndexGO'][:] = obsBandIndex[goodObs]
+            tempCat['obsXGO'][:] = obsXGO
+            tempCat['obsYGO'][:] = obsYGO
+            tempCat['residGO'][:] = residGO
+            tempCat['EGrayErr2GO'][:] = EGrayErr2GO
+            tempCat['gmiGO'][:] = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
+                                   objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
+            pyfits.writeto('%s_xyresiduals.fits' % (self.outfileBaseWithCycle), tempCat, overwrite=True)
 
         # and the overall stats...
         for e in xrange(self.fgcmPars.nEpochs):
