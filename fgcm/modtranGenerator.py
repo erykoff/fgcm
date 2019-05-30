@@ -178,7 +178,7 @@ class ModtranGenerator(object):
 
     def __call__(self, pmb=778.0, pwv=3.0, o3=263.0, tau=0.03, lambdaNorm=7750.0,
                  alpha=1.0, zenith=33.55731, co2MX=CO2MX_DEFAULT,
-                 lambdaRange=[300.0,1100.0], lambdaStep=0.5):
+                 lambdaRange=[300.0,1100.0], lambdaStep=0.5, ctranslamstd=None):
         """
         parameters
         ----------
@@ -222,6 +222,8 @@ class ModtranGenerator(object):
             raise ValueError("zenith distance must be 0-90.0")
         if (lambdaRange[0] < 50.0 or lambdaRange[1] < 50.0 or lambdaRange[1] <= lambdaRange[0]):
             raise ValueError("lambdaRange must be >=50.0 and low to high")
+        if ctranslamstd is None:
+            ctranslamstd = [0.0, lambdaNorm]
 
         # record values
         self.pmb = pmb
@@ -250,13 +252,14 @@ class ModtranGenerator(object):
         nHeaderLines = 12
         nSteps = len(lines)-nHeaderLines-1
         self.atm=np.zeros(nSteps,dtype=[('LAMBDA','f4'),
-                                         ('COMBINED','f4'),
-                                         ('H2O','f4'),
-                                         ('O2','f4'),
-                                         ('O3','f4'),
-                                         ('RAYLEIGH','f4'),
-                                         ('AEROSOL','f4'),
-                                         ('PMBFACTOR','f4')])
+                                        ('COMBINED','f4'),
+                                        ('H2O','f4'),
+                                        ('O2','f4'),
+                                        ('O3','f4'),
+                                        ('RAYLEIGH','f4'),
+                                        ('AEROSOL','f4'),
+                                        ('PMBFACTOR','f4'),
+                                        ('CTRANS','f4')])
         i=0
         for line in lines[12:-1]:
             parts=line.split()
@@ -271,12 +274,16 @@ class ModtranGenerator(object):
         # set default
         self.atm['AEROSOL'][:] = 1.0
         self.atm['PMBFACTOR'][:] = 1.0
+        self.atm['CTRANS'][:] = 1.0
 
         # apply aerosol
         secz = 1./np.cos(self.zenith*np.pi/180.)
         airmass = secz - 0.0018167*(secz-1.0) -  0.002875*(secz-1.0)**2.0 - 0.0008083*(secz-1.0)**3.0
 
         self.atm['AEROSOL'][:] = np.exp(-1.0*self.tau*airmass*(self.atm['LAMBDA'][:]/self.lambdaNorm)**(-self.alpha))
+
+        # And the transmission correction
+        self.atm['CTRANS'][:] = 1.0 + ctranslamstd[0] * (self.atm['LAMBDA'] - ctranslamstd[1]) / ctranslamstd[1]
 
         # and finally apply the pressure correction
         pmbMolecularScattering = np.exp(-(self.pmb - self.pmbElevation)/self.pmbElevation)
@@ -286,7 +293,7 @@ class ModtranGenerator(object):
 
         self.atm['COMBINED'][:] = self.atm['PMBFACTOR'][:] * self.atm['O2'][:] * \
             self.atm['RAYLEIGH'][:] * self.atm['H2O'] * self.atm['O3'] * \
-            self.atm['AEROSOL']
+            self.atm['AEROSOL'] * self.atm['CTRANS']
 
         return self.atm
 

@@ -2,6 +2,9 @@
 
 from __future__ import division, absolute_import, print_function
 
+import matplotlib
+matplotlib.use("Agg")  # noqa E402
+
 import os
 import sys
 import argparse
@@ -19,7 +22,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with open(args.config) as f:
-        configDict = yaml.load(f)
+        configDict = yaml.load(f, Loader=yaml.SafeLoader)
 
     print("Configuration read from %s" % (args.config))
 

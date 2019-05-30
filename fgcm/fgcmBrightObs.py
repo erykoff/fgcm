@@ -9,8 +9,6 @@ import time
 
 from .fgcmUtilities import _pickle_method
 from .fgcmChisq import FgcmChisq
-from .fgcmUtilities import objFlagDict
-
 
 import types
 try:

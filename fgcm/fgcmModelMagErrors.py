@@ -51,23 +51,22 @@ class FgcmModelMagErrors(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
-    def computeMagErrorModel(self, fitName, doPlots=True):
+    def computeMagErrorModel(self, fitName):
         """
         Compute magnitude error model
 
         parameters
         ----------
-        doPlots: bool, default=True
-           Make output plots
+        fitName: `str`
+           Name of the fit to put in plot labeling
         """
 
         if not self.modelMagErrors:
             self.fgcmLog.info('No magnitude error model will be computed')
             return
 
-        self.fgcmLog.info('Computing magnitude error models...')
+        self.fgcmLog.info('Computing magnitude error model parameters...')
 
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
 
@@ -168,7 +167,7 @@ class FgcmModelMagErrors(object):
             self.fgcmPars.compModelErrPars[:, bandIndex] = pars
 
             # And also plots (if necessary)
-            if doPlots:
+            if self.plotPath is not None:
                 plt.set_cmap('viridis')
 
                 ymod = (pars[0] + pars[1] * obsMagADUMeanGOu + pars[2] * obsMagADUMeanGOu**2. +
