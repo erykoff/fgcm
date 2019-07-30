@@ -311,6 +311,7 @@ class FgcmSuperStarFlat(object):
                                                     ('obsXGO', 'f4'),
                                                     ('obsYGO', 'f4'),
                                                     ('residGO', 'f4'),
+                                                    ('magStdMeanGO', 'f4'),
                                                     ('EGrayErr2GO', 'f4'),
                                                     ('gmiGO', 'f4')])
             tempCat['obsExpIndexGO'][:] = obsExpIndex[goodObs]
@@ -319,6 +320,7 @@ class FgcmSuperStarFlat(object):
             tempCat['obsXGO'][:] = obsXGO
             tempCat['obsYGO'][:] = obsYGO
             tempCat['residGO'][:] = residGO
+            tempCat['magStdMeanGO'][:] = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
             tempCat['EGrayErr2GO'][:] = EGrayErr2GO
             tempCat['gmiGO'][:] = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                                    objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
