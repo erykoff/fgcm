@@ -127,6 +127,7 @@ class FgcmSigmaRef(object):
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
                 # start the figure which will have 4 panels
+                # (the figure may not be drawn and written if not configured)
                 fig = plt.figure(figsize=(9, 6))
                 fig.clf()
 
@@ -203,10 +204,12 @@ class FgcmSigmaRef(object):
                     else:
                         ax.set_xlim(plotXRange)
 
-                fig.tight_layout()
-                fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
-                                                       self.outfileBaseWithCycle,
-                                                       band))
+                if self.plotPath is not None:
+                    fig.tight_layout()
+                    fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle,
+                                                           band))
+                plt.close(fig)
 
                 if message is not None:
                     self.fgcmLog.info(message)

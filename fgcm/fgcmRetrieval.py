@@ -123,7 +123,8 @@ class FgcmRetrieval(object):
         preStartTime=time.time()
         self.fgcmLog.info('Pre-matching stars and observations...')
 
-        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, requireSED=True, checkBadMag=True)
+        # Compute this for both good and bad exposures.
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, requireSED=True, checkBadMag=True)
 
         self.goodObsHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.goodObsHandle)[:] = goodObs

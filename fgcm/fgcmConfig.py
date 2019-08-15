@@ -117,6 +117,7 @@ class FgcmConfig(object):
     fwhmField = ConfigField(str, default='PSF_FWHM')
     skyBrightnessField = ConfigField(str, default='SKYBRIGHTNESS')
     minObsPerBand = ConfigField(int, default=2)
+    minObsPerBandFill = ConfigField(int, default=1)
     nCore = ConfigField(int, default=1)
     randomSeed = ConfigField(int, required=False)
     logger = ConfigField(None, required=False)
@@ -193,6 +194,7 @@ class FgcmConfig(object):
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)
+    fillStars = ConfigField(bool, default=False)
     outputZeropoints = ConfigField(bool, default=False)
     outputPath = ConfigField(str, required=False)
     saveParsForDebugging = ConfigField(bool, default=False)
@@ -292,7 +294,7 @@ class FgcmConfig(object):
         if (self.noChromaticCorrections) :
             self.fgcmLog.info('WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
-        if (not os.path.isdir(self.plotPath)):
+        if (self.plotPath is not None and not os.path.isdir(self.plotPath)):
             try:
                 os.makedirs(self.plotPath)
             except:
