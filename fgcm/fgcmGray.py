@@ -919,6 +919,11 @@ class FgcmGray(object):
            Float array (per band) of recommended expGray cuts (high side)
         """
 
+        # set defaults to those that were set in the config file
+        # These are going to be lists of floats for persistence
+        expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]
+        expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
+
         for i in xrange(self.fgcmPars.nBands):
             delta = self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i]
 
