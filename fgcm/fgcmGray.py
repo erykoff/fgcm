@@ -563,7 +563,8 @@ class FgcmGray(object):
         # We also want to filter only photometric observations, because
         # that's what we're going to be using
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
+        # Compute this for both good and bad exposures
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True)
 
         EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, ignoreRef=True)
 

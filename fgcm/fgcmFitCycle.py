@@ -367,7 +367,7 @@ class FgcmFitCycle(object):
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
-            self._doFit(ignoreRef=False)
+            self._doFit(ignoreRef=False, doPlots=self.fgcmConfig.doPlots)
         else:
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
 
