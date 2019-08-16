@@ -156,6 +156,9 @@ class FgcmConfig(object):
     sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95])
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
+    quietMode = ConfigField(bool, default=False)
+    useRepeatabilityForExpGrayCuts = ConfigField(bool, default=False)
+
     mapLongitudeRef = ConfigField(float, default=0.0)
 
     autoPhotometricCutNSig = ConfigField(float, default=3.0)

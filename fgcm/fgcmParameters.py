@@ -356,6 +356,7 @@ class FgcmParameters(object):
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
         self.compSigmaCal = np.zeros(self.nBands, dtype='f8')
         self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawCrunchedRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # and the computed retrieved Pwv
         # these are set to the standard values to start
@@ -454,6 +455,7 @@ class FgcmParameters(object):
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
         self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawCrunchedRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # These are exposure-level properties
         self.compRetrievedLnPwv = np.atleast_1d(inParams['COMPRETRIEVEDLNPWV'][0])

@@ -37,7 +37,7 @@ class FgcmSigFgcm(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmSigFgcm')
+        self.fgcmLog.debug('Initializing FgcmSigFgcm')
 
         # need fgcmPars because it has the sigFgcm
         self.fgcmPars = fgcmPars
@@ -54,6 +54,7 @@ class FgcmSigFgcm(object):
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
+        self.quietMode = fgcmConfig.quietMode
 
     def computeSigFgcm(self, reserved=False, save=True, crunch=False):
         """
@@ -73,7 +74,7 @@ class FgcmSigFgcm(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.info('Computing sigFgcm.')
+        self.fgcmLog.debug('Computing sigFgcm.')
 
         # input numbers
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -193,6 +194,8 @@ class FgcmSigFgcm(object):
                     # Save the reserved raw repeatability.  Used for
                     # convergence testing in LSST stack.
                     self.fgcmPars.compReservedRawRepeatability[bandIndex] = coeff[2]
+                elif (reserved and crunch and (c == 0)):
+                    self.fgcmPars.compReservedRawCrunchedRepeatability[bandIndex] = coeff[2]
 
                 if self.plotPath is None:
                     continue
@@ -233,8 +236,9 @@ class FgcmSigFgcm(object):
                                                          self.fgcmPars.bands[bandIndex]))
             plt.close(fig)
 
-        self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
+                              (time.time() - startTime))
 
 
 
