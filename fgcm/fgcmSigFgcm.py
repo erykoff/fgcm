@@ -55,7 +55,7 @@ class FgcmSigFgcm(object):
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
 
-    def computeSigFgcm(self,reserved=False,save=True,crunch=False):
+    def computeSigFgcm(self, reserved=False, save=True, crunch=False):
         """
         Compute sigFgcm for all bands
 
@@ -161,7 +161,6 @@ class FgcmSigFgcm(object):
 
                 ax=fig.add_subplot(2,2,c+1)
 
-
                 try:
                     coeff = histoGauss(ax, EGrayGO[sigUse]*1000.0)
                     coeff[1] /= 1000.0
@@ -189,6 +188,11 @@ class FgcmSigFgcm(object):
                 if (save and (c==0)):
                     # only save if we're doing the full color range
                     self.fgcmPars.compSigFgcm[bandIndex] = sigFgcm[bandIndex]
+
+                if (reserved and not crunch and (c == 0)):
+                    # Save the reserved raw repeatability.  Used for
+                    # convergence testing in LSST stack.
+                    self.fgcmPars.compReservedRawRepeatability[bandIndex] = coeff[2]
 
                 if self.plotPath is None:
                     continue
@@ -221,12 +225,13 @@ class FgcmSigFgcm(object):
                 else:
                     ax.set_xlim(plotXRange)
 
-            fig.tight_layout()
-            fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
-                                                     self.outfileBaseWithCycle,
-                                                     extraName,
-                                                     self.fgcmPars.bands[bandIndex]))
-            plt.close()
+            if self.plotPath is not None:
+                fig.tight_layout()
+                fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
+                                                         self.outfileBaseWithCycle,
+                                                         extraName,
+                                                         self.fgcmPars.bands[bandIndex]))
+            plt.close(fig)
 
         self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
                          (time.time() - startTime))

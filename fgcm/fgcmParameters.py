@@ -355,6 +355,7 @@ class FgcmParameters(object):
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
         self.compSigmaCal = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # and the computed retrieved Pwv
         # these are set to the standard values to start
@@ -452,6 +453,7 @@ class FgcmParameters(object):
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
+        self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # These are exposure-level properties
         self.compRetrievedLnPwv = np.atleast_1d(inParams['COMPRETRIEVEDLNPWV'][0])
@@ -1629,7 +1631,7 @@ class FgcmParameters(object):
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
 
         # This is the signifier
-        bad = np.where(superStarFlatCenter < -4.0)
+        bad = np.where((superStarFlatCenter < -4.0) | (superStarFlatCenter > 90.0))
         if bad[0].size > 0:
             superStarFlatCenter[bad] = self.illegalValue
 
