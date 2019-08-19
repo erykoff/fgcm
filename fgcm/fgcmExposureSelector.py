@@ -18,7 +18,7 @@ class FgcmExposureSelector(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmExposureSelector')
+        self.fgcmLog.debug('Initializing FgcmExposureSelector')
         self.fgcmPars = fgcmPars
 
         # and config variables...

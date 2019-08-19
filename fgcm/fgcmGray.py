@@ -919,6 +919,9 @@ class FgcmGray(object):
            Float array (per band) of recommended expGray cuts (high side)
         """
 
+        expGrayPhotometricCut = np.zeros(self.fgcmPars.nBands)
+        expGrayHighCut = np.zeros_like(expGrayPhotometricCut)
+
         # set defaults to those that were set in the config file
         # These are going to be lists of floats for persistence
         expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]

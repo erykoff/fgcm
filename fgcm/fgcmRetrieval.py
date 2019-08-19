@@ -51,7 +51,7 @@ class FgcmRetrieval(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmRetrieval')
+        self.fgcmLog.debug('Initializing FgcmRetrieval')
 
         self.fgcmPars = fgcmPars
 
@@ -66,6 +66,7 @@ class FgcmRetrieval(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nExpPerRun = fgcmConfig.nExpPerRun
         self.outputPath = fgcmConfig.outputPath
+        self.quietMode = fgcmConfig.quietMode
 
         self._prepareRetrievalArrays()
 
@@ -96,7 +97,8 @@ class FgcmRetrieval(object):
             raise ValueError("Must run fgcmChisq before fgcmRetrieval.")
 
         startTime = time.time()
-        self.fgcmLog.info('Computing retrieval integrals')
+        if not self.quietMode:
+            self.fgcmLog.info('Computing retrieval integrals')
 
         # reset arrays
         r0 = snmm.getArray(self.r0Handle)
@@ -109,7 +111,8 @@ class FgcmRetrieval(object):
         # select good stars
         goodStars = self.fgcmStars.getGoodStarIndices()
 
-        self.fgcmLog.info('Found %d good stars for retrieval' % (goodStars.size))
+        if not self.quietMode:
+            self.fgcmLog.info('Found %d good stars for retrieval' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise ValueError("No good stars to fit!")
@@ -121,7 +124,7 @@ class FgcmRetrieval(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        self.fgcmLog.info('Pre-matching stars and observations...')
+        self.fgcmLog.debug('Pre-matching stars and observations...')
 
         # Compute this for both good and bad exposures.
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, requireSED=True, checkBadMag=True)
@@ -132,8 +135,9 @@ class FgcmRetrieval(object):
         self.obsExpIndexGOAHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.obsExpIndexGOAHandle)[:] = obsExpIndex[goodObs]
 
-        self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                         (time.time() - preStartTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
+                              (time.time() - preStartTime))
 
         # which exposures have stars?
         # Note that this always returns a sorted array
@@ -148,7 +152,8 @@ class FgcmRetrieval(object):
 
         else:
             # regular multi-core
-            self.fgcmLog.info('Running retrieval on %d cores' % (self.nCore))
+            if not self.quietMode:
+                self.fgcmLog.info('Running retrieval on %d cores' % (self.nCore))
 
             # split exposures into a list of arrays of roughly equal size
             nSections = uExpIndex.size // self.nExpPerRun + 1
@@ -167,8 +172,9 @@ class FgcmRetrieval(object):
         snmm.freeArray(self.obsExpIndexGOAHandle)
 
         # and we're done
-        self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Computed retrieved integrals in %.2f seconds.' %
+                              (time.time() - startTime))
 
 
     def _worker(self,uExpIndex):

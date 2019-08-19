@@ -103,7 +103,7 @@ class FgcmSigmaRef(object):
 
         else:
             # Large numbers
-            self.fgcmLog.info('More than 100 reference stars, so computing "large-number" statistics and making plots.')
+            self.fgcmLog.debug('More than 100 reference stars, so computing "large-number" statistics.')
 
             # and we do 4 runs: full, blue 25%, middle 50%, red 25%
 

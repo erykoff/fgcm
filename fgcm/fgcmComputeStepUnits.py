@@ -44,7 +44,7 @@ class FgcmComputeStepUnits(object):
     def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmChisq')
+        self.fgcmLog.debug('Initializing FgcmComputeStepUnits')
 
         # does this need to be shm'd?
         self.fgcmPars = fgcmPars
@@ -69,6 +69,7 @@ class FgcmComputeStepUnits(object):
         self.stepUnitReference = fgcmConfig.stepUnitReference
         self.fitGradientTolerance = fgcmConfig.fitGradientTolerance
         self.saveParsForDebugging = fgcmConfig.saveParsForDebugging
+        self.quietMode = fgcmConfig.quietMode
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
@@ -101,7 +102,8 @@ class FgcmComputeStepUnits(object):
         self.fgcmPars.parsToExposures()
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False)
-        self.fgcmLog.info('Found %d good stars for step units' % (goodStars.size))
+        if not self.quietMode:
+            self.fgcmLog.info('Found %d good stars for step units' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise RuntimeError("No good stars to fit!")
@@ -297,8 +299,9 @@ class FgcmComputeStepUnits(object):
 
             pyfits.writeto('%s_stepUnits3.fits' % (self.outfileBaseWithCycle), tempCat, overwrite=True)
 
-        self.fgcmLog.info('Step size computation took %.2f seconds.' %
-                          (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Step size computation took %.2f seconds.' %
+                              (time.time() - startTime))
 
     def _stepWorker(self, goodStarsAndObs):
         """

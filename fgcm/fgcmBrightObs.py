@@ -54,7 +54,7 @@ class FgcmBrightObs(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmBrightObs')
+        self.fgcmLog.debug('Initializing FgcmBrightObs')
 
         # need fgcmPars because it tracks good exposures
         self.fgcmPars = fgcmPars
@@ -67,6 +67,7 @@ class FgcmBrightObs(object):
         self.nCore = fgcmConfig.nCore
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.bandFitIndex = fgcmConfig.bandFitIndex
+        self.quietMode = fgcmConfig.quietMode
 
         if (fgcmConfig.useSedLUT and self.fgcmLUT.hasSedLUT):
             self.useSedLUT = True
@@ -89,7 +90,8 @@ class FgcmBrightObs(object):
             raise ValueError("Must run FgcmChisq to compute magStd before FgcmBrightObs")
 
         startTime=time.time()
-        self.fgcmLog.info('Selecting good stars from Bright Observations')
+        if not self.quietMode:
+            self.fgcmLog.info('Selecting good stars from Bright Observations')
 
         self.debug = debug
         self.computeSEDSlopes = computeSEDSlopes
@@ -112,17 +114,20 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        self.fgcmLog.info('Pre-matching stars and observations...')
+        if not self.quietMode:
+            self.fgcmLog.info('Pre-matching stars and observations...')
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
-        self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                         (time.time() - preStartTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
+                              (time.time() - preStartTime))
 
         if (self.debug):
             self._worker((goodStars,goodObs))
         else:
-            self.fgcmLog.info('Running BrightObs on %d cores' % (self.nCore))
+            if not self.quietMode:
+                self.fgcmLog.info('Running BrightObs on %d cores' % (self.nCore))
 
             # split goodStars into a list of arrays of roughly equal size
 
@@ -149,8 +154,8 @@ class FgcmBrightObs(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            self.fgcmLog.info('Using %d sections (%.1f seconds)' %
-                             (nSections,time.time() - prepStartTime))
+            self.fgcmLog.debug('Using %d sections (%.1f seconds)' %
+                               (nSections,time.time() - prepStartTime))
 
             # make a pool
             pool = Pool(processes=self.nCore)
@@ -159,8 +164,9 @@ class FgcmBrightObs(object):
             pool.join()
 
 
-        self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
+                              (time.time() - startTime))
 
 
     def _worker(self,goodStarsAndObs):

@@ -286,7 +286,8 @@ class FgcmConfig(object):
             # Support an external logger such as LSST that has .info() and .debug() calls
             self.fgcmLog = configDict['logger']
             try:
-                self.fgcmLog.info('Logging to external logger.')
+                if not self.quietMode:
+                    self.fgcmLog.info('Logging to external logger.')
             except:
                 raise RuntimeError("Logging to configDict['logger'] failed.")
 

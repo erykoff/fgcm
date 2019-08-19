@@ -565,7 +565,8 @@ class FgcmFitCycle(object):
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='final')
 
-        self.fgcmLog.info(getMemoryString('FitCycle Completed'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
     def _doFit(self, doPlots=True, ignoreRef=False, maxIter=None):
         """
