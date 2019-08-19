@@ -128,6 +128,16 @@ class FgcmSigFgcm(object):
                                gmiGO[okColor[st[-1]]]])
         gmiCutNames = ['All', 'Blue25', 'Middle50', 'Red25']
 
+        sigTypes = []
+        if reserved:
+            sigTypes.append('reserved')
+        else:
+            sigTypes.append('fit')
+        if crunch:
+            sigTypes.append('crunched')
+
+        sigType = '/'.join(sigTypes)
+
         for bandIndex, band in enumerate(self.fgcmStars.bands):
             # start the figure which will have 4 panels
             fig = plt.figure(figsize=(9, 6))
@@ -181,7 +191,8 @@ class FgcmSigFgcm(object):
                     sigFgcm[bandIndex] = np.sqrt(coeff[2]**2. -
                                                  np.median(EGrayErr2GO[sigUse]))
 
-                self.fgcmLog.info("sigFgcm (%s) (%s) = %.2f mmag" % (
+                self.fgcmLog.info("%s sigFgcm (%s) (%s) = %.2f mmag" % (
+                        sigType,
                         self.fgcmPars.bands[bandIndex],
                         name,
                         sigFgcm[bandIndex]*1000.0))
