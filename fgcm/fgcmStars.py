@@ -661,6 +661,13 @@ class FgcmStars(object):
         obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
         obsMagADUModelErr[:] = snmm.getArray(self.obsMagADUErrHandle)[:]
 
+        snmm.getArray(self.objNGoodObsHandle)[:, :] = 0
+
+        snmm.getArray(self.objMagStdMeanHandle)[:, :] = 0.0
+        snmm.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
+        snmm.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
+        snmm.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
+
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minObsPerBand=None, reset=True):
         """
@@ -908,7 +915,8 @@ class FgcmStars(object):
 
         if checkBadMag:
             objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-            okFlag &= (objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0)
+            okFlag &= ((objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0) &
+                       (objMagStdMeanErr[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0))
 
         if not self.allFitBandsAreRequired or self.nNotFitBands > 0:
             # We need to do some extra checks since not all fit bands are required
