@@ -630,8 +630,30 @@ class FgcmStars(object):
             allExpsIndex = np.arange(fgcmPars.expArray.size)
             self.selectStarsMinObsExpIndex(allExpsIndex)
 
+    def reloadStarMagnitudes(self, obsMag, obsMagErr):
+        """
+        Reload star magnitudes, used when automating multiple fit cycles in memory.
 
+        Parameters
+        ----------
+        obsMag: float array
+           Raw ADU magnitude for each observation
+        obsMagErr: float array
+           Raw ADU magnitude error for each observation
+        """
 
+        if len(obsMag) != self.nStarObs:
+            raise RuntimeError("Replacement star magnitude has wrong length.")
+        if len(obsMagErr) != self.nStarObs:
+            raise RuntimeError("Replacement star magnitude error has wrong length.")
+
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput
+        snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
+
+        snmm.getArray(self.obsMagADUErrHandle)[:] = np.sqrt(obsMagErr**2. + self.sigma0Phot**2.)
+        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsMagADUModelErr[:] = snmm.getArray(self.obsMagADUErrHandle)[:]
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minObsPerBand=None, reset=True):
@@ -1340,6 +1362,8 @@ class FgcmStars(object):
         """
         Apply superStarFlat to raw magnitudes.
 
+        Note that this modifies obsMagADU.
+
         parameters
         ----------
         fgcmPars: FgcmParameters
@@ -1398,6 +1422,8 @@ class FgcmStars(object):
     def applyApertureCorrection(self,fgcmPars):
         """
         Apply aperture corrections to raw magnitudes.
+
+        Note that this modifies obsMagADU.
 
         parameters
         ----------
