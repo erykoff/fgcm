@@ -398,6 +398,11 @@ class FgcmFitCycle(object):
             self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
             self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
+        if self.fgcmStars.hasRefstars:
+            for i, band in enumerate(self.fgcmPars.bands):
+                self.fgcmLog.info("Final abs throughput in %s band = %.4f" %
+                                  (band, self.fgcmPars.compAbsThroughput[i]))
+
         # One last run to compute mstd all observations of all exposures
         #  when allExposures is set, mean mags, etc aren't computed
         self.fgcmLog.debug('FitCycle Computing FgcmChisq all exposures')
