@@ -299,6 +299,10 @@ class FgcmComputeStepUnits(object):
 
             pyfits.writeto('%s_stepUnits3.fits' % (self.outfileBaseWithCycle), tempCat, overwrite=True)
 
+        # free shared arrays
+        for key in self.totalHandleDict.keys():
+            snmm.freeArray(self.totalHandleDict[key])
+
         if not self.quietMode:
             self.fgcmLog.info('Step size computation took %.2f seconds.' %
                               (time.time() - startTime))
