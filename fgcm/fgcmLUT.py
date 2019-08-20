@@ -1068,3 +1068,16 @@ class FgcmLUT(object):
 
         return self.sedLUT['FPRIME'][indices,:]
 
+    def __del__(self):
+        snmm.freeArray(self.lutI0Handle)
+        snmm.freeArray(self.lutI1Handle)
+        snmm.freeArray(self.lutDLnPwvHandle)
+        snmm.freeArray(self.lutDO3Handle)
+        snmm.freeArray(self.lutDLnTauHandle)
+        snmm.freeArray(self.lutDAlphaHandle)
+        snmm.freeArray(self.lutDSecZenithHandle)
+        snmm.freeArray(self.lutDLnPwvI1Handle)
+        snmm.freeArray(self.lutDO3I1Handle)
+        snmm.freeArray(self.lutDLnTauI1Handle)
+        snmm.freeArray(self.lutDAlphaI1Handle)
+        snmm.freeArray(self.lutDSecZenithI1Handle)

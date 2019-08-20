@@ -114,6 +114,8 @@ class FgcmStars(object):
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
+        self.starsLoaded = False
+
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
         Load stars from fits files.
@@ -288,7 +290,6 @@ class FgcmStars(object):
 
         self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i4')
         snmm.getArray(self.obsIndexHandle)[:] = np.arange(obsRA.size)
-
 
         # need to stuff into shared memory objects.
         #  nStarObs: total number of observations of all stars
@@ -630,6 +631,8 @@ class FgcmStars(object):
             allExpsIndex = np.arange(fgcmPars.expArray.size)
             self.selectStarsMinObsExpIndex(allExpsIndex)
 
+        self.starsLoaded = True
+
     def reloadStarMagnitudes(self, obsMag, obsMagErr):
         """
         Reload star magnitudes, used when automating multiple fit cycles in memory.
@@ -641,6 +644,9 @@ class FgcmStars(object):
         obsMagErr: float array
            Raw ADU magnitude error for each observation
         """
+
+        if not self.starsLoaded:
+            raise RuntimeError("Cannot call reloadStarMagnitudes until stars have been loaded.")
 
         if len(obsMag) != self.nStarObs:
             raise RuntimeError("Replacement star magnitude has wrong length.")
@@ -1669,3 +1675,43 @@ class FgcmStars(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def __del__(self):
+        if self.starsLoaded:
+            snmm.freeArray(self.obsIndexHandle)
+            snmm.freeArray(self.obsExpHandle)
+            snmm.freeArray(self.obsExpIndexHandle)
+            snmm.freeArray(self.obsCCDHandle)
+            snmm.freeArray(self.obsBandIndexHandle)
+            snmm.freeArray(self.obsLUTFilterIndexHandle)
+            snmm.freeArray(self.obsFlagHandle)
+            snmm.freeArray(self.obsRAHandle)
+            snmm.freeArray(self.obsDecHandle)
+            snmm.freeArray(self.obsSecZenithHandle)
+            snmm.freeArray(self.obsMagADUHandle)
+            snmm.freeArray(self.obsMagADUErrHandle)
+            snmm.freeArray(self.obsMagADUModelErrHandle)
+            snmm.freeArray(self.obsSuperStarAppliedHandle)
+            snmm.freeArray(self.obsMagStdHandle)
+            if self.hasXY:
+                snmm.freeArray(self.obsXHandle)
+                snmm.freeArray(self.obsYHandle)
+            if self.hasRefstars:
+                snmm.freeArray(self.refIDHandle)
+                snmm.freeArray(self.refMagHandle)
+                snmm.freeArray(self.refMagErrHandle)
+                snmm.freeArray(self.objRefIDIndexHandle)
+            snmm.freeArray(self.objIDHandle)
+            snmm.freeArray(self.objRAHandle)
+            snmm.freeArray(self.objDecHandle)
+            snmm.freeArray(self.objObsIndexHandle)
+            snmm.freeArray(self.objNobsHandle)
+            snmm.freeArray(self.objNGoodObsHandle)
+            snmm.freeArray(self.obsObjIDIndexHandle)
+            snmm.freeArray(self.objFlagHandle)
+            snmm.freeArray(self.objMagStdMeanHandle)
+            snmm.freeArray(self.objMagStdMeanErrHandle)
+            snmm.freeArray(self.objSEDSlopeHandle)
+            snmm.freeArray(self.objMagStdMeanNoChromHandle)
+
+            self.starsLoaded = False

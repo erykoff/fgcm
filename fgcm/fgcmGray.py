@@ -87,6 +87,8 @@ class FgcmGray(object):
         self.autoPhotometricCutStep = fgcmConfig.autoPhotometricCutStep
         self.autoHighCutNSig = fgcmConfig.autoHighCutNSig
 
+        self.arraysPrepared = False
+
         self._prepareGrayArrays()
 
     def _prepareGrayArrays(self):
@@ -124,6 +126,8 @@ class FgcmGray(object):
         self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayErrColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
+
+        self.arraysPrepared = True
 
     def computeExpGrayForInitialSelection(self):
         """
@@ -948,3 +952,29 @@ class FgcmGray(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def __del__(self):
+        if self.arraysPrepared:
+            snmm.freeArray(self.expGrayForInitialSelectionHandle)
+            snmm.freeArray(self.expGrayRMSForInitialSelectionHandle)
+            snmm.freeArray(self.expNGoodStarForInitialSelectionHandle)
+            snmm.freeArray(self.ccdGrayHandle)
+            snmm.freeArray(self.ccdGrayRMSHandle)
+            snmm.freeArray(self.ccdGrayErrHandle)
+            snmm.freeArray(self.ccdNGoodObsHandle)
+            snmm.freeArray(self.ccdNGoodStarsHandle)
+            snmm.freeArray(self.ccdNGoodTilingsHandle)
+            if self.ccdGraySubCCD:
+                snmm.freeArray(self.ccdGraySubCCDParsHandle)
+            snmm.freeArray(self.expGrayHandle)
+            snmm.freeArray(self.expGrayRMSHandle)
+            snmm.freeArray(self.expGrayErrHandle)
+            snmm.freeArray(self.expNGoodStarsHandle)
+            snmm.freeArray(self.expNGoodCCDsHandle)
+            snmm.freeArray(self.expNGoodTilingsHandle)
+            snmm.freeArray(self.expGrayColorSplitHandle)
+            snmm.freeArray(self.expGrayRMSColorSplitHandle)
+            snmm.freeArray(self.expGrayErrColorSplitHandle)
+            snmm.freeArray(self.expGrayNGoodStarsColorSplitHandle)
+
+            self.arraysPrepared = False

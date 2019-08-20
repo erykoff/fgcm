@@ -68,6 +68,7 @@ class FgcmRetrieval(object):
         self.outputPath = fgcmConfig.outputPath
         self.quietMode = fgcmConfig.quietMode
 
+        self.arraysPrepared = False
         self._prepareRetrievalArrays()
 
     def _prepareRetrievalArrays(self):
@@ -82,6 +83,8 @@ class FgcmRetrieval(object):
         r0[:] = self.illegalValue
         r10 = snmm.getArray(self.r10Handle)
         r10[:] = self.illegalValue
+
+        self.arraysPrepared = True
 
     def computeRetrievalIntegrals(self,debug=False):
         """
@@ -327,3 +330,8 @@ class FgcmRetrieval(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def __del__(self):
+        if self.arraysPrepared:
+            snmm.freeArray(self.r0Handle)
+            snmm.freeArray(self.r10Handle)
