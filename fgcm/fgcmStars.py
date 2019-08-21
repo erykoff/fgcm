@@ -915,6 +915,7 @@ class FgcmStars(object):
 
         if checkBadMag:
             objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+            objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
             okFlag &= ((objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0) &
                        (objMagStdMeanErr[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0))
 
@@ -1683,43 +1684,3 @@ class FgcmStars(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
-
-    def __del__(self):
-        if self.starsLoaded:
-            snmm.freeArray(self.obsIndexHandle)
-            snmm.freeArray(self.obsExpHandle)
-            snmm.freeArray(self.obsExpIndexHandle)
-            snmm.freeArray(self.obsCCDHandle)
-            snmm.freeArray(self.obsBandIndexHandle)
-            snmm.freeArray(self.obsLUTFilterIndexHandle)
-            snmm.freeArray(self.obsFlagHandle)
-            snmm.freeArray(self.obsRAHandle)
-            snmm.freeArray(self.obsDecHandle)
-            snmm.freeArray(self.obsSecZenithHandle)
-            snmm.freeArray(self.obsMagADUHandle)
-            snmm.freeArray(self.obsMagADUErrHandle)
-            snmm.freeArray(self.obsMagADUModelErrHandle)
-            snmm.freeArray(self.obsSuperStarAppliedHandle)
-            snmm.freeArray(self.obsMagStdHandle)
-            if self.hasXY:
-                snmm.freeArray(self.obsXHandle)
-                snmm.freeArray(self.obsYHandle)
-            if self.hasRefstars:
-                snmm.freeArray(self.refIDHandle)
-                snmm.freeArray(self.refMagHandle)
-                snmm.freeArray(self.refMagErrHandle)
-                snmm.freeArray(self.objRefIDIndexHandle)
-            snmm.freeArray(self.objIDHandle)
-            snmm.freeArray(self.objRAHandle)
-            snmm.freeArray(self.objDecHandle)
-            snmm.freeArray(self.objObsIndexHandle)
-            snmm.freeArray(self.objNobsHandle)
-            snmm.freeArray(self.objNGoodObsHandle)
-            snmm.freeArray(self.obsObjIDIndexHandle)
-            snmm.freeArray(self.objFlagHandle)
-            snmm.freeArray(self.objMagStdMeanHandle)
-            snmm.freeArray(self.objMagStdMeanErrHandle)
-            snmm.freeArray(self.objSEDSlopeHandle)
-            snmm.freeArray(self.objMagStdMeanNoChromHandle)
-
-            self.starsLoaded = False

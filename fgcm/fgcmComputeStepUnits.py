@@ -113,7 +113,8 @@ class FgcmComputeStepUnits(object):
 
         expFlag = self.fgcmPars.expFlag
 
-        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag)
+        goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag,
+                                                                 checkBadMag=True)
 
         self.nSums = 1 # nobs
         # 0: nFitPars -> derivative for step calculation
