@@ -330,8 +330,3 @@ class FgcmRetrieval(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
-
-    def __del__(self):
-        if self.arraysPrepared:
-            snmm.freeArray(self.r0Handle)
-            snmm.freeArray(self.r10Handle)
