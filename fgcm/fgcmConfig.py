@@ -531,6 +531,8 @@ class FgcmConfig(object):
         newCycleNumber: `int`
         """
 
+        self.cycleNumber = newCycleNumber
+
         self.outfileBaseWithCycle = '%s_cycle%02d' % (self.outfileBase, self.cycleNumber)
 
         logFile = '%s/%s.log' % (self.outputPath, self.outfileBaseWithCycle)
