@@ -275,6 +275,7 @@ class FgcmConfig(object):
 
         # set up logger are we get the name...
         if ('logger' not in configDict):
+            self.externalLogger = False
             self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
                                                      self.outfileBaseWithCycle),
                                       self.logLevel, printLogger=configDict['printOnly'])
@@ -284,6 +285,7 @@ class FgcmConfig(object):
                 self.fgcmLog.info('Logging started to %s' % (self.fgcmLog.logFile))
         else:
             # Support an external logger such as LSST that has .info() and .debug() calls
+            self.externalLogger = True
             self.fgcmLog = configDict['logger']
             try:
                 if not self.quietMode:
@@ -331,9 +333,6 @@ class FgcmConfig(object):
         for filterName in self.filterToBand:
             if filterName not in self.lutFilterNames:
                 raise ValueError("Filter %s in filterToBand not in LUT" % (filterName))
-            #if self.filterToBand[filterName] not in self.bands:
-            #    raise ValueError("Band %s in filterToBand not in bands" %
-            #                     (self.filterToBand[filterName]))
         #  2) check that all the lutStdFilterNames are lutFilterNames (redundant)
         for lutStdFilterName in self.lutStdFilterNames:
             if lutStdFilterName not in self.lutFilterNames:
@@ -511,9 +510,6 @@ class FgcmConfig(object):
         # and AB zeropoint
         self.hPlanck = 6.6
         self.expPlanck = -27.0
-        #self.zptABNoThroughput = (-48.6 - 2.5*self.expPlanck +
-        #                           2.5*np.log10((self.mirrorArea) /
-        #                                        (self.hPlanck * self.cameraGain)))
         self.zptABNoThroughput = (-48.6 - 2.5 * self.expPlanck +
                                    2.5 * np.log10(self.mirrorArea) -
                                    2.5 * np.log10(self.hPlanck * self.cameraGain))
@@ -525,6 +521,40 @@ class FgcmConfig(object):
 
         self.configDictSaved = configDict
         ## FIXME: add pmb scaling?
+
+    def updateCycleNumber(self, newCycleNumber):
+        """
+        Update the cycle number for re-use of config.
+
+        Parameters
+        ----------
+        newCycleNumber: `int`
+        """
+
+        self.outfileBaseWithCycle = '%s_cycle%02d' % (self.outfileBase, self.cycleNumber)
+
+        logFile = '%s/%s.log' % (self.outputPath, self.outfileBaseWithCycle)
+        if os.path.isfile(logFile) and not self.clobber:
+            raise RuntimeError("Found logFile %s, but clobber == False." % (logFile))
+
+        self.plotPath = None
+        if self.doPlots:
+            self.plotPath = '%s/%s_plots' % (self.outputPath,self.outfileBaseWithCycle)
+            if os.path.isdir(self.plotPath) and not self.clobber:
+                # check if directory is empty
+                if len(os.listdir(self.plotPath)) > 0:
+                    raise RuntimeError("Found plots in %s, but clobber == False." % (self.plotPath))
+
+        if not self.externalLogger:
+            self.fgcmLog = FgcmLogger('%s/%s.log' % (self.outputPath,
+                                                     self.outfileBaseWithCycle),
+                                      self.logLevel, printLogger=configDict['printOnly'])
+
+        if (self.plotPath is not None and not os.path.isdir(self.plotPath)):
+            try:
+                os.makedirs(self.plotPath)
+            except:
+                raise IOError("Could not create plot path: %s" % (self.plotPath))
 
     @staticmethod
     def _readConfigDict(configFile):
