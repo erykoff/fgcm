@@ -41,7 +41,7 @@ class FgcmSigmaCal(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmSigmaCal')
+        self.fgcmLog.debug('Initializing FgcmSigmaCal')
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
@@ -56,6 +56,7 @@ class FgcmSigmaCal(object):
         self.sigmaCalPlotPercentile = fgcmConfig.sigmaCalPlotPercentile
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.quietMode = fgcmConfig.quietMode
 
         # these are the standard *band* I10s
         self.I10StdBand = fgcmConfig.I10StdBand
@@ -81,7 +82,8 @@ class FgcmSigmaCal(object):
 
         goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True)
 
-        self.fgcmLog.info('Found %d good reserve stars for SigmaCal' % (goodStars.size))
+        if not self.quietMode:
+            self.fgcmLog.info('Found %d good reserve stars for SigmaCal' % (goodStars.size))
 
         if goodStars.size == 0:
             raise ValueError("No good reserve stars to fit!")
@@ -90,13 +92,14 @@ class FgcmSigmaCal(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        self.fgcmLog.info('Pre-matching stars and observations...')
+        self.fgcmLog.debug('Pre-matching stars and observations...')
 
         expFlag = self.fgcmPars.expFlag
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag)
 
-        self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                          (time.time() - preStartTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
+                              (time.time() - preStartTime))
 
         nSections = goodStars.size // self.nStarPerRun + 1
         goodStarsList = np.array_split(goodStars, nSections)
@@ -116,7 +119,8 @@ class FgcmSigmaCal(object):
         # reverse sort so the longest running go first
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-        self.fgcmLog.info('Running SigmaCal on %d cores' % (self.nCore))
+        if not self.quietMode:
+            self.fgcmLog.info('Running SigmaCal on %d cores' % (self.nCore))
 
         # Plan:
         # Do 50 steps in the range; if the range is 0, then just set that.
@@ -165,7 +169,7 @@ class FgcmSigmaCal(object):
             cNorm = colors.Normalize(vmin=self.sigmaCalRange[0], vmax=self.sigmaCalRange[1])
             scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
 
-        medChi2s = np.zeros((nStep, self.fgcmPars.nBands))
+        medChi2s = np.ones((nStep, self.fgcmPars.nBands))
 
         # Get the indices to use for the fit for each band
         indices = {}
@@ -196,7 +200,8 @@ class FgcmSigmaCal(object):
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 ok, = np.where((objChi2[goodStars[indices[band]], bandIndex] > 0.001) &
                                (objChi2[goodStars[indices[band]], bandIndex] < 1000.0))
-                medChi2s[i, bandIndex] = np.median(objChi2[goodStars[indices[band][ok]], bandIndex])
+                if ok.size > 0:
+                    medChi2s[i, bandIndex] = np.median(objChi2[goodStars[indices[band][ok]], bandIndex])
 
             if self.plotPath is not None:
                 for bandIndex, band in enumerate(self.fgcmPars.bands):

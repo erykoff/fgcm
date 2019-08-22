@@ -50,7 +50,7 @@ class FgcmGray(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing fgcmGray')
+        self.fgcmLog.debug('Initializing fgcmGray')
 
         # need fgcmPars because it tracks good exposures
         #  also this is where the gray info is stored
@@ -79,12 +79,15 @@ class FgcmGray(object):
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
         self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.quietMode = fgcmConfig.quietMode
 
         self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
         self.expGrayHighCut = fgcmConfig.expGrayHighCut
         self.autoPhotometricCutNSig = fgcmConfig.autoPhotometricCutNSig
         self.autoPhotometricCutStep = fgcmConfig.autoPhotometricCutStep
         self.autoHighCutNSig = fgcmConfig.autoHighCutNSig
+
+        self.arraysPrepared = False
 
         self._prepareGrayArrays()
 
@@ -124,6 +127,8 @@ class FgcmGray(object):
         self.expGrayErrColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
 
+        self.arraysPrepared = True
+
     def computeExpGrayForInitialSelection(self):
         """
         Compute exposure gray using bright star magnitudes to get initial estimates.
@@ -136,7 +141,7 @@ class FgcmGray(object):
         # Note this computes ExpGray for all exposures, good and bad
 
         startTime = time.time()
-        self.fgcmLog.info('Computing ExpGray for initial selection')
+        self.fgcmLog.debug('Computing ExpGray for initial selection')
 
         # useful numbers
         expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
@@ -170,8 +175,8 @@ class FgcmGray(object):
 
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
-        self.fgcmLog.info('FgcmGray initial exp gray using %d observations from %d good stars.' %
-                         (goodObs.size,goodStars.size))
+        self.fgcmLog.debug('FgcmGray initial exp gray using %d observations from %d good stars.' %
+                           (goodObs.size,goodStars.size))
 
         # Now only observations that have the minimum number of good observations are
         # selected, even in the "off-bands"
@@ -197,10 +202,11 @@ class FgcmGray(object):
         expGrayRMSForInitialSelection[gd] = np.sqrt((expGrayRMSForInitialSelection[gd]/expNGoodStarForInitialSelection[gd]) -
                                              (expGrayForInitialSelection[gd])**2.)
 
-        self.fgcmLog.info('ExpGray for initial selection computed for %d exposures.' %
-                         (gd.size))
-        self.fgcmLog.info('Computed ExpGray for initial selection in %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('ExpGray for initial selection computed for %d exposures.' %
+                              (gd.size))
+            self.fgcmLog.info('Computed ExpGray for initial selection in %.2f seconds.' %
+                              (time.time() - startTime))
 
         if self.plotPath is None:
             return
@@ -257,7 +263,7 @@ class FgcmGray(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.info('Computing CCDGray and ExpGray.')
+        self.fgcmLog.debug('Computing CCDGray and ExpGray.')
 
         # Note: this computes the gray values for all exposures, good and bad
 
@@ -315,8 +321,8 @@ class FgcmGray(object):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
-        self.fgcmLog.info('FgcmGray using %d observations from %d good stars.' %
-                         (goodObs.size,goodStars.size))
+        self.fgcmLog.debug('FgcmGray using %d observations from %d good stars.' %
+                           (goodObs.size,goodStars.size))
 
         # group by CCD and sum
 
@@ -444,7 +450,7 @@ class FgcmGray(object):
                                     fit)
                 ccdGray[eInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
-        self.fgcmLog.info('Computed CCDGray for %d CCDs' % (gd[0].size))
+        self.fgcmLog.debug('Computed CCDGray for %d CCDs' % (gd[0].size))
 
         # set illegalValue for totally bad CCDs
         bad = np.where((ccdNGoodStars <= 2) | (ccdGrayWt <= 0.0))
@@ -469,8 +475,8 @@ class FgcmGray(object):
                            (ccdGrayErr > 0.0) &
                            (ccdGrayErr < self.maxCCDGrayErr))
 
-        self.fgcmLog.info('For ExpGray, found %d good CCDs' %
-                         (goodCCD[0].size))
+        self.fgcmLog.debug('For ExpGray, found %d good CCDs' %
+                           (goodCCD[0].size))
 
         # note: goodCCD[0] refers to the expIndex, goodCCD[1] to the CCDIndex
 
@@ -524,9 +530,10 @@ class FgcmGray(object):
 
         ##  per band we plot the expGray for photometric exposures...
 
-        self.fgcmLog.info('ExpGray computed for %d exposures.' % (gd.size))
-        self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('ExpGray computed for %d exposures.' % (gd.size))
+            self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
+                              (time.time() - startTime))
 
         self.makeExpGrayPlots()
 
@@ -539,7 +546,7 @@ class FgcmGray(object):
             raise RuntimeError("Must run FgcmChisq to compute magStd before computeExpGrayColorSplit")
 
         startTime = time.time()
-        self.fgcmLog.info('Computing ExpGrayColorSplit')
+        self.fgcmLog.debug('Computing ExpGrayColorSplit')
 
         expGrayColorSplit = snmm.getArray(self.expGrayColorSplitHandle)
         expGrayErrColorSplit = snmm.getArray(self.expGrayErrColorSplitHandle)
@@ -898,6 +905,41 @@ class FgcmGray(object):
                                            min(cut, -0.005))
 
             delta = self.autoHighCutNSig * coeff[2] + coeff[1]
+            cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
+            expGrayHighCut[i] = max(0.005,
+                                    min(cut, expGrayHighCut[i]*2))
+
+        return (expGrayPhotometricCut, expGrayHighCut)
+
+    def computeExpGrayCutsFromRepeatability(self):
+        """
+        Compute exposure gray recommended cuts, using repeatability info.
+
+        Returns
+        -------
+        expGrayPhotometricCut: `np.array`
+           Float array (per band) of recommended expGray cuts
+        expGrayHighCut: `np.array`
+           Float array (per band) of recommended expGray cuts (high side)
+        """
+
+        expGrayPhotometricCut = np.zeros(self.fgcmPars.nBands)
+        expGrayHighCut = np.zeros_like(expGrayPhotometricCut)
+
+        # set defaults to those that were set in the config file
+        # These are going to be lists of floats for persistence
+        expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]
+        expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
+
+        for i in xrange(self.fgcmPars.nBands):
+            delta = self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i]
+
+            cut = -1 * int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
+            # Clip the cut to a range from 2 times the input to 5 mmag
+            expGrayPhotometricCut[i] = max(expGrayPhotometricCut[i]*2,
+                                           min(cut, -0.005))
+
+            delta = self.autoHighCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i]
             cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             expGrayHighCut[i] = max(0.005,
                                     min(cut, expGrayHighCut[i]*2))

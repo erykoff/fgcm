@@ -1067,4 +1067,3 @@ class FgcmLUT(object):
         #  but the noise in g-r is going to cause things to bounce around.  Pout.
 
         return self.sedLUT['FPRIME'][indices,:]
-
