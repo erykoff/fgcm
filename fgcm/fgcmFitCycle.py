@@ -54,7 +54,7 @@ class FgcmFitCycle(object):
     Note that at least one of useFits or noFitsDict must be supplied.
     """
 
-    def __init__(self, configDict, useFits=False, noFitsDict=None):
+    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False):
         # are we in fits mode?
         self.useFits = useFits
 
@@ -71,14 +71,15 @@ class FgcmFitCycle(object):
 
         if self.useFits:
             # Everything can be loaded from fits
-            self.fgcmConfig = FgcmConfig.configWithFits(configDict)
+            self.fgcmConfig = FgcmConfig.configWithFits(configDict, noOutput=noOutput)
         else:
             # everything must be passed in.
             self.fgcmConfig = FgcmConfig(configDict,
-                                            noFitsDict['lutIndex'],
-                                            noFitsDict['lutStd'],
-                                            noFitsDict['expInfo'],
-                                            noFitsDict['ccdOffsets'])
+                                         noFitsDict['lutIndex'],
+                                         noFitsDict['lutStd'],
+                                         noFitsDict['expInfo'],
+                                         noFitsDict['ccdOffsets'],
+                                         noOutput=noOutput)
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
         self.quietMode = self.fgcmConfig.quietMode
