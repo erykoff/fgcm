@@ -35,7 +35,7 @@ class FgcmApertureCorrection(object):
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.info('Initializing FgcmApertureCorrection')
+        self.fgcmLog.debug('Initializing FgcmApertureCorrection')
 
         self.fgcmPars = fgcmPars
 
@@ -47,6 +47,7 @@ class FgcmApertureCorrection(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.quietMode = fgcmConfig.quietMode
 
     def computeApertureCorrections(self):
         """
@@ -61,8 +62,9 @@ class FgcmApertureCorrection(object):
             return
 
         startTime=time.time()
-        self.fgcmLog.info('Computing aperture corrections with %d bins' %
-                         (self.aperCorrFitNBins))
+        if not self.quietMode:
+            self.fgcmLog.info('Computing aperture corrections with %d bins' %
+                              (self.aperCorrFitNBins))
 
         # need to make a local copy since we're modifying
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
@@ -73,7 +75,7 @@ class FgcmApertureCorrection(object):
         # first, remove any previous correction if necessary...
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
-            self.fgcmLog.info('Removing old aperture corrections')
+            self.fgcmLog.debug('Removing old aperture corrections')
 
             expSeeingVariableClipped = np.clip(self.fgcmPars.expSeeingVariable,
                                                self.fgcmPars.compAperCorrRange[0,self.fgcmPars.expBandIndex],
@@ -213,5 +215,6 @@ class FgcmApertureCorrection(object):
         ## MAYBE: modify ccd gray and exp gray?
         ##  could rely on the iterations taking care of this.
 
-        self.fgcmLog.info('Computed aperture corrections in %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Computed aperture corrections in %.2f seconds.' %
+                              (time.time() - startTime))

@@ -81,6 +81,7 @@ class FgcmFitCycle(object):
                                             noFitsDict['ccdOffsets'])
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
+        self.quietMode = self.fgcmConfig.quietMode
 
         # and set up cycle info
 
@@ -152,7 +153,8 @@ class FgcmFitCycle(object):
         Set up with fits files.
         """
 
-        self.fgcmLog.info(getMemoryString('Setting up with fits'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('Setting up with fits'))
 
         # read in the LUT
         self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile,
@@ -208,7 +210,8 @@ class FgcmFitCycle(object):
         self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
 
         self.setupComplete = True
-        self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
 
     def run(self):
         """
@@ -274,7 +277,8 @@ class FgcmFitCycle(object):
 
             # Apply the mirror chromaticity if desired (we require SEDs)
             if self.fgcmConfig.fitMirrorChromaticity:
-                self.fgcmLog.info("Applying mirror chromaticity corrections...")
+                if not self.quietMode:
+                    self.fgcmLog.info("Applying mirror chromaticity corrections...")
                 self.fgcmStars.applyMirrorChromaticityCorrection(self.fgcmPars, self.fgcmLUT)
 
         else:
@@ -288,7 +292,8 @@ class FgcmFitCycle(object):
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
             brightObs.brightestObsMeanMag(computeSEDSlopes=True)
 
-            self.fgcmLog.info(getMemoryString('FitCycle Post Bright-Obs'))
+            if not self.quietMode:
+                self.fgcmLog.info(getMemoryString('FitCycle Post Bright-Obs'))
 
             # flag stars that are outside our color cuts
             self.fgcmStars.performColorCuts()
@@ -321,7 +326,8 @@ class FgcmFitCycle(object):
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
-                self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
+                if not self.quietMode:
+                    self.fgcmLog.info('Configured to precompute superstar flat on initial cycle')
                 # Flag superstar outliers here before computing superstar...
                 self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
 
@@ -363,7 +369,8 @@ class FgcmFitCycle(object):
         if self.fgcmConfig.resetParameters:
             self.fgcmPars.resetAtmosphereParameters()
 
-        self.fgcmLog.info(getMemoryString('FitCycle Pre-Fit'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('FitCycle Pre-Fit'))
 
         # Perform Fit (subroutine)
         if (self.fgcmConfig.maxIter > 0):
@@ -374,7 +381,8 @@ class FgcmFitCycle(object):
         # Plot the parameters whether or not we did a fit!
         self.fgcmPars.plotParameters()
 
-        self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
 
         # another run to soak up the reserve stars...
         # FIXME: look for more efficient way of doing this
@@ -384,10 +392,16 @@ class FgcmFitCycle(object):
         if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
             # Redo absolute offset here for total consistency with final
             # parameters and values
-            self.fgcmLog.info("Final computation of absolute offset.")
+            if not self.quietMode:
+                self.fgcmLog.info("Final computation of absolute offset.")
             deltaAbsOffset = self.fgcmStars.computeAbsOffset()
             self.fgcmPars.compAbsThroughput *= 10.**(-deltaAbsOffset / 2.5)
             self.fgcmStars.applyAbsOffset(deltaAbsOffset)
+
+        if self.fgcmStars.hasRefstars:
+            for i, band in enumerate(self.fgcmPars.bands):
+                self.fgcmLog.info("Final abs throughput in %s band = %.4f" %
+                                  (band, self.fgcmPars.compAbsThroughput[i]))
 
         # One last run to compute mstd all observations of all exposures
         #  when allExposures is set, mean mags, etc aren't computed
@@ -395,16 +409,17 @@ class FgcmFitCycle(object):
 
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), allExposures=True, includeReserve=True)
 
-
-        self.fgcmLog.info(getMemoryString('After recomputing chisq for all exposures'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After recomputing chisq for all exposures'))
 
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
         self.fgcmGray.computeExpGrayColorSplit()
-        # This must be here before we modify the selection
+        # We can compute this now...
         self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCuts()
-        self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
@@ -414,7 +429,8 @@ class FgcmFitCycle(object):
         self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
 
-        self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
 
         # Flag variables for next cycle
         # NOT USED NOW
@@ -435,7 +451,8 @@ class FgcmFitCycle(object):
                                            self.fgcmStars,self.fgcmLUT)
         self.fgcmRetrieval.computeRetrievalIntegrals()
 
-        self.fgcmLog.info(getMemoryString('After computing retrieved integrals'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing retrieved integrals'))
 
         # Compute Retrieved PWV -- always because why not?
         self.fgcmLog.debug('FitCycle computing RPWV')
@@ -452,14 +469,16 @@ class FgcmFitCycle(object):
         superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
         superStarFlat.computeSuperStarFlats()
 
-        self.fgcmLog.info(getMemoryString('After computing superstar flats'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing superstar flats'))
 
         # Compute Aperture Corrections
         self.fgcmLog.debug('FitCycle computing ApertureCorrections')
         aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
         aperCorr.computeApertureCorrections()
 
-        self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
         # Compute mirror chromaticity
         if self.fgcmConfig.fitMirrorChromaticity:
@@ -471,7 +490,8 @@ class FgcmFitCycle(object):
         self.fgcmQeSysSlope.computeQeSysSlope('final')
         self.fgcmQeSysSlope.plotQeSysRefStars('final')
 
-        self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
 
         # Compute mag error model (if configured)
         self.fgcmModelMagErrs.computeMagErrorModel('postfit')
@@ -500,13 +520,17 @@ class FgcmFitCycle(object):
         self.fgcmZpts.computeZeropoints()
 
         # And finally compute the stars and test repeatability *after* the crunch
-        self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch')
+        self.fgcmLog.debug('Using FgcmChisq to compute mags with CCD crunch')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
 
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
 
-        self.fgcmLog.info(getMemoryString('After computing zeropoints'))
+        if self.fgcmConfig.useRepeatabilityForExpGrayCuts:
+            self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
+
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('After computing zeropoints'))
 
         if (self.useFits):
             if self.fgcmConfig.outputZeropoints:
@@ -541,12 +565,13 @@ class FgcmFitCycle(object):
 
         # and make map of coverage
 
-        self.fgcmLog.info('Making map of coverage')
+        self.fgcmLog.debug('Making map of coverage')
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
         self.fgcmStars.plotStarMap(mapType='final')
 
-        self.fgcmLog.info(getMemoryString('FitCycle Completed'))
+        if not self.quietMode:
+            self.fgcmLog.info(getMemoryString('FitCycle Completed'))
 
     def _doFit(self, doPlots=True, ignoreRef=False, maxIter=None):
         """

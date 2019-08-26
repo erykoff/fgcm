@@ -38,7 +38,7 @@ class FgcmModelMagErrors(object):
 
     def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.info('Initializing FgcmModelMagErrors')
+        self.fgcmLog.debug('Initializing FgcmModelMagErrors')
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
@@ -50,6 +50,7 @@ class FgcmModelMagErrors(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.quietMode = fgcmConfig.quietMode
 
     def computeMagErrorModel(self, fitName):
         """
@@ -62,10 +63,12 @@ class FgcmModelMagErrors(object):
         """
 
         if not self.modelMagErrors:
-            self.fgcmLog.info('No magnitude error model will be computed')
+            if not self.quietMode:
+                self.fgcmLog.info('No magnitude error model will be computed')
             return
 
-        self.fgcmLog.info('Computing magnitude error model parameters...')
+        if not self.quietMode:
+            self.fgcmLog.info('Computing magnitude error model parameters...')
 
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)

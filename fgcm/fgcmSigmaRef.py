@@ -31,7 +31,7 @@ class FgcmSigmaRef(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmSigmaRef')
+        self.fgcmLog.debug('Initializing FgcmSigmaRef')
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
@@ -41,6 +41,7 @@ class FgcmSigmaRef(object):
         self.cycleNumber = fgcmConfig.cycleNumber
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.refStarOutlierNSig = fgcmConfig.refStarOutlierNSig
+        self.quietMode = fgcmConfig.quietMode
 
         if not self.fgcmStars.hasRefstars:
             raise RuntimeError("Cannot use FgcmSigmaRef without reference stars!")
@@ -51,7 +52,7 @@ class FgcmSigmaRef(object):
         """
 
         startTime = time.time()
-        self.fgcmLog.info('Computing sigmaRef')
+        self.fgcmLog.debug('Computing sigmaRef')
 
         # Input numbers
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
@@ -102,7 +103,7 @@ class FgcmSigmaRef(object):
 
         else:
             # Large numbers
-            self.fgcmLog.info('More than 100 reference stars, so computing "large-number" statistics and making plots.')
+            self.fgcmLog.debug('More than 100 reference stars, so computing "large-number" statistics.')
 
             # and we do 4 runs: full, blue 25%, middle 50%, red 25%
 
@@ -219,6 +220,7 @@ class FgcmSigmaRef(object):
         self.fgcmPars.compRefOffset[:] = offsetRef
         self.fgcmPars.compRefSigma[:] = sigmaRef
 
-        self.fgcmLog.info('Done computing sigmaRef in %.2f sec.' %
-                          (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done computing sigmaRef in %.2f sec.' %
+                              (time.time() - startTime))
 

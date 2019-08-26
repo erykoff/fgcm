@@ -59,8 +59,7 @@ class FgcmChisq(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        #self.fgcmLog.log('INFO','Initializing FgcmChisq')
-        self.fgcmLog.info('Initializing FgcmChisq')
+        self.fgcmLog.debug('Initializing FgcmChisq')
 
         # does this need to be shm'd?
         self.fgcmPars = fgcmPars
@@ -84,6 +83,7 @@ class FgcmChisq(object):
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
         self.saveParsForDebugging = fgcmConfig.saveParsForDebugging
+        self.quietMode = fgcmConfig.quietMode
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
@@ -101,7 +101,8 @@ class FgcmChisq(object):
 
         # this is the default number of parameters
         self.nActualFitPars = self.fgcmPars.nFitPars
-        self.fgcmLog.info('Default: fit %d parameters.' % (self.nActualFitPars))
+        if not self.quietMode:
+            self.fgcmLog.info('Default: fit %d parameters.' % (self.nActualFitPars))
 
         self.clearMatchCache()
 
@@ -266,7 +267,8 @@ class FgcmChisq(object):
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=self.includeReserve)
 
-        self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
+        if not self.quietMode:
+            self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
 
         if (goodStars.size == 0):
             raise RuntimeError("No good stars to fit!")
@@ -282,7 +284,7 @@ class FgcmChisq(object):
 
         if (self.useMatchCache and self.matchesCached) :
             # we have already done the matching
-            self.fgcmLog.info('Retrieving cached matches')
+            self.fgcmLog.debug('Retrieving cached matches')
             goodObs = self.goodObs
             goodStarsSub = self.goodStarsSub
         else:
@@ -297,11 +299,11 @@ class FgcmChisq(object):
 
             goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag)
 
-            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                             (time.time() - preStartTime))
+            self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
+                               (time.time() - preStartTime))
 
             if (self.useMatchCache) :
-                self.fgcmLog.info('Caching matches for next iteration')
+                self.fgcmLog.debug('Caching matches for next iteration')
                 self.matchesCached = True
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
@@ -371,10 +373,10 @@ class FgcmChisq(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            self.fgcmLog.info('Using %d sections (%.1f seconds)' %
-                              (nSections,time.time()-prepStartTime))
+            self.fgcmLog.debug('Using %d sections (%.1f seconds)' %
+                               (nSections,time.time()-prepStartTime))
 
-            self.fgcmLog.info('Running chisq on %d cores' % (self.nCore))
+            self.fgcmLog.debug('Running chisq on %d cores' % (self.nCore))
 
             # make a pool
             pool = Pool(processes=self.nCore)
@@ -412,7 +414,8 @@ class FgcmChisq(object):
                                     (partialSums[3*self.fgcmPars.nFitPars:
                                                      4*self.fgcmPars.nFitPars] > 0))
                 self.nActualFitPars = nonZero.size
-                self.fgcmLog.info('Actually fit %d parameters.' % (self.nActualFitPars))
+                if not self.quietMode:
+                    self.fgcmLog.info('Actually fit %d parameters.' % (self.nActualFitPars))
 
             fitDOF = partialSums[-3] + partialSums[-1] - float(self.nActualFitPars)
 
@@ -488,8 +491,9 @@ class FgcmChisq(object):
         for key in self.totalHandleDict.keys():
             snmm.freeArray(self.totalHandleDict[key])
 
-        self.fgcmLog.info('Chisq computation took %.2f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Chisq computation took %.2f seconds.' %
+                              (time.time() - startTime))
 
         self.fgcmStars.magStdComputed = True
         if (self.allExposures):
