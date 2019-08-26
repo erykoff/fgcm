@@ -326,6 +326,8 @@ class FgcmMakeStars(object):
         hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         gdpix, = np.where(hpix > 0)
+        self.fgcmLog.info("Matching primary stars in %d pixels" % (gdpix.size))
+
         for ii, gpix in enumerate(gdpix):
             # This is the array of all the observations in the coarse pixel
             p1a=revpix[revpix[gpix]: revpix[gpix + 1]]
@@ -702,6 +704,13 @@ class FgcmMakeStars(object):
                                                     ('dec','f8'),
                                                     ('obsarrindex','i4'),
                                                     ('nobs','i4')])
+
+        hasExtraQuantities = False
+        if len(self.starConfig['quantitiesToAverage']) > 0:
+            hasExtraQuantities = True
+            for quant in self.starConfig['quantitiesToAverage']:
+                dtype.extend([(quant, 'f4')])
+
         self.objIndexCat['fgcm_id'][:] = self.objCat['fgcm_id'][gd]
         self.objIndexCat['ra'][:] = self.objCat['ra'][gd]
         self.objIndexCat['dec'][:] = self.objCat['dec'][gd]
@@ -709,6 +718,11 @@ class FgcmMakeStars(object):
         self.objIndexCat['nobs'][:] = nObsPerObj[gd]
         # and the index is given by the cumulative sum
         self.objIndexCat['obsarrindex'][1:] = np.cumsum(nObsPerObj[gd])[:-1]
+
+        # Copy in the extra quantities
+        if hasExtraQuantities:
+            for quant in self.starConfig['quantitiesToAverage']:
+                self.objIndexCat[quant][:] = self.objCat[quant][gd]
 
         # and we need to create the observation indices from the obsarrindex
 
