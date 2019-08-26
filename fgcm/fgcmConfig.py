@@ -89,6 +89,8 @@ class FgcmConfig(object):
        Info about CCD positional offsets and sizes
     checkFiles: bool, default=False
        Check that all fits files exist
+    noOutput: bool, default=False
+       Do not create an output directory.
     """
 
     bands = ConfigField(list, required=True)
@@ -219,7 +221,7 @@ class FgcmConfig(object):
     inParameterFile = ConfigField(str, required=False)
     inFlagStarFile = ConfigField(str, required=False)
 
-    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False):
+    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False, noOutput=False):
 
         self._setVarsFromDict(configDict)
 
@@ -237,11 +239,12 @@ class FgcmConfig(object):
             self.outputPath = os.path.abspath(self.outputPath)
 
         # create output path if necessary
-        if (not os.path.isdir(self.outputPath)):
-            try:
-                os.makedirs(self.outputPath)
-            except:
-                raise IOError("Could not create output path: %s" % (self.outputPath))
+        if not noOutput:
+            if (not os.path.isdir(self.outputPath)):
+                try:
+                    os.makedirs(self.outputPath)
+                except:
+                    raise IOError("Could not create output path: %s" % (self.outputPath))
 
         if (self.cycleNumber < 0):
             raise ValueError("Illegal cycleNumber: must be >= 0")
@@ -572,7 +575,7 @@ class FgcmConfig(object):
         return configDict
 
     @classmethod
-    def configWithFits(cls, configDict):
+    def configWithFits(cls, configDict, noOutput=False):
         """
         Initialize FgcmConfig object and read in fits files.
 
@@ -580,6 +583,8 @@ class FgcmConfig(object):
         ----------
         configDict: dict
            Dictionary with config variables.
+        noOutput: bool, default=False
+           Do not create output directory.
         """
 
         import fitsio
@@ -594,7 +599,7 @@ class FgcmConfig(object):
 
         ccdOffsets = fitsio.read(configDict['ccdOffsetFile'], ext=1)
 
-        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=True)
+        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=True, noOutput=noOutput)
 
 
     def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
