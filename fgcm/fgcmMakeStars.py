@@ -62,6 +62,9 @@ class FgcmMakeStars(object):
             if (key not in starConfig):
                 raise ValueError("required %s not in starConfig" % (key))
 
+        if 'quantitiesToAverage' not in starConfig:
+            starConfig['quantitiesToAverage'] = []
+
         self.objCat = None
 
         # Note that the order doesn't matter for the making of the stars
@@ -145,7 +148,14 @@ class FgcmMakeStars(object):
                         fitsWhere = fitsWhere + ' || ' + clause
         w=fits[1].where(fitsWhere)
 
-        obsCat = fits[1].read(columns=['ra','dec','filtername'],lower=True,rows=w)
+        columns = ['ra', 'dec', 'filtername']
+        if len(self.starConfig['quantitiesToAverage']) > 0:
+            extraColumns = []
+            for quant in self.starConfig['quantitiesToAverage']:
+                extraColumns.extend([quant.lower(), quant.lower() + '_err'])
+            columns.extend(extraColumns)
+
+        obsCat = fits[1].read(columns=columns,lower=True,rows=w)
 
         if ('brightStarFile' in self.starConfig):
             brightStarCat = fitsio.read(self.starConfig['brightStarFile'],ext=1,lower=True)
@@ -161,10 +171,16 @@ class FgcmMakeStars(object):
 
         filterNameArray = np.core.defchararray.strip(obsCat['filtername'])
 
+        if len(self.starConfig['quantitiesToAverage']) > 0:
+            extraQuantityArrays = obsCat[extraColumns]
+        else:
+            extraQuantityArrays = None
+
         self.makePrimaryStars(obsCat['ra'], obsCat['dec'], filterNameArray,
-                                brightStarRA=brightStarRA,
-                                brightStarDec=brightStarDec,
-                                brightStarRadius=brightStarRadius)
+                              extraQuantityArrays=extraQuantityArrays,
+                              brightStarRA=brightStarRA,
+                              brightStarDec=brightStarDec,
+                              brightStarRadius=brightStarRadius)
 
         fitsio.write(self.starConfig['starfileBase']+'_prepositions.fits',self.objCat,clobber=True)
 
@@ -231,8 +247,9 @@ class FgcmMakeStars(object):
         return refFile
 
     def makePrimaryStars(self, raArray, decArray, filterNameArray,
-                           bandSelected=False,
-                           brightStarRA=None, brightStarDec=None, brightStarRadius=None):
+                         extraQuantityArrays=None,
+                         bandSelected=False,
+                         brightStarRA=None, brightStarDec=None, brightStarRadius=None):
         """
         Make primary stars, from pre-loaded arrays
 
@@ -244,6 +261,8 @@ class FgcmMakeStars(object):
            Dec for each observation
         filterNameArray: string array
            Array of filterNames.
+        extraQuantityArrays: numpy recarray, optional
+           Record array of extra quantities to average.  Default None.
         bandSelected: bool, default=False
            Has the input raArray/decArray been pre-selected by band?
         brightStarRA: double array, optional
@@ -288,6 +307,16 @@ class FgcmMakeStars(object):
                ('ra', 'f8'),
                ('dec', 'f8')]
 
+        hasExtraQuantities = False
+        if len(self.starConfig['quantitiesToAverage']) > 0:
+            if extraQuantityArrays is None:
+                raise RuntimeError("Cannot set quantitiesToAverage without passing extraQuantityArrays")
+            hasExtraQuantities = True
+            for quant in self.starConfig['quantitiesToAverage']:
+                dtype.extend([(quant, 'f4')])
+                if quant not in extraQuantityArrays.dtype.names:
+                    raise RuntimeError("quantity to average %s not in extraQuantityArrays" % (quant))
+
         pixelCats = []
 
         # Split into pixels
@@ -320,6 +349,9 @@ class FgcmMakeStars(object):
                 raArrayUse = raArray[p1a[useFlag]]
                 decArrayUse = decArray[p1a[useFlag]]
 
+                if hasExtraQuantities:
+                    extraQuantityArraysUse = extraQuantityArrays[p1a[useFlag]]
+
                 if raArrayUse.size == 0:
                     self.fgcmLog.info("Nothing found for pixel %d" % (ipring[p1a[0]]))
                     continue
@@ -348,6 +380,7 @@ class FgcmMakeStars(object):
                     i1 = matches[1]
                     i2 = matches[0]
 
+                """
                 # Try this instead...
 
                 counter = np.zeros(raArrayUse.size, dtype=np.int64)
@@ -372,6 +405,16 @@ class FgcmMakeStars(object):
                 bandPixelCatTemp['ra'] = raMeanAll[uId]
                 bandPixelCatTemp['dec'] = decMeanAll[uId]
 
+                # Any extra quantities?
+                if len(self.starConfig['quantitiesToAverage']) > 0:
+                    for quant in enumerate(self.starConfig['quantitiesToAverage']):
+                        quantMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
+                        np.add.at(quantMeanAll, i1, extraQuantityArrays[quant][p1a[useFlag[i2]]])
+                        quantMeanAll /= counter
+                        bandPixelCatTemp[quant] = quantMeanAll[uId]
+                        """
+
+                # This is the official working version, but slower
                 fakeId = np.arange(p1a.size)
                 hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
 
@@ -412,6 +455,12 @@ class FgcmMakeStars(object):
                         hist[starInd] = 0
                         bandPixelCatTemp['ra'][index] = np.sum(raTemp[starInd]) / starInd.size
                         bandPixelCatTemp['dec'][index] = np.sum(decArrayUse[starInd]) / starInd.size
+                        if hasExtraQuantities:
+                            for quant in self.starConfig['quantitiesToAverage']:
+                                ok, = np.where((extraQuantityArraysUse[quant + '_err'][starInd] > 0.0))
+                                wt = 1./extraQuantityArraysUse[quant + '_err'][starInd[ok]]**2.
+                                bandPixelCatTemp[quant][index] = np.sum(wt * extraQuantityArraysUse[quant][starInd[ok]]) / np.sum(wt)
+
                         index = index + 1
 
                 # Restore negative RAs
