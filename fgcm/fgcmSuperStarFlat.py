@@ -37,7 +37,7 @@ class FgcmSuperStarFlat(object):
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
 
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.info('Initializing FgcmSuperStarFlat')
+        self.fgcmLog.debug('Initializing FgcmSuperStarFlat')
 
         self.fgcmPars = fgcmPars
 
@@ -51,6 +51,7 @@ class FgcmSuperStarFlat(object):
         self.epochNames = fgcmConfig.epochNames
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
+        self.quietMode = fgcmConfig.quietMode
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
@@ -73,7 +74,7 @@ class FgcmSuperStarFlat(object):
         """
 
         startTime = time.time()
-        self.fgcmLog.info('Computing superstarflats')
+        self.fgcmLog.debug('Computing superstarflats')
 
         # New version, use the stars directly
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -316,11 +317,12 @@ class FgcmSuperStarFlat(object):
                                    superStarFlatFPMean[e, f] * 1000.0, superStarFlatFPSigma[e, f] * 1000.0,
                                    deltaSuperStarFlatFPMean[e, f] * 1000.0, deltaSuperStarFlatFPSigma[e, f] * 1000.0))
 
-        self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
-                          (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
+                              (time.time() - startTime))
 
         if doPlots and self.plotPath is not None:
-            self.fgcmLog.info('Making SuperStarFlat plots')
+            self.fgcmLog.debug('Making SuperStarFlat plots')
 
             self.plotSuperStarFlatsAndDelta(self.fgcmPars.parSuperStarFlat,
                                             deltaSuperStarFlatCenter,

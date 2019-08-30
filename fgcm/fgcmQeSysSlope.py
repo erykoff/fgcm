@@ -29,7 +29,7 @@ class FgcmQeSysSlope(object):
     """
     def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
         self.fgcmLog = fgcmConfig.fgcmLog
-        self.fgcmLog.info('Initializing FgcmQeSysSlope')
+        self.fgcmLog.debug('Initializing FgcmQeSysSlope')
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.plotPath = fgcmConfig.plotPath

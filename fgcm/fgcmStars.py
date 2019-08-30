@@ -51,7 +51,7 @@ class FgcmStars(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing stars.')
+        self.fgcmLog.debug('Initializing stars.')
 
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
@@ -75,6 +75,7 @@ class FgcmStars(object):
         self.ccdField = fgcmConfig.ccdField
         self.reserveFraction = fgcmConfig.reserveFraction
         self.modelMagErrors = fgcmConfig.modelMagErrors
+        self.quietMode = fgcmConfig.quietMode
 
         self.inFlagStarFile = fgcmConfig.inFlagStarFile
 
@@ -113,6 +114,8 @@ class FgcmStars(object):
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
+        self.starsLoaded = False
+
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
         Load stars from fits files.
@@ -137,36 +140,40 @@ class FgcmStars(object):
 
         # read in the observation indices...
         startTime = time.time()
-        self.fgcmLog.info('Reading in observation indices...')
+        self.fgcmLog.debug('Reading in observation indices...')
         index = fitsio.read(self.indexFile, ext='INDEX', upper=True)
-        self.fgcmLog.info('Done reading in %d observation indices in %.1f seconds.' %
-                         (index.size, time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done reading in %d observation indices in %.1f seconds.' %
+                              (index.size, time.time() - startTime))
 
         # read in obsfile and cut
         startTime = time.time()
-        self.fgcmLog.info('Reading in star observations...')
+        self.fgcmLog.debug('Reading in star observations...')
         obs = fitsio.read(self.obsFile, ext=1, upper=True)
         # cut down to those that are indexed
         obs = obs[index['OBSINDEX']]
-        self.fgcmLog.info('Done reading in %d observations in %.1f seconds.' %
-                         (obs.size, time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done reading in %d observations in %.1f seconds.' %
+                              (obs.size, time.time() - startTime))
 
         # and positions...
         startTime = time.time()
-        self.fgcmLog.info('Reading in star positions...')
+        self.fgcmLog.debug('Reading in star positions...')
         pos = fitsio.read(self.indexFile, ext='POS', upper=True)
-        self.fgcmLog.info('Done reading in %d unique star positions in %.1f seconds.' %
-                         (pos.size, time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done reading in %d unique star positions in %.1f seconds.' %
+                              (pos.size, time.time() - startTime))
 
         obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
 
         # And refstars if available
         if self.refstarFile is not None:
             startTime = time.time()
-            self.fgcmLog.info('Reading in reference stars...')
+            self.fgcmLog.debug('Reading in reference stars...')
             ref = fitsio.read(self.refstarFile, ext=1, lower=True)
-            self.fgcmLog.info('Done reading %d reference starss in %.1f seconds.' %
-                              (ref.size, time.time() - startTime))
+            if not self.quietMode:
+                self.fgcmLog.info('Done reading %d reference starss in %.1f seconds.' %
+                                  (ref.size, time.time() - startTime))
             refID = ref['fgcm_id']
             refMag = ref['mag']
             refMagErr = ref['mag_err']
@@ -176,8 +183,8 @@ class FgcmStars(object):
             refMagErr = None
 
         if (self.inFlagStarFile is not None):
-            self.fgcmLog.info('Reading in list of previous flagged stars from %s' %
-                             (self.inFlagStarFile))
+            self.fgcmLog.debug('Reading in list of previous flagged stars from %s' %
+                               (self.inFlagStarFile))
 
             inFlagStars = fitsio.read(self.inFlagStarFile, ext=1, upper=True)
 
@@ -188,7 +195,7 @@ class FgcmStars(object):
             flagFlag = None
 
         if ('X' in obs.dtype.names and 'Y' in obs.dtype.names):
-            self.fgcmLog.info('Found X/Y in input observations')
+            self.fgcmLog.debug('Found X/Y in input observations')
             obsX = obs['X']
             obsY = obs['Y']
         else:
@@ -283,7 +290,6 @@ class FgcmStars(object):
 
         self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i4')
         snmm.getArray(self.obsIndexHandle)[:] = np.arange(obsRA.size)
-
 
         # need to stuff into shared memory objects.
         #  nStarObs: total number of observations of all stars
@@ -382,8 +388,8 @@ class FgcmStars(object):
             snmm.getArray(self.refMagErrHandle)[:, :] = refMagErr
 
 
-        self.fgcmLog.info('Applying sigma0Phot = %.4f to mag errs' %
-                         (self.sigma0Phot))
+        self.fgcmLog.debug('Applying sigma0Phot = %.4f to mag errs' %
+                           (self.sigma0Phot))
 
         obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
 
@@ -401,14 +407,15 @@ class FgcmStars(object):
         obsMagADUModelErr[:] = obsMagADUErr[:]
 
         startTime = time.time()
-        self.fgcmLog.info('Matching observations to exposure table.')
+        self.fgcmLog.debug('Matching observations to exposure table.')
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsExpIndex[:] = -1
         a,b=esutil.numpy_util.match(fgcmPars.expArray,
                                     snmm.getArray(self.obsExpHandle)[:])
         obsExpIndex[b] = a
-        self.fgcmLog.info('Observations matched in %.1f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Observations matched in %.1f seconds.' %
+                              (time.time() - startTime))
 
         bad, = np.where(obsExpIndex < 0)
         obsFlag[bad] |= obsFlagDict['NO_EXPOSURE']
@@ -419,7 +426,7 @@ class FgcmStars(object):
 
         # match bands and filters to indices
         startTime = time.time()
-        self.fgcmLog.info('Matching observations to bands.')
+        self.fgcmLog.debug('Matching observations to bands.')
 
         # new version for multifilter support
         # First, we have the filterNames
@@ -438,8 +445,9 @@ class FgcmStars(object):
                 snmm.getArray(self.obsLUTFilterIndexHandle)[use] = filterIndex
                 snmm.getArray(self.obsBandIndexHandle)[use] = bandIndex
 
-        self.fgcmLog.info('Observations matched in %.1f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Observations matched in %.1f seconds.' %
+                              (time.time() - startTime))
 
         #  nStars: total number of unique stars
         self.nStars = objID.size
@@ -474,7 +482,7 @@ class FgcmStars(object):
         #    (to get objID, then objID[obsObjIDIndex]
 
         startTime = time.time()
-        self.fgcmLog.info('Indexing star observations...')
+        self.fgcmLog.debug('Indexing star observations...')
         self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objID = snmm.getArray(self.objIDHandle)
@@ -485,14 +493,15 @@ class FgcmStars(object):
         ##   probably extraneous.
         for i in xrange(self.nStars):
             obsObjIDIndex[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = i
-        self.fgcmLog.info('Done indexing in %.1f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Done indexing in %.1f seconds.' %
+                              (time.time() - startTime))
 
         # And we need to match the reference stars if necessary
         if self.hasRefstars:
             # self.refIdHandle
             startTime = time.time()
-            self.fgcmLog.info('Matching reference star IDs')
+            self.fgcmLog.debug('Matching reference star IDs')
             self.objRefIDIndexHandle = snmm.createArray(self.nStars, dtype='i4')
             objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
 
@@ -513,8 +522,9 @@ class FgcmStars(object):
                 self.fgcmLog.info("%.5f%% stars have a reference match in the %s band."
                                   % (fracRef * 100.0, band))
 
-            self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
-                              (time.time() - startTime))
+            if not self.quietMode:
+                self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
+                                  (time.time() - startTime))
 
         obsObjIDIndex = None
         objID = None
@@ -592,7 +602,7 @@ class FgcmStars(object):
         # compute secZenith for every observation
 
         startTime=time.time()
-        self.fgcmLog.info('Computing secZenith for each star observation...')
+        self.fgcmLog.debug('Computing secZenith for each star observation...')
         objRARad = np.radians(snmm.getArray(self.objRAHandle))
         objDecRad = np.radians(snmm.getArray(self.objDecHandle))
         ## FIXME: deal with this at some point...
@@ -612,16 +622,51 @@ class FgcmStars(object):
         bad,=np.where(obsFlag != 0)
         tempSecZenith[bad] = 1.0  # filler here, but these stars aren't used
         snmm.getArray(self.obsSecZenithHandle)[:] = tempSecZenith
-        self.fgcmLog.info('Computed secZenith in %.1f seconds.' %
-                         (time.time() - startTime))
+        if not self.quietMode:
+            self.fgcmLog.info('Computed secZenith in %.1f seconds.' %
+                              (time.time() - startTime))
 
         if (computeNobs):
-            self.fgcmLog.info('Checking stars with all exposure numbers')
+            self.fgcmLog.debug('Checking stars with all exposure numbers')
             allExpsIndex = np.arange(fgcmPars.expArray.size)
             self.selectStarsMinObsExpIndex(allExpsIndex)
 
+        self.starsLoaded = True
 
+    def reloadStarMagnitudes(self, obsMag, obsMagErr):
+        """
+        Reload star magnitudes, used when automating multiple fit cycles in memory.
 
+        Parameters
+        ----------
+        obsMag: float array
+           Raw ADU magnitude for each observation
+        obsMagErr: float array
+           Raw ADU magnitude error for each observation
+        """
+
+        if not self.starsLoaded:
+            raise RuntimeError("Cannot call reloadStarMagnitudes until stars have been loaded.")
+
+        if len(obsMag) != self.nStarObs:
+            raise RuntimeError("Replacement star magnitude has wrong length.")
+        if len(obsMagErr) != self.nStarObs:
+            raise RuntimeError("Replacement star magnitude error has wrong length.")
+
+        snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
+        snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput
+        snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
+
+        snmm.getArray(self.obsMagADUErrHandle)[:] = np.sqrt(obsMagErr**2. + self.sigma0Phot**2.)
+        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
+        obsMagADUModelErr[:] = snmm.getArray(self.obsMagADUErrHandle)[:]
+
+        snmm.getArray(self.objNGoodObsHandle)[:, :] = 0
+
+        snmm.getArray(self.objMagStdMeanHandle)[:, :] = 0.0
+        snmm.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
+        snmm.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
+        snmm.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minObsPerBand=None, reset=True):
@@ -654,8 +699,8 @@ class FgcmStars(object):
         obsFlag = snmm.getArray(self.obsFlagHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
-        self.fgcmLog.info('Selecting good stars from %d exposures.' %
-                         (goodExpsIndex.size))
+        self.fgcmLog.debug('Selecting good stars from %d exposures.' %
+                           (goodExpsIndex.size))
         _,goodObs=esutil.numpy_util.match(goodExpsIndex,obsExpIndex)
 
         # Filter out bad (previously flagged) individual observations
@@ -728,7 +773,7 @@ class FgcmStars(object):
         obsFlag = snmm.getArray(self.obsFlagHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
 
-        self.fgcmLog.info( 'Selecting good stars from %d exposure/ccd pairs.' %
+        self.fgcmLog.debug('Selecting good stars from %d exposure/ccd pairs.' %
                          (goodExps.size))
 
         # hash together exposure and ccd and match this
@@ -870,7 +915,9 @@ class FgcmStars(object):
 
         if checkBadMag:
             objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-            okFlag &= (objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0)
+            objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+            okFlag &= ((objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0) &
+                       (objMagStdMeanErr[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0))
 
         if not self.allFitBandsAreRequired or self.nNotFitBands > 0:
             # We need to do some extra checks since not all fit bands are required
@@ -1270,7 +1317,7 @@ class FgcmStars(object):
         Do outlier cuts from common ccd/filter/epochs
         """
 
-        self.fgcmLog.info('Computing superstar outliers')
+        self.fgcmLog.debug('Computing superstar outliers')
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
 
@@ -1330,12 +1377,14 @@ class FgcmStars(object):
         """
         Apply superStarFlat to raw magnitudes.
 
+        Note that this modifies obsMagADU.
+
         parameters
         ----------
         fgcmPars: FgcmParameters
         """
 
-        self.fgcmLog.info('Applying SuperStarFlat to raw magnitudes')
+        self.fgcmLog.debug('Applying SuperStarFlat to raw magnitudes')
 
         obsMagADU = snmm.getArray(self.obsMagADUHandle)
         obsSuperStarApplied = snmm.getArray(self.obsSuperStarAppliedHandle)
@@ -1389,17 +1438,19 @@ class FgcmStars(object):
         """
         Apply aperture corrections to raw magnitudes.
 
+        Note that this modifies obsMagADU.
+
         parameters
         ----------
         fgcmPars: FgcmParameters
         """
 
-        self.fgcmLog.info('Applying ApertureCorrections to raw magnitudes')
+        self.fgcmLog.debug('Applying ApertureCorrections to raw magnitudes')
 
         if self.seeingSubExposure:
-            self.fgcmLog.info('Aperture correction has sub-exposure information')
+            self.fgcmLog.debug('Aperture correction has sub-exposure information')
         else:
-            self.fgcmLog.info('Aperture correction is per-exposure')
+            self.fgcmLog.debug('Aperture correction is per-exposure')
 
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
@@ -1428,17 +1479,17 @@ class FgcmStars(object):
         """
 
         if (fgcmPars.compModelErrFwhmPivot[0] <= 0.0) :
-            self.fgcmLog.info('No model for mag errors, so mag errors are unchanged.')
+            self.fgcmLog.debug('No model for mag errors, so mag errors are unchanged.')
             return
 
         if not self.modelMagErrors:
-            self.fgcmLog.info('Model magnitude errors are turned off.')
+            self.fgcmLog.debug('Model magnitude errors are turned off.')
             return
 
         if not self.magStdComputed:
             raise RuntimeError("Must run FgcmChisq to compute magStd before computeModelMagErrors")
 
-        self.fgcmLog.info('Computing model magnitude errors for photometric observations')
+        self.fgcmLog.debug('Computing model magnitude errors for photometric observations')
 
         objFlag = snmm.getArray(self.objFlagHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
@@ -1544,7 +1595,7 @@ class FgcmStars(object):
         flagObjStruct = self.getFlagStarIndices()
 
         self.fgcmLog.info('Saving %d flagged star indices to %s' %
-                         (flagObjStruct.size,flagStarFile))
+                          (flagObjStruct.size,flagStarFile))
 
         # set clobber == True?
         fitsio.write(flagStarFile,flagObjStruct,clobber=True)

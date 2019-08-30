@@ -29,7 +29,7 @@ class FgcmRetrieveAtmosphere(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing fgcmRetrieveAtmosphere')
+        self.fgcmLog.debug('Initializing fgcmRetrieveAtmosphere')
 
         self.fgcmLUT = fgcmLUT
         self.fgcmPars = fgcmPars
@@ -42,6 +42,7 @@ class FgcmRetrieveAtmosphere(object):
         self.useNightlyRetrievedPwv = fgcmConfig.useNightlyRetrievedPwv
         self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
         self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.quietMode = fgcmConfig.quietMode
 
     def r1ToPwv(self, fgcmRetrieval):
         """
@@ -52,7 +53,8 @@ class FgcmRetrieveAtmosphere(object):
         fgcmRetrieval: FgcmRetrieval
         """
 
-        self.fgcmLog.info('Retrieving PWV Values...')
+        if not self.quietMode:
+            self.fgcmLog.info('Retrieving PWV Values...')
 
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         # Note that at this point it doesn't matter if we use the input or not
@@ -323,7 +325,7 @@ class FgcmRetrieveAtmosphere(object):
 
 
         # and we're done!  Everything is filled in!
-        self.fgcmLog.info('Done computing retrieved PWV values')
+        self.fgcmLog.debug('Done computing retrieved PWV values')
 
     def r0ToNightlyTau(self, fgcmRetrieval):
         """
@@ -334,7 +336,8 @@ class FgcmRetrieveAtmosphere(object):
         fgcmRetrieval: FgcmRetrieval
         """
 
-        self.fgcmLog.info('Retrieving Nightly Tau Values...')
+        if not self.quietMode:
+            self.fgcmLog.info('Retrieving Nightly Tau Values...')
 
         #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
 
@@ -390,8 +393,9 @@ class FgcmRetrieveAtmosphere(object):
                                           rev=True, min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
-            self.fgcmLog.info( 'Found %d nights to retrieve tau in %s band' %
-                             (gd.size, tauBands[i]))
+            if not self.quietMode:
+                self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
+                                  (gd.size, tauBands[i]))
 
             for j in xrange(gd.size):
                 i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
@@ -456,7 +460,8 @@ class FgcmRetrieveAtmosphere(object):
         fgcmGray: FgcmGray
         """
 
-        self.fgcmLog.info( 'Retrieving nightly Tau values...')
+        if not self.quietMode:
+            self.fgcmLog.info('Retrieving nightly Tau values...')
 
         expGray = snmm.getArray(fgcmGray.expGrayHandle)
 
@@ -537,8 +542,9 @@ class FgcmRetrieveAtmosphere(object):
                                           rev=True, min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
-            self.fgcmLog.info( 'Found %d nights to retrieve tau in %s band' %
-                             (gd.size, tauBands[i]))
+            if not self.quietMode:
+                self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
+                                  (gd.size, tauBands[i]))
 
             for j in xrange(gd.size):
                 i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]

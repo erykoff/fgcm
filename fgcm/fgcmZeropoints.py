@@ -53,7 +53,7 @@ class FgcmZeropoints(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmZeropoints...')
+        self.fgcmLog.debug('Initializing FgcmZeropoints...')
 
         self.illegalValue = fgcmConfig.illegalValue
         self.outputPath = fgcmConfig.outputPath
@@ -79,6 +79,7 @@ class FgcmZeropoints(object):
         self.I0StdBand = fgcmConfig.I0StdBand
         self.I1StdBand = fgcmConfig.I1StdBand
         self.lambdaStdBand = fgcmConfig.lambdaStdBand
+        self.quietMode = fgcmConfig.quietMode
 
     def computeZeropoints(self):
         """
@@ -148,7 +149,8 @@ class FgcmZeropoints(object):
 
         # set up output structures
 
-        self.fgcmLog.info('Building zeropoint structure...')
+        if not self.quietMode:
+            self.fgcmLog.info('Building zeropoint structure...')
 
         dtype = [(self.expField,'i4'),
                  (self.ccdField,'i2'),
@@ -523,7 +525,8 @@ class FgcmZeropoints(object):
         ############
 
         if self.plotPath is not None:
-            self.fgcmLog.info('Making I1/R1 plots...')
+            if not self.quietMode:
+                self.fgcmLog.info('Making I1/R1 plots...')
 
             plotter = FgcmZeropointPlotter(zpStruct, self.fgcmStars, self.fgcmPars,
                                            self.I0StdBand, self.I1StdBand, self.I10StdBand,
@@ -534,7 +537,8 @@ class FgcmZeropoints(object):
             plotter.makeR1I1Maps(self.ccdOffsets, ccdField=self.ccdField)
             plotter.makeR1I1TemporalResidualPlots()
 
-            self.fgcmLog.info('Making zeropoint summary plots...')
+            if not self.quietMode:
+                self.fgcmLog.info('Making zeropoint summary plots...')
 
             expZpMean = np.zeros(self.fgcmPars.nExp,dtype='f4')
             expZpNCCD = np.zeros(self.fgcmPars.nExp,dtype='i4')

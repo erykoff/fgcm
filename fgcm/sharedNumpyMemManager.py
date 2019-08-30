@@ -45,8 +45,8 @@ class SharedNumpyMemManager(object):
     Note that the array is a pointer to the shared memory, so when
     run in multiprocessing the shared memory is not copied.
 
-    Note that this can only wrap 1+D numpy arrays, and cannot wrap
-    objects or numpy recarrays, etc.
+    Note that this can only wrap 1 or multi-dimensional numpy arrays,
+    and cannot wrap objects or numpy recarrays, etc.
 
     Also note when creating wrapped arrays if you read in data
     then you need to clear this memory (setting to None) or else

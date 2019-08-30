@@ -73,7 +73,7 @@ class FgcmParameters(object):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
-        self.fgcmLog.info('Initializing FgcmParameters...')
+        self.fgcmLog.debug('Initializing FgcmParameters...')
 
         # for plotting
         self.minExpPerNight = fgcmConfig.minExpPerNight
@@ -154,6 +154,7 @@ class FgcmParameters(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.illegalValue = fgcmConfig.illegalValue
+        self.quietMode = fgcmConfig.quietMode
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -355,6 +356,8 @@ class FgcmParameters(object):
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
         self.compSigmaCal = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawCrunchedRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # and the computed retrieved Pwv
         # these are set to the standard values to start
@@ -452,6 +455,8 @@ class FgcmParameters(object):
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
+        self.compReservedRawRepeatability = np.zeros(self.nBands, dtype='f8')
+        self.compReservedRawCrunchedRepeatability = np.zeros(self.nBands, dtype='f8')
 
         # These are exposure-level properties
         self.compRetrievedLnPwv = np.atleast_1d(inParams['COMPRETRIEVEDLNPWV'][0])
@@ -472,7 +477,7 @@ class FgcmParameters(object):
         self.parSuperStarFlat = inSuperStar
 
     def resetAtmosphereParameters(self):
-        self.fgcmLog.info("Resetting atmosphere parameters.")
+        self.fgcmLog.info("Resetting atmosphere parameters prior to fit.")
 
         self.parAlpha[:] = self.alphaStd
         self.parO3[:] = self.o3Std
@@ -518,7 +523,8 @@ class FgcmParameters(object):
 
         self.nExp = self.nExp
 
-        self.fgcmLog.info('Loading info on %d exposures.' % (self.nExp))
+        if not self.quietMode:
+            self.fgcmLog.info('Loading info on %d exposures.' % (self.nExp))
 
         self.expArray = expInfo[self.expField]
         self.expFlag = np.zeros(self.nExp,dtype=np.int8)
@@ -579,7 +585,8 @@ class FgcmParameters(object):
         self.campaignNights = np.unique(mjdForNight)
         self.nCampaignNights = self.campaignNights.size
 
-        self.fgcmLog.info('Exposures taken on %d nights.' % (self.nCampaignNights))
+        if not self.quietMode:
+            self.fgcmLog.info('Exposures taken on %d nights.' % (self.nCampaignNights))
 
         self.expDeltaUT = (self.expMJD + self.UTBoundary) - mjdForNight
 
@@ -697,7 +704,8 @@ class FgcmParameters(object):
         self.nCoatingIntervals = self.coatingMJDs.size + 1
         self.coatingMJDs = np.insert(self.coatingMJDs, 0, np.min(self.expMJD) - 1.0)
 
-        self.fgcmLog.info("Compiling indices for %d mirror coating(s)." % (self.nCoatingIntervals))
+        if not self.quietMode:
+            self.fgcmLog.info("Compiling indices for %d mirror coating(s)." % (self.nCoatingIntervals))
 
         self.expCoatingIndex = np.zeros(self.nExp, dtype='i4')
         self.mirrorChromaticityPivot = np.zeros(self.nCoatingIntervals)
@@ -995,7 +1003,8 @@ class FgcmParameters(object):
         self.parExternalLnPwvScale = 1.0
 
         match, = np.where(self.externalPwvFlag)
-        self.fgcmLog.info('%d exposures of %d have external pwv values' % (match.size,self.nExp))
+        if not self.quietMode:
+            self.fgcmLog.info('%d exposures of %d have external pwv values' % (match.size,self.nExp))
 
 
     def loadExternalTau(self, withAlpha=False):
@@ -1629,7 +1638,7 @@ class FgcmParameters(object):
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
 
         # This is the signifier
-        bad = np.where(superStarFlatCenter < -4.0)
+        bad = np.where((superStarFlatCenter < -4.0) | (superStarFlatCenter > 90.0))
         if bad[0].size > 0:
             superStarFlatCenter[bad] = self.illegalValue
 
