@@ -108,9 +108,17 @@ class FgcmMakeStars(object):
         if (not os.path.isfile(observationFile)):
             raise IOError("Could not find observationFile %s" % (observationFile))
 
+        prepositionFile = self.starConfig['starfileBase'] + '_prepositions.fits'
+
+        if not clobber and os.path.isfile(prepositionFile):
+            import fitsio
+
+            self.objCat = fitsio.read(prepositionFile, ext=1)
+        else:
+            self.makePrimaryStarsFromFits(observationFile)
+
         obsIndexFile = self.starConfig['starfileBase']+'_obs_index.fits'
 
-        self.makePrimaryStarsFromFits(observationFile)
         self.makeMatchedStarsFromFits(observationFile, obsIndexFile, clobber=clobber)
 
     def makePrimaryStarsFromFits(self, observationFile):
@@ -698,18 +706,20 @@ class FgcmMakeStars(object):
         # redo the good object selection after sampling
         gd,=np.where(objClass == 1)
 
-        # create the object catalog index
-        self.objIndexCat = np.zeros(gd.size, dtype=[('fgcm_id','i4'),
-                                                    ('ra','f8'),
-                                                    ('dec','f8'),
-                                                    ('obsarrindex','i4'),
-                                                    ('nobs','i4')])
+        dtype = [('fgcm_id','i4'),
+                 ('ra','f8'),
+                 ('dec','f8'),
+                 ('obsarrindex','i4'),
+                 ('nobs','i4')]
 
         hasExtraQuantities = False
         if len(self.starConfig['quantitiesToAverage']) > 0:
             hasExtraQuantities = True
             for quant in self.starConfig['quantitiesToAverage']:
                 dtype.extend([(quant, 'f4')])
+
+        # create the object catalog index
+        self.objIndexCat = np.zeros(gd.size, dtype=dtype)
 
         self.objIndexCat['fgcm_id'][:] = self.objCat['fgcm_id'][gd]
         self.objIndexCat['ra'][:] = self.objCat['ra'][gd]
