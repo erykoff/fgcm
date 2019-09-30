@@ -16,12 +16,14 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
                'VARIABLE':2**2,
                'TEMPORARY_BAD_STAR':2**3,
                'RESERVED':2**4,
-               'REFSTAR_OUTLIER': 2**5}
+               'REFSTAR_OUTLIER': 2**5,
+               'BAD_QUANTITY': 2**6}
 
 # Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE':2**0,
                'BAD_ERROR':2**1,
-               'SUPERSTAR_OUTLIER':2**2}
+               'SUPERSTAR_OUTLIER':2**2,
+               'NO_ZEROPOINT': 2**4}
 
 # Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,
@@ -31,7 +33,8 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
                'NO_STARS':2**4,
                'BAND_NOT_IN_LUT':2**5,
                'TEMPORARY_BAD_EXPOSURE':2**6,
-               'EXP_GRAY_TOO_POSITIVE':2**7}
+               'EXP_GRAY_TOO_POSITIVE':2**7,
+               'BAD_ZPFLAG':2**8}
 
 # Dictionary of zeropoint flags
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,

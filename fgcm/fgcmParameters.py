@@ -527,7 +527,7 @@ class FgcmParameters(object):
             self.fgcmLog.info('Loading info on %d exposures.' % (self.nExp))
 
         self.expArray = expInfo[self.expField]
-        self.expFlag = np.zeros(self.nExp,dtype=np.int8)
+        self.expFlag = np.zeros(self.nExp,dtype=np.int16)
         self.expExptime = expInfo['EXPTIME']
 
         # Load in the expSeeingVariable

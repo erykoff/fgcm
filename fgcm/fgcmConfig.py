@@ -136,6 +136,7 @@ class FgcmConfig(object):
     illegalValue = ConfigField(float, default=-9999.0)
     sedFudgeFactors = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
+    quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
@@ -220,6 +221,9 @@ class FgcmConfig(object):
 
     inParameterFile = ConfigField(str, required=False)
     inFlagStarFile = ConfigField(str, required=False)
+
+    zpsToApplyFile = ConfigField(str, required=False)
+    maxFlagZpsToApply = ConfigField(int, default=2)
 
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False, noOutput=False):
 

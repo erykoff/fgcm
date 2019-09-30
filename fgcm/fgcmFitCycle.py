@@ -49,7 +49,7 @@ class FgcmFitCycle(object):
     useFits: bool, optional
        Read in files using fitsio?
     noFitsDict: dict, optional
-       Dict with lutIndox/lutStd/expInfo/ccdOffsets if useFits == False
+       Dict with lutIndex/lutStd/expInfo/ccdOffsets if useFits == False
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
