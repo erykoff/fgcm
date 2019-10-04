@@ -49,9 +49,10 @@ retrievalFlagDict = {'EXPOSURE_RETRIEVED':2**0,
                      'EXPOSURE_INTERPOLATED':2**1,
                      'EXPOSURE_STANDARD':2**2}
 
-logDict = {'NONE':0,
-           'INFO':1,
-           'DEBUG':2}
+logDict = {'NONE': 0,
+           'WARN': 1,
+           'INFO': 2,
+           'DEBUG': 3}
 
 class MaxFitIterations(Exception):
     """
@@ -206,6 +207,9 @@ def histoGauss(ax,array):
 
     q13 = np.percentile(array,[25,75])
     binsize=2*(q13[1] - q13[0])*array.size**(-1./3.)
+
+    if binsize < 0.0:
+        binsize = 0.1
 
     hist=esutil.stat.histogram(array,binsize=binsize,more=True)
 
