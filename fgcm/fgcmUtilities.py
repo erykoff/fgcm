@@ -205,11 +205,11 @@ def histoGauss(ax,array):
     import matplotlib.pyplot as plt
     import esutil
 
+    if array.size < 5:
+        return np.array([1.0, 0.0, 1.0])
+
     q13 = np.percentile(array,[25,75])
     binsize=2*(q13[1] - q13[0])*array.size**(-1./3.)
-
-    if binsize < 0.0:
-        binsize = 0.1
 
     hist=esutil.stat.histogram(array,binsize=binsize,more=True)
 

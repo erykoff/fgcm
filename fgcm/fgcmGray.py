@@ -932,14 +932,14 @@ class FgcmGray(object):
         expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
 
         for i in xrange(self.fgcmPars.nBands):
-            delta = self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i]
+            delta = np.clip(self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i], 0.001, 1e5)
 
             cut = -1 * int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             # Clip the cut to a range from 2 times the input to 5 mmag
             expGrayPhotometricCut[i] = max(expGrayPhotometricCut[i]*2,
                                            min(cut, -0.005))
 
-            delta = self.autoHighCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i]
+            delta = np.clip(self.autoHighCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i], 0.001, 1e5)
             cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             expGrayHighCut[i] = max(0.005,
                                     min(cut, expGrayHighCut[i]*2))
