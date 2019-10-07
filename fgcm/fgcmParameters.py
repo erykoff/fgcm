@@ -157,7 +157,7 @@ class FgcmParameters(object):
         self.quietMode = fgcmConfig.quietMode
 
         if fgcmConfig.aperCorrFitNBins == 0 and len(fgcmConfig.aperCorrInputParameters) > 0:
-            self.aperCorrInputParameters = fgcmConfig.aperCorrParameters
+            self.aperCorrInputParameters = fgcmConfig.aperCorrInputParameters
         else:
             self.aperCorrInputParameters = None
 
