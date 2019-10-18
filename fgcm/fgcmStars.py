@@ -67,6 +67,7 @@ class FgcmStars(object):
         self.nNotFitBands = len(fgcmConfig.notFitBands)
         self.sedFudgeFactors = fgcmConfig.sedFudgeFactors
         self.starColorCuts = fgcmConfig.starColorCuts
+        self.quantityCuts = fgcmConfig.quantityCuts
         self.sigma0Phot = fgcmConfig.sigma0Phot
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.plotPath = fgcmConfig.plotPath
@@ -164,6 +165,28 @@ class FgcmStars(object):
             self.fgcmLog.info('Done reading in %d unique star positions in %.1f seconds.' %
                               (pos.size, time.time() - startTime))
 
+        # Cut down the stars here if desired.
+        if len(self.quantityCuts) > 0:
+            cut = None
+            for qcut in self.quantityCuts:
+                quant = qcut[0].upper()
+                qmin = qcut[1]
+                qmax = qcut[2]
+
+                if quant not in pos.dtype.names:
+                    raise ValueError("Could not find cut quantity %s in indexfile %s[POS]" %
+                                     (quant, self.indexFile))
+
+                if cut is None:
+                    cut = ((pos[quant] >= qmin) & (pos[quant] <= qmax))
+                else:
+                    cut &= ((pos[quant] >= qmin) & (pos[quant] <= qmax))
+
+            nCut = np.sum(~cut)
+            self.fgcmLog.info('Cutting %d objects from extra quantities' % (nCut))
+
+            pos = pos[cut]
+
         obsFilterName = np.core.defchararray.strip(obs['FILTERNAME'][:])
 
         # And refstars if available
@@ -172,7 +195,7 @@ class FgcmStars(object):
             self.fgcmLog.debug('Reading in reference stars...')
             ref = fitsio.read(self.refstarFile, ext=1, lower=True)
             if not self.quietMode:
-                self.fgcmLog.info('Done reading %d reference starss in %.1f seconds.' %
+                self.fgcmLog.info('Done reading %d reference stars in %.1f seconds.' %
                                   (ref.size, time.time() - startTime))
             refID = ref['fgcm_id']
             refMag = ref['mag']
@@ -1665,6 +1688,7 @@ class FgcmStars(object):
         outCat = np.zeros(goodStars.size, dtype=[('FGCM_ID', 'i8'),
                                                  ('RA', 'f8'),
                                                  ('DEC', 'f8'),
+                                                 ('FLAG', 'i4'),
                                                  ('NGOOD', 'i4', len(self.bands)),
                                                  ('MAG_STD', 'f4', len(self.bands)),
                                                  ('MAGERR_STD', 'f4', len(self.bands))])
@@ -1672,6 +1696,7 @@ class FgcmStars(object):
         outCat['FGCM_ID'] = objID[goodStars]
         outCat['RA'] = objRA[goodStars]
         outCat['DEC'] = objDec[goodStars]
+        outCat['FLAG'] = objFlag[goodStars]
         outCat['NGOOD'] = objNGoodObs[goodStars, :]
         outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
         outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]

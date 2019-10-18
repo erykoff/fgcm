@@ -133,9 +133,11 @@ class FgcmConfig(object):
     ccdGraySubCCDChebyshevOrder = ConfigField(int, default=1)
     ccdGraySubCCDTriangular = ConfigField(bool, default=True)
     aperCorrFitNBins = ConfigField(int, default=5)
+    aperCorrInputParameters = ConfigField(np.ndarray, default=np.array([]))
     illegalValue = ConfigField(float, default=-9999.0)
     sedFudgeFactors = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
+    quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
@@ -220,6 +222,9 @@ class FgcmConfig(object):
 
     inParameterFile = ConfigField(str, required=False)
     inFlagStarFile = ConfigField(str, required=False)
+
+    zpsToApplyFile = ConfigField(str, required=False)
+    maxFlagZpsToApply = ConfigField(int, default=2)
 
     def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False, noOutput=False):
 
@@ -498,7 +503,6 @@ class FgcmConfig(object):
 
         # and check the star color cuts and replace with indices...
         #  note that self.starColorCuts is a copy so that we don't overwrite.
-        ## FIXME: allow index or name here
 
         for cCut in self.starColorCuts:
             if (not isinstance(cCut[0],int)) :
@@ -509,6 +513,14 @@ class FgcmConfig(object):
                 if (cCut[1] not in self.bands):
                     raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
                 cCut[1] = list(self.bands).index(cCut[1])
+
+        # Check for input aperture corrections.
+        if self.aperCorrFitNBins == 0:
+            if len(self.aperCorrInputParameters) == 0:
+                self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputParameters")
+            else:
+                if len(self.aperCorrInputParameters) != len(self.bands):
+                    raise RuntimeError("Length of aperCorrInputParameters does not equal number of bands!")
 
         # and AB zeropoint
         self.hPlanck = 6.6
