@@ -156,10 +156,10 @@ class FgcmParameters(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
 
-        if fgcmConfig.aperCorrFitNBins == 0 and len(fgcmConfig.aperCorrInputParameters) > 0:
-            self.aperCorrInputParameters = fgcmConfig.aperCorrInputParameters
+        if fgcmConfig.aperCorrFitNBins == 0 and len(fgcmConfig.aperCorrInputSlopes) > 0:
+            self.aperCorrInputSlopes = fgcmConfig.aperCorrInputSlopes
         else:
-            self.aperCorrInputParameters = None
+            self.aperCorrInputSlopes = None
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -347,9 +347,9 @@ class FgcmParameters(object):
         self.compAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
 
-        if self.aperCorrInputParameters is not None:
+        if self.aperCorrInputSlopes is not None:
             # Set the aperture correction parameters to those that were input
-            self.compAperCorrSlope[:] = self.aperCorrInputParameters[:]
+            self.compAperCorrSlope[:] = self.aperCorrInputSlopes[:]
             self.compAperCorrRange[0, :] = 0.0
             self.compAperCorrRange[1, :] = np.inf
             for bandIndex in range(len(self.bands)):
