@@ -58,8 +58,8 @@ class FgcmApertureCorrection(object):
             self.fgcmLog.info('No aperture correction will be computed')
             # Only reset to zero if there aren't any input parameters
             # Otherwise, leave them as is and they'll get happily saved
-            # for the next fiy cycle.
-            if self.fgcmPars.aperCorrInputParameters is None:
+            # for the next fit cycle.
+            if self.fgcmPars.aperCorrInputSlopes is None:
                 self.fgcmPars.compAperCorrPivot[:] = 0.0
                 self.fgcmPars.compAperCorrSlope[:] = 0.0
                 self.fgcmPars.compAperCorrSlopeErr[:] = 0.0
