@@ -133,7 +133,7 @@ class FgcmConfig(object):
     ccdGraySubCCDChebyshevOrder = ConfigField(int, default=1)
     ccdGraySubCCDTriangular = ConfigField(bool, default=True)
     aperCorrFitNBins = ConfigField(int, default=5)
-    aperCorrInputParameters = ConfigField(np.ndarray, default=np.array([]))
+    aperCorrInputSlopes = ConfigField(np.ndarray, default=np.array([]))
     illegalValue = ConfigField(float, default=-9999.0)
     sedFudgeFactors = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
@@ -516,11 +516,11 @@ class FgcmConfig(object):
 
         # Check for input aperture corrections.
         if self.aperCorrFitNBins == 0:
-            if len(self.aperCorrInputParameters) == 0:
-                self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputParameters")
+            if len(self.aperCorrInputSlopes) == 0:
+                self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopes")
             else:
-                if len(self.aperCorrInputParameters) != len(self.bands):
-                    raise RuntimeError("Length of aperCorrInputParameters does not equal number of bands!")
+                if len(self.aperCorrInputSlopes) != len(self.bands):
+                    raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
 
         # and AB zeropoint
         self.hPlanck = 6.6
