@@ -40,3 +40,5 @@ from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
 from .fgcmComputeStepUnits import FgcmComputeStepUnits
 from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
+from .fgcmZpsToApply import FgcmZpsToApply
+from .fgcmApplyZeropoints import FgcmApplyZeropoints

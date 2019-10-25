@@ -56,9 +56,13 @@ class FgcmApertureCorrection(object):
 
         if (self.aperCorrFitNBins == 0):
             self.fgcmLog.info('No aperture correction will be computed')
-            self.fgcmPars.compAperCorrPivot[:] = 0.0
-            self.fgcmPars.compAperCorrSlope[:] = 0.0
-            self.fgcmPars.compAperCorrSlopeErr[:] = 0.0
+            # Only reset to zero if there aren't any input parameters
+            # Otherwise, leave them as is and they'll get happily saved
+            # for the next fit cycle.
+            if self.fgcmPars.aperCorrInputSlopes is None:
+                self.fgcmPars.compAperCorrPivot[:] = 0.0
+                self.fgcmPars.compAperCorrSlope[:] = 0.0
+                self.fgcmPars.compAperCorrSlopeErr[:] = 0.0
             return
 
         startTime=time.time()
@@ -69,8 +73,6 @@ class FgcmApertureCorrection(object):
         # need to make a local copy since we're modifying
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
         expGrayTemp = expGray.copy()
-
-        # FIXME: this should be per FILTER not per BAND
 
         # first, remove any previous correction if necessary...
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >

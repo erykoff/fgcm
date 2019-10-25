@@ -156,6 +156,11 @@ class FgcmParameters(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
 
+        if fgcmConfig.aperCorrFitNBins == 0 and len(fgcmConfig.aperCorrInputSlopes) > 0:
+            self.aperCorrInputSlopes = fgcmConfig.aperCorrInputSlopes
+        else:
+            self.aperCorrInputSlopes = None
+
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
         else:
@@ -336,11 +341,25 @@ class FgcmParameters(object):
             self.loadExternalTau()
 
         # and the aperture corrections
-        ## FIXME: should these be per band or filter??
+        # These are per-band
         self.compAperCorrPivot = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrSlope = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrSlopeErr = np.zeros(self.nBands,dtype='f8')
         self.compAperCorrRange = np.zeros((2,self.nBands),dtype='f8')
+
+        if self.aperCorrInputSlopes is not None:
+            # Set the aperture correction parameters to those that were input
+            self.compAperCorrSlope[:] = self.aperCorrInputSlopes[:]
+            self.compAperCorrRange[0, :] = 0.0
+            self.compAperCorrRange[1, :] = np.inf
+            for bandIndex in range(len(self.bands)):
+                use, = np.where((self.expBandIndex == bandIndex) &
+                                (self.expSeeingVariable > 0.0))
+                # The pivot is somewhat arbitrary and will come out in the wash
+                # through the fit cycles, but it's good to have it as something
+                # sensible
+                if use.size >= 3:
+                    self.compAperCorrPivot[i] = np.median(self.expSeeingVariable[use])
 
         # The magnitude model parameters
         self.compModelErrExptimePivot = np.zeros(self.nBands, dtype='f8')
@@ -527,7 +546,7 @@ class FgcmParameters(object):
             self.fgcmLog.info('Loading info on %d exposures.' % (self.nExp))
 
         self.expArray = expInfo[self.expField]
-        self.expFlag = np.zeros(self.nExp,dtype=np.int8)
+        self.expFlag = np.zeros(self.nExp,dtype=np.int16)
         self.expExptime = expInfo['EXPTIME']
 
         # Load in the expSeeingVariable
@@ -1674,8 +1693,6 @@ class FgcmParameters(object):
 
         expApertureCorrection = np.zeros(self.nExp,dtype='f8')
 
-        ## FIXME if changing aperture correction
-        # FIXME should filter not band
         expSeeingVariableClipped = np.clip(self.expSeeingVariable,
                                            self.compAperCorrRange[0,self.expBandIndex],
                                            self.compAperCorrRange[1,self.expBandIndex])

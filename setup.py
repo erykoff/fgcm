@@ -8,7 +8,8 @@ exec(open('fgcm/_version.py').read())
 
 scripts = ['scripts/runFgcmFitCycle.py',
            'scripts/makeFgcmAtmosphereTable.py',
-           'scripts/listFgcmAtmosphereTables.py']
+           'scripts/listFgcmAtmosphereTables.py',
+           'scripts/applyFgcmZeropoints.py']
 
 name='fgcm'
 
