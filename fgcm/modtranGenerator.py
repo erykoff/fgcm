@@ -95,7 +95,7 @@ class ModtranGenerator(object):
             if m is not None:
                 o3Line = lines[i+1]
                 break
-        m=re.search("CONTAINED\ +(\d+\.\d+)\ +", o3Line)
+        m=re.search(r"CONTAINED\ +(\d+\.\d+)\ +", o3Line)
         self._o3DefaultSealevel = float(m.groups()[0])
 
         # for PWV, find line with "THE WATER PROFILE".
@@ -105,7 +105,7 @@ class ModtranGenerator(object):
             if m is not None:
                 pwvLine = lines[i+1]
                 break
-        m=re.search("INITIAL:\ +(\d+\.\d+)\ +", pwvLine)
+        m=re.search(r"INITIAL:\ +(\d+\.\d+)\ +", pwvLine)
         self._h2oDefaultSealevel = float(m.groups()[0])
 
         # for the H2O, O3 values at elevation, find line "H2O         O3" (9 spaces)
