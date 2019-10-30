@@ -111,6 +111,7 @@ class FgcmStars(object):
         self.hasXY = False
         self.hasRefstars = False
         self.nRefStars = 0
+        self.hasPsfCandidate = False
         self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
@@ -257,7 +258,7 @@ class FgcmStars(object):
     def loadStars(self, fgcmPars,
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
-                  refID=None, refMag=None, refMagErr=None,
+                  psfCandidate=None, refID=None, refMag=None, refMagErr=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
         Load stars from arrays
@@ -301,6 +302,8 @@ class FgcmStars(object):
            x position for each observation
         obsY: float array, optional
            y position for each observation
+        psfCandidate: bool array, optional
+           Flag if this star was a psf candidate in single-epoch images
         flagID: int array, optional
            ID of each object that is flagged from previous cycle
         flagFlag: int array, optional
@@ -358,6 +361,13 @@ class FgcmStars(object):
             # hasXY = False
             if self.superStarSubCCD:
                 raise ValueError("Input stars do not have x/y but superStarSubCCD is set.")
+        if psfCandidate is not None:
+            self.hasPsfCandidate = True
+
+            self.fgcmLog.info('PSF Candidate Flags found')
+
+            # psfCandidate: bool flag if this is a single-epoch psf candidate
+            self.psfCandidateHandle = snmm.createArray(self.nStarObs, dtype=np.bool)
 
         if (refID is not None and refMag is not None and refMagErr is not None):
             self.hasRefstars = True
@@ -395,6 +405,8 @@ class FgcmStars(object):
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
             snmm.getArray(self.obsYHandle)[:] = obsY
+        if self.hasPsfCandidate:
+            snmm.getArray(self.psfCandidateHandle)[:] = psfCandidate
 
         if self.hasRefstars:
             # And filter out bad signal to noise, per band, if desired,
@@ -487,6 +499,11 @@ class FgcmStars(object):
         self.objNobsHandle = snmm.createArray(self.nStars,dtype='i4')
         #  objNGoodObsHandle: number of good observations, per band
         self.objNGoodObsHandle = snmm.createArray((self.nStars,self.nBands),dtype='i4')
+        #  objNTotalObsHandle: number of all observations, per band
+        self.objNTotalObsHandle = snmm.createArray((self.nStars, self.nBands), dtype='i4')
+        if self.hasPsfCandidate:
+            #  objNPsfCandidateHandle: number of observations that are a psf candidate, per band
+            self.objNPsfCandidateHandle = snmm.createArray((self.nStars, self.nBands), dtype='i4')
 
         snmm.getArray(self.objIDHandle)[:] = objID
         snmm.getArray(self.objRAHandle)[:] = objRA
@@ -653,6 +670,8 @@ class FgcmStars(object):
             self.fgcmLog.debug('Checking stars with all exposure numbers')
             allExpsIndex = np.arange(fgcmPars.expArray.size)
             self.selectStarsMinObsExpIndex(allExpsIndex)
+
+            self.computeNTotalStats(fgcmPars)
 
         self.starsLoaded = True
 
@@ -835,6 +854,46 @@ class FgcmStars(object):
 
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
         self.fgcmLog.info('Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
+
+    def computeNTotalStats(self, fgcmPars):
+        """
+        Compute ntotal statistics and psf candidate statistics if available.
+
+        Parameters
+        ----------
+        fgcmPars: FgcmParameters
+        """
+
+        goodExpsIndex, = np.where(fgcmPars.expFlag >= 0)
+
+        minObsPerBand = 0
+
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
+
+        _, goodObs = esutil.numpy_util.match(goodExpsIndex, obsExpIndex)
+
+        objNTotalObs[:, :] = 0
+        np.add.at(objNTotalObs,
+                  (obsObjIDIndex[goodObs],
+                   obsBandIndex[goodObs]),
+                  1)
+
+        # Do the psf candidate computation if available
+        if self.hasPsfCandidate:
+            psfCandidate = snmm.getArray(self.psfCandidateHandle)
+            objNPsfCandidate = snmm.getArray(self.objNPsfCandidateHandle)
+
+            ispsf, = np.where(psfCandidate[goodObs])
+            psfObs = goodObs[ispsf]
+
+            objNPsfCandidate[:, :] = 0
+            np.add.at(objNPsfCandidate,
+                      (obsObjIDIndex[psfObs],
+                       obsBandIndex[psfObs]),
+                      1)
 
     def getGoodStarIndices(self, includeReserve=False, onlyReserve=False, checkMinObs=False,
                            checkHasColor=False):
@@ -1677,29 +1736,40 @@ class FgcmStars(object):
         objRA = snmm.getArray(self.objRAHandle)
         objDec = snmm.getArray(self.objDecHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        if self.hasPsfCandidate:
+            objNPsfCandidate = snmm.getArray(self.objNPsfCandidateHandle)
 
         rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
                       objFlagDict['TOO_FEW_OBS'])
 
         goodStars, = np.where((objFlag & rejectMask) == 0)
 
-        outCat = np.zeros(goodStars.size, dtype=[('FGCM_ID', 'i8'),
-                                                 ('RA', 'f8'),
-                                                 ('DEC', 'f8'),
-                                                 ('FLAG', 'i4'),
-                                                 ('NGOOD', 'i4', len(self.bands)),
-                                                 ('MAG_STD', 'f4', len(self.bands)),
-                                                 ('MAGERR_STD', 'f4', len(self.bands))])
+        dtype=[('FGCM_ID', 'i8'),
+               ('RA', 'f8'),
+               ('DEC', 'f8'),
+               ('FLAG', 'i4'),
+               ('NGOOD', 'i4', len(self.bands)),
+               ('NTOTAL', 'i4', len(self.bands)),
+               ('MAG_STD', 'f4', len(self.bands)),
+               ('MAGERR_STD', 'f4', len(self.bands))]
+        if self.hasPsfCandidate:
+            dtype.append(('NPSFCAND', 'i4', len(self.bands)))
+
+        outCat = np.zeros(goodStars.size, dtype=dtype)
 
         outCat['FGCM_ID'] = objID[goodStars]
         outCat['RA'] = objRA[goodStars]
         outCat['DEC'] = objDec[goodStars]
         outCat['FLAG'] = objFlag[goodStars]
         outCat['NGOOD'] = objNGoodObs[goodStars, :]
+        outCat['NTOTAL'] = objNTotalObs[goodStars, :]
         outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
         outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]
+        if self.hasPsfCandidate:
+            outCat['NPSFCAND'][:, :] = objNPsfCandidate[goodStars, :]
 
         return outCat
 
