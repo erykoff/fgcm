@@ -77,10 +77,10 @@ class FgcmSigmaRef(object):
         offsetRef = np.zeros(self.fgcmStars.nBands)
         sigmaRef = np.zeros(self.fgcmStars.nBands)
 
-        if goodRefStars.size < 100:
-            # Arbitrarily do 100 as the cutoff between small and large number...
+        if goodRefStars.size < 50:
+            # Arbitrarily do 50 as the cutoff between small and large number...
 
-            self.fgcmLog.info('Found %d refstars (< 100), so computing "small-number" statistics:' % (goodRefStars.size))
+            self.fgcmLog.info('Found %d refstars (< 50), so computing "small-number" statistics:' % (goodRefStars.size))
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
                 # Filter on previous bad refstars
@@ -103,7 +103,7 @@ class FgcmSigmaRef(object):
 
         else:
             # Large numbers
-            self.fgcmLog.debug('More than 100 reference stars, so computing "large-number" statistics.')
+            self.fgcmLog.debug('More than 50 reference stars, so computing "large-number" statistics.')
 
             # and we do 4 runs: full, blue 25%, middle 50%, red 25%
 

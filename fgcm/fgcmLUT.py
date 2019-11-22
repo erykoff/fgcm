@@ -936,7 +936,7 @@ class FgcmLUT(object):
         dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
 
         indicesSecZenithPlus = np.array(indices[:-1])
-        indicesSecZenithPlus[5] += 1
+        indicesSecZenithPlus[5] = np.clip(indicesSecZenithPlus[5] + 1, 0, self.secZenith.size - 1)
         indicesPwvPlus = np.array(indices[:-1])
         indicesPwvPlus[1] = np.clip(indicesPwvPlus[1] + 1, 0, self.lnPwv.size-1)
 
@@ -981,7 +981,7 @@ class FgcmLUT(object):
         dSecZenith = secZenith - (self.secZenith[0] + indices[5] * self.secZenithDelta)
 
         indicesSecZenithPlus = np.array(indices[:-1])
-        indicesSecZenithPlus[5] += 1
+        indicesSecZenithPlus[5] = np.clip(indicesSecZenithPlus[5] + 1, 0, self.secZenith.size - 1)
         indicesPwvPlus = np.array(indices[:-1])
         indicesPwvPlus[1] = np.clip(indicesPwvPlus[1] + 1, 0, self.lnPwv.size-1)
 
