@@ -123,6 +123,7 @@ class FgcmConfig(object):
     nCore = ConfigField(int, default=1)
     randomSeed = ConfigField(int, required=False)
     logger = ConfigField(None, required=False)
+    outputFgcmcalZpts = ConfigField(bool, default=False)
 
     brightObsGrayMax = ConfigField(float, default=0.15)
     minStarPerCCD = ConfigField(int, default=5)
