@@ -116,6 +116,8 @@ class FgcmStars(object):
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
+        self.secZenithRange = 1. / np.cos(np.radians(fgcmConfig.zenithRange))
+
         self.starsLoaded = False
 
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
@@ -426,10 +428,18 @@ class FgcmStars(object):
         self.fgcmLog.debug('Applying sigma0Phot = %.4f to mag errs' %
                            (self.sigma0Phot))
 
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
         obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
 
         obsFlag = snmm.getArray(self.obsFlagHandle)
-        bad, = np.where(obsMagADUErr <= 0.0)
+
+        bad, = np.where(~np.isfinite(obsMagADU))
+        obsFlag[bad] |= obsFlagDict['BAD_MAG']
+        if bad.size > 0:
+            self.fgcmLog.info('Flagging %d observations with bad magnitudes.' %
+                              (bad.size))
+
+        bad, = np.where((np.nan_to_num(obsMagADUErr) <= 0.0) | ~np.isfinite(obsMagADUErr))
         obsFlag[bad] |= obsFlagDict['BAD_ERROR']
         if (bad.size > 0):
             self.fgcmLog.info('Flagging %d observations with bad errors.' %
@@ -661,7 +671,15 @@ class FgcmStars(object):
 
         bad,=np.where(obsFlag != 0)
         tempSecZenith[bad] = 1.0  # filler here, but these stars aren't used
-        snmm.getArray(self.obsSecZenithHandle)[:] = tempSecZenith
+        obsSecZenith = snmm.getArray(self.obsSecZenithHandle)
+        obsSecZenith[:] = tempSecZenith
+
+        # Check the airmass range
+        if ((np.min(obsSecZenith) < self.secZenithRange[0]) |
+            (np.max(obsSecZenith) > self.secZenithRange[1])):
+            raise ValueError("Input stars have a secZenith that is out of range of LUT."
+                             "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" % (np.min(obsSecZenith), np.max(obsSecZenith), self.secZenithRange[0], self.secZenithRange[1]))
+
         if not self.quietMode:
             self.fgcmLog.info('Computed secZenith in %.1f seconds.' %
                               (time.time() - startTime))

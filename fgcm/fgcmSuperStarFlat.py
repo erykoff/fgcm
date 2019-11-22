@@ -173,7 +173,7 @@ class FgcmSuperStarFlat(object):
             # And for signaling here, we're going to set to a large value
             superStarOffset[~gd] = 100.0
 
-            # And the central parameter should be in flux or mag space depending
+            # And the central parameter should be in flux space
             self.fgcmPars.parSuperStarFlat[:, :, :, 0] = 10.**(superStarOffset / (-2.5))
 
         else:
