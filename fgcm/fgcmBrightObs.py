@@ -1,5 +1,6 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+
+from builtins import range
 
 import numpy as np
 import os
@@ -140,7 +141,7 @@ class FgcmBrightObs(object):
             #  see also fgcmChisq.py
             # splitValues is the first of the goodStars in each list
             splitValues = np.zeros(nSections-1,dtype='i4')
-            for i in xrange(1,nSections):
+            for i in range(1,nSections):
                 splitValues[i-1] = goodStarsList[i][0]
 
             # get the indices from the goodStarsSub matched list

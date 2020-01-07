@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -117,7 +117,7 @@ class FgcmRetrieveAtmosphere(object):
                                                  o3ZU, lnTauZU, alphaZU, secZenithZU,
                                                  pmbZU, indices)
 
-        for i in xrange(zUse.size):
+        for i in range(zUse.size):
             interpolator = scipy.interpolate.interp1d(I1Arr[:,i], lnPwvVals)
             rLnPwvZU[i] = interpolator(np.clip(r1ZU[i], I1Arr[:,i].min() + 0.0001,
                                              I1Arr[:,i].max() - 0.0001))
@@ -136,7 +136,7 @@ class FgcmRetrieveAtmosphere(object):
 
         rLnPwvStruct['EXPINDEX'] = minExpIndex + gd
 
-        for i in xrange(gd.size):
+        for i in range(gd.size):
             i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
 
             rLnPwvStruct['RLNPWV_MED'][i] = np.mean(rLnPwvZU[i1a])
@@ -152,7 +152,7 @@ class FgcmRetrieveAtmosphere(object):
         # we do this on any night that we have at least 1
         gd, = np.where(h > 0)
 
-        for i in xrange(gd.size):
+        for i in range(gd.size):
             i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
 
             if (i1a.size == 1):
@@ -162,7 +162,7 @@ class FgcmRetrieveAtmosphere(object):
                 st = np.argsort(rLnPwvStruct['MJD'][i1a])
                 i1a = i1a[st]
 
-                for j in xrange(i1a.size):
+                for j in range(i1a.size):
                     u = np.arange(np.clip(j - self.pwvRetrievalSmoothBlock/2, 0, i1a.size-1),
                                   np.clip(j + self.pwvRetrievalSmoothBlock/2, 0, i1a.size-1),
                                   1, dtype=np.int32)
@@ -185,7 +185,7 @@ class FgcmRetrieveAtmosphere(object):
 
         gd, = np.where(h > 0)
 
-        for i in xrange(gd.size):
+        for i in range(gd.size):
             i1a = b[rev[rev[gd[i]]:rev[gd[i]+1]]]
 
             # sort by MJD
@@ -360,7 +360,7 @@ class FgcmRetrieveAtmosphere(object):
 
         tauRetrievedBands = np.zeros((nTauBands, self.fgcmPars.nCampaignNights)) + self.illegalValue
 
-        for i in xrange(nTauBands):
+        for i in range(nTauBands):
             #bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
             bandIndex = self.fgcmPars.bands.index(tauBands[i])
 
@@ -397,7 +397,7 @@ class FgcmRetrieveAtmosphere(object):
                 self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
                                   (gd.size, tauBands[i]))
 
-            for j in xrange(gd.size):
+            for j in range(gd.size):
                 i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
                 fit=np.polyfit(expSecZenith[use[i1a]], extDelta[i1a], 1.0)
 
@@ -405,7 +405,7 @@ class FgcmRetrieveAtmosphere(object):
 
         # now loop over nights and take the average of good ones...
         self.fgcmPars.compRetrievedTauNight[:] = self.fgcmPars.tauStd
-        for i in xrange(self.fgcmPars.nCampaignNights):
+        for i in range(self.fgcmPars.nCampaignNights):
             u, = np.where(tauRetrievedBands[:, i] > self.illegalValue)
             if u.size > 0:
                 self.fgcmPars.compRetrievedTauNight[i] = np.mean(tauRetrievedBands[u, i])
@@ -506,7 +506,7 @@ class FgcmRetrieveAtmosphere(object):
         tauRetrievedBands = np.zeros((tauBands.size, self.fgcmPars.nCampaignNights)) + self.illegalValue
         tauModelBands = np.zeros_like(tauRetrievedBands)
 
-        for i in xrange(nTauBands):
+        for i in range(nTauBands):
             #bandIndex, = np.where(self.fgcmPars.bands == tauBands[i])[0]
             bandIndex = self.fgcmPars.bands.index(tauBands[i])
 
@@ -546,7 +546,7 @@ class FgcmRetrieveAtmosphere(object):
                 self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
                                   (gd.size, tauBands[i]))
 
-            for j in xrange(gd.size):
+            for j in range(gd.size):
                 i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
                 fit, cov = scipy.optimize.curve_fit(slopeFunc, expSecZenith[use[i1a]],
                                                     extDelta[i1a])
@@ -557,7 +557,7 @@ class FgcmRetrieveAtmosphere(object):
         # now loop over nights and take the average of good ones...
         self.fgcmPars.compRetrievedTauNight[:] = self.fgcmPars.tauStd
         modelTauNight = np.zeros_like(self.fgcmPars.compRetrievedTauNight)
-        for i in xrange(self.fgcmPars.nCampaignNights):
+        for i in range(self.fgcmPars.nCampaignNights):
             u, = np.where(tauRetrievedBands[:, i] > self.illegalValue)
             if u.size > 0:
                 self.fgcmPars.compRetrievedTauNight[i] = np.mean(tauRetrievedBands[u, i])

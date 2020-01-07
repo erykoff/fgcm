@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -574,7 +574,7 @@ class FgcmZeropoints(object):
             cols = ['g','r','b','m','y']
             syms = ['.','+','o','*','x']
 
-            for i in xrange(self.fgcmPars.nBands):
+            for i in range(self.fgcmPars.nBands):
                 use,=np.where((self.fgcmPars.expBandIndex == i) &
                               (expZpMean > 0.0))
 

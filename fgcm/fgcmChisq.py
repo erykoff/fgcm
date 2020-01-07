@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -344,7 +344,7 @@ class FgcmChisq(object):
             proc = None
 
             self.totalHandleDict = {}
-            for thisCore in xrange(self.nCore):
+            for thisCore in range(self.nCore):
                 self.totalHandleDict[workerIndex + thisCore] = (
                     snmm.createArray(self.nSums,dtype='f8'))
 
@@ -359,7 +359,7 @@ class FgcmChisq(object):
             #  see also fgcmBrightObs.py
             # splitValues is the first of the goodStars in each list
             splitValues = np.zeros(nSections-1,dtype='i4')
-            for i in xrange(1,nSections):
+            for i in range(1,nSections):
                 splitValues[i-1] = goodStarsList[i][0]
 
             # get the indices from the goodStarsSub matched list (matched to goodStars)
@@ -398,7 +398,7 @@ class FgcmChisq(object):
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
-            for thisCore in xrange(self.nCore):
+            for thisCore in range(self.nCore):
                 partialSums[:] += snmm.getArray(
                     self.totalHandleDict[workerIndex + thisCore])[:]
 
