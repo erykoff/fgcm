@@ -1,6 +1,6 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
 
+from builtins import range
 
 import numpy as np
 import scipy.interpolate as interpolate
@@ -356,10 +356,10 @@ class FgcmAtmosphereTable(object):
         self.fgcmLog.info("Generating %d*%d=%d PWV atmospheres..." % (pwvPlus.size,zenithPlus.size,pwvPlus.size*zenithPlus.size))
         self.pwvAtmTable = np.zeros((pwvPlus.size,zenithPlus.size,self.atmLambda.size))
 
-        for i in xrange(pwvPlus.size):
+        for i in range(pwvPlus.size):
             sys.stdout.write('%d' % (i))
             sys.stdout.flush()
-            for j in xrange(zenithPlus.size):
+            for j in range(zenithPlus.size):
                 sys.stdout.write('.')
                 sys.stdout.flush()
                 atm=self.modGen(pwv=pwvPlus[i],zenith=zenithPlus[j],
@@ -370,10 +370,10 @@ class FgcmAtmosphereTable(object):
         self.fgcmLog.info("\nGenerating %d*%d=%d O3 atmospheres..." % (o3Plus.size,zenithPlus.size,o3Plus.size*zenithPlus.size))
         self.o3AtmTable = np.zeros((o3Plus.size, zenithPlus.size, self.atmLambda.size))
 
-        for i in xrange(o3Plus.size):
+        for i in range(o3Plus.size):
             sys.stdout.write('%d' % (i))
             sys.stdout.flush()
-            for j in xrange(zenithPlus.size):
+            for j in range(zenithPlus.size):
                 sys.stdout.write('.')
                 sys.stdout.flush()
                 atm=self.modGen(o3=o3Plus[i],zenith=zenithPlus[j],
@@ -386,7 +386,7 @@ class FgcmAtmosphereTable(object):
         self.o2AtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
         self.rayleighAtmTable = np.zeros((zenithPlus.size, self.atmLambda.size))
 
-        for j in xrange(zenithPlus.size):
+        for j in range(zenithPlus.size):
             sys.stdout.write('.')
             sys.stdout.flush()
             atm=self.modGen(zenith=zenithPlus[j],

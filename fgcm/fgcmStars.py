@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import esutil
@@ -541,7 +541,7 @@ class FgcmStars(object):
         objNobs = snmm.getArray(self.objNobsHandle)
         ## FIXME: check if this extra obsIndex reference is necessary or not.
         ##   probably extraneous.
-        for i in xrange(self.nStars):
+        for i in range(self.nStars):
             obsObjIDIndex[obsIndex[objObsIndex[i]:objObsIndex[i]+objNobs[i]]] = i
         if not self.quietMode:
             self.fgcmLog.info('Done indexing in %.1f seconds.' %
@@ -1510,7 +1510,7 @@ class FgcmStars(object):
 
             h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
-            for i in xrange(h.size):
+            for i in range(h.size):
                 if h[i] == 0: continue
 
                 i1a = rev[rev[i]:rev[i+1]]
@@ -1628,7 +1628,7 @@ class FgcmStars(object):
         goodStarsSub = goodStarsSub[gd]
 
         # loop over bands
-        for bandIndex in xrange(fgcmPars.nBands):
+        for bandIndex in range(fgcmPars.nBands):
             use, = np.where((obsBandIndex[goodObs] == bandIndex) &
                             (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             pars = fgcmPars.compModelErrPars[:, bandIndex]

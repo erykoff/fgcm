@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -128,7 +128,7 @@ class FgcmComputeStepUnits(object):
         proc = None
 
         self.totalHandleDict = {}
-        for thisCore in xrange(self.nCore):
+        for thisCore in range(self.nCore):
             self.totalHandleDict[workerIndex + thisCore] = (
                 snmm.createArray(self.nSums,dtype='f8'))
 
@@ -138,7 +138,7 @@ class FgcmComputeStepUnits(object):
         goodStarsList = np.array_split(goodStars,nSections)
 
         splitValues = np.zeros(nSections-1,dtype='i4')
-        for i in xrange(1,nSections):
+        for i in range(1,nSections):
             splitValues[i-1] = goodStarsList[i][0]
 
         splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
@@ -161,7 +161,7 @@ class FgcmComputeStepUnits(object):
 
         # sum up the partial sums from the different jobs
         partialSums = np.zeros(self.nSums,dtype='f8')
-        for thisCore in xrange(self.nCore):
+        for thisCore in range(self.nCore):
             partialSums[:] += snmm.getArray(
                 self.totalHandleDict[workerIndex + thisCore])[:]
 

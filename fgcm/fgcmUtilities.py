@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 
@@ -139,7 +139,7 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
                                         ('N','i4')])
     binStruct['X_BIN'] = np.linspace(xRange[0],xRange[1],hist.size)
 
-    for i in xrange(hist.size):
+    for i in range(hist.size):
         if (hist[i] >= minPerBin):
             i1a=rev[rev[i]:rev[i+1]]
 
@@ -150,7 +150,7 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
             medXs=np.zeros(nTrial,dtype='f8')
             medXWidths=np.zeros(nTrial,dtype='f8')
 
-            for t in xrange(nTrial):
+            for t in range(nTrial):
                 r=(np.random.random(i1a.size)*i1a.size).astype('i4')
 
                 medYs[t] = np.median(y[i1a[r]])
@@ -312,7 +312,7 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
     ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
     ax.tick_params(axis='both',which='major',labelsize=14)
 
-    for k in xrange(values.size):
+    for k in range(values.size):
         off=[ccdOffsets['DELTA_RA'][k],
              ccdOffsets['DELTA_DEC'][k]]
 
@@ -517,7 +517,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     # compute central values...
     centralValues = np.zeros(ccdOffsets.size)
 
-    for i in xrange(ccdOffsets.size):
+    for i in range(ccdOffsets.size):
         field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[i, :])
         centralValues[i] = -2.5 * np.log10(field.evaluateCenter()) * 1000.0
 
@@ -545,7 +545,7 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
     ax.tick_params(axis='both',which='major',labelsize=14)
 
-    for k in xrange(ccdOffsets.size):
+    for k in range(ccdOffsets.size):
         xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][i], 50)
         yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][i], 50)
 

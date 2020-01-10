@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -195,7 +195,7 @@ class FgcmSuperStarFlat(object):
 
             h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
-            for i in xrange(h.size):
+            for i in range(h.size):
                 if h[i] == 0: continue
 
                 i1a = rev[rev[i]:rev[i+1]]
@@ -290,8 +290,8 @@ class FgcmSuperStarFlat(object):
         deltaSuperStarFlatCenter = superStarFlatCenter - prevSuperStarFlatCenter
 
         # and the overall stats...
-        for e in xrange(self.fgcmPars.nEpochs):
-            for f in xrange(self.fgcmPars.nLUTFilter):
+        for e in range(self.fgcmPars.nEpochs):
+            for f in range(self.fgcmPars.nLUTFilter):
                 use,=np.where(superStarNGoodStars[e, f, :] > 0)
 
                 if use.size < 3:
@@ -357,8 +357,8 @@ class FgcmSuperStarFlat(object):
         from .fgcmUtilities import plotCCDMap
         from .fgcmUtilities import plotCCDMap2d
 
-        for e in xrange(self.fgcmPars.nEpochs):
-            for f in xrange(self.fgcmPars.nLUTFilter):
+        for e in range(self.fgcmPars.nEpochs):
+            for f in range(self.fgcmPars.nLUTFilter):
                 use, = np.where(superStarNGoodStars[e, f, :] > 0)
 
                 if use.size == 0:
@@ -435,7 +435,7 @@ class FgcmSuperStarFlat(object):
 
         h, rev = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
 
-        for i in xrange(h.size):
+        for i in range(h.size):
             if h[i] == 0: continue
 
             i1a = rev[rev[i]:rev[i+1]]

@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -215,7 +215,7 @@ class FgcmGray(object):
                          (expNGoodStarForInitialSelection > self.minStarPerExp) &
                          (expGrayForInitialSelection > self.expGrayInitialCut))
 
-        for i in xrange(self.fgcmPars.nBands):
+        for i in range(self.fgcmPars.nBands):
             self.fgcmLog.debug('Making EXP_GRAY (initial) histogram for %s band' %
                                (self.fgcmPars.bands[i]))
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
@@ -594,7 +594,7 @@ class FgcmGray(object):
         expGrayNGoodStarsColorSplit[:, :] = 0
         expGrayWtColorSplit = np.zeros_like(expGrayColorSplit)
 
-        for c in xrange(gmiCutLow.size):
+        for c in range(gmiCutLow.size):
             use, = np.where((gmiGO > gmiCutLow[c]) &
                             (gmiGO < gmiCutHigh[c]))
 
@@ -704,7 +704,7 @@ class FgcmGray(object):
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
                          (expNGoodStars > self.minStarPerExp))
 
-        for i in xrange(self.fgcmPars.nBands):
+        for i in range(self.fgcmPars.nBands):
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
 
             if (inBand.size == 0) :
@@ -888,7 +888,7 @@ class FgcmGray(object):
         expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]
         expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
 
-        for i in xrange(self.fgcmPars.nBands):
+        for i in range(self.fgcmPars.nBands):
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
 
             if inBand.size == 0:
@@ -931,7 +931,7 @@ class FgcmGray(object):
         expGrayPhotometricCut[:] = [float(f) for f in self.expGrayPhotometricCut]
         expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
 
-        for i in xrange(self.fgcmPars.nBands):
+        for i in range(self.fgcmPars.nBands):
             delta = np.clip(self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i], 0.001, 1e5)
 
             cut = -1 * int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
