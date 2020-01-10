@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -173,6 +173,9 @@ class FgcmZeropoints(object):
                           ('FGCM_FZPT_SSTAR_CHEB', 'f8', (self.nChebParSstar, )),
                           ('FGCM_FZPT_XYMAX', 'f4', 2)])
 
+        maxBandLen = len(max(self.fgcmPars.bands, key=len))
+        maxFilterLen = len(max(self.fgcmPars.lutFilterNames, key=len))
+
         dtype.extend([('FGCM_I0','f8'),
                       ('FGCM_I10','f8'),
                       ('FGCM_R0','f8'),
@@ -191,8 +194,8 @@ class FgcmZeropoints(object):
                       ('FGCM_APERCORR','f8'),
                       ('FGCM_CTRANS', 'f4'),
                       ('EXPTIME','f4'),
-                      ('FILTERNAME','a2'),
-                      ('BAND','a2'),
+                      ('FILTERNAME', 'a%d' % (maxFilterLen)),
+                      ('BAND', 'a%d' % (maxBandLen)),
                       ('MJD', 'f8')])
 
         zpStruct = np.zeros(self.fgcmPars.nExp*self.fgcmPars.nCCD,
@@ -574,7 +577,7 @@ class FgcmZeropoints(object):
             cols = ['g','r','b','m','y']
             syms = ['.','+','o','*','x']
 
-            for i in xrange(self.fgcmPars.nBands):
+            for i in range(self.fgcmPars.nBands):
                 use,=np.where((self.fgcmPars.expBandIndex == i) &
                               (expZpMean > 0.0))
 

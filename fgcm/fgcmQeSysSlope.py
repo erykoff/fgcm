@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -193,13 +193,13 @@ class FgcmQeSysSlope(object):
             colors = ['g', 'b', 'r', 'c', 'm', 'y', 'k']
             started = False
 
-            for i in xrange(self.fgcmPars.nWashIntervals):
+            for i in range(self.fgcmPars.nWashIntervals):
                 use, = np.where(self.fgcmPars.expWashIndex == i)
                 washMJDRange = [np.min(self.fgcmPars.expMJD[use]), np.max(self.fgcmPars.expMJD[use])]
 
                 if self.instrumentParsPerBand:
                     # Need to plot all of them one-by-one
-                    for j in xrange(self.fgcmPars.nBands):
+                    for j in range(self.fgcmPars.nBands):
                         label = self.fgcmPars.bands[j] if not started else None
                         ax.plot(washMJDRange - firstMJD,
                                 1000.0*((washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[j, i] +
@@ -219,7 +219,7 @@ class FgcmQeSysSlope(object):
 
             # Make the vertical wash markers
             ylim = ax.get_ylim()
-            for i in xrange(self.fgcmPars.nWashIntervals):
+            for i in range(self.fgcmPars.nWashIntervals):
                 ax.plot([self.fgcmPars.washMJDs[i] - firstMJD, self.fgcmPars.washMJDs[i]-firstMJD],
                         ylim, 'k--')
 
