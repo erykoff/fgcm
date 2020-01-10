@@ -848,11 +848,14 @@ class FgcmParameters(object):
         """
         # this can be run without fits
 
+        maxFilterLen = len(max(self.lutFilterNames, key=len))
+        maxBandLen = len(max(self.bands, key=len))
+
         dtype=[('NCCD','i4'),
-               ('LUTFILTERNAMES','a2',len(self.lutFilterNames)),
-               ('BANDS','a2',len(self.bands)),
-               ('FITBANDS','a2',len(self.fitBands)),
-               ('NOTFITBANDS','a2',len(self.notFitBands)),
+               ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), len(self.lutFilterNames)),
+               ('BANDS','a%d' % (maxBandLen), len(self.bands)),
+               ('FITBANDS', 'a%d' % (maxBandLen), len(self.fitBands)),
+               ('NOTFITBANDS', 'a%d' % (maxBandLen), len(self.notFitBands)),
                ('LNTAUUNIT','f8'),
                ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
