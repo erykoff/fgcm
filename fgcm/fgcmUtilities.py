@@ -20,10 +20,11 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
                'BAD_QUANTITY': 2**6}
 
 # Dictionary of observation flags
-obsFlagDict = {'NO_EXPOSURE':2**0,
-               'BAD_ERROR':2**1,
-               'SUPERSTAR_OUTLIER':2**2,
-               'NO_ZEROPOINT': 2**4}
+obsFlagDict = {'NO_EXPOSURE': 2**0,
+               'BAD_ERROR': 2**1,
+               'SUPERSTAR_OUTLIER': 2**2,
+               'NO_ZEROPOINT': 2**4,
+               'BAD_MAG': 2**5}
 
 # Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,
