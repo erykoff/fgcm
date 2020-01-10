@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -89,7 +89,7 @@ class FgcmModelMagErrors(object):
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # And loop over bands
-        for bandIndex in xrange(self.fgcmPars.nBands):
+        for bandIndex in range(self.fgcmPars.nBands):
             use0, = np.where((obsBandIndex[goodObs] == bandIndex) &
                              (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             # Sample down to the number of observations in config (for speed)

@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -438,7 +438,7 @@ class FgcmMakeStars(object):
                 # how many unique objects do we have?
                 histTemp = hist.copy()
                 count=0
-                for j in xrange(histTemp.size):
+                for j in range(histTemp.size):
                     jj = fakeId[j]
                     if (histTemp[jj] >= self.starConfig['minPerBand']):
                         i1a = rev[rev[jj]: rev[jj + 1]]
@@ -456,7 +456,7 @@ class FgcmMakeStars(object):
 
                 # Compute mean ra/dec
                 index = 0
-                for j in xrange(hist.size):
+                for j in range(hist.size):
                     jj = fakeId[j]
                     if (hist[jj] >= self.starConfig['minPerBand']):
                         i1a = rev[rev[jj]: rev[jj + 1]]
@@ -668,7 +668,7 @@ class FgcmMakeStars(object):
             # this could be made more efficient
             self.fgcmLog.info("Computing number of observations per band")
             nObs = np.zeros((reqBands.size, self.objCat.size), dtype='i4')
-            for i in xrange(reqBands.size):
+            for i in range(reqBands.size):
                 use,=np.where(bandArray[i2] == reqBands[i])
                 hist = esutil.stat.histogram(i1[use], min=0, max=self.objCat.size-1)
                 nObs[i,:] = hist
@@ -698,7 +698,7 @@ class FgcmMakeStars(object):
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
         self.fgcmLog.info("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
-        for i in xrange(high.size):
+        for i in range(high.size):
             i1a=rev[rev[high[i]]:rev[high[i]+1]]
             cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
             objClass[gd[cut]] = 0

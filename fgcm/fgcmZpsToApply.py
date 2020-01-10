@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import esutil
@@ -152,7 +152,7 @@ class FgcmZpsToApply(object):
         goodStarsList = np.array_split(goodStars, nSections)
 
         splitValues = np.zeros(nSections - 1, dtype='i4')
-        for i in xrange(1, nSections):
+        for i in range(1, nSections):
             splitValues[i - 1] = goodStarsList[i][0]
 
         splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)

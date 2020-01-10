@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -564,7 +564,7 @@ class FgcmParameters(object):
             # less necessary I think
 
             self.expSeeingVariable = np.zeros(expInfo.size)
-            for i in xrange(expInfo.size):
+            for i in range(expInfo.size):
                 u = ((self.expSeeingVariablePerCCD[i, :] != 0.0) &
                      (self.expSeeingVariablePerCCD[i, :] > -100.0))
                 if u.sum() >= 3:
@@ -618,7 +618,7 @@ class FgcmParameters(object):
         self.nightDuration = np.zeros(self.nCampaignNights)
         self.maxDeltaUTPerNight = np.zeros(self.nCampaignNights)
         self.expPerNight = np.zeros(self.nCampaignNights,dtype=np.int32)
-        for i in xrange(self.nCampaignNights):
+        for i in range(self.nCampaignNights):
             use,=np.where(mjdForNight == self.campaignNights[i])
             self.expPerNight[i] = use.size
             # night duration in days
@@ -680,7 +680,7 @@ class FgcmParameters(object):
         self.nEpochs = self.epochMJDs.size - 1
 
         self.expEpochIndex = np.zeros(self.nExp,dtype='i4')
-        for i in xrange(self.nEpochs):
+        for i in range(self.nEpochs):
             use,=np.where((self.expMJD > self.epochMJDs[i]) &
                           (self.expMJD < self.epochMJDs[i+1]))
             self.expEpochIndex[use] = i
@@ -694,7 +694,7 @@ class FgcmParameters(object):
         self.nEpochs = self.epochMJDs.size - 1
 
         self.expEpochIndex = np.zeros(self.nExp,dtype='i4')
-        for i in xrange(self.nEpochs):
+        for i in range(self.nEpochs):
             use,=np.where((self.expMJD > self.epochMJDs[i]) &
                           (self.expMJD < self.epochMJDs[i+1]))
             self.expEpochIndex[use] = i
@@ -714,7 +714,7 @@ class FgcmParameters(object):
 
         # record the range in each to get typical length of wash epoch
         washMJDRange = np.zeros((self.nWashIntervals,2))
-        for i in xrange(self.nWashIntervals):
+        for i in range(self.nWashIntervals):
             use,=np.where((self.expMJD > tempWashMJDs[i]) &
                           (self.expMJD < tempWashMJDs[i+1]))
             self.expWashIndex[use] = i
@@ -731,7 +731,7 @@ class FgcmParameters(object):
         tempCoatingMJDs = self.coatingMJDs.copy()
         tempCoatingMJDs = np.append(tempCoatingMJDs, 1e10)
 
-        for i in xrange(self.nCoatingIntervals):
+        for i in range(self.nCoatingIntervals):
             use, = np.where((self.expMJD > tempCoatingMJDs[i]) &
                             (self.expMJD < tempCoatingMJDs[i + 1]))
             self.expCoatingIndex[use] = i
@@ -848,11 +848,14 @@ class FgcmParameters(object):
         """
         # this can be run without fits
 
+        maxFilterLen = len(max(self.lutFilterNames, key=len))
+        maxBandLen = len(max(self.bands, key=len))
+
         dtype=[('NCCD','i4'),
-               ('LUTFILTERNAMES','a2',len(self.lutFilterNames)),
-               ('BANDS','a2',len(self.bands)),
-               ('FITBANDS','a2',len(self.fitBands)),
-               ('NOTFITBANDS','a2',len(self.notFitBands)),
+               ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), len(self.lutFilterNames)),
+               ('BANDS','a%d' % (maxBandLen), len(self.bands)),
+               ('FITBANDS', 'a%d' % (maxBandLen), len(self.fitBands)),
+               ('NOTFITBANDS', 'a%d' % (maxBandLen), len(self.notFitBands)),
                ('LNTAUUNIT','f8'),
                ('LNTAUSLOPEUNIT','f8'),
                ('ALPHAUNIT','f8'),
@@ -1118,7 +1121,7 @@ class FgcmParameters(object):
 
         if not self.instrumentParsPerBand:
             # Set the same number for all the bands
-            for bandIndex in xrange(self.nBands):
+            for bandIndex in range(self.nBands):
                 self.parQESysIntercept[bandIndex, :] = (parArray[self.parQESysInterceptLoc:
                                                                     self.parQESysInterceptLoc + self.nWashIntervals] /
                                                         units[self.parQESysInterceptLoc:
@@ -1302,7 +1305,7 @@ class FgcmParameters(object):
                 parArray[self.parRetrievedLnPwvOffsetLoc] = self.parRetrievedLnPwvOffset * u
 
         if not self.instrumentParsPerBand:
-            for bandIndex in xrange(self.nBands):
+            for bandIndex in range(self.nBands):
                 inds = np.ravel_multi_index((bandIndex, np.arange(self.nWashIntervals)),
                                             self.parQESysIntercept.shape)
                 u = units[self.parQESysInterceptLoc + inds]
@@ -1648,9 +1651,9 @@ class FgcmParameters(object):
         superStarFlatCenter = np.zeros((self.nEpochs,
                                         self.nLUTFilter,
                                         self.nCCD))
-        for e in xrange(self.nEpochs):
-            for f in xrange(self.nLUTFilter):
-                for c in xrange(self.nCCD):
+        for e in range(self.nEpochs):
+            for f in range(self.nLUTFilter):
+                for c in range(self.nCCD):
                     field = Cheb2dField(self.ccdOffsets['X_SIZE'][c],
                                         self.ccdOffsets['Y_SIZE'][c],
                                         self.parSuperStarFlat[e, f, c, :])
@@ -1717,7 +1720,7 @@ class FgcmParameters(object):
 
 
         # Run per ccd (assuming it's the shorter loop)
-        for i in xrange(self.nCCD):
+        for i in range(self.nCCD):
             ccdSeeingVariableClipped = np.clip(self.expSeeingVariablePerCCD[:, i],
                                                self.compAperCorrRange[0, self.expBandIndex],
                                                self.compAperCorrRange[1, self.expBandIndex])

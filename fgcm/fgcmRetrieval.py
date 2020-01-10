@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import scipy.linalg as linalg
@@ -307,7 +307,7 @@ class FgcmRetrieval(object):
         expIndexUse, ccdIndexUse = np.where(nStar >= self.minStarPerCCD)
 
         # loop, doing the linear algebra
-        for i in xrange(expIndexUse.size):
+        for i in range(expIndexUse.size):
             mat = IMatrix[:, :, expIndexUse[i], ccdIndexUse[i]]
             det = mat[0, 0] * mat[1, 1] - mat[0, 1] * mat[1, 0]
             if not np.isfinite(det):

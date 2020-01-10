@@ -1,5 +1,6 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+
+from builtins import range
 
 import numpy as np
 import os
@@ -96,7 +97,7 @@ class FgcmApertureCorrection(object):
 
         expIndexUse,=np.where(self.fgcmPars.expFlag == 0)
 
-        for i in xrange(self.fgcmPars.nBands):
+        for i in range(self.fgcmPars.nBands):
             use,=np.where((self.fgcmPars.expBandIndex[expIndexUse] == i) &
                           (self.fgcmPars.expSeeingVariable[expIndexUse] > self.illegalValue) &
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))

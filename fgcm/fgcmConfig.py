@@ -1,5 +1,5 @@
 from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+from builtins import range
 
 import numpy as np
 import os
@@ -440,7 +440,7 @@ class FgcmConfig(object):
 
         if self.epochNames is None:
             self.epochNames = []
-            for i in xrange(self.epochMJDs.size):
+            for i in range(self.epochMJDs.size):
                 self.epochNames.append('epoch%d' % (i))
 
         # are they sorted?
