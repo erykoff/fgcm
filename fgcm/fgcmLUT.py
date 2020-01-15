@@ -735,10 +735,28 @@ class FgcmLUT(object):
 
     def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
 
-        #self.filterNames = indexVals['FILTERNAMES'][0]
-        #self.stdFilterNames = indexVals['STDFILTERNAMES'][0]
         self.filterNames = [n.decode('utf-8') for n in indexVals['FILTERNAMES'][0]]
         self.stdFilterNames = [n.decode('utf-8') for n in indexVals['STDFILTERNAMES'][0]]
+
+        # Set up filterToBand if necessary
+        if (filterToBand is None or not filterToBand):
+            # just set up a 1-1 mapping
+            self.filterToBand = {}
+            for filterName in self.filterNames:
+                self.filterToBand[filterName] = filterName
+        else:
+            self.filterToBand = filterToBand
+
+        # We cut down these to those filters that are defined in the map
+        usedFilterNames = self.filterToBand.keys()
+        usedLutFilterMark = np.zeros(len(self.filterNames), dtype=np.bool)
+        for i, f in enumerate(self.filterNames):
+            if f in usedFilterNames:
+                usedLutFilterMark[i] = True
+
+        self.filterNames = [f for i, f in enumerate(self.filterNames) if usedLutFilterMark[i]]
+        self.stdFilterNames = [f for i, f in enumerate(self.stdFilterNames) if usedLutFilterMark[i]]
+
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]
@@ -762,14 +780,18 @@ class FgcmLUT(object):
         self.nCCDStep = self.nCCD+1
 
         # make shared memory arrays for LUTs
-        sizeTuple = (len(self.filterNames),self.pwv.size,self.o3.size,
-                     self.tau.size,self.alpha.size,self.zenith.size,self.nCCDStep)
+        origSizeTuple = (usedLutFilterMark.size, self.pwv.size, self.o3.size,
+                         self.tau.size, self.alpha.size, self.zenith.size, self.nCCDStep)
+        sizeTuple = (len(self.filterNames), self.pwv.size, self.o3.size,
+                     self.tau.size, self.alpha.size, self.zenith.size, self.nCCDStep)
 
         self.lutI0Handle = snmm.createArray(sizeTuple,dtype='f4')
-        snmm.getArray(self.lutI0Handle)[:,:,:,:,:,:,:] = lutFlat['I0'].reshape(sizeTuple)
+        snmm.getArray(self.lutI0Handle)[:, :, :, :, :, :, :] = \
+            lutFlat['I0'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
 
         self.lutI1Handle = snmm.createArray(sizeTuple,dtype='f4')
-        snmm.getArray(self.lutI1Handle)[:,:,:,:,:,:,:] = lutFlat['I1'].reshape(sizeTuple)
+        snmm.getArray(self.lutI1Handle)[:, :, :, :, :, :, :] = \
+            lutFlat['I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
 
         # and read in the derivatives
 
@@ -786,24 +808,33 @@ class FgcmLUT(object):
         self.lutDAlphaI1Handle = snmm.createArray(sizeTuple,dtype='f4')
         self.lutDSecZenithI1Handle = snmm.createArray(sizeTuple,dtype='f4')
 
-        snmm.getArray(self.lutDLnPwvHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNPWV'].reshape(sizeTuple)
-        snmm.getArray(self.lutDO3Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_O3'].reshape(sizeTuple)
-        snmm.getArray(self.lutDLnTauHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU'].reshape(sizeTuple)
-        snmm.getArray(self.lutDAlphaHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA'].reshape(sizeTuple)
-        snmm.getArray(self.lutDSecZenithHandle)[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH'].reshape(sizeTuple)
+        snmm.getArray(self.lutDLnPwvHandle)[:, :, :, :, :, :, :] = \
+            lutDerivFlat['D_LNPWV'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+        snmm.getArray(self.lutDO3Handle)[:, :, :, :, :, :, :] = \
+            lutDerivFlat['D_O3'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+        snmm.getArray(self.lutDLnTauHandle)[:, :, :, :, :, :, :] = \
+            lutDerivFlat['D_LNTAU'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+        snmm.getArray(self.lutDAlphaHandle)[:, :, :, :, :, :, :] = \
+            lutDerivFlat['D_ALPHA'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+        snmm.getArray(self.lutDSecZenithHandle)[:, :, :, :, :, :, :] = \
+            lutDerivFlat['D_SECZENITH'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
 
         self.hasI1Derivatives = False
         try:
-            snmm.getArray(self.lutDLnPwvI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNPWV_I1'].reshape(sizeTuple)
-            snmm.getArray(self.lutDO3I1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_O3_I1'].reshape(sizeTuple)
-            snmm.getArray(self.lutDLnTauI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_LNTAU_I1'].reshape(sizeTuple)
-            snmm.getArray(self.lutDAlphaI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_ALPHA_I1'].reshape(sizeTuple)
-            snmm.getArray(self.lutDSecZenithI1Handle)[:,:,:,:,:,:,:] = lutDerivFlat['D_SECZENITH_I1'].reshape(sizeTuple)
+            snmm.getArray(self.lutDLnPwvI1Handle)[:, :, :, :, :, :, :] = \
+                lutDerivFlat['D_LNPWV_I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+            snmm.getArray(self.lutDO3I1Handle)[:, :, :, :, :, :, :] = \
+                lutDerivFlat['D_O3_I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+            snmm.getArray(self.lutDLnTauI1Handle)[:, :, :, :, :, :, :] = \
+                lutDerivFlat['D_LNTAU_I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+            snmm.getArray(self.lutDAlphaI1Handle)[:, :, :, :, :, :, :] = \
+                lutDerivFlat['D_ALPHA_I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
+            snmm.getArray(self.lutDSecZenithI1Handle)[:, :, :, :, :, :, :] = \
+                lutDerivFlat['D_SECZENITH_I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
             self.hasI1Derivatives = True
         except:
             # just fill with zeros
             pass
-            #print("No I1 derivative information")
 
         # get the standard values
 
@@ -818,25 +849,17 @@ class FgcmLUT(object):
         self.secZenithStd = 1./np.cos(np.radians(self.zenithStd))
         self.lambdaRange = stdVals['LAMBDARANGE'][0]
         self.lambdaStep = stdVals['LAMBDASTEP'][0]
-        self.lambdaStd = stdVals['LAMBDASTD'][0]
-        self.lambdaStdFilter = stdVals['LAMBDASTDFILTER'][0]
-        self.I0Std = stdVals['I0STD'][0]
-        self.I1Std = stdVals['I1STD'][0]
-        self.I10Std = stdVals['I10STD'][0]
-        self.I2Std = stdVals['I2STD'][0]
-        self.lambdaB = stdVals['LAMBDAB'][0]
+        self.lambdaStd = stdVals['LAMBDASTD'][0][usedLutFilterMark]
+        self.lambdaStdFilter = stdVals['LAMBDASTDFILTER'][0][usedLutFilterMark]
+        self.I0Std = stdVals['I0STD'][0][usedLutFilterMark]
+        self.I1Std = stdVals['I1STD'][0][usedLutFilterMark]
+        self.I10Std = stdVals['I10STD'][0][usedLutFilterMark]
+        self.I2Std = stdVals['I2STD'][0][usedLutFilterMark]
+        self.lambdaB = stdVals['LAMBDAB'][0][usedLutFilterMark]
         self.atmLambda = stdVals['ATMLAMBDA'][0]
         self.atmStdTrans = stdVals['ATMSTDTRANS'][0]
 
         self.magConstant = 2.5/np.log(10)
-
-        if (filterToBand is None):
-            # just set up a 1-1 mapping
-            self.filterToBand = {}
-            for filterName in self.filterNames:
-                self.filterToBand[filterName] = filterName
-        else:
-            self.filterToBand = filterToBand
 
         # finally, read in the sedLUT
         ## this is experimental

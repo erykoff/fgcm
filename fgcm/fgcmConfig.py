@@ -323,6 +323,7 @@ class FgcmConfig(object):
         # these are np arrays and encoded as such
         self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
         self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
+
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -350,20 +351,19 @@ class FgcmConfig(object):
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
-                # Every LUT filter must be in the filterToBand mapping.  Raise an explicit
-                # and clear exception here.
-                if filterName not in self.filterToBand:
-                    raise ValueError("Filter %s is described in the LUT but not mapped in filterToBand" % (filterName))
-                if self.filterToBand[filterName] == band:
-                    # If we haven't found it yet, set the index
-                    ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
-                    if bandStdFilterIndex[i] < 0:
-                        bandStdFilterIndex[i] = ind
-                    else:
-                        if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
-                            raise ValueError("Band %s has multiple standard filters (%s, %s)" %
-                                             (band, self.lutStdFilterNames[ind],
-                                              self.lutStdFilterNames[bandStdFilterIndex[i]]))
+                # Not every LUT filter must be in the filterToBand mapping.
+                # If it is not there, it will not be used.
+                if filterName in self.filterToBand:
+                    if self.filterToBand[filterName] == band:
+                        # If we haven't found it yet, set the index
+                        ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
+                        if bandStdFilterIndex[i] < 0:
+                            bandStdFilterIndex[i] = ind
+                        else:
+                            if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
+                                raise ValueError("Band %s has multiple standard filters (%s, %s)" %
+                                                 (band, self.lutStdFilterNames[ind],
+                                                  self.lutStdFilterNames[bandStdFilterIndex[i]]))
         #  4) check that all the fitBands are in bands
         for fitBand in self.fitBands:
             if fitBand not in self.bands:
@@ -391,13 +391,23 @@ class FgcmConfig(object):
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
 
+        # Cut the LUT filter names to those that are actually used
+        usedFilterNames = self.filterToBand.keys()
+        usedLutFilterMark = np.zeros(len(self.lutFilterNames), dtype=np.bool)
+        for i, f in enumerate(self.lutFilterNames):
+            if f in usedFilterNames:
+                usedLutFilterMark[i] = True
+
+        self.lutFilterNames = [f for i, f in enumerate(self.lutFilterNames) if usedLutFilterMark[i]]
+        self.lutStdFilterNames = [f for i, f in enumerate(self.lutStdFilterNames) if usedLutFilterMark[i]]
+
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
         self.I0StdBand = lutStd['I0STD'][0][bandStdFilterIndex]
         self.I1StdBand = lutStd['I1STD'][0][bandStdFilterIndex]
         self.I2StdBand = lutStd['I2STD'][0][bandStdFilterIndex]
-        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
+        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0][usedLutFilterMark]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
