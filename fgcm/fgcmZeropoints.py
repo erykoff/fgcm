@@ -574,8 +574,8 @@ class FgcmZeropoints(object):
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
             # FIXME: make configurable
-            cols = ['g','r','b','m','y']
-            syms = ['.','+','o','*','x']
+            cols = ['g', 'r', 'b', 'm', 'y']
+            syms = ['.', '+', 'o', '*', 'X']
 
             for i in range(self.fgcmPars.nBands):
                 use,=np.where((self.fgcmPars.expBandIndex == i) &
@@ -585,7 +585,7 @@ class FgcmZeropoints(object):
                     continue
 
                 plt.plot(self.fgcmPars.expMJD[use] - firstMJD,
-                         expZpMean[use],cols[i]+syms[i],
+                         expZpMean[use], cols[i % 5] + syms[i % 5],
                          label=r'$(%s)$' % (self.fgcmPars.bands[i]))
 
             ax.legend(loc=3)
@@ -968,6 +968,8 @@ class FgcmZeropointPlotter(object):
             np.add.at(nPerCCD, ccdIndex, 1)
 
             use,=np.where(nPerCCD > 0)
+            if use.size < 3:
+                continue
             meanI1[use] /= nPerCCD[use]
             meanR1[use] /= nPerCCD[use]
 
@@ -982,14 +984,17 @@ class FgcmZeropointPlotter(object):
 
                 ax=fig.add_subplot(111)
 
-                if (plotType == 'R1'):
-                    plotCCDMap(ax, ccdOffsets[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
-                elif (plotType == 'I1'):
-                    plotCCDMap(ax, ccdOffsets[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
-                else:
-                    # for the residuals, center at zero, but use lo/hi
-                    amp = np.abs((hi - lo)/2.)
-                    plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
+                try:
+                    if (plotType == 'R1'):
+                        plotCCDMap(ax, ccdOffsets[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
+                    elif (plotType == 'I1'):
+                        plotCCDMap(ax, ccdOffsets[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
+                    else:
+                        # for the residuals, center at zero, but use lo/hi
+                        amp = np.abs((hi - lo)/2.)
+                        plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
+                except ValueError:
+                    continue
 
                 text = r'$(%s)$' % (filterName) + '\n' + \
                     r'%s' % (plotType)
@@ -1042,9 +1047,11 @@ class FgcmZeropointPlotter(object):
                           (yValues < yValues[st[int(0.99 * st.size)]]))
             xValues = xValues[u]
             yValues = yValues[u]
-
-            xRange = [np.min(xValues), np.max(xValues)]
-            yRange = [np.min(yValues), np.max(yValues)]
+            try:
+                xRange = [np.min(xValues), np.max(xValues)]
+                yRange = [np.min(yValues), np.max(yValues)]
+            except ValueError:
+                continue
 
             # Arbitrarily do 50 days...
             binStruct = dataBinner(xValues, yValues, 50.0, xRange)

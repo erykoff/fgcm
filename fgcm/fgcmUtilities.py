@@ -582,3 +582,44 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
 
     return None
 
+
+def logFlaggedExposuresPerBand(log, fgcmPars, flagName, raiseAllBad=True):
+    """
+    Log how many exposures per band were flagged with a given flag.
+
+    Parameters
+    ----------
+    log: fgcmLog
+    fgcmPars: `fgcm.fgcmParameters`
+    flagName: `str`
+       Name of flag
+    raiseAllBad: `bool`, optional
+       Raise if a band has all bad.  Default is True.
+    """
+
+    for i, band in enumerate(fgcmPars.bands):
+        inBand, = np.where(fgcmPars.expBandIndex == i)
+        inBandBad, = np.where((fgcmPars.expFlag[inBand] &
+                               expFlagDict[flagName]) > 0)
+        log.info(' %s: %s band: %d of %d exposures' %
+                 (flagName, band, inBandBad.size, inBand.size))
+        if raiseAllBad and inBandBad.size == inBand.size:
+            raise RuntimeError("FATAL: All observations in %s band have been cut with %s" % (band, flagName))
+
+
+def checkFlaggedExposuresPerBand(log, fgcmPars):
+    """
+    Raise if any band has had all exposures removed.
+
+    Parameters
+    ----------
+    log: fgcmLog
+    fgcmPars: `fgcm.fgcmParameters`
+
+    """
+
+    for i, band in enumerate(fgcmPars.bands):
+        inBand, = np.where(fgcmPars.expBandIndex == i)
+        inBandBad, = np.where(fgcmPars.expFlag[inBand] > 0)
+        if inBandBad.size >= (inBand.size - 1):
+            raise RuntimeError("FATAL: All observations in %s band have been cut!")
