@@ -1578,7 +1578,7 @@ class FgcmStars(object):
         fgcmPars: FgcmParameters
         """
 
-        if (fgcmPars.compModelErrFwhmPivot[0] <= 0.0) :
+        if (np.max(fgcmPars.compModelErrFwhmPivot) <= 0.0) :
             self.fgcmLog.debug('No model for mag errors, so mag errors are unchanged.')
             return
 
@@ -1629,6 +1629,9 @@ class FgcmStars(object):
 
         # loop over bands
         for bandIndex in range(fgcmPars.nBands):
+            if fgcmPars.compModelErrFwhmPivot[bandIndex] <= 0.0:
+                self.fgcmLog.info('No error model for band %s' % (self.bands[bandIndex]))
+
             use, = np.where((obsBandIndex[goodObs] == bandIndex) &
                             (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             pars = fgcmPars.compModelErrPars[:, bandIndex]
