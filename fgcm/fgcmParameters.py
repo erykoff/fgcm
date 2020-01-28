@@ -719,6 +719,15 @@ class FgcmParameters(object):
                           (self.expMJD < tempWashMJDs[i+1]))
             self.expWashIndex[use] = i
 
+        # Mark for each band the first wash index where it shows up
+        self.firstWashIndex = np.zeros(len(self.bands), dtype=np.int32)
+        for bandIndex, band in enumerate(self.bands):
+            use, = np.where(self.expBandIndex == bandIndex)
+            self.firstWashIndex[bandIndex] = np.min(self.expWashIndex[use])
+            if not self.quietMode:
+                self.fgcmLog.info("Band %s first used in wash index %d" % (band,
+                                                                           self.firstWashIndex[bandIndex]))
+
         # And the coating...
         self.nCoatingIntervals = self.coatingMJDs.size + 1
         self.coatingMJDs = np.insert(self.coatingMJDs, 0, np.min(self.expMJD) - 1.0)
@@ -794,10 +803,8 @@ class FgcmParameters(object):
                 self.parRetrievedLnPwvOffsetLoc = ctr
                 ctr+=1
 
-        #self.nFitPars += self.nQESysInterceptPars # parQESysIntercept
         self.nFitPars += self.parQESysIntercept.size # parQESysIntercept
         self.parQESysInterceptLoc = ctr
-        #ctr += self.nQESysInterceptPars
         ctr += self.parQESysIntercept.size
 
         self.nFitPars += self.nLUTFilter # parFilterOffset
@@ -1507,6 +1514,12 @@ class FgcmParameters(object):
 
             # And for the first interval the intercept is zero for all bands
             inds = np.ravel_multi_index((np.arange(self.nBands), 0),
+                                        self.parQESysIntercept.shape)
+            parLow[self.parQESysInterceptLoc + inds] = 0.0
+            parHigh[self.parQESysInterceptLoc + inds] = 0.0
+
+            # And for the first interval for each band (may be redundant with above)
+            inds = np.ravel_multi_index((np.arange(self.nBands), self.firstWashIndex),
                                         self.parQESysIntercept.shape)
             parLow[self.parQESysInterceptLoc + inds] = 0.0
             parHigh[self.parQESysInterceptLoc + inds] = 0.0

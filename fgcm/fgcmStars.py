@@ -66,6 +66,7 @@ class FgcmStars(object):
         self.notFitBands = fgcmConfig.notFitBands
         self.nNotFitBands = len(fgcmConfig.notFitBands)
         self.sedFudgeFactors = fgcmConfig.sedFudgeFactors
+        self.sedExtrapolate = fgcmConfig.sedExtrapolate
         self.starColorCuts = fgcmConfig.starColorCuts
         self.quantityCuts = fgcmConfig.quantityCuts
         self.sigma0Phot = fgcmConfig.sigma0Phot
@@ -1133,22 +1134,11 @@ class FgcmStars(object):
                                                   objMagStdMeanOI[:, i]) / (
                 (self.lambdaStdBand[i + 1] - self.lambdaStdBand[i]))
 
-        # FIXME: will need to handle u (or blueward) non-fit bands
-
-        # The bluest one of the fit bands is an extrapolation
-        # Note that this is different from the original Burke++17 paper
-        tempIndex = self.bandFitIndex[0]
-        # Only use stars that are measured in bands 0/1/2 (e.g. g/r)
-        use, = np.where((objMagStdMeanOI[:, tempIndex] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex + 1] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex + 2] < 90.0))
-        objSEDSlopeOI[use, tempIndex] = (
-            S[use, tempIndex] + self.sedFudgeFactors[tempIndex] * (
-                S[use, tempIndex + 1] + S[use, tempIndex]))
-
-        # The middle ones are straight averages
-        for tempIndex in self.bandFitIndex[1: -1]:
-            # Only use stars that are measured in bands 0/1/2, 1/2/3 (e.g. g/r/i, r/i/z)
+        # Interpolated SEDs
+        interpBands, = np.where(self.sedExtrapolate == 0)
+        for tempIndex in interpBands:
+            # use only stars that are measured in bands 0/1/2, 1/2/3
+            # (g/r/i, r/i/z), etc.
             use, = np.where((objMagStdMeanOI[:, tempIndex - 1] < 90.0) &
                             (objMagStdMeanOI[:, tempIndex] < 90.0) &
                             (objMagStdMeanOI[:, tempIndex + 1] < 90.0))
@@ -1156,30 +1146,28 @@ class FgcmStars(object):
                 self.sedFudgeFactors[tempIndex] * (
                     S[use, tempIndex - 1] + S[use, tempIndex]) / 2.0)
 
-        # The reddest one is another extrapolation
-        tempIndex = self.bandFitIndex[-1]
-        # Only use stars that are measured in bands e.g. 1/2/3 (e.g. r/i/z)
-        use, = np.where((objMagStdMeanOI[:, tempIndex - 2] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex - 1] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex] < 90.0))
-        objSEDSlopeOI[use, tempIndex] = (
-            S[use, tempIndex - 1] + self.sedFudgeFactors[tempIndex] * (
-                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 1]) /
-                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 2])) *
-            (S[use, tempIndex - 1] - S[use, tempIndex - 2]))
+        # +1 is extrapolate from the red (e.g. g, r, i -> g)
+        extrapFromRedBands, = np.where(self.sedExtrapolate > 0)
+        for tempIndex in extrapFromRedBands:
+            # Use only stars that are measured in bands 0/1/2 (e.g. g/r/i)
+            use, = np.where((objMagStdMeanOI[:, tempIndex] < 90.0) &
+                            (objMagStdMeanOI[:, tempIndex + 1] < 90.0) &
+                            (objMagStdMeanOI[:, tempIndex + 2] < 90.0))
+            objSEDSlopeOI[use, tempIndex] = (
+                S[use, tempIndex] + self.sedFudgeFactors[tempIndex] * (
+                    S[use, tempIndex + 1] + S[use, tempIndex]))
 
-        # And for the redward non-fit band(s):
-        for notFitIndex in self.bandNotFitIndex:
-            # Only use stars that are measured in bands e.g. 2/3/4 (e.g. i/z/Y)
-            use, = np.where((objMagStdMeanOI[:, notFitIndex - 2] < 90.0) &
-                            (objMagStdMeanOI[:, notFitIndex - 1] < 90.0) &
-                            (objMagStdMeanOI[:, notFitIndex] < 90.0))
-            objSEDSlopeOI[use, notFitIndex] = (
-                S[use, notFitIndex-1] + self.sedFudgeFactors[notFitIndex] * (
-                    (self.lambdaStdBand[notFitIndex] - self.lambdaStdBand[notFitIndex - 1]) /
-                    (self.lambdaStdBand[notFitIndex] - self.lambdaStdBand[notFitIndex - 2])) *
-                (S[use, notFitIndex - 1] - S[use, notFitIndex - 2]))
-
+        # -1 is extrapolate from the blue (e.g. i, z, y -> y)
+        extrapFromBlueBands, = np.where(self.sedExtrapolate < 0)
+        for tempIndex in extrapFromBlueBands:
+            use, = np.where((objMagStdMeanOI[:, tempIndex - 2] < 90.0) &
+                            (objMagStdMeanOI[:, tempIndex - 1] < 90.0) &
+                            (objMagStdMeanOI[:, tempIndex] < 90.0))
+            objSEDSlopeOI[use, tempIndex] = (
+                S[use, tempIndex - 1] + self.sedFudgeFactors[tempIndex] * (
+                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 1]) /
+                    (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 2])) *
+                (S[use, tempIndex - 1] - S[use, tempIndex - 2]))
 
         # Save the values, protected
         objSEDSlopeLock.acquire()
@@ -1631,6 +1619,7 @@ class FgcmStars(object):
         for bandIndex in range(fgcmPars.nBands):
             if fgcmPars.compModelErrFwhmPivot[bandIndex] <= 0.0:
                 self.fgcmLog.info('No error model for band %s' % (self.bands[bandIndex]))
+                continue
 
             use, = np.where((obsBandIndex[goodObs] == bandIndex) &
                             (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))

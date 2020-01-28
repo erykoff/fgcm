@@ -1079,7 +1079,7 @@ class FgcmZeropointPlotter(object):
             text = r'$(%s)$' % (filterName)
             ax.annotate(text,
                         (0.1, 0.93), xycoords='axes fraction',
-                        ha='left', va='top', fontsize=18)
+                        ha='left', va='top', fontsize=18, color='r')
 
             fig.savefig('%s/%s_r1-i1_vs_mjd_%s.png' % (self.plotPath,
                                                        self.outfileBase,

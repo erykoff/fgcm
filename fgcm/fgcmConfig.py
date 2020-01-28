@@ -137,6 +137,7 @@ class FgcmConfig(object):
     aperCorrInputSlopes = ConfigField(np.ndarray, default=np.array([]))
     illegalValue = ConfigField(float, default=-9999.0)
     sedFudgeFactors = ConfigField(np.ndarray, required=True)
+    sedExtrapolate = ConfigField(np.ndarray, required=True)
     starColorCuts = ConfigField(list, required=True)
     quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
@@ -698,9 +699,8 @@ class FgcmConfig(object):
         """
 
         # Check the fudge factors...
-        # type(self).__dict__['sedFitBandFudgeFactors']._length = len(self.fitBands)
-        # type(self).__dict__['sedNotFitBandFudgeFactors']._length = len(self.notFitBands)
         type(self).__dict__['sedFudgeFactors']._length = len(self.bands)
+        type(self).__dict__['sedExtrapolate']._length = len(self.bands)
 
         # And the gray cuts
         type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)

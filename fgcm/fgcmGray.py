@@ -611,12 +611,15 @@ class FgcmGray(object):
                       obsExpIndex[goodObs[use]],
                       1)
 
-            gd, = np.where(expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp / 4)
+            gd_flag = ((expGrayNGoodStarsColorSplit[:, c] >= self.minStarPerExp / 4) &
+                       (expGrayWtColorSplit[:, c] > 0.0) &
+                       (expGrayRMSColorSplit[:, c] > 0.0))
+            gd, = np.where(gd_flag)
+            bd, = np.where(~gd_flag)
             expGrayColorSplit[gd, c] /= expGrayWtColorSplit[gd, c]
             expGrayErrColorSplit[gd, c] = np.sqrt(1. / expGrayWtColorSplit[gd, c])
-            expGrayRMSColorSplit[gd, c] = np.sqrt((expGrayRMSColorSplit[gd, c] / expGrayWtColorSplit[gd, c]) - expGrayColorSplit[gd, c]**2.)
+            expGrayRMSColorSplit[gd, c] = np.sqrt(np.clip((expGrayRMSColorSplit[gd, c] / expGrayWtColorSplit[gd, c]) - expGrayColorSplit[gd, c]**2., 0.0, None))
 
-            bd, = np.where(expGrayNGoodStarsColorSplit[:, c] < self.minStarPerExp / 4)
             expGrayColorSplit[bd, c] = self.illegalValue
             expGrayRMSColorSplit[bd, c] = self.illegalValue
             expGrayErrColorSplit[bd, c] = self.illegalValue
@@ -627,14 +630,13 @@ class FgcmGray(object):
 
             plt.set_cmap('viridis')
 
-            #for bandIndex in self.bandFitIndex:
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 use, = np.where((self.fgcmPars.expBandIndex == bandIndex) &
                                 (self.fgcmPars.expFlag == 0) &
                                 (expGrayColorSplit[:, 0] > self.illegalValue) &
                                 (expGrayColorSplit[:, 2] > self.illegalValue))
                 if (use.size == 0):
-                    self.fgcmLog.info('Could not find photometric exposures in band %d' % (bandIndex))
+                    self.fgcmLog.info('Could not find photometric color-split exposures in band %d' % (bandIndex))
                     continue
 
                 fig = plt.figure(1, figsize=(8, 6))
