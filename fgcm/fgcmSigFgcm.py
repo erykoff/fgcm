@@ -26,7 +26,7 @@ class FgcmSigFgcm(object):
 
     Config variables
     ----------------
-    sigFgcmMaxEGray: float
+    sigFgcmMaxEGray: list
        Maxmimum m_std - <m_std> to consider to compute sigFgcm
     sigFgcmMaxErr: float
        Maxmimum error on m_std - <m_std> to consider to compute sigFgcm
@@ -149,13 +149,13 @@ class FgcmSigFgcm(object):
                     # There shouldn't be any need any additional checks on if these
                     # stars were actually observed in this band, because the goodObs
                     # selection takes care of that.
-                    sigUse, = np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray) &
+                    sigUse, = np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray[bandIndex]) &
                                        (EGrayErr2GO > 0.0) &
                                        (EGrayErr2GO < self.sigFgcmMaxErr**2.) &
                                        (EGrayGO != 0.0) &
                                        (obsBandIndex[goodObs] == bandIndex))
                 else:
-                    sigUse, = np.where((np.abs(EGrayGO[okColor]) < self.sigFgcmMaxEGray) &
+                    sigUse, = np.where((np.abs(EGrayGO[okColor]) < self.sigFgcmMaxEGray[bandIndex]) &
                                        (EGrayErr2GO[okColor] > 0.0) &
                                        (EGrayErr2GO[okColor] < self.sigFgcmMaxErr**2.) &
                                        (EGrayGO[okColor] != 0.0) &

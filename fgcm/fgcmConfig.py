@@ -143,7 +143,7 @@ class FgcmConfig(object):
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
     sigFgcmMaxErr = ConfigField(float, default=0.01)
-    sigFgcmMaxEGray = ConfigField(float, default=0.05)
+    sigFgcmMaxEGray = ConfigField(list, default=[0.05])
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
     mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
@@ -162,7 +162,7 @@ class FgcmConfig(object):
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
     quietMode = ConfigField(bool, default=False)
-    useRepeatabilityForExpGrayCuts = ConfigField(bool, default=False)
+    useRepeatabilityForExpGrayCuts = ConfigField(list, default=[False])
 
     mapLongitudeRef = ConfigField(float, default=0.0)
 
@@ -427,6 +427,20 @@ class FgcmConfig(object):
 
         if self.sigmaCalRange[1] < self.sigmaCalRange[0]:
             raise ValueError("sigmaCalRange[1] must me equal to or larger than sigmaCalRange[0]")
+
+        if len(self.useRepeatabilityForExpGrayCuts) != 1 and \
+                len(self.useRepeatabilityForExpGrayCuts) != len(self.bands):
+            raise ValueError("useRepeatabilityForExpGrayCuts must be of length 1 or number of bands")
+        # Expand into the full list if necessary
+        if len(self.useRepeatabilityForExpGrayCuts) == 1:
+            self.useRepeatabilityForExpGrayCuts = self.useRepeatabilityForExpGrayCuts * len(self.bands)
+
+        if len(self.sigFgcmMaxEGray) != 1 and \
+                len(self.sigFgcmMaxEGray) != len(self.bands):
+            raise ValueError("sigFgcmMaxEGray must be of length 1 or number of bands")
+        # Expand into the full list if necessary
+        if len(self.sigFgcmMaxEGray) == 1:
+            self.sigFgcmMaxEGray = self.sigFgcmMaxEGray * len(self.bands)
 
         # and look at the exposure file and grab some stats
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])

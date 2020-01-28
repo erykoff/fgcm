@@ -647,7 +647,8 @@ class FgcmGray(object):
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
 
                 text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
-                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+                ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
+                            va='top', fontsize=16, color='r')
 
                 fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
                                                                       self.outfileBaseWithCycle,
@@ -680,9 +681,10 @@ class FgcmGray(object):
                         [0.0, 0.0], 'r--')
 
                 text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
-                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+                ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
+                            va='top', fontsize=16, color='r')
 
-                plt.savefig('%s/%s_compare-redblue-expgray-mjd_%s.png' % (self.plotPath,
+                plt.savefig('%s/%s_compare-mjd-redblue-expgray_%s.png' % (self.plotPath,
                                                                           self.outfileBaseWithCycle,
                                                                           self.fgcmPars.bands[bandIndex]))
                 plt.close(fig)
@@ -761,7 +763,8 @@ class FgcmGray(object):
             ax.hexbin(secZenith[ok],expGray[expUse[inBand[ok]]]*1000.0,rasterized=True)
 
             text = r'$(%s)$' % (self.fgcmPars.bands[i])
-            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+            ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
+                        va='top', fontsize=16, color='r')
 
             ax.set_xlabel(r'$\mathrm{sec}(\mathrm{zd})$',fontsize=16)
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
@@ -782,7 +785,8 @@ class FgcmGray(object):
             ax.hexbin(self.fgcmPars.expDeltaUT[expUse[inBand]],
                       expGray[expUse[inBand]]*1000.0,
                       rasterized=True)
-            ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+            ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
+                        va='top', fontsize=16, color='r')
 
             ax.set_xlabel(r'$\Delta \mathrm{UT}$',fontsize=16)
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
