@@ -473,6 +473,14 @@ class FgcmStars(object):
         self.fgcmLog.debug('Matching observations to bands.')
 
         # new version for multifilter support
+
+        obsFilterNameIsEncoded = False
+        try:
+            test = obsFilterName[0].decode('utf-8')
+            obsFilterNameIsEncoded = True
+        except AttributeError:
+            pass
+
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
@@ -482,7 +490,10 @@ class FgcmStars(object):
                 bandIndex = -1
 
             # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
-            use, = np.where(obsFilterName == filterName.encode('utf-8'))
+            if obsFilterNameIsEncoded:
+                use, = np.where(obsFilterName == filterName.encode('utf-8'))
+            else:
+                use, = np.where(obsFilterName == filterName)
             if use.size == 0:
                 self.fgcmLog.info('WARNING: no observations in filter %s' % (filterName))
             else:

@@ -322,8 +322,14 @@ class FgcmConfig(object):
         # and look at the lutFile
         self.nCCD = lutIndex['NCCD'][0]
         # these are np arrays and encoded as such
-        self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
-        self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
+        try:
+            self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
+        except AttributeError:
+            self.lutFilterNames = [n for n in lutIndex['FILTERNAMES'][0]]
+        try:
+            self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
+        except AttributeError:
+            self.lutStdFilterNames = [n for n in lutIndex['STDFILTERNAMES'][0]]
 
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
