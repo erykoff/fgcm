@@ -136,8 +136,8 @@ class FgcmConfig(object):
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopes = ConfigField(np.ndarray, default=np.array([]))
     illegalValue = ConfigField(float, default=-9999.0)
-    sedFudgeFactors = ConfigField(np.ndarray, required=True)
-    sedExtrapolate = ConfigField(np.ndarray, required=True)
+    sedBoundaryTermDict = ConfigField(dict, required=True)
+    sedTermDict = ConfigField(dict, required=True)
     starColorCuts = ConfigField(list, required=True)
     quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
@@ -548,6 +548,60 @@ class FgcmConfig(object):
                 if len(self.aperCorrInputSlopes) != len(self.bands):
                     raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
 
+        # Check the sed mapping dictionaries
+        # First, make sure every band is listed in the sedTermDict
+        for band in self.bands:
+            if band not in self.sedTermDict:
+                raise RuntimeError("Band %s not listed in sedTermDict." % (band))
+
+        # Second, make sure sedBoundaryTermDict is correct format
+        for boundaryTermName, boundaryTerm in self.sedBoundaryTermDict.items():
+            if 'primary' not in boundaryTerm or 'secondary' not in boundaryTerm:
+                raise RuntimeError("sedBoundaryTerm %s must have primary and secondary keys." % (boundaryTerm))
+            if boundaryTerm['primary'] not in self.bands:
+                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
+                                   (boundaryTermName, boundaryTerm['primary']))
+            if boundaryTerm['secondary'] not in self.bands:
+                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
+                                   (boundaryTermName, boundaryTerm['secondary']))
+
+        # Third, extract all the terms and bands from sedTermDict, make sure all
+        # are defined.
+        mapBands = []
+        mapTerms = []
+        for band in self.sedTermDict:
+            sedTerm = self.sedTermDict[band]
+            if 'extrapolated' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have 'extrapolated' key." % (band))
+            if 'constant' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have 'constant' key." % (band))
+            if 'primaryTerm' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have a primaryTerm." % (band))
+            if 'secondaryTerm' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have a secondaryTerm." % (band))
+            mapTerms.append(sedTerm['primaryTerm'])
+            if sedTerm['secondaryTerm'] is not None:
+                mapTerms.append(sedTerm['secondaryTerm'])
+            if sedTerm['extrapolated']:
+                if sedTerm['secondaryTerm'] is None:
+                    raise RuntimeError("sedTermDict %s must have a secondaryTerm if extrapolated." % (band))
+                if 'primaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a primaryBand if extrapolated." % (band))
+                if 'secondaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a secondaryBand if extrapolated." % (band))
+                if 'tertiaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a tertiaryBand if extrapolated." % (band))
+                mapBands.append(sedTerm['primaryBand'])
+                mapBands.append(sedTerm['secondaryBand'])
+                mapBands.append(sedTerm['tertiaryBand'])
+
+        for mapTerm in mapTerms:
+            if mapTerm not in self.sedBoundaryTermDict:
+                raise RuntimeError("Term %s is used in sedTermDict but not in sedBoundaryTermDict" % (mapTerm))
+        for mapBand in mapBands:
+            if mapBand not in self.bands:
+                raise RuntimeError("Band %s is used in sedTermDict but not in bands" % (mapBand))
+
         # and AB zeropoint
         self.hPlanck = 6.6
         self.expPlanck = -27.0
@@ -699,8 +753,7 @@ class FgcmConfig(object):
         """
 
         # Check the fudge factors...
-        type(self).__dict__['sedFudgeFactors']._length = len(self.bands)
-        type(self).__dict__['sedExtrapolate']._length = len(self.bands)
+        type(self).__dict__['sedTermDict']._length = len(self.bands)
 
         # And the gray cuts
         type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)
