@@ -526,8 +526,11 @@ class FgcmFitCycle(object):
 
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
 
-        if self.fgcmConfig.useRepeatabilityForExpGrayCuts:
-            self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
+        repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
+        for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
+            if useRep:
+                self.updatedPhotometricCut[i] = repPhotometricCut[i]
+                self.updatedHighCut[i] = repHighCut[i]
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After computing zeropoints'))

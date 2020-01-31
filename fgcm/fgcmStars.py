@@ -27,8 +27,6 @@ class FgcmStars(object):
     ----------------
     minObsPerBand: int
        Minumum number of observations per band to be "good"
-    sedFudgeFactors: float array
-       Fudge factors for computing fnuprime
     starColorCuts: list
        List that contains lists of [bandIndex0, bandIndex1, minColor, maxColor]
     sigma0Phot: float
@@ -65,7 +63,6 @@ class FgcmStars(object):
         self.nFitBands = len(fgcmConfig.fitBands)
         self.notFitBands = fgcmConfig.notFitBands
         self.nNotFitBands = len(fgcmConfig.notFitBands)
-        self.sedFudgeFactors = fgcmConfig.sedFudgeFactors
         self.starColorCuts = fgcmConfig.starColorCuts
         self.quantityCuts = fgcmConfig.quantityCuts
         self.sigma0Phot = fgcmConfig.sigma0Phot
@@ -76,6 +73,8 @@ class FgcmStars(object):
         self.ccdField = fgcmConfig.ccdField
         self.reserveFraction = fgcmConfig.reserveFraction
         self.modelMagErrors = fgcmConfig.modelMagErrors
+        self.sedBoundaryTermDict = fgcmConfig.sedBoundaryTermDict
+        self.sedTermDict = fgcmConfig.sedTermDict
         self.quietMode = fgcmConfig.quietMode
 
         self.inFlagStarFile = fgcmConfig.inFlagStarFile
@@ -474,6 +473,14 @@ class FgcmStars(object):
         self.fgcmLog.debug('Matching observations to bands.')
 
         # new version for multifilter support
+
+        obsFilterNameIsEncoded = False
+        try:
+            test = obsFilterName[0].decode('utf-8')
+            obsFilterNameIsEncoded = True
+        except AttributeError:
+            pass
+
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
@@ -483,7 +490,10 @@ class FgcmStars(object):
                 bandIndex = -1
 
             # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
-            use, = np.where(obsFilterName == filterName.encode('utf-8'))
+            if obsFilterNameIsEncoded:
+                use, = np.where(obsFilterName == filterName.encode('utf-8'))
+            else:
+                use, = np.where(obsFilterName == filterName)
             if use.size == 0:
                 self.fgcmLog.info('WARNING: no observations in filter %s' % (filterName))
             else:
@@ -1100,10 +1110,6 @@ class FgcmStars(object):
            Array of object indices to do computation
         """
 
-        if self.nBands < 3:
-            # cannot compute SED slopes ... just leave at 0
-            return
-
         # work on multiple indices
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
@@ -1122,64 +1128,50 @@ class FgcmStars(object):
         objSEDSlopeOI = np.zeros((objIndicesIn.size, self.nBands), dtype='f4')
         objNGoodObsOI = objNGoodObs[objIndicesIn, :]
 
-        # NOTE: There is still an assumption here that the fit bands are sequential.
+        # New mapping, nothing needs to be sequential, it's all configured
 
-        # New plan:
-        # Compute values for everything, and cut out bad ones below...
+        # First compute the terms
+        S = {}
+        for boundaryTermName, boundaryTerm in self.sedBoundaryTermDict.items():
+            index0 = self.bands.index(boundaryTerm['primary'])
+            index1 = self.bands.index(boundaryTerm['secondary'])
 
-        S = np.zeros((objIndicesIn.size, self.nBands - 1), dtype='f8')
-        for i in range(self.nBands - 1):
-            S[:, i] = (-1. / self.magConstant) * (objMagStdMeanOI[:, i + 1] -
-                                                  objMagStdMeanOI[:, i]) / (
-                (self.lambdaStdBand[i + 1] - self.lambdaStdBand[i]))
+            S[boundaryTermName] = (-1. / self.magConstant) * (objMagStdMeanOI[:, index0] - objMagStdMeanOI[:, index1]) / ((self.lambdaStdBand[index0] - self.lambdaStdBand[index1]))
+            # And flag the ones that are bad
+            bad, = np.where((objMagStdMeanOI[:, index0] >= 90.0) |
+                            (objMagStdMeanOI[:, index1] >= 90.0))
+            S[boundaryTermName][bad] = np.nan
 
-        # FIXME: will need to handle u (or blueward) non-fit bands
+        # Now for each band
+        for bandIndex, band in enumerate(self.bands):
+            sedTerm = self.sedTermDict[band]
 
-        # The bluest one of the fit bands is an extrapolation
-        # Note that this is different from the original Burke++17 paper
-        tempIndex = self.bandFitIndex[0]
-        # Only use stars that are measured in bands 0/1/2 (e.g. g/r)
-        use, = np.where((objMagStdMeanOI[:, tempIndex] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex + 1] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex + 2] < 90.0))
-        objSEDSlopeOI[use, tempIndex] = (
-            S[use, tempIndex] + self.sedFudgeFactors[tempIndex] * (
-                S[use, tempIndex + 1] + S[use, tempIndex]))
+            if sedTerm['secondaryTerm'] is not None:
+                use, = np.where((np.isfinite(S[sedTerm['primaryTerm']])) &
+                                (np.isfinite(S[sedTerm['secondaryTerm']])))
+            else:
+                use, = np.where(np.isfinite(S[sedTerm['primaryTerm']]))
 
-        # The middle ones are straight averages
-        for tempIndex in self.bandFitIndex[1: -1]:
-            # Only use stars that are measured in bands 0/1/2, 1/2/3 (e.g. g/r/i, r/i/z)
-            use, = np.where((objMagStdMeanOI[:, tempIndex - 1] < 90.0) &
-                            (objMagStdMeanOI[:, tempIndex] < 90.0) &
-                            (objMagStdMeanOI[:, tempIndex + 1] < 90.0))
-            objSEDSlopeOI[use, tempIndex] = (
-                self.sedFudgeFactors[tempIndex] * (
-                    S[use, tempIndex - 1] + S[use, tempIndex]) / 2.0)
+            if sedTerm['extrapolated']:
+                # Extrapolated
+                primaryIndex = self.bands.index(sedTerm['primaryBand'])
+                secondaryIndex = self.bands.index(sedTerm['secondaryBand'])
+                tertiaryIndex = self.bands.index(sedTerm['tertiaryBand'])
 
-        # The reddest one is another extrapolation
-        tempIndex = self.bandFitIndex[-1]
-        # Only use stars that are measured in bands e.g. 1/2/3 (e.g. r/i/z)
-        use, = np.where((objMagStdMeanOI[:, tempIndex - 2] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex - 1] < 90.0) &
-                        (objMagStdMeanOI[:, tempIndex] < 90.0))
-        objSEDSlopeOI[use, tempIndex] = (
-            S[use, tempIndex - 1] + self.sedFudgeFactors[tempIndex] * (
-                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 1]) /
-                (self.lambdaStdBand[tempIndex] - self.lambdaStdBand[tempIndex - 2])) *
-            (S[use, tempIndex - 1] - S[use, tempIndex - 2]))
-
-        # And for the redward non-fit band(s):
-        for notFitIndex in self.bandNotFitIndex:
-            # Only use stars that are measured in bands e.g. 2/3/4 (e.g. i/z/Y)
-            use, = np.where((objMagStdMeanOI[:, notFitIndex - 2] < 90.0) &
-                            (objMagStdMeanOI[:, notFitIndex - 1] < 90.0) &
-                            (objMagStdMeanOI[:, notFitIndex] < 90.0))
-            objSEDSlopeOI[use, notFitIndex] = (
-                S[use, notFitIndex-1] + self.sedFudgeFactors[notFitIndex] * (
-                    (self.lambdaStdBand[notFitIndex] - self.lambdaStdBand[notFitIndex - 1]) /
-                    (self.lambdaStdBand[notFitIndex] - self.lambdaStdBand[notFitIndex - 2])) *
-                (S[use, notFitIndex - 1] - S[use, notFitIndex - 2]))
-
+                objSEDSlopeOI[use, bandIndex] = (
+                    S[sedTerm['primaryTerm']][use] + sedTerm['constant'] * (
+                        (self.lambdaStdBand[primaryIndex] - self.lambdaStdBand[secondaryIndex]) /
+                        (self.lambdaStdBand[primaryIndex] - self.lambdaStdBand[tertiaryIndex])) *
+                    (S[sedTerm['primaryTerm']][use] - S[sedTerm['secondaryTerm']][use]))
+            else:
+                # Interpolated
+                if sedTerm['secondaryTerm'] is not None:
+                    objSEDSlopeOI[use, bandIndex] = (
+                        sedTerm['constant'] * ((S[sedTerm['primaryTerm']][use] +
+                                                S[sedTerm['secondaryTerm']][use]) / 2.0))
+                else:
+                    objSEDSlopeOI[use, bandIndex] = (
+                        sedTerm['constant'] * S[sedTerm['primaryTerm']][use])
 
         # Save the values, protected
         objSEDSlopeLock.acquire()
@@ -1578,7 +1570,7 @@ class FgcmStars(object):
         fgcmPars: FgcmParameters
         """
 
-        if (fgcmPars.compModelErrFwhmPivot[0] <= 0.0) :
+        if (np.max(fgcmPars.compModelErrFwhmPivot) <= 0.0) :
             self.fgcmLog.debug('No model for mag errors, so mag errors are unchanged.')
             return
 
@@ -1629,6 +1621,10 @@ class FgcmStars(object):
 
         # loop over bands
         for bandIndex in range(fgcmPars.nBands):
+            if fgcmPars.compModelErrFwhmPivot[bandIndex] <= 0.0:
+                self.fgcmLog.info('No error model for band %s' % (self.bands[bandIndex]))
+                continue
+
             use, = np.where((obsBandIndex[goodObs] == bandIndex) &
                             (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             pars = fgcmPars.compModelErrPars[:, bandIndex]

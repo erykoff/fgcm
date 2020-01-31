@@ -136,14 +136,15 @@ class FgcmConfig(object):
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopes = ConfigField(np.ndarray, default=np.array([]))
     illegalValue = ConfigField(float, default=-9999.0)
-    sedFudgeFactors = ConfigField(np.ndarray, required=True)
+    sedBoundaryTermDict = ConfigField(dict, required=True)
+    sedTermDict = ConfigField(dict, required=True)
     starColorCuts = ConfigField(list, required=True)
     quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
     sigFgcmMaxErr = ConfigField(float, default=0.01)
-    sigFgcmMaxEGray = ConfigField(float, default=0.05)
+    sigFgcmMaxEGray = ConfigField(list, default=[0.05])
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
     mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
@@ -162,7 +163,7 @@ class FgcmConfig(object):
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
     quietMode = ConfigField(bool, default=False)
-    useRepeatabilityForExpGrayCuts = ConfigField(bool, default=False)
+    useRepeatabilityForExpGrayCuts = ConfigField(list, default=[False])
 
     mapLongitudeRef = ConfigField(float, default=0.0)
 
@@ -321,8 +322,15 @@ class FgcmConfig(object):
         # and look at the lutFile
         self.nCCD = lutIndex['NCCD'][0]
         # these are np arrays and encoded as such
-        self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
-        self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
+        try:
+            self.lutFilterNames = [n.decode('utf-8') for n in lutIndex['FILTERNAMES'][0]]
+        except AttributeError:
+            self.lutFilterNames = [n for n in lutIndex['FILTERNAMES'][0]]
+        try:
+            self.lutStdFilterNames = [n.decode('utf-8') for n in lutIndex['STDFILTERNAMES'][0]]
+        except AttributeError:
+            self.lutStdFilterNames = [n for n in lutIndex['STDFILTERNAMES'][0]]
+
         self.pmbRange = np.array([np.min(lutIndex['PMB']),np.max(lutIndex['PMB'])])
         self.pwvRange = np.array([np.min(lutIndex['PWV']),np.max(lutIndex['PWV'])])
         self.O3Range = np.array([np.min(lutIndex['O3']),np.max(lutIndex['O3'])])
@@ -350,20 +358,19 @@ class FgcmConfig(object):
         bandStdFilterIndex = np.zeros(len(self.bands), dtype=np.int32) - 1
         for i, band in enumerate(self.bands):
             for j, filterName in enumerate(self.lutFilterNames):
-                # Every LUT filter must be in the filterToBand mapping.  Raise an explicit
-                # and clear exception here.
-                if filterName not in self.filterToBand:
-                    raise ValueError("Filter %s is described in the LUT but not mapped in filterToBand" % (filterName))
-                if self.filterToBand[filterName] == band:
-                    # If we haven't found it yet, set the index
-                    ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
-                    if bandStdFilterIndex[i] < 0:
-                        bandStdFilterIndex[i] = ind
-                    else:
-                        if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
-                            raise ValueError("Band %s has multiple standard filters (%s, %s)" %
-                                             (band, self.lutStdFilterNames[ind],
-                                              self.lutStdFilterNames[bandStdFilterIndex[i]]))
+                # Not every LUT filter must be in the filterToBand mapping.
+                # If it is not there, it will not be used.
+                if filterName in self.filterToBand:
+                    if self.filterToBand[filterName] == band:
+                        # If we haven't found it yet, set the index
+                        ind = list(self.lutFilterNames).index(self.lutStdFilterNames[j])
+                        if bandStdFilterIndex[i] < 0:
+                            bandStdFilterIndex[i] = ind
+                        else:
+                            if self.lutStdFilterNames[ind] != self.lutStdFilterNames[bandStdFilterIndex[i]]:
+                                raise ValueError("Band %s has multiple standard filters (%s, %s)" %
+                                                 (band, self.lutStdFilterNames[ind],
+                                                  self.lutStdFilterNames[bandStdFilterIndex[i]]))
         #  4) check that all the fitBands are in bands
         for fitBand in self.fitBands:
             if fitBand not in self.bands:
@@ -391,13 +398,23 @@ class FgcmConfig(object):
         self.alphaStd = lutStd['ALPHASTD'][0]
         self.zenithStd = lutStd['ZENITHSTD'][0]
 
+        # Cut the LUT filter names to those that are actually used
+        usedFilterNames = self.filterToBand.keys()
+        usedLutFilterMark = np.zeros(len(self.lutFilterNames), dtype=np.bool)
+        for i, f in enumerate(self.lutFilterNames):
+            if f in usedFilterNames:
+                usedLutFilterMark[i] = True
+
+        self.lutFilterNames = [f for i, f in enumerate(self.lutFilterNames) if usedLutFilterMark[i]]
+        self.lutStdFilterNames = [f for i, f in enumerate(self.lutStdFilterNames) if usedLutFilterMark[i]]
+
         # And the lambdaStd and I10Std, for each *band*
         self.lambdaStdBand = lutStd['LAMBDASTD'][0][bandStdFilterIndex]
         self.I10StdBand = lutStd['I10STD'][0][bandStdFilterIndex]
         self.I0StdBand = lutStd['I0STD'][0][bandStdFilterIndex]
         self.I1StdBand = lutStd['I1STD'][0][bandStdFilterIndex]
         self.I2StdBand = lutStd['I2STD'][0][bandStdFilterIndex]
-        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0]
+        self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0][usedLutFilterMark]
 
         if (self.expGrayPhotometricCut.size != len(self.bands)):
             raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
@@ -417,6 +434,20 @@ class FgcmConfig(object):
 
         if self.sigmaCalRange[1] < self.sigmaCalRange[0]:
             raise ValueError("sigmaCalRange[1] must me equal to or larger than sigmaCalRange[0]")
+
+        if len(self.useRepeatabilityForExpGrayCuts) != 1 and \
+                len(self.useRepeatabilityForExpGrayCuts) != len(self.bands):
+            raise ValueError("useRepeatabilityForExpGrayCuts must be of length 1 or number of bands")
+        # Expand into the full list if necessary
+        if len(self.useRepeatabilityForExpGrayCuts) == 1:
+            self.useRepeatabilityForExpGrayCuts = self.useRepeatabilityForExpGrayCuts * len(self.bands)
+
+        if len(self.sigFgcmMaxEGray) != 1 and \
+                len(self.sigFgcmMaxEGray) != len(self.bands):
+            raise ValueError("sigFgcmMaxEGray must be of length 1 or number of bands")
+        # Expand into the full list if necessary
+        if len(self.sigFgcmMaxEGray) == 1:
+            self.sigFgcmMaxEGray = self.sigFgcmMaxEGray * len(self.bands)
 
         # and look at the exposure file and grab some stats
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
@@ -522,6 +553,60 @@ class FgcmConfig(object):
             else:
                 if len(self.aperCorrInputSlopes) != len(self.bands):
                     raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
+
+        # Check the sed mapping dictionaries
+        # First, make sure every band is listed in the sedTermDict
+        for band in self.bands:
+            if band not in self.sedTermDict:
+                raise RuntimeError("Band %s not listed in sedTermDict." % (band))
+
+        # Second, make sure sedBoundaryTermDict is correct format
+        for boundaryTermName, boundaryTerm in self.sedBoundaryTermDict.items():
+            if 'primary' not in boundaryTerm or 'secondary' not in boundaryTerm:
+                raise RuntimeError("sedBoundaryTerm %s must have primary and secondary keys." % (boundaryTerm))
+            if boundaryTerm['primary'] not in self.bands:
+                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
+                                   (boundaryTermName, boundaryTerm['primary']))
+            if boundaryTerm['secondary'] not in self.bands:
+                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
+                                   (boundaryTermName, boundaryTerm['secondary']))
+
+        # Third, extract all the terms and bands from sedTermDict, make sure all
+        # are defined.
+        mapBands = []
+        mapTerms = []
+        for band in self.sedTermDict:
+            sedTerm = self.sedTermDict[band]
+            if 'extrapolated' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have 'extrapolated' key." % (band))
+            if 'constant' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have 'constant' key." % (band))
+            if 'primaryTerm' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have a primaryTerm." % (band))
+            if 'secondaryTerm' not in sedTerm:
+                raise RuntimeError("sedTermDict %s must have a secondaryTerm." % (band))
+            mapTerms.append(sedTerm['primaryTerm'])
+            if sedTerm['secondaryTerm'] is not None:
+                mapTerms.append(sedTerm['secondaryTerm'])
+            if sedTerm['extrapolated']:
+                if sedTerm['secondaryTerm'] is None:
+                    raise RuntimeError("sedTermDict %s must have a secondaryTerm if extrapolated." % (band))
+                if 'primaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a primaryBand if extrapolated." % (band))
+                if 'secondaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a secondaryBand if extrapolated." % (band))
+                if 'tertiaryBand' not in sedTerm:
+                    raise RuntimeError("sedTermDict %s must have a tertiaryBand if extrapolated." % (band))
+                mapBands.append(sedTerm['primaryBand'])
+                mapBands.append(sedTerm['secondaryBand'])
+                mapBands.append(sedTerm['tertiaryBand'])
+
+        for mapTerm in mapTerms:
+            if mapTerm not in self.sedBoundaryTermDict:
+                raise RuntimeError("Term %s is used in sedTermDict but not in sedBoundaryTermDict" % (mapTerm))
+        for mapBand in mapBands:
+            if mapBand not in self.bands:
+                raise RuntimeError("Band %s is used in sedTermDict but not in bands" % (mapBand))
 
         # and AB zeropoint
         self.hPlanck = 6.6
@@ -674,9 +759,7 @@ class FgcmConfig(object):
         """
 
         # Check the fudge factors...
-        # type(self).__dict__['sedFitBandFudgeFactors']._length = len(self.fitBands)
-        # type(self).__dict__['sedNotFitBandFudgeFactors']._length = len(self.notFitBands)
-        type(self).__dict__['sedFudgeFactors']._length = len(self.bands)
+        type(self).__dict__['sedTermDict']._length = len(self.bands)
 
         # And the gray cuts
         type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)
