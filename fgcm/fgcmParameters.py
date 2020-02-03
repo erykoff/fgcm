@@ -359,7 +359,7 @@ class FgcmParameters(object):
                 # through the fit cycles, but it's good to have it as something
                 # sensible
                 if use.size >= 3:
-                    self.compAperCorrPivot[i] = np.median(self.expSeeingVariable[use])
+                    self.compAperCorrPivot[bandIndex] = np.median(self.expSeeingVariable[use])
 
         # The magnitude model parameters
         self.compModelErrExptimePivot = np.zeros(self.nBands, dtype='f8')
