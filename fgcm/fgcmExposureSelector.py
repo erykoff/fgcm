@@ -5,7 +5,7 @@ import os
 import sys
 import esutil
 
-from .fgcmUtilities import expFlagDict
+from .fgcmUtilities import expFlagDict, logFlaggedExposuresPerBand, checkFlaggedExposuresPerBand
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -26,6 +26,7 @@ class FgcmExposureSelector(object):
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
         self.expGrayHighCut = fgcmConfig.expGrayHighCut
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
+        self.quietMode = fgcmConfig.quietMode
 
     def selectGoodExposures(self):
         """
@@ -39,11 +40,17 @@ class FgcmExposureSelector(object):
         bad,=np.where(self.fgcmPars.compNGoodStarPerExp == 0)
         self.fgcmPars.expFlag[bad] |= expFlagDict['NO_STARS']
         self.fgcmLog.info('Flagged %d bad exposures with no stars' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'NO_STARS')
 
         bad,=np.where((self.fgcmPars.compNGoodStarPerExp < self.minStarPerExp) &
                       (self.fgcmPars.compNGoodStarPerExp > 0))
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
         self.fgcmLog.info('Flagged %d bad exposures with too few stars.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'TOO_FEW_STARS')
 
         bad,=np.where((self.fgcmPars.compExpGray <
                        self.expGrayPhotometricCut[self.fgcmPars.expBandIndex]) &
@@ -51,16 +58,27 @@ class FgcmExposureSelector(object):
 
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_NEGATIVE']
         self.fgcmLog.info('Flagged %d bad exposures with EXP_GRAY too negative.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'EXP_GRAY_TOO_NEGATIVE')
 
         bad,=np.where((self.fgcmPars.compExpGray >
                        self.expGrayHighCut[self.fgcmPars.expBandIndex]) &
                       (self.fgcmPars.compNGoodStarPerExp > 0))
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_POSITIVE']
         self.fgcmLog.info('Flagged %d bad exposures with EXP_GRAY too positive.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'EXP_GRAY_TOO_POSITIVE')
 
         bad,=np.where(self.fgcmPars.compVarGray > self.expVarGrayPhotometricCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
         self.fgcmLog.info('Flagged %d bad exposures with VAR_GRAY too large.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'VAR_GRAY_TOO_LARGE')
+
+        checkFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars)
 
         good,=np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.info('There are now %d of %d exposures that are "photometric"' %
@@ -85,10 +103,18 @@ class FgcmExposureSelector(object):
         bad,=np.where(expNGoodStarForInitialSelection < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
         self.fgcmLog.info('Flagged %d bad exposures with too few stars' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'TOO_FEW_STARS')
 
         bad,=np.where(expGrayForInitialSelection < self.expGrayInitialCut)
         self.fgcmPars.expFlag[bad] |= expFlagDict['EXP_GRAY_TOO_NEGATIVE']
         self.fgcmLog.info('Flagged %d bad exposures with EXP_GRAY (initial) too large.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
+                                       'EXP_GRAY_TOO_NEGATIVE')
+
+        checkFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars)
 
         good,=np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.info('There are now %d of %d exposures that are potentially "photometric"' %
@@ -109,7 +135,6 @@ class FgcmExposureSelector(object):
 
         self.fgcmLog.info('Number of good exposures: %d' % (goodExp.size))
 
-
         # we first need to look for the good nights
         nExpPerNight=esutil.stat.histogram(self.fgcmPars.expNightIndex[goodExp],min=0,
                                 max=self.fgcmPars.nCampaignNights-1)
@@ -129,3 +154,7 @@ class FgcmExposureSelector(object):
 
         bad,=np.where((self.fgcmPars.expFlag & expFlagDict['TOO_FEW_EXP_ON_NIGHT']) > 0)
         self.fgcmLog.info('Flagged %d exposures on bad nights.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars, 'TOO_FEW_EXP_ON_NIGHT')
+
+        checkFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars)

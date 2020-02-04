@@ -345,6 +345,13 @@ class FgcmMakeStars(object):
 
             bandPixelCat = None
 
+            filterNameArrayIsEncoded = False
+            try:
+                test = filterNameArray[0].decode('utf-8')
+                filterNameArrayIsEncoded = True
+            except AttributeError:
+                pass
+
             # loop over bands...
             for primaryBand in self.starConfig['primaryBands']:
                 # We first need to select based on the band, not on the filter name
@@ -352,9 +359,15 @@ class FgcmMakeStars(object):
                 for filterName in self.filterNames:
                     if (self.starConfig['filterToBand'][filterName] == primaryBand):
                         if useFlag is None:
-                            useFlag = (filterNameArray[p1a] == filterName.encode('utf-8'))
+                            if filterNameArrayIsEncoded:
+                                useFlag = (filterNameArray[p1a] == filterName.encode('utf-8'))
+                            else:
+                                useFlag = (filterNameArray[p1a] == filterName)
                         else:
-                            useFlag |= (filterNameArray[p1a] == filterName.encode('utf-8'))
+                            if filterNameArrayIsEncoded:
+                                useFlag |= (filterNameArray[p1a] == filterName.encode('utf-8'))
+                            else:
+                                useFlag = (filterNameArray[p1a] == filterName)
 
                 raArrayUse = raArray[p1a[useFlag]]
                 decArrayUse = decArray[p1a[useFlag]]
@@ -617,11 +630,21 @@ class FgcmMakeStars(object):
 
         # translate filterNameArray to bandArray ... can this be made faster, or
         #  does it need to be?
+
+        filterNameArrayIsEncoded = False
+        try:
+            test = filterNameArray[0].decode('utf-8')
+            filterNameArrayIsEncoded = True
+        except AttributeError:
+            pass
+
         bandArray = np.zeros_like(filterNameArray)
         for filterName in self.filterNames:
-            use,=np.where(filterNameArray == filterName.encode('utf-8'))
+            if filterNameArrayIsEncoded:
+                use, = np.where(filterNameArray == filterName.encode('utf-8'))
+            else:
+                use, = np.where(filterNameArray == filterName)
             bandArray[use] = self.starConfig['filterToBand'][filterName]
-
 
         self.fgcmLog.info("Matching positions to observations...")
 

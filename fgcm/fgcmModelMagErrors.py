@@ -98,6 +98,11 @@ class FgcmModelMagErrors(object):
             else:
                 use = use0
 
+            if use.size < 10000:
+                # This is arbitrary, but necessary.
+                self.fgcmLog.info('Not enough star observations to model errors in %s band' % (self.fgcmPars.bands[bandIndex]))
+                continue
+
             # Compute medians exposure time for scaling
             medExptime = np.median(obsExptime[goodObs[use]])
 
@@ -133,6 +138,10 @@ class FgcmModelMagErrors(object):
 
             # Start with the quadratic model
             ok = okFwhm & okSky
+
+            if okFwhm.sum() < 1000 or okSky.sum() < 1000 or ok.sum() < 1000:
+                self.fgcmLog.info('Not enough quality star observations to model errors in %s band' % (self.fgcmPars.bands[bandIndex]))
+                continue
 
             quadFit = np.polyfit(obsMagADUMeanGOu[ok].astype(np.float64),
                                  np.log10(obsMagADUErrGOu[ok].astype(np.float64)), 2)
