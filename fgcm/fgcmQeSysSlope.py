@@ -195,6 +195,10 @@ class FgcmQeSysSlope(object):
 
             for i in range(self.fgcmPars.nWashIntervals):
                 use, = np.where(self.fgcmPars.expWashIndex == i)
+                if use.size == 0:
+                    # There are none in this interval, that's fine
+                    continue
+
                 washMJDRange = [np.min(self.fgcmPars.expMJD[use]), np.max(self.fgcmPars.expMJD[use])]
 
                 if self.instrumentParsPerBand:
