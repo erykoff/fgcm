@@ -442,7 +442,7 @@ class FgcmMakeStars(object):
                 hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
 
                 if (hist.max() == 1):
-                    self.fgcmLog.info("Warning: No matches found for pixel %d, band %s!" %
+                    self.fgcmLog.warn("No matches found for pixel %d, band %s!" %
                                       (ipring[p1a[0]], primaryBand))
                     continue
 

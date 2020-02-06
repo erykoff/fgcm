@@ -486,7 +486,7 @@ class FgcmStars(object):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except KeyError:
-                self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
+                self.fgcmLog.warn('Observations with filter %s not in config' % (filterName))
                 bandIndex = -1
 
             # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
@@ -495,7 +495,7 @@ class FgcmStars(object):
             else:
                 use, = np.where(obsFilterName == filterName)
             if use.size == 0:
-                self.fgcmLog.info('WARNING: no observations in filter %s' % (filterName))
+                self.fgcmLog.warn('No observations in filter %s' % (filterName))
             else:
                 snmm.getArray(self.obsLUTFilterIndexHandle)[use] = filterIndex
                 snmm.getArray(self.obsBandIndexHandle)[use] = bandIndex
@@ -1235,7 +1235,7 @@ class FgcmStars(object):
         if not self.hasRefstars:
             # should this Raise because it's programmer error, or just pass because
             # it's harmless?
-            self.fgcmLog.info("Warning: cannot compute abs offset without reference stars.")
+            self.fgcmLog.warn("Cannot compute abs offset without reference stars.")
             return np.zeros(self.nBands)
 
         # Set things up
