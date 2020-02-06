@@ -90,6 +90,9 @@ class FgcmParameters(object):
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.bandNotFitIndex = fgcmConfig.bandNotFitIndex
 
+        self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
+        self.bandNotRequiredIndex = fgcmConfig.bandRequiredIndex
+
         self.lutFilterNames = fgcmConfig.lutFilterNames
         self.lutStdFilterNames = fgcmConfig.lutStdFilterNames
         self.nLUTFilter = len(self.lutFilterNames)
@@ -647,6 +650,8 @@ class FgcmParameters(object):
         # link exposures to bands
         self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
+        self.hasExposuresInFilter = np.ones(self.nLUTFilter, dtype=np.bool)
+        self.hasExposuresInBand = np.zeros(self.nBands, dtype=np.bool)
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
 
         expFilterNameIsEncoded = False
@@ -669,10 +674,12 @@ class FgcmParameters(object):
             else:
                 use, = np.where(expFilterName == filterName)
             if use.size == 0:
-                self.fgcmLog.warn('No exposures in filter %s' % (filterName))
+                self.fgcmLog.info('No exposures in filter %s' % (filterName))
+                self.hasExposuresInFilter[filterIndex] = False
             else:
                 self.expBandIndex[use] = bandIndex
                 self.expLUTFilterIndex[use] = filterIndex
+                self.hasExposuresInBand[bandIndex] = True
 
         bad,=np.where(self.expLUTFilterIndex < 0)
         if (bad.size > 0):
@@ -684,6 +691,14 @@ class FgcmParameters(object):
         if self.nNotFitBands > 0:
             a, b = esutil.numpy_util.match(self.bandNotFitIndex, self.expBandIndex)
             self.expNotFitBandFlag[b] = True
+
+        # Raise if any missing bands are required
+        missingBandIndices, = np.where(~self.hasExposuresInBand)
+        for missingBandIndex in missingBandIndices:
+            if missingBandIndex in self.bandRequiredIndex:
+                raise RuntimeError("Band %s is required, but has no input exposures." % (missingBandIndex))
+            else:
+                self.fgcmLog.info("Non-required band %s has no exposures." % (self.bands[missingBandIndex]))
 
         # set up the observing epochs and link indices
 
@@ -733,6 +748,8 @@ class FgcmParameters(object):
         # Mark for each band the first wash index where it shows up
         self.firstWashIndex = np.zeros(len(self.bands), dtype=np.int32)
         for bandIndex, band in enumerate(self.bands):
+            if not self.hasExposuresInBand[bandIndex]:
+                continue
             use, = np.where(self.expBandIndex == bandIndex)
             self.firstWashIndex[bandIndex] = np.min(self.expWashIndex[use])
             if not self.quietMode:
@@ -1936,8 +1953,11 @@ class FgcmParameters(object):
 
         parFilterOffsetMmag = self.parFilterOffset * 1000.0
 
-        ax.plot(self.lambdaStdFilter, parFilterOffsetMmag, 'r.')
+        use, = np.where(self.hasExposuresInFilter)
+        ax.plot(self.lambdaStdFilter[use], parFilterOffsetMmag[use], 'r.')
         for i, f in enumerate(self.lutFilterNames):
+            if not self.hasExposuresInFilter[i]:
+                continue
             ax.annotate(r'$%s$' % (f), (self.lambdaStdFilter[i], parFilterOffsetMmag[i] - 10.0), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
         ax.set_ylabel('Filter Offset (mmag)')
@@ -1951,8 +1971,11 @@ class FgcmParameters(object):
         fig.clf()
         ax = fig.add_subplot(111)
 
-        ax.plot(self.lambdaStdBand, self.compAbsThroughput, 'r.')
+        use, = np.where(self.hasExposuresInBand)
+        ax.plot(self.lambdaStdBand[use], self.compAbsThroughput[use], 'r.')
         for i, b in enumerate(self.bands):
+            if not self.hasExposuresInBand[i]:
+                continue
             ax.annotate(r'$%s$' % (b), (self.lambdaStdBand[i], self.compAbsThroughput[i] - 0.1), xycoords='data', ha='center', va='top', fontsize=16)
         ax.set_xlabel('Std Wavelength (A)')
         ax.set_ylabel('Absolute throughput (fraction)')
@@ -1962,6 +1985,8 @@ class FgcmParameters(object):
                                                self.outfileBaseWithCycle))
 
         for i, band in enumerate(self.bands):
+            if not self.hasExposuresInBand[i]:
+                continue
             self.fgcmLog.info('Abs throughput in %s band: %.4f' % (band, self.compAbsThroughput[i]))
 
         ## FIXME: add pwv offset plotting routine (if external)

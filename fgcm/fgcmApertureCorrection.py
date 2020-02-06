@@ -98,6 +98,9 @@ class FgcmApertureCorrection(object):
         expIndexUse,=np.where(self.fgcmPars.expFlag == 0)
 
         for i in range(self.fgcmPars.nBands):
+            if not self.fgcmPars.hasExposuresInBand[i]:
+                continue
+
             use,=np.where((self.fgcmPars.expBandIndex[expIndexUse] == i) &
                           (self.fgcmPars.expSeeingVariable[expIndexUse] > self.illegalValue) &
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
