@@ -90,6 +90,8 @@ class FgcmModelMagErrors(object):
 
         # And loop over bands
         for bandIndex in range(self.fgcmPars.nBands):
+            if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
             use0, = np.where((obsBandIndex[goodObs] == bandIndex) &
                              (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             # Sample down to the number of observations in config (for speed)

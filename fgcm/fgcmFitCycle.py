@@ -317,6 +317,8 @@ class FgcmFitCycle(object):
                 self.fgcmStars.applyAbsOffset(deltaAbsOffset)
 
                 for i, band in enumerate(self.fgcmPars.bands):
+                    if not self.fgcmPars.hasExposuresInBand[i]:
+                        continue
                     self.fgcmLog.info("Initial abs throughput in %s band = %.4f" %
                                       (band, self.fgcmPars.compAbsThroughput[i]))
 
@@ -400,6 +402,8 @@ class FgcmFitCycle(object):
 
         if self.fgcmStars.hasRefstars:
             for i, band in enumerate(self.fgcmPars.bands):
+                if not self.fgcmPars.hasExposuresInBand[i]:
+                    continue
                 self.fgcmLog.info("Final abs throughput in %s band = %.4f" %
                                   (band, self.fgcmPars.compAbsThroughput[i]))
 

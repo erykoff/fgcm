@@ -98,6 +98,9 @@ class FgcmApertureCorrection(object):
         expIndexUse,=np.where(self.fgcmPars.expFlag == 0)
 
         for i in range(self.fgcmPars.nBands):
+            if not self.fgcmPars.hasExposuresInBand[i]:
+                continue
+
             use,=np.where((self.fgcmPars.expBandIndex[expIndexUse] == i) &
                           (self.fgcmPars.expSeeingVariable[expIndexUse] > self.illegalValue) &
                           (np.isfinite(self.fgcmPars.expSeeingVariable[expIndexUse])))
@@ -127,7 +130,7 @@ class FgcmApertureCorrection(object):
             # remove any empty bins...
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
             if (gd.size < 3):
-                self.fgcmLog.info('Warning: could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
+                self.fgcmLog.warn('Could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
 
@@ -160,7 +163,7 @@ class FgcmApertureCorrection(object):
                 continue
 
             if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
-                self.fgcmLog.info('Warning: Aperture correction computation failed for band %s' %
+                self.fgcmLog.warn('Aperture correction computation failed for band %s' %
                                  (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = 0.0
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0

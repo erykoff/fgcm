@@ -267,7 +267,7 @@ class FgcmChisq(object):
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=self.includeReserve)
 
-        if not self.quietMode:
+        if self._nIterations == 0:
             self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
 
         if (goodStars.size == 0):
@@ -414,7 +414,7 @@ class FgcmChisq(object):
                                     (partialSums[3*self.fgcmPars.nFitPars:
                                                      4*self.fgcmPars.nFitPars] > 0))
                 self.nActualFitPars = nonZero.size
-                if not self.quietMode:
+                if self._nIterations == 0:
                     self.fgcmLog.info('Actually fit %d parameters.' % (self.nActualFitPars))
 
             fitDOF = partialSums[-3] + partialSums[-1] - float(self.nActualFitPars)

@@ -138,9 +138,8 @@ class FgcmRetrieval(object):
         self.obsExpIndexGOAHandle = snmm.createArray(goodObs.size,dtype='i4')
         snmm.getArray(self.obsExpIndexGOAHandle)[:] = obsExpIndex[goodObs]
 
-        if not self.quietMode:
-            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                              (time.time() - preStartTime))
+        self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
+                           (time.time() - preStartTime))
 
         # which exposures have stars?
         # Note that this always returns a sorted array
