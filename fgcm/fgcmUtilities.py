@@ -598,6 +598,8 @@ def logFlaggedExposuresPerBand(log, fgcmPars, flagName, raiseAllBad=True):
     """
 
     for i, band in enumerate(fgcmPars.bands):
+        if not fgcmPars.hasExposuresInBand[i]:
+            continue
         inBand, = np.where(fgcmPars.expBandIndex == i)
         inBandBad, = np.where((fgcmPars.expFlag[inBand] &
                                expFlagDict[flagName]) > 0)
@@ -619,6 +621,8 @@ def checkFlaggedExposuresPerBand(log, fgcmPars):
     """
 
     for i, band in enumerate(fgcmPars.bands):
+        if not fgcmPars.hasExposuresInBand[i]:
+            continue
         inBand, = np.where(fgcmPars.expBandIndex == i)
         inBandBad, = np.where(fgcmPars.expFlag[inBand] > 0)
         if inBandBad.size >= (inBand.size - 1):

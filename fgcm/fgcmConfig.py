@@ -308,7 +308,7 @@ class FgcmConfig(object):
         if (self.resetParameters) :
             self.fgcmLog.info('Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
-            self.fgcmLog.info('WARNING: No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+            self.fgcmLog.warn('No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
         if (self.plotPath is not None and not os.path.isdir(self.plotPath)):
             try:
