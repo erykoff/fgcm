@@ -138,6 +138,9 @@ class FgcmSigFgcm(object):
         sigType = '/'.join(sigTypes)
 
         for bandIndex, band in enumerate(self.fgcmStars.bands):
+            if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
+
             # start the figure which will have 4 panels
             fig = plt.figure(figsize=(9, 6))
             fig.clf()

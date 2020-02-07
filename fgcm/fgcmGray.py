@@ -631,6 +631,8 @@ class FgcmGray(object):
             plt.set_cmap('viridis')
 
             for bandIndex, band in enumerate(self.fgcmPars.bands):
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
                 use, = np.where((self.fgcmPars.expBandIndex == bandIndex) &
                                 (self.fgcmPars.expFlag == 0) &
                                 (expGrayColorSplit[:, 0] > self.illegalValue) &
@@ -823,6 +825,10 @@ class FgcmGray(object):
 
         # And plot correlations of EXP^gray between pairs of bands
         for ind, bandIndex0 in enumerate(self.bandFitIndex[:-2]):
+            if not self.fgcmPars.hasExposuresInBand[ind] or \
+               not self.fgcmPars.hasExposuresInBand[ind + 1]:
+                continue
+
             bandIndex1 = self.bandFitIndex[ind + 1]
 
             use0, = np.where((self.fgcmPars.expBandIndex == bandIndex0) &
@@ -833,7 +839,8 @@ class FgcmGray(object):
                              (expGray > self.illegalValue))
 
             if use0.size == 0 or use1.size == 0:
-                self.fgcmLog.info('Could not find photometric exposures in bands %d or %d' % (bandIndex0, bandIndex1))
+                self.fgcmLog.info('Could not find photometric exposures in bands %s or %s' %
+                                  (self.fgcmPars.bands[bandIndex0], self.fgcmPars.bands[bandIndex1]))
                 continue
 
             matchInd = np.clip(np.searchsorted(self.fgcmPars.expMJD[use0],

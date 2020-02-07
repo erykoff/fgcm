@@ -97,6 +97,8 @@ class FgcmQeSysSlope(object):
             deltaTAll = None
 
             for bandIndex in bandIndices:
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
                 i2a = bandRev[bandRev[bandIndex]: bandRev[bandIndex + 1]]
 
                 # Now lump the stars together
@@ -204,10 +206,12 @@ class FgcmQeSysSlope(object):
                 if self.instrumentParsPerBand:
                     # Need to plot all of them one-by-one
                     for j in range(self.fgcmPars.nBands):
+                        if not self.fgcmPars.hasExposuresInBand[j]:
+                            continue
                         label = self.fgcmPars.bands[j] if not started else None
                         ax.plot(washMJDRange - firstMJD,
                                 1000.0*((washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[j, i] +
-                                self.fgcmPars.parQESysIntercept[j, i]), linestyle='--', color=colors[j], linewidth=2, label=label)
+                                        self.fgcmPars.parQESysIntercept[j, i]), linestyle='--', color=colors[j % len(colors)], linewidth=2, label=label)
                 else:
                     ax.plot(washMJDRange - firstMJD,
                             1000.0*((washMJDRange - self.fgcmPars.washMJDs[i])*self.fgcmPars.compQESysSlope[0, i] +
@@ -321,6 +325,8 @@ class FgcmQeSysSlope(object):
                                 (self.fgcmPars.washMJDs <= maxMjd))
 
         for i, band in enumerate(self.fgcmPars.bands):
+            if not self.fgcmPars.hasExposuresInBand[i]:
+                continue
 
             use, = np.where(obsBandIndex[goodObs[goodRefObsGO]] == i)
             if use.size < 100:

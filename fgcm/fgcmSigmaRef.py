@@ -82,6 +82,9 @@ class FgcmSigmaRef(object):
             self.fgcmLog.info('Found %d refstars (< 50), so computing "small-number" statistics:' % (goodRefStars.size))
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
+
                 # Filter on previous bad refstars
                 refUse, = np.where((refMag[objRefIDIndex[goodRefStars], bandIndex] < 90.0) &
                                    (objMagStdMean[goodRefStars, bandIndex] < 90.0))
@@ -126,6 +129,9 @@ class FgcmSigmaRef(object):
             gmiCutNames = ['All', 'Blue25', 'Middle50', 'Red25']
 
             for bandIndex, band in enumerate(self.fgcmStars.bands):
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
+
                 # start the figure which will have 4 panels
                 # (the figure may not be drawn and written if not configured)
                 fig = plt.figure(figsize=(9, 6))

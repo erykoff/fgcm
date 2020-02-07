@@ -486,7 +486,7 @@ class FgcmStars(object):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except KeyError:
-                self.fgcmLog.info('WARNING: observations with filter %s not in config' % (filterName))
+                self.fgcmLog.warn('Observations with filter %s not in config' % (filterName))
                 bandIndex = -1
 
             # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
@@ -495,7 +495,7 @@ class FgcmStars(object):
             else:
                 use, = np.where(obsFilterName == filterName)
             if use.size == 0:
-                self.fgcmLog.info('WARNING: no observations in filter %s' % (filterName))
+                self.fgcmLog.info('No observations in filter %s' % (filterName))
             else:
                 snmm.getArray(self.obsLUTFilterIndexHandle)[use] = filterIndex
                 snmm.getArray(self.obsBandIndexHandle)[use] = bandIndex
@@ -576,6 +576,9 @@ class FgcmStars(object):
 
             # Compute the fraction of stars that are reference stars
             for i, band in enumerate(self.bands):
+                if not fgcmPars.hasExposuresInBand[i]:
+                    continue
+
                 gd, = np.where(refMag[:, i] < 90.0)
                 fracRef = float(gd.size) / float(len(snmm.getArray(self.objIDHandle)))
 
@@ -1136,7 +1139,11 @@ class FgcmStars(object):
             index0 = self.bands.index(boundaryTerm['primary'])
             index1 = self.bands.index(boundaryTerm['secondary'])
 
-            S[boundaryTermName] = (-1. / self.magConstant) * (objMagStdMeanOI[:, index0] - objMagStdMeanOI[:, index1]) / ((self.lambdaStdBand[index0] - self.lambdaStdBand[index1]))
+            with np.warnings.catch_warnings():
+                np.warnings.simplefilter("ignore")
+
+                S[boundaryTermName] = (-1. / self.magConstant) * (objMagStdMeanOI[:, index0] - objMagStdMeanOI[:, index1]) / ((self.lambdaStdBand[index0] - self.lambdaStdBand[index1]))
+
             # And flag the ones that are bad
             bad, = np.where((objMagStdMeanOI[:, index0] >= 90.0) |
                             (objMagStdMeanOI[:, index1] >= 90.0))
@@ -1235,7 +1242,7 @@ class FgcmStars(object):
         if not self.hasRefstars:
             # should this Raise because it's programmer error, or just pass because
             # it's harmless?
-            self.fgcmLog.info("Warning: cannot compute abs offset without reference stars.")
+            self.fgcmLog.warn("Cannot compute abs offset without reference stars.")
             return np.zeros(self.nBands)
 
         # Set things up
@@ -1621,6 +1628,8 @@ class FgcmStars(object):
 
         # loop over bands
         for bandIndex in range(fgcmPars.nBands):
+            if not fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
             if fgcmPars.compModelErrFwhmPivot[bandIndex] <= 0.0:
                 self.fgcmLog.info('No error model for band %s' % (self.bands[bandIndex]))
                 continue
@@ -1734,7 +1743,13 @@ class FgcmStars(object):
 
         self.fgcmLog.info('Saving standard stars to %s' % (starFile))
 
-        fitsio.write(starFile, self.retrieveStdStarCatalog(fgcmPars), clobber=True)
+        stdStars, goodBands = self.retrieveStdStarCatalog(fgcmPars)
+
+        hdr = fitsio.FITSHDR()
+        for i, goodBand in enumerate(goodBands):
+            hdr['BAND%d' % (i)] = goodBand
+
+        fitsio.write(starFile, self.retrieveStdStarCatalog(fgcmPars), clobber=True, header=hdr)
 
     def retrieveStdStarCatalog(self, fgcmPars):
         """
@@ -1761,16 +1776,19 @@ class FgcmStars(object):
 
         goodStars, = np.where((objFlag & rejectMask) == 0)
 
+        goodBands, = np.where(fgcmPars.hasExposuresInBand)
+        goodBandNames = [fgcmPars.bands[i] for i in goodBands]
+
         dtype=[('FGCM_ID', 'i8'),
                ('RA', 'f8'),
                ('DEC', 'f8'),
                ('FLAG', 'i4'),
-               ('NGOOD', 'i4', len(self.bands)),
-               ('NTOTAL', 'i4', len(self.bands)),
-               ('MAG_STD', 'f4', len(self.bands)),
-               ('MAGERR_STD', 'f4', len(self.bands))]
+               ('NGOOD', 'i4', goodBands.size),
+               ('NTOTAL', 'i4', goodBands.size),
+               ('MAG_STD', 'f4', goodBands.size),
+               ('MAGERR_STD', 'f4', goodBands.size)]
         if self.hasPsfCandidate:
-            dtype.append(('NPSFCAND', 'i4', len(self.bands)))
+            dtype.append(('NPSFCAND', 'i4', goodBands.size))
 
         outCat = np.zeros(goodStars.size, dtype=dtype)
 
@@ -1778,14 +1796,15 @@ class FgcmStars(object):
         outCat['RA'] = objRA[goodStars]
         outCat['DEC'] = objDec[goodStars]
         outCat['FLAG'] = objFlag[goodStars]
-        outCat['NGOOD'] = objNGoodObs[goodStars, :]
-        outCat['NTOTAL'] = objNTotalObs[goodStars, :]
-        outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
-        outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]
-        if self.hasPsfCandidate:
-            outCat['NPSFCAND'][:, :] = objNPsfCandidate[goodStars, :]
+        for i, goodBand in enumerate(goodBands):
+            outCat['NGOOD'][:, i] = objNGoodObs[goodStars, goodBand]
+            outCat['NTOTAL'][:, i] = objNTotalObs[goodStars, goodBand]
+            outCat['MAG_STD'][:, i] = objMagStdMean[goodStars, goodBand]
+            outCat['MAGERR_STD'][:, i] = objMagStdMeanErr[goodStars, goodBand]
+            if self.hasPsfCandidate:
+                outCat['NPSFCAND'][:, i] = objNPsfCandidate[goodStars, goodBand]
 
-        return outCat
+        return outCat, goodBandNames
 
     def __getstate__(self):
         # Don't try to pickle the logger.

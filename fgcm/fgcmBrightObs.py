@@ -115,14 +115,12 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
-        if not self.quietMode:
-            self.fgcmLog.info('Pre-matching stars and observations...')
+        self.fgcmLog.debug('Pre-matching stars and observations...')
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
-        if not self.quietMode:
-            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                              (time.time() - preStartTime))
+        self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
+                           (time.time() - preStartTime))
 
         if (self.debug):
             self._worker((goodStars,goodObs))

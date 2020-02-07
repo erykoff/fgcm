@@ -97,9 +97,8 @@ class FgcmSigmaCal(object):
         expFlag = self.fgcmPars.expFlag
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlag)
 
-        if not self.quietMode:
-            self.fgcmLog.info('Pre-matching done in %.1f sec.' %
-                              (time.time() - preStartTime))
+        self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
+                           (time.time() - preStartTime))
 
         nSections = goodStars.size // self.nStarPerRun + 1
         goodStarsList = np.array_split(goodStars, nSections)
@@ -175,6 +174,9 @@ class FgcmSigmaCal(object):
         indices = {}
         plotIndices = {}
         for bandIndex, band in enumerate(self.fgcmPars.bands):
+            if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
+
             ok, = np.where((objMagStdMean[goodStars, bandIndex] < 90.0) &
                            (objMagStdMean[goodStars, bandIndex] != 0.0) &
                            (objNGoodObs[goodStars, bandIndex] > 2))
@@ -198,6 +200,9 @@ class FgcmSigmaCal(object):
             pool.join()
 
             for bandIndex, band in enumerate(self.fgcmPars.bands):
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
+
                 ok, = np.where((objChi2[goodStars[indices[band]], bandIndex] > 0.001) &
                                (objChi2[goodStars[indices[band]], bandIndex] < 1000.0))
                 if ok.size > 0:
@@ -205,6 +210,9 @@ class FgcmSigmaCal(object):
 
             if self.plotPath is not None:
                 for bandIndex, band in enumerate(self.fgcmPars.bands):
+                    if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                        continue
+
                     ok, = np.where((objChi2[goodStars[plotIndices[band]], bandIndex] > 0.001) &
                                    (objChi2[goodStars[plotIndices[band]], bandIndex] < 1000.0))
                     # These have already been limited to the plot percentile range
@@ -220,6 +228,9 @@ class FgcmSigmaCal(object):
         # And get the minima...
         mininds = np.zeros(self.fgcmPars.nBands, dtype=np.int32)
         for bandIndex, band in enumerate(self.fgcmPars.bands):
+            if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
+
             mininds[bandIndex] = np.argmin(np.abs(np.log10(medChi2s[:, bandIndex])))
             self.fgcmPars.compSigmaCal[bandIndex] = sigmaCals[mininds[bandIndex]]
             self.fgcmLog.info('Best sigmaCal (%s band) = %.2f mmag' % (band, sigmaCals[mininds[bandIndex]]*1000.0))
@@ -227,6 +238,9 @@ class FgcmSigmaCal(object):
         # And do the plots if desired
         if self.plotPath is not None:
             for bandIndex, band in enumerate(self.fgcmPars.bands):
+                if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
+
                 fig = plt.figure(figsize=(9, 6))
                 fig.clf()
 
