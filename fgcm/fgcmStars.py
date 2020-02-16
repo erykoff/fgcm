@@ -690,8 +690,16 @@ class FgcmStars(object):
         # Check the airmass range
         if ((np.min(obsSecZenith) < self.secZenithRange[0]) |
             (np.max(obsSecZenith) > self.secZenithRange[1])):
-            raise ValueError("Input stars have a secZenith that is out of range of LUT."
-                             "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" % (np.min(obsSecZenith), np.max(obsSecZenith), self.secZenithRange[0], self.secZenithRange[1]))
+            self.fgcmLog.warn("Input stars have a secZenith that is out of range of LUT."
+                              "Observed range is  %.2f to %.2f, and LUT goes from %.2f to %.2f" %
+                              (np.min(obsSecZenith), np.max(obsSecZenith),
+                               self.secZenithRange[0], self.secZenithRange[1]))
+            bad, = np.where((obsSecZenith <= self.secZenithRange[0]) |
+                            (obsSecZenith >= self.secZenithRange[1]))
+            self.fgcmLog.warn("Clipping %d observations out of airmass range" % (bad.size))
+            obsSecZenith[bad] = np.clip(obsSecZenith[bad],
+                                        obsSecZenithRange[0],
+                                        obsSecZenithRange[1])
 
         if not self.quietMode:
             self.fgcmLog.info('Computed secZenith in %.1f seconds.' %
