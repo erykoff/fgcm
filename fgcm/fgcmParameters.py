@@ -159,7 +159,7 @@ class FgcmParameters(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
 
-        if fgcmConfig.aperCorrFitNBins == 0 and len(fgcmConfig.aperCorrInputSlopes) > 0:
+        if len(fgcmConfig.aperCorrInputSlopes) > 0:
             self.aperCorrInputSlopes = fgcmConfig.aperCorrInputSlopes
         else:
             self.aperCorrInputSlopes = None

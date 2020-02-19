@@ -75,6 +75,11 @@ class FgcmApertureCorrection(object):
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
         expGrayTemp = expGray.copy()
 
+        # save original pivot and range in case it fails
+        originalSlope = self.fgcmPars.compAperCorrSlope.copy()
+        originalPivot = self.fgcmPars.compAperCorrPivot.copy()
+        originalRange = self.fgcmPars.compAperCorrRange.copy()
+
         # first, remove any previous correction if necessary...
         if (np.max(self.fgcmPars.compAperCorrRange[1,:]) >
             np.min(self.fgcmPars.compAperCorrRange[0,:])) :
@@ -110,7 +115,6 @@ class FgcmApertureCorrection(object):
                 continue
 
             # sort to set the range...
-            #st=np.argsort(expGrayTemp[use])
             st=np.argsort(self.fgcmPars.expSeeingVariable[expIndexUse[use]])
             use=use[st]
 
@@ -131,7 +135,9 @@ class FgcmApertureCorrection(object):
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
             if (gd.size < 3):
                 self.fgcmLog.warn('Could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
-                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlope[i] = originalSlope[i]
+                self.fgcmPars.compAperCorrPivot[i] = originalPivot[i]
+                self.fgcmPars.compAperCorrRange[:, i] = originalRange[:, i]
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
 
                 continue
@@ -158,14 +164,18 @@ class FgcmApertureCorrection(object):
             except Exception as inst:
                 self.fgcmLog.info('aperture correction completely failed for band %s' %
                                   (self.fgcmPars.bands[i]))
-                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlope[i] = originalSlope[i]
+                self.fgcmPars.compAperCorrPivot[i] = originalPivot[i]
+                self.fgcmPars.compAperCorrRange[:, i] = originalRange[:, i]
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
                 continue
 
             if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
                 self.fgcmLog.warn('Aperture correction computation failed for band %s' %
                                  (self.fgcmPars.bands[i]))
-                self.fgcmPars.compAperCorrSlope[i] = 0.0
+                self.fgcmPars.compAperCorrSlope[i] = originalSlope[i]
+                self.fgcmPars.compAperCorrPivot[i] = originalPivot[i]
+                self.fgcmPars.compAperCorrRange[:, i] = originalRange[:, i]
                 self.fgcmPars.compAperCorrSlopeErr[i] = 0.0
 
                 continue
