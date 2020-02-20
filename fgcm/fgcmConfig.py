@@ -547,12 +547,11 @@ class FgcmConfig(object):
                 cCut[1] = list(self.bands).index(cCut[1])
 
         # Check for input aperture corrections.
-        if self.aperCorrFitNBins == 0:
-            if len(self.aperCorrInputSlopes) == 0:
-                self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopes")
-            else:
-                if len(self.aperCorrInputSlopes) != len(self.bands):
-                    raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
+        if self.aperCorrFitNBins == 0 and len(self.aperCorrInputSlopes) == 0:
+            self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopes")
+        if len(self.aperCorrInputSlopes) > 0:
+            if len(self.aperCorrInputSlopes) != len(self.bands):
+                raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
 
         # Check the sed mapping dictionaries
         # First, make sure every band is listed in the sedTermDict
