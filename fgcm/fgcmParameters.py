@@ -159,10 +159,10 @@ class FgcmParameters(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
 
-        if len(fgcmConfig.aperCorrInputSlopes) > 0:
-            self.aperCorrInputSlopes = fgcmConfig.aperCorrInputSlopes
-        else:
+        if np.any(fgcmConfig.aperCorrInputSlopes == fgcmConfig.illegalValue):
             self.aperCorrInputSlopes = None
+        else:
+            self.aperCorrInputSlopes = fgcmConfig.aperCorrInputSlopes
 
         if (initNew):
             self._initializeNewParameters(expInfo, fgcmLUT)
@@ -887,30 +887,30 @@ class FgcmParameters(object):
         maxBandLen = len(max(self.bands, key=len))
 
         dtype=[('NCCD','i4'),
-               ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), len(self.lutFilterNames)),
-               ('BANDS','a%d' % (maxBandLen), len(self.bands)),
-               ('FITBANDS', 'a%d' % (maxBandLen), len(self.fitBands)),
-               ('NOTFITBANDS', 'a%d' % (maxBandLen), len(self.notFitBands)),
-               ('LNTAUUNIT','f8'),
-               ('LNTAUSLOPEUNIT','f8'),
-               ('ALPHAUNIT','f8'),
-               ('LNPWVUNIT','f8'),
-               ('LNPWVSLOPEUNIT','f8'),
-               ('LNPWVQUADRATICUNIT','f8'),
-               ('LNPWVGLOBALUNIT','f8'),
-               ('O3UNIT','f8'),
-               ('QESYSUNIT','f8'),
-               ('FILTEROFFSETUNIT','f8'),
-               ('HASEXTERNALPWV','i2'),
-               ('HASEXTERNALTAU','i2')]
+               ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.lutFilterNames), )),
+               ('BANDS', 'a%d' % (maxBandLen), (len(self.bands), )),
+               ('FITBANDS', 'a%d' % (maxBandLen), (len(self.fitBands), )),
+               ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
+               ('LNTAUUNIT', 'f8'),
+               ('LNTAUSLOPEUNIT', 'f8'),
+               ('ALPHAUNIT', 'f8'),
+               ('LNPWVUNIT', 'f8'),
+               ('LNPWVSLOPEUNIT', 'f8'),
+               ('LNPWVQUADRATICUNIT', 'f8'),
+               ('LNPWVGLOBALUNIT', 'f8'),
+               ('O3UNIT', 'f8'),
+               ('QESYSUNIT', 'f8'),
+               ('FILTEROFFSETUNIT', 'f8'),
+               ('HASEXTERNALPWV', 'i2'),
+               ('HASEXTERNALTAU', 'i2')]
 
         ## FIXME: change from these files...
         if (self.hasExternalPwv):
-            dtype.extend([('PWVFILE','a%d' % (len(self.pwvFile)+1))])
+            dtype.extend([('PWVFILE', 'a%d' % (len(self.pwvFile)+1))])
         if (self.hasExternalTau):
-            dtype.extend([('TAUFILE','a%d' % (len(self.tauFile)+1))])
+            dtype.extend([('TAUFILE', 'a%d' % (len(self.tauFile)+1))])
 
-        parInfo=np.zeros(1,dtype=dtype)
+        parInfo=np.zeros(1, dtype=dtype)
         parInfo['NCCD'] = self.nCCD
         parInfo['LUTFILTERNAMES'] = self.lutFilterNames
         parInfo['BANDS'] = self.bands
@@ -924,53 +924,53 @@ class FgcmParameters(object):
         if (self.hasExternalTau):
             parInfo['TAUFILE'] = self.tauFile
 
-        dtype=[('PARALPHA','f8',self.parAlpha.size),
-               ('PARO3','f8',self.parO3.size),
-               ('PARLNPWVINTERCEPT','f8',self.parLnPwvIntercept.size),
-               ('PARLNPWVSLOPE','f8',self.parLnPwvSlope.size),
-               ('PARLNPWVQUADRATIC','f8',self.parLnPwvQuadratic.size),
-               ('PARLNTAUINTERCEPT','f8',self.parLnTauIntercept.size),
-               ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
-               ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
-               ('COMPQESYSSLOPE','f8',self.compQESysSlope.size),
-               ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
-               ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
-               ('COMPABSTHROUGHPUT', 'f8', self.compAbsThroughput.size),
-               ('COMPREFOFFSET', 'f8', self.compRefOffset.size),
-               ('COMPREFSIGMA', 'f8', self.compRefSigma.size),
-               ('COMPMIRRORCHROMATICITY', 'f8', self.compMirrorChromaticity.size),
-               ('MIRRORCHROMATICITYPIVOT', 'f8', self.mirrorChromaticityPivot.size),
-               ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
-               ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
-               ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
-               ('COMPAPERCORRRANGE','f8',self.compAperCorrRange.size),
-               ('COMPMODELERREXPTIMEPIVOT', 'f8', self.compModelErrExptimePivot.size),
-               ('COMPMODELERRFWHMPIVOT', 'f8', self.compModelErrFwhmPivot.size),
-               ('COMPMODELERRSKYPIVOT', 'f8', self.compModelErrSkyPivot.size),
-               ('COMPMODELERRPARS', 'f8', self.compModelErrPars.size),
-               ('COMPEXPGRAY','f8',self.compExpGray.size),
-               ('COMPVARGRAY','f8',self.compVarGray.size),
-               ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
-               ('COMPSIGFGCM','f8',self.compSigFgcm.size),
-               ('COMPSIGMACAL', 'f8', self.compSigmaCal.size),
-               ('COMPRETRIEVEDLNPWV','f8',self.compRetrievedLnPwv.size),
-               ('COMPRETRIEVEDLNPWVRAW','f8',self.compRetrievedLnPwvRaw.size),
-               ('COMPRETRIEVEDLNPWVFLAG','i2',self.compRetrievedLnPwvFlag.size),
-               ('PARRETRIEVEDLNPWVSCALE','f8'),
-               ('PARRETRIEVEDLNPWVOFFSET','f8'),
-               ('PARRETRIEVEDLNPWVNIGHTLYOFFSET','f8',self.parRetrievedLnPwvNightlyOffset.size),
-               ('COMPRETRIEVEDTAUNIGHT','f8',self.compRetrievedTauNight.size)]
+        dtype=[('PARALPHA', 'f8' , (self.parAlpha.size, )),
+               ('PARO3', 'f8', (self.parO3.size, )),
+               ('PARLNPWVINTERCEPT', 'f8' , (self.parLnPwvIntercept.size, )),
+               ('PARLNPWVSLOPE', 'f8', (self.parLnPwvSlope.size, )),
+               ('PARLNPWVQUADRATIC', 'f8' , (self.parLnPwvQuadratic.size, )),
+               ('PARLNTAUINTERCEPT', 'f8', (self.parLnTauIntercept.size, )),
+               ('PARLNTAUSLOPE', 'f8', (self.parLnTauSlope.size, )),
+               ('PARQESYSINTERCEPT', 'f8', (self.parQESysIntercept.size, )),
+               ('COMPQESYSSLOPE', 'f8', (self.compQESysSlope.size, )),
+               ('PARFILTEROFFSET', 'f8', (self.parFilterOffset.size, )),
+               ('PARFILTEROFFSETFITFLAG', 'i2', (self.parFilterOffsetFitFlag.size, )),
+               ('COMPABSTHROUGHPUT', 'f8', (self.compAbsThroughput.size, )),
+               ('COMPREFOFFSET', 'f8', (self.compRefOffset.size, )),
+               ('COMPREFSIGMA', 'f8', (self.compRefSigma.size, )),
+               ('COMPMIRRORCHROMATICITY', 'f8', (self.compMirrorChromaticity.size, )),
+               ('MIRRORCHROMATICITYPIVOT', 'f8', (self.mirrorChromaticityPivot.size, )),
+               ('COMPAPERCORRPIVOT', 'f8', (self.compAperCorrPivot.size, )),
+               ('COMPAPERCORRSLOPE', 'f8', (self.compAperCorrSlope.size, )),
+               ('COMPAPERCORRSLOPEERR', 'f8', (self.compAperCorrSlopeErr.size, )),
+               ('COMPAPERCORRRANGE', 'f8', (self.compAperCorrRange.size, )),
+               ('COMPMODELERREXPTIMEPIVOT', 'f8', (self.compModelErrExptimePivot.size, )),
+               ('COMPMODELERRFWHMPIVOT', 'f8', (self.compModelErrFwhmPivot.size, )),
+               ('COMPMODELERRSKYPIVOT', 'f8', (self.compModelErrSkyPivot.size, )),
+               ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
+               ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
+               ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
+               ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
+               ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
+               ('COMPRETRIEVEDLNPWV', 'f8', (self.compRetrievedLnPwv.size, )),
+               ('COMPRETRIEVEDLNPWVRAW', 'f8', (self.compRetrievedLnPwvRaw.size, )),
+               ('COMPRETRIEVEDLNPWVFLAG', 'i2', (self.compRetrievedLnPwvFlag.size, )),
+               ('PARRETRIEVEDLNPWVSCALE', 'f8'),
+               ('PARRETRIEVEDLNPWVOFFSET', 'f8'),
+               ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8', (self.parRetrievedLnPwvNightlyOffset.size, )),
+               ('COMPRETRIEVEDTAUNIGHT', 'f8', (self.compRetrievedTauNight.size, ))]
 
         if (self.hasExternalPwv):
-            dtype.extend([('PAREXTERNALLNPWVSCALE','f8'),
-                          ('PAREXTERNALLNPWVOFFSET','f8',self.parExternalLnPwvOffset.size),
-                          ('EXTERNALLNPWV','f8',self.nExp)])
+            dtype.extend([('PAREXTERNALLNPWVSCALE', 'f8'),
+                          ('PAREXTERNALLNPWVOFFSET', 'f8', (self.parExternalLnPwvOffset.size, )),
+                          ('EXTERNALLNPWV', 'f8', (self.nExp, ))])
         if (self.hasExternalTau):
-            dtype.extend([('PAREXTERNALLNTAUSCALE','f8'),
-                          ('PAREXTERNALLNTAUOFFSET','f8',self.parExternalLnTauOffset.size),
-                          ('EXTERNALTAU','f8',self.nExp)])
+            dtype.extend([('PAREXTERNALLNTAUSCALE', 'f8'),
+                          ('PAREXTERNALLNTAUOFFSET', 'f8', (self.parExternalLnTauOffset.size, )),
+                          ('EXTERNALTAU', 'f8', (self.nExp, ))])
 
-        pars=np.zeros(1,dtype=dtype)
+        pars=np.zeros(1, dtype=dtype)
 
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3

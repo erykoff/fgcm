@@ -110,7 +110,7 @@ class FgcmGray(object):
         self.ccdNGoodStarsHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='i4')
         self.ccdNGoodTilingsHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
 
-        if self.ccdGraySubCCD:
+        if np.any(self.ccdGraySubCCD):
             order = self.ccdGraySubCCDChebyshevOrder
             self.ccdGraySubCCDParsHandle = snmm.createArray((self.fgcmPars.nExp, self.fgcmPars.nCCD, (order + 1) * (order + 1)), dtype='f8')
             self.ccdGrayNPar = (order + 1) * (order + 1)
@@ -275,7 +275,7 @@ class FgcmGray(object):
         ccdNGoodStars = snmm.getArray(self.ccdNGoodStarsHandle)
         ccdNGoodTilings = snmm.getArray(self.ccdNGoodTilingsHandle)
 
-        if self.ccdGraySubCCD:
+        if np.any(self.ccdGraySubCCD):
             ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
 
         expGray = snmm.getArray(self.expGrayHandle)
@@ -317,7 +317,7 @@ class FgcmGray(object):
         EGrayGO=EGrayGO[gd]
         EGrayErr2GO=EGrayErr2GO[gd]
 
-        if self.ccdGraySubCCD:
+        if np.any(self.ccdGraySubCCD):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
@@ -352,7 +352,7 @@ class FgcmGray(object):
                   objNGoodObs[obsObjIDIndex[goodObs],
                               obsBandIndex[goodObs]])
 
-        if not self.ccdGraySubCCD:
+        if not np.any(self.ccdGraySubCCD):
             np.add.at(ccdGray,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                       EGrayGO/EGrayErr2GO)
@@ -408,12 +408,16 @@ class FgcmGray(object):
 
                 eInd = obsExpIndex[goodObs[i1a[0]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
+                bInd = obsBandIndex[goodObs[i1a[0]]]
 
                 ccdNGoodStars[eInd, cInd] = i1a.size
 
                 computeMean = False
 
-                if i1a.size < 10 * pars.size:
+                if not self.ccdGraySubCCD[bInd]:
+                    fit = pars.flatten()
+                    computeMean = True
+                elif i1a.size < 10 * pars.size:
                     # insufficient stars for chebyshev fit
                     fit = pars.flatten()
                     computeMean = True

@@ -71,7 +71,8 @@ class FgcmExposureSelector(object):
             logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars,
                                        'EXP_GRAY_TOO_POSITIVE')
 
-        bad,=np.where(self.fgcmPars.compVarGray > self.expVarGrayPhotometricCut)
+        bad, = np.where(self.fgcmPars.compVarGray >
+                        self.expVarGrayPhotometricCut[self.fgcmPars.expBandIndex])
         self.fgcmPars.expFlag[bad] |= expFlagDict['VAR_GRAY_TOO_LARGE']
         self.fgcmLog.info('Flagged %d bad exposures with VAR_GRAY too large.' % (bad.size))
         if not self.quietMode:
