@@ -130,11 +130,11 @@ class FgcmConfig(object):
     minStarPerExp = ConfigField(int, default=100)
     minCCDPerExp = ConfigField(int, default=5)
     maxCCDGrayErr = ConfigField(float, default=0.05)
-    ccdGraySubCCD = ConfigField(bool, default=False)
+    ccdGraySubCCDDict = ConfigField(dict, default={})
     ccdGraySubCCDChebyshevOrder = ConfigField(int, default=1)
     ccdGraySubCCDTriangular = ConfigField(bool, default=True)
     aperCorrFitNBins = ConfigField(int, default=5)
-    aperCorrInputSlopes = ConfigField(np.ndarray, default=np.array([]))
+    aperCorrInputSlopeDict = ConfigField(dict, default={})
     illegalValue = ConfigField(float, default=-9999.0)
     sedBoundaryTermDict = ConfigField(dict, required=True)
     sedTermDict = ConfigField(dict, required=True)
@@ -144,26 +144,26 @@ class FgcmConfig(object):
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
     sigFgcmMaxErr = ConfigField(float, default=0.01)
-    sigFgcmMaxEGray = ConfigField(list, default=[0.05])
+    sigFgcmMaxEGrayDict = ConfigField(dict, default={})
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
     mirrorArea = ConfigField(float, required=True) # cm^2
     cameraGain = ConfigField(float, required=True)
-    approxThroughput = ConfigField(list, default=[1.0])
+    approxThroughputDict = ConfigField(dict, default={})
     ccdStartIndex = ConfigField(int, default=0)
     minExpPerNight = ConfigField(int, default=10)
     expGrayInitialCut = ConfigField(float, default=-0.25)
-    expVarGrayPhotometricCut = ConfigField(float, default=0.0005)
-    expGrayPhotometricCut = ConfigField(np.ndarray, required=True)
+    expVarGrayPhotometricCutDict = ConfigField(dict, default={})
+    expGrayPhotometricCutDict = ConfigField(dict, required=True)
     expGrayRecoverCut = ConfigField(float, default=-1.0)
-    expGrayHighCut = ConfigField(np.ndarray, required=True)
+    expGrayHighCutDict = ConfigField(dict, required=True)
     expGrayErrRecoverCut = ConfigField(float, default=0.05)
-    sigmaCalRange = ConfigField(list, default=[0.001, 0.003])
-    sigmaCalFitPercentile = ConfigField(list, default=[0.05, 0.15])
-    sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95])
+    sigmaCalRange = ConfigField(list, default=[0.001, 0.003], length=2)
+    sigmaCalFitPercentile = ConfigField(list, default=[0.05, 0.15], length=2)
+    sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95], length=2)
     sigma0Phot = ConfigField(float, default=0.003)
     logLevel = ConfigField(str, default='INFO')
     quietMode = ConfigField(bool, default=False)
-    useRepeatabilityForExpGrayCuts = ConfigField(list, default=[False])
+    useRepeatabilityForExpGrayCutsDict = ConfigField(dict, default={})
 
     mapLongitudeRef = ConfigField(float, default=0.0)
 
@@ -196,7 +196,7 @@ class FgcmConfig(object):
     fitMirrorChromaticity = ConfigField(bool, default=False)
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
-    superStarSubCCD = ConfigField(bool, default=False)
+    superStarSubCCDDict = ConfigField(dict, default={})
     superStarSubCCDChebyshevOrder = ConfigField(int, default=1)
     superStarSubCCDTriangular = ConfigField(bool, default=False)
     superStarSigmaClip = ConfigField(float, default=5.0)
@@ -218,7 +218,7 @@ class FgcmConfig(object):
     experimentalMode = ConfigField(bool, default=False)
     resetParameters = ConfigField(bool, default=True)
     noChromaticCorrections = ConfigField(bool, default=False)
-    colorSplitIndices = ConfigField(np.ndarray, default=np.array((0,2)), length=2)
+    colorSplitBands = ConfigField(list, default=['g', 'i'], length=2)
     expGrayCheckDeltaT = ConfigField(float, default=10. / (24. * 60.))
     modelMagErrorNObs = ConfigField(int, default=100000)
 
@@ -416,38 +416,44 @@ class FgcmConfig(object):
         self.I2StdBand = lutStd['I2STD'][0][bandStdFilterIndex]
         self.lambdaStdFilter = lutStd['LAMBDASTDFILTER'][0][usedLutFilterMark]
 
-        if (self.expGrayPhotometricCut.size != len(self.bands)):
-            raise ValueError("expGrayPhotometricCut must have same number of elements as bands.")
-        if (self.expGrayHighCut.size != len(self.bands)):
-            raise ValueError("expGrayHighCut must have same number of elements as bands.")
+        # Convert maps to lists...
+
+        self.ccdGraySubCCD = self._convertDictToBandList(self.ccdGraySubCCDDict,
+                                                         bool, False, required=False)
+        self.superStarSubCCD = self._convertDictToBandList(self.superStarSubCCDDict,
+                                                           bool, False, required=False)
+        self.aperCorrInputSlopes = self._convertDictToBandList(self.aperCorrInputSlopeDict,
+                                                               float, self.illegalValue,
+                                                               ndarray=True, required=False)
+        self.sigFgcmMaxEGray = self._convertDictToBandList(self.sigFgcmMaxEGrayDict,
+                                                           float, 0.05, required=False)
+        self.approxThroughput = self._convertDictToBandList(self.approxThroughputDict,
+                                                            float, 1.0, required=False)
+        self.expVarGrayPhotometricCut = self._convertDictToBandList(self.expVarGrayPhotometricCutDict,
+                                                                    float, 0.0005,
+                                                                    ndarray=True, required=False)
+        self.expGrayPhotometricCut = self._convertDictToBandList(self.expGrayPhotometricCutDict,
+                                                                 float, -0.05,
+                                                                 ndarray=True, required=True,
+                                                                 dictName='expGrayPhotometricCutDict')
+        self.expGrayHighCut = self._convertDictToBandList(self.expGrayHighCutDict,
+                                                          float, 0.10,
+                                                          ndarray=True, required=True,
+                                                          dictName='expGrayHighCutDict')
+        self.useRepeatabilityForExpGrayCuts = self._convertDictToBandList(self.useRepeatabilityForExpGrayCutsDict,
+                                                                          bool, False, required=False)
+
+        if self.colorSplitBands[0] not in self.bands or self.colorSplitBands[1] not in self.bands:
+            raise RuntimeError("Bands listed in colorSplitBands must be valid bands.")
+        self.colorSplitIndices = [self.bands.index(x) for x in self.colorSplitBands]
+
         if (self.expGrayPhotometricCut.max() >= 0.0):
             raise ValueError("expGrayPhotometricCut must all be negative")
         if (self.expGrayHighCut.max() <= 0.0):
             raise ValueError("expGrayHighCut must all be positive")
 
-        if len(self.sigmaCalRange) != 2:
-            raise ValueError("sigmaCalRange must have 2 elements")
-        if len(self.sigmaCalFitPercentile) != 2:
-            raise ValueError("sigmaCalFitPercentile must have 2 elements")
-        if len(self.sigmaCalPlotPercentile) != 2:
-            raise ValueError("sigmaCalPlotPercentile must have 2 elements")
-
         if self.sigmaCalRange[1] < self.sigmaCalRange[0]:
             raise ValueError("sigmaCalRange[1] must me equal to or larger than sigmaCalRange[0]")
-
-        if len(self.useRepeatabilityForExpGrayCuts) != 1 and \
-                len(self.useRepeatabilityForExpGrayCuts) != len(self.bands):
-            raise ValueError("useRepeatabilityForExpGrayCuts must be of length 1 or number of bands")
-        # Expand into the full list if necessary
-        if len(self.useRepeatabilityForExpGrayCuts) == 1:
-            self.useRepeatabilityForExpGrayCuts = self.useRepeatabilityForExpGrayCuts * len(self.bands)
-
-        if len(self.sigFgcmMaxEGray) != 1 and \
-                len(self.sigFgcmMaxEGray) != len(self.bands):
-            raise ValueError("sigFgcmMaxEGray must be of length 1 or number of bands")
-        # Expand into the full list if necessary
-        if len(self.sigFgcmMaxEGray) == 1:
-            self.sigFgcmMaxEGray = self.sigFgcmMaxEGray * len(self.bands)
 
         # and look at the exposure file and grab some stats
         self.expRange = np.array([np.min(expInfo[self.expField]),np.max(expInfo[self.expField])])
@@ -547,11 +553,8 @@ class FgcmConfig(object):
                 cCut[1] = list(self.bands).index(cCut[1])
 
         # Check for input aperture corrections.
-        if self.aperCorrFitNBins == 0 and len(self.aperCorrInputSlopes) == 0:
-            self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopes")
-        if len(self.aperCorrInputSlopes) > 0:
-            if len(self.aperCorrInputSlopes) != len(self.bands):
-                raise RuntimeError("Length of aperCorrInputSlopes does not equal number of bands!")
+        if self.aperCorrFitNBins == 0 and np.any(self.aperCorrInputSlopes == self.illegalValue):
+            self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopeDict")
 
         # Check the sed mapping dictionaries
         # First, make sure every band is listed in the sedTermDict
@@ -613,9 +616,6 @@ class FgcmConfig(object):
         self.zptABNoThroughput = (-48.6 - 2.5 * self.expPlanck +
                                    2.5 * np.log10(self.mirrorArea) -
                                    2.5 * np.log10(self.hPlanck * self.cameraGain))
-
-        if len(self.approxThroughput) != 1 and len(self.approxThroughput) != len(self.bands):
-            raise ValueError("approxThroughput must have 1 or nbands elements.")
 
         self.fgcmLog.info("AB offset (w/o throughput) estimated as %.4f" % (self.zptABNoThroughput))
 
@@ -731,8 +731,9 @@ class FgcmConfig(object):
 
         # And update the photometric cuts...
         # These need to be converted to lists of floats
-        configDict['expGrayPhotometricCut'] = [float(f) for f in self.expGrayPhotometricCut]
-        configDict['expGrayHighCut'] = [float(f) for f in self.expGrayHighCut]
+        for i, b in enumerate(self.bands):
+            configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCut[i])
+            configDict['expGrayHighCut'][b] = float(self.expGrayHighCut[i])
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)
@@ -760,9 +761,45 @@ class FgcmConfig(object):
         # Check the fudge factors...
         type(self).__dict__['sedTermDict']._length = len(self.bands)
 
-        # And the gray cuts
-        type(self).__dict__['expGrayPhotometricCut']._length = len(self.bands)
-        type(self).__dict__['expGrayHighCut']._length = len(self.bands)
-
         # And the epoch names
         type(self).__dict__['epochNames']._length = len(self.epochMJDs)
+
+    def _convertDictToBandList(self, inputDict, dtype, default,
+                               required=False, ndarray=False, dictName=''):
+        """
+        Convert an input dict into a list or ndarray in band order.
+
+        Parameters
+        ----------
+        inputDict : `dict`
+            Input dictionary
+        dtype : `type`
+            Type of array
+        default : value of dtype
+            Default value
+        ndarray : `bool`, optional
+            Return ndarray (True) or list (False)
+        required : `bool`, optional
+            All bands are required?
+        dictName: `str`, optional
+            Name of dict for error logging.  Should be set if required is True.
+
+        Returns
+        -------
+        bandOrderedList : `ndarray` or `list`
+        """
+        if ndarray:
+            retval = np.zeros(len(self.bands), dtype=dtype) + default
+        else:
+            retval = [default]*len(self.bands)
+
+        if required:
+            for band in self.bands:
+                if band not in inputDict:
+                    raise RuntimeError("All bands must be listed in %s" % (dictName))
+
+        for i, band in enumerate(self.bands):
+            if band in inputDict:
+                retval[i] = inputDict[band]
+
+        return retval

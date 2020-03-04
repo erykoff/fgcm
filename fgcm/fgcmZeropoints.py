@@ -39,7 +39,7 @@ class FgcmZeropoints(object):
        Minimum (negative!) exposure gray to consider recovering via focal-plane average
     expGrayErrRecoverCut: float
        Maximum exposure gray error to consider recovering via focal-plane average
-    expVarGrayPhotometricCut: float
+    expVarGrayPhotometricCut: `list`
        Exposure gray variance to consider recovering via focal-plane average
     """
 
@@ -162,11 +162,11 @@ class FgcmZeropoints(object):
 
         if self.outputFgcmcalZpts:
             self.nChebParGray = 1
-            if self.ccdGraySubCCD:
+            if np.any(self.ccdGraySubCCD):
                 self.nChebParGray = self.fgcmGray.ccdGrayNPar
 
             self.nChebParSstar = 1
-            if self.superStarSubCCD:
+            if np.any(self.superStarSubCCD):
                 self.nChebParSstar = self.fgcmPars.superStarNPar
 
             dtype.extend([('FGCM_FZPT_CHEB', 'f8', (self.nChebParGray, )),
@@ -350,14 +350,14 @@ class FgcmZeropoints(object):
                           (expGrayErr[zpExpIndex] <=
                            self.expGrayErrRecoverCut) &
                           (expGrayRMS[zpExpIndex] <=
-                           np.sqrt(self.expVarGrayPhotometricCut)) &
+                           np.sqrt(self.expVarGrayPhotometricCut[self.fgcmPars.expBandIndex[zpExpIndex]])) &
                           (expGray[zpExpIndex] >=
                            self.expGrayRecoverCut))
 
         zpStruct['FGCM_TILINGS'][badCCDGoodExp] = expNGoodTilings[zpExpIndex[badCCDGoodExp]]
         zpStruct['FGCM_GRY'][badCCDGoodExp] = expGray[zpExpIndex[badCCDGoodExp]]
         # And fill in the chebyshev parameters if necessary
-        if self.outputFgcmcalZpts and self.ccdGraySubCCD:
+        if self.outputFgcmcalZpts and np.any(self.ccdGraySubCCD):
             # We need to alter the gray parameters to record the constant (interpolated)
             # gray offset
             ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
@@ -653,7 +653,7 @@ class FgcmZeropoints(object):
            nxm array of flux superstar parameters
         """
 
-        if self.fgcmPars.superStarSubCCD:
+        if np.any(self.fgcmPars.superStarSubCCD):
             zptChebSstarPars = np.zeros((zpIndex.size, self.fgcmPars.superStarNPar))
         else:
             zptChebSstarPars = np.zeros((zpIndex.size, 1))
@@ -677,12 +677,12 @@ class FgcmZeropoints(object):
             fiInd = self.fgcmPars.expLUTFilterIndex[zpExpIndex[i1a[0]]]
             cInd = zpCCDIndex[i1a[0]]
 
-            if self.fgcmPars.superStarSubCCD:
+            if np.any(self.fgcmPars.superStarSubCCD):
                 zptChebSstarPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :]
             else:
                 zptChebSstarPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0]
 
-        if self.fgcmGray.ccdGraySubCCD:
+        if np.any(self.fgcmGray.ccdGraySubCCD):
             ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
             zpExpIndex = (np.searchsorted(self.fgcmPars.expArray, zpStruct[self.expField]))[zpIndex]
