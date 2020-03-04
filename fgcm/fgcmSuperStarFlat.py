@@ -132,7 +132,7 @@ class FgcmSuperStarFlat(object):
         #  were just an offset, because the other terms are zeros
         prevSuperStarFlatCenter[:, :, :] = self.fgcmPars.superStarFlatCenter
 
-        if not self.superStarSubCCD or doNotUseSubCCD:
+        if not np.any(self.superStarSubCCD) or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
             mark = np.ones(goodObs.size, dtype=np.bool)
@@ -204,6 +204,7 @@ class FgcmSuperStarFlat(object):
                 epInd = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[i1a[0]]]]
                 fiInd = self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs[i1a[0]]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
+                bInd = self.fgcmPars.expBandIndex[obsExpIndex[goodObs[i1a[0]]]]
 
                 computeMean = False
                 try:
@@ -218,7 +219,11 @@ class FgcmSuperStarFlat(object):
                     # In general, let's demand we have 10 times as many stars as
                     # parameters (which is actually quite thin), or else we'll
                     # just compute the mean
-                    if (i1a.size < 10 * pars.size):
+                    if not self.superStarSubCCD[bInd]:
+                        # Just compute mean for this band
+                        fit = pars.flatten()
+                        computeMean = True
+                    elif (i1a.size < 10 * pars.size):
                         self.fgcmLog.warn("Insufficient stars for chebyshev fit (%d, %d, %d), setting to mean"
                                           % (epInd, fiInd, cInd))
                         fit = pars.flatten()
@@ -278,7 +283,8 @@ class FgcmSuperStarFlat(object):
                 superStarFlatCenter[epInd, fiInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
                 # and record the fit
-                self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = fit
+                self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = 0
+                self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0: fit.size] = fit
 
             # And we need to flag those that have bad observations
             bad = np.where(superStarNGoodStars == 0)

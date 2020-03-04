@@ -635,18 +635,18 @@ class FgcmLUTMaker(object):
         # and now save the indices
         maxFilterLen = len(max(self.filterNames, key=len))
 
-        indexVals = np.zeros(1,dtype=[('FILTERNAMES', 'a%d' % (maxFilterLen), len(self.filterNames)),
-                                      ('STDFILTERNAMES', 'a%d' % (maxFilterLen), len(self.stdFilterNames)),
-                                      ('PMB','f8',self.pmb.size),
-                                      ('PMBFACTOR','f8',self.pmb.size),
-                                      ('PMBELEVATION','f8'),
-                                      ('PWV','f8',self.pwv.size),
-                                      ('O3','f8',self.o3.size),
-                                      ('TAU','f8',self.tau.size),
-                                      ('LAMBDANORM','f8'),
-                                      ('ALPHA','f8',self.alpha.size),
-                                      ('ZENITH','f8',self.zenith.size),
-                                      ('NCCD','i4')])
+        indexVals = np.zeros(1, dtype=[('FILTERNAMES', 'a%d' % (maxFilterLen), (len(self.filterNames), )),
+                                       ('STDFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.stdFilterNames), )),
+                                       ('PMB', 'f8', (self.pmb.size, )),
+                                       ('PMBFACTOR', 'f8', (self.pmb.size, )),
+                                       ('PMBELEVATION', 'f8'),
+                                       ('PWV', 'f8', (self.pwv.size, )),
+                                       ('O3', 'f8', (self.o3.size, )),
+                                       ('TAU', 'f8', (self.tau.size, )),
+                                       ('LAMBDANORM', 'f8'),
+                                       ('ALPHA', 'f8', (self.alpha.size, )),
+                                       ('ZENITH', 'f8', (self.zenith.size, )),
+                                       ('NCCD', 'i4')])
         indexVals['FILTERNAMES'] = self.filterNames
         indexVals['STDFILTERNAMES'] = self.stdFilterNames
         indexVals['PMB'] = self.pmb
@@ -663,24 +663,24 @@ class FgcmLUTMaker(object):
         fitsio.write(lutFile,indexVals,extname='INDEX')
 
         # and the standard values
-        stdVals = np.zeros(1,dtype=[('PMBSTD','f8'),
-                                    ('PWVSTD','f8'),
-                                    ('O3STD','f8'),
-                                    ('TAUSTD','f8'),
-                                    ('ALPHASTD','f8'),
-                                    ('ZENITHSTD','f8'),
-                                    ('LAMBDARANGE','f8',2),
-                                    ('LAMBDASTEP','f8'),
-                                    ('LAMBDASTD','f8',len(self.filterNames)),
-                                    ('LAMBDASTDFILTER','f8',len(self.filterNames)),
-                                    ('LAMBDANORM','f8'),
-                                    ('I0STD','f8',len(self.filterNames)),
-                                    ('I1STD','f8',len(self.filterNames)),
-                                    ('I10STD','f8',len(self.filterNames)),
-                                    ('I2STD','f8',len(self.filterNames)),
-                                    ('LAMBDAB','f8',len(self.filterNames)),
-                                    ('ATMLAMBDA','f8',self.atmLambda.size),
-                                    ('ATMSTDTRANS','f8',self.atmStdTrans.size)])
+        stdVals = np.zeros(1, dtype=[('PMBSTD', 'f8'),
+                                     ('PWVSTD', 'f8'),
+                                     ('O3STD', 'f8'),
+                                     ('TAUSTD', 'f8'),
+                                     ('ALPHASTD', 'f8'),
+                                     ('ZENITHSTD', 'f8'),
+                                     ('LAMBDARANGE', 'f8', (2, )),
+                                     ('LAMBDASTEP', 'f8'),
+                                     ('LAMBDASTD', 'f8', (len(self.filterNames), )),
+                                     ('LAMBDASTDFILTER', 'f8', (len(self.filterNames), )),
+                                     ('LAMBDANORM', 'f8'),
+                                     ('I0STD', 'f8', (len(self.filterNames), )),
+                                     ('I1STD', 'f8', (len(self.filterNames), )),
+                                     ('I10STD', 'f8', (len(self.filterNames), )),
+                                     ('I2STD', 'f8', (len(self.filterNames), )),
+                                     ('LAMBDAB', 'f8', (len(self.filterNames), )),
+                                     ('ATMLAMBDA', 'f8', (self.atmLambda.size, )),
+                                     ('ATMSTDTRANS', 'f8', (self.atmStdTrans.size, ))])
         stdVals['PMBSTD'] = self.pmbStd
         stdVals['PWVSTD'] = self.pwvStd
         stdVals['O3STD'] = self.o3Std
