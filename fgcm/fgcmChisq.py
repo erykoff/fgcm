@@ -203,14 +203,14 @@ class FgcmChisq(object):
             # put in saving of the parameters...
             # this will be in both units
             import astropy.io.fits as pyfits
-            tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('qeSysIntercept', 'f8', self.fgcmPars.parQESysIntercept.size)])
+            tempCat = np.zeros(1, dtype=[('o3', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('lnTauIntercept', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('lnTauSlope', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('alpha', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('lnPwvIntercept', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('lnPwvSlope', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('lnPwvQuadratic', 'f8', (self.fgcmPars.nCampaignNights, )),
+                                         ('qeSysIntercept', 'f8', (self.fgcmPars.parQESysIntercept.size, ))])
             tempCat['o3'][0][:] = fitParams[self.fgcmPars.parO3Loc:
                                                 (self.fgcmPars.parO3Loc +
                                                  self.fgcmPars.nCampaignNights)]
@@ -238,14 +238,14 @@ class FgcmChisq(object):
 
             pyfits.writeto('%s_fitParams_%d_fitterunits.fits' % (self.outfileBaseWithCycle, len(self.fitChisqs) + 1), tempCat, overwrite=True)
 
-            tempCat = np.zeros(1, dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                         ('qeSysIntercept', 'f8', (self.fgcmPars.nBands, self.fgcmPars.nWashIntervals))])
+            tempCat = np.zeros((1, ), dtype=[('o3', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('alpha', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
+                                             ('qeSysIntercept', 'f8', (self.fgcmPars.nBands, self.fgcmPars.nWashIntervals))])
             tempCat['o3'][0][:] = self.fgcmPars.parO3
             tempCat['lnTauIntercept'][0][:] = self.fgcmPars.parLnTauIntercept
             tempCat['lnTauSlope'][0][:] = self.fgcmPars.parLnTauSlope
@@ -430,15 +430,15 @@ class FgcmChisq(object):
                 if self.saveParsForDebugging:
 
                     import astropy.io.fits as pyfits
-                    tempCat = np.zeros(1, dtype=[('chisq', 'f8'),
-                                                 ('o3', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('alpha', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
-                                                 ('qeSysIntercept', 'f8', self.fgcmPars.nWashIntervals)])
+                    tempCat = np.zeros((1, ), dtype=[('chisq', 'f8'),
+                                                     ('o3', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('lnTauIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('lnTauSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('alpha', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('lnPwvIntercept', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('lnPwvSlope', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('lnPwvQuadratic', 'f8', self.fgcmPars.nCampaignNights),
+                                                     ('qeSysIntercept', 'f8', self.fgcmPars.nWashIntervals)])
                     tempCat['o3'][0][:] = dChisqdP[self.fgcmPars.parO3Loc:
                                                        (self.fgcmPars.parO3Loc +
                                                         self.fgcmPars.nCampaignNights)]
@@ -541,7 +541,7 @@ class FgcmChisq(object):
             # this is ccdGray[expIndex, ccdIndex]
             # and we only apply when > self.illegalValue
             # same sign as FGCM_DUST (QESys)
-            if self.ccdGraySubCCD:
+            if np.any(self.ccdGraySubCCD):
                 ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
         # and the arrays for locking access
@@ -598,7 +598,7 @@ class FgcmChisq(object):
             # because we're filtering good observations (I hope!)
             ok,=np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
 
-            if self.ccdGraySubCCD:
+            if np.any(self.ccdGraySubCCD):
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
                 expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
