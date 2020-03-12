@@ -121,7 +121,7 @@ class FgcmRetrieveAtmosphere(object):
             for i in range(pwvUse.size):
                 interpolator = scipy.interpolate.interp1d(I1Arr[:,i], lnPwvVals)
                 rLnPwvPU[i] = interpolator(np.clip(r1PU[i], I1Arr[:,i].min() + 0.0001,
-                                                 I1Arr[:,i].max() - 0.0001))
+                                                   I1Arr[:,i].max() - 0.0001))
 
 
             # next, we median together each exposure...
