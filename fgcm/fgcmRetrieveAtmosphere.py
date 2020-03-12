@@ -73,78 +73,84 @@ class FgcmRetrieveAtmosphere(object):
         self.fgcmPars.compRetrievedLnPwv[:] = self.fgcmPars.lnPwvStd
         self.fgcmPars.compRetrievedLnPwvFlag[:] = retrievalFlagDict['EXPOSURE_STANDARD']
 
-        # FIXME: check that there are actually z-band images...etc.
         # Also: allow retrieval from other bands, configurable.
-        try:
-            zBandIndex = self.fgcmPars.bands.index('z')
-        except ValueError:
-            self.fgcmLog.info("No z band, so no PWV retrieval.")
-            return
 
-        zUse,=np.where((self.fgcmPars.expBandIndex[expIndexArray] == zBandIndex) &
-                       (self.fgcmPars.expFlag[expIndexArray] == 0) &
-                       (np.abs(r0[expIndexArray, ccdIndexArray]) < 1000.0) &
-                       (np.abs(r10[expIndexArray, ccdIndexArray]) < 1000.0))
+        didRetrieval = False
+        rLnPwvStruct = None
+        for pwvBand in ['z', 'y', 'Y']:
+            try:
+                pwvBandIndex = self.fgcmPars.bands.index('z')
+            except ValueError:
+                continue
 
-        if zUse.size == 0:
-            self.fgcmLog.info("Could not find any good z-band exposures for PWV retrieval.")
-            return
+            pwvUse, = np.where((self.fgcmPars.expBandIndex[expIndexArray] == pwvBandIndex) &
+                               (self.fgcmPars.expFlag[expIndexArray] == 0) &
+                               (np.abs(r0[expIndexArray, ccdIndexArray]) < 1000.0) &
+                               (np.abs(r10[expIndexArray, ccdIndexArray]) < 1000.0))
 
-        o3ZU = self.fgcmPars.expO3[expIndexArray[zUse]]
-        lnTauZU = self.fgcmPars.expLnTau[expIndexArray[zUse]]
-        alphaZU = self.fgcmPars.expAlpha[expIndexArray[zUse]]
-        secZenithZU = 1./(np.sin(self.fgcmPars.expTelDec[expIndexArray[zUse]]) *
-                          self.fgcmPars.sinLatitude +
-                          np.cos(self.fgcmPars.expTelDec[expIndexArray[zUse]]) *
-                          self.fgcmPars.cosLatitude *
-                          np.cos(self.fgcmPars.expTelHA[expIndexArray[zUse]]))
-        pmbZU = self.fgcmPars.expPmb[expIndexArray[zUse]]
+            if pwvUse.size == 0:
+                continue
 
-        r1ZU = (r10[expIndexArray[zUse], ccdIndexArray[zUse]] *
-                r0[expIndexArray[zUse], ccdIndexArray[zUse]])
+            o3PU = self.fgcmPars.expO3[expIndexArray[pwvUse]]
+            lnTauPU = self.fgcmPars.expLnTau[expIndexArray[pwvUse]]
+            alphaPU = self.fgcmPars.expAlpha[expIndexArray[pwvUse]]
+            secZenithPU = 1./(np.sin(self.fgcmPars.expTelDec[expIndexArray[pwvUse]]) *
+                              self.fgcmPars.sinLatitude +
+                              np.cos(self.fgcmPars.expTelDec[expIndexArray[pwvUse]]) *
+                              self.fgcmPars.cosLatitude *
+                              np.cos(self.fgcmPars.expTelHA[expIndexArray[pwvUse]]))
+            pmbPU = self.fgcmPars.expPmb[expIndexArray[pwvUse]]
 
-        rLnPwvZU = np.zeros(zUse.size)
+            r1PU = (r10[expIndexArray[pwvUse], ccdIndexArray[pwvUse]] *
+                    r0[expIndexArray[pwvUse], ccdIndexArray[pwvUse]])
 
-        lnPwvVals = self.fgcmLUT.lnPwv
-        I1Arr = np.zeros((lnPwvVals.size, zUse.size))
+            rLnPwvPU = np.zeros(pwvUse.size)
 
-        for i, lnPwv in enumerate(lnPwvVals):
-            indices = self.fgcmLUT.getIndices(np.repeat(zBandIndex, zUse.size),
-                                              np.repeat(lnPwv, zUse.size),
-                                              o3ZU, lnTauZU, alphaZU, secZenithZU,
-                                              ccdIndexArray[zUse], pmbZU)
-            I1Arr[i, :] = self.fgcmLUT.computeI1(np.repeat(lnPwv, zUse.size),
-                                                 o3ZU, lnTauZU, alphaZU, secZenithZU,
-                                                 pmbZU, indices)
+            lnPwvVals = self.fgcmLUT.lnPwv
+            I1Arr = np.zeros((lnPwvVals.size, pwvUse.size))
 
-        for i in range(zUse.size):
-            interpolator = scipy.interpolate.interp1d(I1Arr[:,i], lnPwvVals)
-            rLnPwvZU[i] = interpolator(np.clip(r1ZU[i], I1Arr[:,i].min() + 0.0001,
-                                             I1Arr[:,i].max() - 0.0001))
+            for i, lnPwv in enumerate(lnPwvVals):
+                indices = self.fgcmLUT.getIndices(np.repeat(pwvBandIndex, pwvUse.size),
+                                                  np.repeat(lnPwv, pwvUse.size),
+                                                  o3PU, lnTauPU, alphaPU, secZenithPU,
+                                                  ccdIndexArray[pwvUse], pmbPU)
+                I1Arr[i, :] = self.fgcmLUT.computeI1(np.repeat(lnPwv, pwvUse.size),
+                                                     o3PU, lnTauPU, alphaPU, secZenithPU,
+                                                     pmbPU, indices)
+
+            for i in range(pwvUse.size):
+                interpolator = scipy.interpolate.interp1d(I1Arr[:,i], lnPwvVals)
+                rLnPwvPU[i] = interpolator(np.clip(r1PU[i], I1Arr[:,i].min() + 0.0001,
+                                                 I1Arr[:,i].max() - 0.0001))
 
 
-        # next, we median together each exposure...
-        minExpIndex = np.min(expIndexArray[zUse])
-        h, rev = esutil.stat.histogram(expIndexArray[zUse], min=minExpIndex, rev=True)
+            # next, we median together each exposure...
+            minExpIndex = np.min(expIndexArray[pwvUse])
+            h, rev = esutil.stat.histogram(expIndexArray[pwvUse], min=minExpIndex, rev=True)
 
-        gd, = np.where(h >= self.minCCDPerExp)
+            gd, = np.where(h >= self.minCCDPerExp)
 
-        rLnPwvStruct = np.zeros(gd.size, dtype=[('EXPINDEX', 'i4'),
-                                                ('RLNPWV_MED', 'f8'),
-                                                ('RLNPWV_SMOOTH', 'f8'),
-                                                ('MJD', 'f8')])
+            rLnPwvStructTemp = np.zeros(gd.size, dtype=[('EXPINDEX', 'i4'),
+                                                        ('RLNPWV_MED', 'f8'),
+                                                        ('RLNPWV_SMOOTH', 'f8'),
+                                                        ('MJD', 'f8')])
 
-        rLnPwvStruct['EXPINDEX'] = minExpIndex + gd
+            rLnPwvStructTemp['EXPINDEX'] = minExpIndex + gd
 
-        for i in range(gd.size):
-            i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
+            for i in range(gd.size):
+                i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
 
-            rLnPwvStruct['RLNPWV_MED'][i] = np.mean(rLnPwvZU[i1a])
+                rLnPwvStructTemp['RLNPWV_MED'][i] = np.mean(rLnPwvPU[i1a])
 
-        rLnPwvStruct['MJD'] = self.fgcmPars.expMJD[rLnPwvStruct['EXPINDEX']]
+            rLnPwvStructTemp['MJD'] = self.fgcmPars.expMJD[rLnPwvStructTemp['EXPINDEX']]
+
+            didRetrieval = True
+            if rLnPwvStruct is None:
+                rLnPwvStruct = rLnPwvStructTemp
+            else:
+                rLnPwvStruct = np.append(rLnPwvStruct, rLnPwvStructTemp)
 
         # next, we do the median smoothing using pwvRetrievalSmoothBlock
-        # self.pwvRetrievalSmoothBlock = fgcmConfig.pwvRetrievalSmoothBlock
 
         h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']],
                                        rev=True)
