@@ -308,9 +308,9 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
 
     ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
     ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
-    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
-    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
-    ax.tick_params(axis='both',which='major',labelsize=14)
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=18)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=18)
+    ax.tick_params(axis='both',which='major',labelsize=16)
 
     for k in range(values.size):
         off=[ccdOffsets['DELTA_RA'][k],
@@ -327,9 +327,10 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
             )
 
     cb=None
-    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), format='%.1f')
+    cb.ax.tick_params(labelsize=16)
 
-    cb.set_label('%s' % (cbLabel), fontsize=14)
+    cb.set_label('%s' % (cbLabel), fontsize=18)
 
     return None
 
@@ -541,9 +542,9 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
 
     ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
     ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
-    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
-    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
-    ax.tick_params(axis='both',which='major',labelsize=14)
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=18)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=18)
+    ax.tick_params(axis='both',which='major',labelsize=16)
 
     for k in range(ccdOffsets.size):
         xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][i], 50)
@@ -576,9 +577,10 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
                    norm=cNorm)
 
     cb=None
-    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), format='%.1f')
+    cb.ax.tick_params(labelsize=16)
 
-    cb.set_label('%s' % (cbLabel), fontsize=14)
+    cb.set_label('%s' % (cbLabel), fontsize=18)
 
     return None
 

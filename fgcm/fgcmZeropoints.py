@@ -978,6 +978,16 @@ class FgcmZeropointPlotter(object):
             lo = meanR1[use[st[int(0.02*st.size)]]]
             hi = meanR1[use[st[int(0.98*st.size)]]]
 
+            # Round these to the nearest integer
+            if lo < 0.0:
+                lo = np.floor(lo)
+            else:
+                lo = np.ceil(lo)
+            if hi < 0.0:
+                hi = np.floor(hi)
+            else:
+                hi = np.ceil(hi)
+
             for plotType in plotTypes:
                 fig=plt.figure(1,figsize=(8,6))
                 fig.clf()

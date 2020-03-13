@@ -150,6 +150,9 @@ class FgcmRetrieveAtmosphere(object):
             else:
                 rLnPwvStruct = np.append(rLnPwvStruct, rLnPwvStructTemp)
 
+        if not didRetrieval:
+            self.fgcmLog.warn('No observations in pwv bands for retrieval.')
+            return
         # next, we do the median smoothing using pwvRetrievalSmoothBlock
 
         h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']],
