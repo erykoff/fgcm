@@ -23,6 +23,7 @@ from .fgcmBrightObs import FgcmBrightObs
 from .fgcmGray import FgcmGray
 from .fgcmSuperStarFlat import FgcmSuperStarFlat
 from .fgcmRetrieval import FgcmRetrieval
+from .fgcmSEDRetrieval import FgcmSEDRetrieval
 from .fgcmApertureCorrection import FgcmApertureCorrection
 from .fgcmExposureSelector import FgcmExposureSelector
 from .fgcmFitCycle import FgcmFitCycle

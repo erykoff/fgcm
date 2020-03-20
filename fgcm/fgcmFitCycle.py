@@ -17,6 +17,7 @@ from .fgcmGray import FgcmGray
 from .fgcmZeropoints import FgcmZeropoints
 from .fgcmSuperStarFlat import FgcmSuperStarFlat
 from .fgcmRetrieval import FgcmRetrieval
+from .fgcmSEDRetrieval import FgcmSEDRetrieval
 from .fgcmApertureCorrection import FgcmApertureCorrection
 from .fgcmBrightObs import FgcmBrightObs
 from .fgcmExposureSelector import FgcmExposureSelector
@@ -457,6 +458,11 @@ class FgcmFitCycle(object):
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After computing retrieved integrals'))
+
+        self.fgcmLog.debug('FitCycle computing retrieved SEDs')
+        self.fgcmSEDRetrieval = FgcmSEDRetrieval(self.fgcmConfig, self.fgcmPars,
+                                                 self.fgcmStars, self.fgcmLUT)
+        self.fgcmSEDRetrieval.computeSEDRetrieval()
 
         # Compute Retrieved PWV -- always because why not?
         self.fgcmLog.debug('FitCycle computing RPWV')

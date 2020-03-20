@@ -630,11 +630,11 @@ class FgcmChisq(object):
             objMagStdMeanTemp = np.zeros_like(objMagStdMean)
 
             add_at_2d(wtSum,
-                   (obsObjIDIndexGO,obsBandIndexGO),
-                   1./obsMagErr2GO)
+                      (obsObjIDIndexGO,obsBandIndexGO),
+                      1./obsMagErr2GO)
             add_at_2d(objMagStdMeanTemp,
-                   (obsObjIDIndexGO,obsBandIndexGO),
-                   obsMagGO/obsMagErr2GO)
+                      (obsObjIDIndexGO,obsBandIndexGO),
+                      obsMagGO/obsMagErr2GO)
 
             # these are good object/bands that were observed
             gd=np.where(wtSum > 0.0)

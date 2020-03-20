@@ -658,6 +658,9 @@ class FgcmStars(object):
                                                   syncAccess=True)
         #  objMagStdMeanNoChrom: mean std mag of each object, no chromatic correction, per band
         self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        #  objSEDSlopeRetrieved: Approximate sub-band estimation of slope
+        self.objSEDSlopeRetrievedHandle = snmm.createArray((self.nStars, self.nBands), dtype='f4', syncAccess=True)
+        self.objSEDSlopeRetrievedErrHandle = snmm.createArray((self.nStars, self.nBands), dtype='f4')
 
         # note: if this takes too long it can be moved to the star computation,
         #       but it seems pretty damn fast (which may raise the question of
@@ -748,6 +751,8 @@ class FgcmStars(object):
         snmm.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
         snmm.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
         snmm.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
+        snmm.getArray(self.objSEDSlopeRetrievedHandle)[:, :] = 0.0
+        snmm.getArray(self.objSEDSlopeRetrievedErrHandle)[:, :] = 0.0
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minObsPerBand=None, reset=True):
@@ -1776,6 +1781,8 @@ class FgcmStars(object):
         objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        objSEDSlopeRetrieved = snmm.getArray(self.objSEDSlopeRetrievedHandle)
+        objSEDSlopeRetrievedErr = snmm.getArray(self.objSEDSlopeRetrievedErrHandle)
         if self.hasPsfCandidate:
             objNPsfCandidate = snmm.getArray(self.objNPsfCandidateHandle)
 
@@ -1794,7 +1801,9 @@ class FgcmStars(object):
                ('NGOOD', 'i4', goodBands.size),
                ('NTOTAL', 'i4', goodBands.size),
                ('MAG_STD', 'f4', goodBands.size),
-               ('MAGERR_STD', 'f4', goodBands.size)]
+               ('MAGERR_STD', 'f4', goodBands.size),
+               ('FNUPRIME_RETRIEVED', 'f4', goodBands.size),
+               ('FNUPRIME_RETRIEVED_ERR', 'f4', goodBands.size)]
         if self.hasPsfCandidate:
             dtype.append(('NPSFCAND', 'i4', goodBands.size))
 
@@ -1809,6 +1818,8 @@ class FgcmStars(object):
             outCat['NTOTAL'][:, i] = objNTotalObs[goodStars, goodBand]
             outCat['MAG_STD'][:, i] = objMagStdMean[goodStars, goodBand]
             outCat['MAGERR_STD'][:, i] = objMagStdMeanErr[goodStars, goodBand]
+            outCat['FNUPRIME_RETRIEVED'][:, i] = objSEDSlopeRetrieved[goodStars, goodBand]
+            outCat['FNUPRIME_RETRIEVED_ERR'][:, i] = objSEDSlopeRetrievedErr[goodStars, goodBand]
             if self.hasPsfCandidate:
                 outCat['NPSFCAND'][:, i] = objNPsfCandidate[goodStars, goodBand]
 
