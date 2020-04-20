@@ -735,10 +735,15 @@ class FgcmLUT(object):
 
     def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
 
-        #self.filterNames = indexVals['FILTERNAMES'][0]
-        #self.stdFilterNames = indexVals['STDFILTERNAMES'][0]
-        self.filterNames = [n.decode('utf-8') for n in indexVals['FILTERNAMES'][0]]
-        self.stdFilterNames = [n.decode('utf-8') for n in indexVals['STDFILTERNAMES'][0]]
+        try:
+            self.filterNames = [n.decode('utf-8') for n in indexVals['FILTERNAMES'][0]]
+        except AttributeError:
+            self.filterNames = [n for n in indexVals['FILTERNAMES'][0]]
+        try:
+            self.stdFilterNames = [n.decode('utf-8') for n in indexVals['STDFILTERNAMES'][0]]
+        except AttributeError:
+            self.stdFilterNames = [n for n in indexVals['STDFILTERNAMES'][0]]
+
         self.pmb = indexVals['PMB'][0]
         self.pmbFactor = indexVals['PMBFACTOR'][0]
         self.pmbDelta = self.pmb[1] - self.pmb[0]

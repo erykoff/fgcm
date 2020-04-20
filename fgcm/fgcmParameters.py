@@ -648,6 +648,14 @@ class FgcmParameters(object):
         self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
+
+        expFilterNameIsEncoded = False
+        try:
+            test = expFilterName[0].decode('utf-8')
+            expFilterNameIsEncoded = True
+        except AttributeError:
+            pass
+
         for filterIndex,filterName in enumerate(self.lutFilterNames):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
@@ -656,7 +664,10 @@ class FgcmParameters(object):
                 continue
 
             # note that for Py3 we need to encode filterName to match to the numpy array
-            use,=np.where(expFilterName == filterName.encode('utf-8'))
+            if expFilterNameIsEncoded:
+                use, = np.where(expFilterName == filterName.encode('utf-8'))
+            else:
+                use, = np.where(expFilterName == filterName)
             if use.size == 0:
                 self.fgcmLog.info('WARNING: no exposures in filter %s' % (filterName))
             else:
