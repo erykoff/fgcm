@@ -109,6 +109,7 @@ class FgcmStars(object):
         self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
         self.hasXY = False
+        self.hasDeltaAper = False
         self.hasRefstars = False
         self.nRefStars = 0
         self.ccdOffsets = fgcmConfig.ccdOffsets
@@ -225,6 +226,12 @@ class FgcmStars(object):
             obsX = None
             obsY = None
 
+        if ('DELTA_APER' in obs.dtype.names):
+            self.fgcmLog.info('Found DELTA_APER in input observations')
+            obsDeltaAper = obs['DELTA_APER']
+        else:
+            obsDeltaAper = None
+
         # process
         self.loadStars(fgcmPars,
                        obs[self.expField],
@@ -241,6 +248,7 @@ class FgcmStars(object):
                        pos['NOBS'],
                        obsX=obsX,
                        obsY=obsY,
+                       obsDeltaAper=obsDeltaAper,
                        refID=refID,
                        refMag=refMag,
                        refMagErr=refMagErr,
@@ -257,6 +265,7 @@ class FgcmStars(object):
     def loadStars(self, fgcmPars,
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
+                  obsDeltaAper=None,
                   refID=None, refMag=None, refMagErr=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
@@ -301,6 +310,8 @@ class FgcmStars(object):
            x position for each observation
         obsY: float array, optional
            y position for each observation
+        obsDeltaAper: float array, optional
+           delta_aper for each observation
         flagID: int array, optional
            ID of each object that is flagged from previous cycle
         flagFlag: int array, optional
@@ -359,6 +370,12 @@ class FgcmStars(object):
             if self.superStarSubCCD:
                 raise ValueError("Input stars do not have x/y but superStarSubCCD is set.")
 
+        if obsDeltaAper is not None:
+            self.hasDeltaAper = True
+
+            #  obsDeltaAper: delta mag for smaller - larger aperture
+            self.obsDeltaAperHandle = snmm.createArray(self.nStarObs, dtype='f4')
+
         if (refID is not None and refMag is not None and refMagErr is not None):
             self.hasRefstars = True
 
@@ -395,6 +412,8 @@ class FgcmStars(object):
         if self.hasXY:
             snmm.getArray(self.obsXHandle)[:] = obsX
             snmm.getArray(self.obsYHandle)[:] = obsY
+        if self.hasDeltaAper:
+            snmm.getArray(self.obsDeltaAperHandle)[:] = obsDeltaAper
 
         if self.hasRefstars:
             # And filter out bad signal to noise, per band, if desired,
@@ -628,6 +647,8 @@ class FgcmStars(object):
                                                   syncAccess=True)
         #  objMagStdMeanNoChrom: mean std mag of each object, no chromatic correction, per band
         self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        if self.hasDeltaAper:
+            self.objDeltaAperMeanHandle = snmm.createArray((self.nStars, self.nBands), dtype='f4', syncAccess=True)
 
         # note: if this takes too long it can be moved to the star computation,
         #       but it seems pretty damn fast (which may raise the question of
@@ -1695,13 +1716,18 @@ class FgcmStars(object):
 
         goodStars, = np.where((objFlag & rejectMask) == 0)
 
-        outCat = np.zeros(goodStars.size, dtype=[('FGCM_ID', 'i8'),
-                                                 ('RA', 'f8'),
-                                                 ('DEC', 'f8'),
-                                                 ('FLAG', 'i4'),
-                                                 ('NGOOD', 'i4', len(self.bands)),
-                                                 ('MAG_STD', 'f4', len(self.bands)),
-                                                 ('MAGERR_STD', 'f4', len(self.bands))])
+        dtype = [('FGCM_ID', 'i8'),
+                 ('RA', 'f8'),
+                 ('DEC', 'f8'),
+                 ('FLAG', 'i4'),
+                 ('NGOOD', 'i4', len(self.bands)),
+                 ('MAG_STD', 'f4', len(self.bands)),
+                 ('MAGERR_STD', 'f4', len(self.bands))]
+
+        if self.hasDeltaAper:
+            dtype.extend([('DELTA_APER', 'f4', len(self.bands))])
+
+        outCat = np.zeros(goodStars.size, dtype=dtype)
 
         outCat['FGCM_ID'] = objID[goodStars]
         outCat['RA'] = objRA[goodStars]
@@ -1710,6 +1736,10 @@ class FgcmStars(object):
         outCat['NGOOD'] = objNGoodObs[goodStars, :]
         outCat['MAG_STD'][:, :] = objMagStdMean[goodStars, :]
         outCat['MAGERR_STD'][:, :] = objMagStdMeanErr[goodStars, :]
+
+        if self.hasDeltaAper:
+            objDeltaAperMean = snmm.getArray(self.objDeltaAperMeanHandle)
+            outCat['DELTA_APER'][:, :] = objDeltaAperMean[goodStars, :]
 
         return outCat
 
