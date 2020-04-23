@@ -30,6 +30,7 @@ from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
 from .fgcmComputeStepUnits import FgcmComputeStepUnits
 from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
+from .fgcmDeltaAper import FgcmDeltaAper
 
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
@@ -424,6 +425,14 @@ class FgcmFitCycle(object):
         self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCuts()
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After computing CCD and Exp Gray'))
+
+        # Compute deltaAper parameters if available
+        if self.fgcmStars.hasDeltaAper:
+            self.fgcmLog.debug('FitCycle computing deltaAper')
+            self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
+                                               self.fgcmStars)
+            self.fgcmDeltaAper.computeDeltaAperExposures()
+            self.fgcmDeltaAper.computeDeltaAperStars()
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')

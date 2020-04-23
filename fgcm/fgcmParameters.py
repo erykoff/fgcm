@@ -375,6 +375,10 @@ class FgcmParameters(object):
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
         self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
 
+        # We also have the median delta aperture and epsilon per exposure
+        self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
+        self.compEpsilon = np.zeros(self.nExp, dtype='f8')
+
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
         self.compSigmaCal = np.zeros(self.nBands, dtype='f8')
@@ -474,6 +478,13 @@ class FgcmParameters(object):
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
+
+        try:
+            self.compMedDeltaAper = np.atleast_1d(inParams['COMPMEDDELTAAPER'][0])
+            self.compEpsilon = np.atleast_1d(inParams['COMPEPSILON'][0])
+        except ValueError:
+            self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
+            self.compEpsilon = np.zeros(self.nExp, dtype='f8')
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
@@ -950,6 +961,8 @@ class FgcmParameters(object):
                ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
                ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
                ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPMEDDELTAAPER', 'f8', (self.compMedDeltaAper.size, )),
+               ('COMPEPSILON', 'f8', (self.compEpsilon.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
                ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
@@ -972,6 +985,7 @@ class FgcmParameters(object):
 
         pars=np.zeros(1, dtype=dtype)
 
+        pars['EXPNUM'][:] = self.expArray
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3
         pars['PARLNTAUINTERCEPT'][:] = self.parLnTauIntercept
@@ -1011,6 +1025,9 @@ class FgcmParameters(object):
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
+
+        pars['COMPMEDDELTAAPER'][:] = self.compMedDeltaAper
+        pars['COMPEPSILON'][:] = self.compEpsilon
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
         pars['COMPSIGMACAL'][:] = self.compSigmaCal
