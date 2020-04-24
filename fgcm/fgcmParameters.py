@@ -935,7 +935,8 @@ class FgcmParameters(object):
         if (self.hasExternalTau):
             parInfo['TAUFILE'] = self.tauFile
 
-        dtype=[('PARALPHA', 'f8' , (self.parAlpha.size, )),
+        dtype=[(self.expField, 'i8', (self.expArray.size, )),
+               ('PARALPHA', 'f8' , (self.parAlpha.size, )),
                ('PARO3', 'f8', (self.parO3.size, )),
                ('PARLNPWVINTERCEPT', 'f8' , (self.parLnPwvIntercept.size, )),
                ('PARLNPWVSLOPE', 'f8', (self.parLnPwvSlope.size, )),
@@ -985,7 +986,7 @@ class FgcmParameters(object):
 
         pars=np.zeros(1, dtype=dtype)
 
-        pars['EXPNUM'][:] = self.expArray
+        pars[self.expField][:] = self.expArray
         pars['PARALPHA'][:] = self.parAlpha
         pars['PARO3'][:] = self.parO3
         pars['PARLNTAUINTERCEPT'][:] = self.parLnTauIntercept
