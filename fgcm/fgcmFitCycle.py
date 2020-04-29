@@ -433,6 +433,8 @@ class FgcmFitCycle(object):
                                                self.fgcmStars)
             self.fgcmDeltaAper.computeDeltaAperExposures()
             self.fgcmDeltaAper.computeDeltaAperStars()
+            self.fgcmDeltaAper.computeEpsilonMap()
+            self.fgcmDeltaAper.computeEpsilonPerCcd()
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
