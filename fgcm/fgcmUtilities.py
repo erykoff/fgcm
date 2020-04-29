@@ -617,6 +617,10 @@ def plotCCDMapBinned2d(ax, ccdOffsets, binnedArray, cbLabel, loHi=None,
         flatArray = binnedArray.flatten()
         gd, = np.where(flatArray > illegalValue)
 
+        if gd.size < 2:
+            # Nothing to plot here
+            return
+
         st = np.argsort(flatArray[gd])
         lo = flatArray[gd[st[int(0.02*st.size)]]]
         hi = flatArray[gd[st[int(0.98*st.size)]]]
