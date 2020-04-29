@@ -544,9 +544,9 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
     ax.tick_params(axis='both',which='major',labelsize=14)
 
-    for k in xrange(ccdOffsets.size):
-        xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][i], 50)
-        yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][i], 50)
+    for k in range(ccdOffsets.size):
+        xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][k], 50)
+        yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][k], 50)
 
         xGrid = np.repeat(xValues, yValues.size)
         yGrid = np.tile(yValues, xValues.size)
@@ -581,3 +581,229 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
 
     return None
 
+def plotCCDMapBinned2d(ax, ccdOffsets, binnedArray, cbLabel, loHi=None,
+                       illegalValue=-9999):
+    """
+    Plot CCD map with binned values
+
+    Parameters
+    ----------
+    ax: plot axis object
+    ccdOffsets: ccdOffset recarray
+    binnedArray: float array (nCCD, nx, ny)
+    cbLabel: string
+       Color bar label
+    loHi: tuple [2], optional
+       (lo, hi) or else scaling is computed from data.
+    illegalValue: float
+       Sentinel for blank values
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+    plt.set_cmap('rainbow')
+
+    plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
+                   ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
+    plotDecRange = [ccdOffsets['DELTA_DEC'].min() - ccdOffsets['DEC_SIZE'].max()/2.,
+                    ccdOffsets['DELTA_DEC'].max() + ccdOffsets['DEC_SIZE'].max()/2.]
+
+    nx = binnedArray.shape[1]
+    ny = binnedArray.shape[2]
+
+    if loHi is None:
+        flatArray = binnedArray.flatten()
+        gd, = np.where(flatArray > illegalValue)
+
+        st = np.argsort(flatArray[gd])
+        lo = flatArray[gd[st[int(0.02*st.size)]]]
+        hi = flatArray[gd[st[int(0.98*st.size)]]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z=[[0,0],[0,0]]
+    levels=np.linspace(lo,hi,num=150)
+    CS3=plt.contourf(Z,levels,cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRARange[0] - 0.05, plotRARange[1] + 0.05)
+    ax.set_ylim(plotDecRange[0] - 0.05, plotDecRange[1] + 0.05)
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$', fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    for k in range(ccdOffsets.size):
+        xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][k] - 1, 50)
+        yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][k] - 1, 50)
+
+        xGrid = np.repeat(xValues, yValues.size)
+        yGrid = np.tile(yValues, xValues.size)
+
+        xBin = np.floor((xGrid*nx)/ccdOffsets['X_SIZE'][k]).astype(np.int32)
+        yBin = np.floor((yGrid*ny)/ccdOffsets['Y_SIZE'][k]).astype(np.int32)
+
+        zGrid = binnedArray[k, xBin, yBin]
+
+        extent = [ccdOffsets['DELTA_RA'][k] -
+                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_RA'][k] +
+                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_DEC'][k] -
+                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
+                  ccdOffsets['DELTA_DEC'][k] +
+                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
+
+        zGridPlot = zGrid.reshape(xValues.size, yValues.size)
+        if ccdOffsets['XRA'][k]:
+            zGridPlot = zGridPlot.T
+
+        # Mask this to make bad values transparent
+        zGridPlotM = np.ma.masked_where(zGridPlot <= illegalValue, zGridPlot)
+
+        ax.imshow(zGridPlotM,
+                   interpolation='bilinear',
+                   origin='lower',
+                   extent=extent,
+                   norm=cNorm)
+
+    cb=None
+    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
+
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None
+
+
+def logFlaggedExposuresPerBand(log, fgcmPars, flagName, raiseAllBad=True):
+    """
+    Log how many exposures per band were flagged with a given flag.
+
+    Parameters
+    ----------
+    log: fgcmLog
+    fgcmPars: `fgcm.fgcmParameters`
+    flagName: `str`
+       Name of flag
+    raiseAllBad: `bool`, optional
+       Raise if a band has all bad.  Default is True.
+    """
+
+    for i, band in enumerate(fgcmPars.bands):
+        if not fgcmPars.hasExposuresInBand[i]:
+            continue
+        inBand, = np.where(fgcmPars.expBandIndex == i)
+        inBandBad, = np.where((fgcmPars.expFlag[inBand] &
+                               expFlagDict[flagName]) > 0)
+        log.info(' %s: %s band: %d of %d exposures' %
+                 (flagName, band, inBandBad.size, inBand.size))
+        if raiseAllBad and inBandBad.size == inBand.size:
+            raise RuntimeError("FATAL: All observations in %s band have been cut with %s" % (band, flagName))
+
+
+def checkFlaggedExposuresPerBand(log, fgcmPars):
+    """
+    Raise if any band has had all exposures removed.
+
+    Parameters
+    ----------
+    log: fgcmLog
+    fgcmPars: `fgcm.fgcmParameters`
+
+    """
+
+    for i, band in enumerate(fgcmPars.bands):
+        if not fgcmPars.hasExposuresInBand[i]:
+            continue
+        inBand, = np.where(fgcmPars.expBandIndex == i)
+        inBandBad, = np.where(fgcmPars.expFlag[inBand] > 0)
+        if inBandBad.size >= (inBand.size - 1):
+            raise RuntimeError("FATAL: All observations in %s band have been cut!")
+
+
+def _computeCCDOffsetSigns(ccdOffsets, ccdStartIndex, fgcmStars, goodObs):
+    """
+    Compute CCD offset signs.  Replaces ccdOffsets.
+
+    Parameters
+    ----------
+    ccdOffsets : `np.ecarray`
+       CCD offset array
+    ccdStartIndex : `int`
+       Start index for ccd numbering
+    fgcmStars : `fgcm.FgcmStars`
+       FGCM star object
+    goodObs : `np.ndarray`
+       Array of good observation indices
+    """
+    import scipy.stats
+    import esutil
+    from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
+    obsObjIDIndex = snmm.getArray(fgcmStars.obsObjIDIndexHandle)
+    obsCCDIndex = snmm.getArray(fgcmStars.obsCCDHandle) - ccdStartIndex
+    obsExpIndex = snmm.getArray(fgcmStars.obsExpIndexHandle)
+
+    obsX = snmm.getArray(fgcmStars.obsXHandle)
+    obsY = snmm.getArray(fgcmStars.obsYHandle)
+    objRA = snmm.getArray(fgcmStars.objRAHandle)
+    objDec = snmm.getArray(fgcmStars.objDecHandle)
+
+    h, rev = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
+
+    for i in range(h.size):
+        if h[i] == 0: continue
+
+        i1a = rev[rev[i]:rev[i+1]]
+
+        cInd = obsCCDIndex[goodObs[i1a[0]]]
+
+        if ccdOffsets['RASIGN'][cInd] == 0:
+            # choose a good exposure to work with
+            hTest, revTest = esutil.stat.histogram(obsExpIndex[goodObs[i1a]], rev=True)
+            maxInd = np.argmax(hTest)
+            testStars = revTest[revTest[maxInd]:revTest[maxInd+1]]
+
+            testRA = objRA[obsObjIDIndex[goodObs[i1a[testStars]]]]
+            testDec = objDec[obsObjIDIndex[goodObs[i1a[testStars]]]]
+            testX = obsX[goodObs[i1a[testStars]]]
+            testY = obsY[goodObs[i1a[testStars]]]
+
+            corrXRA,_ = scipy.stats.pearsonr(testX,testRA)
+            corrYRA,_ = scipy.stats.pearsonr(testY,testRA)
+
+            if (np.abs(corrXRA) > np.abs(corrYRA)):
+                ccdOffsets['XRA'][cInd] = True
+            else:
+                ccdOffsets['XRA'][cInd] = False
+
+            if ccdOffsets['XRA'][cInd]:
+                # x is correlated with RA
+                if corrXRA < 0:
+                    ccdOffsets['RASIGN'][cInd] = -1
+                else:
+                    ccdOffsets['RASIGN'][cInd] = 1
+
+                corrYDec,_ = scipy.stats.pearsonr(testY,testDec)
+                if corrYDec < 0:
+                    ccdOffsets['DECSIGN'][cInd] = -1
+                else:
+                    ccdOffsets['DECSIGN'][cInd] = 1
+            else:
+                # y is correlated with RA
+                if corrYRA < 0:
+                    ccdOffsets['RASIGN'][cInd] = -1
+                else:
+                    ccdOffsets['RASIGN'][cInd] = 1
+
+                corrXDec,_ = scipy.stats.pearsonr(testX,testDec)
+                if corrXDec < 0:
+                    ccdOffsets['DECSIGN'][cInd] = -1
+                else:
+                    ccdOffsets['DECSIGN'][cInd] = 1

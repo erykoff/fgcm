@@ -11,7 +11,7 @@ import time
 import matplotlib.pyplot as plt
 
 from .fgcmUtilities import _pickle_method
-from .fgcmUtilities import dataBinner
+from .fgcmUtilities import dataBinner, _computeCCDOffsetSigns
 
 import types
 try:
@@ -53,11 +53,13 @@ class FgcmDeltaAper(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
 
+        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.minStarPerExp = fgcmConfig.minStarPerExp
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
         self.nCore = fgcmConfig.nCore
         self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.deltaAperFitPerCcdNx = fgcmConfig.deltaAperFitPerCcdNx
         self.deltaAperFitPerCcdNy = fgcmConfig.deltaAperFitPerCcdNy
         self.deltaAperFitSpatialNside = fgcmConfig.deltaAperFitSpatialNside
@@ -86,7 +88,6 @@ class FgcmDeltaAper(object):
 
         obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
         objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
@@ -106,8 +107,11 @@ class FgcmDeltaAper(object):
 
         for expIndex in expIndices:
             i1a = rev[rev[expIndex]: rev[expIndex + 1]]
-            mag = objMagStdMean[obsObjIDIndex[obsIndex[goodObs[i1a]]],
-                                obsBandIndex[obsIndex[goodObs[i1a]]]]
+            # mag = objMagStdMean[obsObjIDIndex[obsIndex[goodObs[i1a]]],
+            #                     obsBandIndex[obsIndex[goodObs[i1a]]]]
+            mag = objMagStdMean[obsObjIDIndex[goodObs[i1a]],
+                                obsBandIndex[goodObs[i1a]]]
+
             deltaAper = obsDeltaAper[goodObs[i1a]]
             err = obsMagADUModelErr[goodObs[i1a]]
 
@@ -129,7 +133,8 @@ class FgcmDeltaAper(object):
             yerr = err[ok]
 
             # Will need to check for warnings here...
-            fit = np.polyfit(x, y, 1, w=1./yerr)
+            # fit = np.polyfit(x, y, 1, w=1./yerr)
+            fit, nStar = self._fitEpsilonWithOutlierRejection(x, y, yerr)
 
             self.fgcmPars.compEpsilon[expIndex] = fit[0] / self.deltaAreaArcsec2
 
@@ -292,6 +297,9 @@ class FgcmDeltaAper(object):
                 yvals = delta
                 yerr = delta_err
 
+                fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
+
+                """
                 # Need to do outlier rejection
                 med = np.median(yvals)
                 sigma_mad = 1.4826*np.median(np.abs(yvals - med))
@@ -303,8 +311,8 @@ class FgcmDeltaAper(object):
                 resid = yvals - (fit[0]*xvals + fit[1])
                 ok, = np.where(np.abs(resid) < 5.0*yerr)
                 fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
-
-                offsetMap['nstar_fit'][i, j] = ok.size
+                """
+                offsetMap['nstar_fit'][i, j] = nStar
                 offsetMap['epsilon'][i, j] = fit[0]/self.deltaAreaArcsec2
 
         # Store the offsetmap in njy_per_arcsec2
@@ -319,7 +327,7 @@ class FgcmDeltaAper(object):
                 vmin = offsetMap['epsilon'][hpix[st[int(0.02*st.size)]], j]
                 vmax = offsetMap['epsilon'][hpix[st[int(0.98*st.size)]], j]
 
-                self.fgcmLog.info('Background offset in %s band 2%%-98%%: %.5f, %.5f nJy/arcsec2' %
+                self.fgcmLog.info('Background offset in %s band 2%% to 98%%: %.5f, %.5f nJy/arcsec2' %
                                   (band, vmin, vmax))
 
                 # Rotate RA, and flip
@@ -352,7 +360,109 @@ class FgcmDeltaAper(object):
         """
         Compute epsilon binned per ccd.
         """
-        pass
+        if not self.fgcmStars.hasXY:
+            self.fgcmLog.info("Cannot compute background x/y correlations without x/y information")
+            return
+
+        from .fgcmUtilities import plotCCDMapBinned2d
+
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+
+        obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
+
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsX = snmm.getArray(self.fgcmStars.obsXHandle)
+        obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+
+        # Use only good observations of good stars
+        goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
+
+        _computeCCDOffsetSigns(self.ccdOffsets, self.ccdStartIndex,
+                               self.fgcmStars, goodObs)
+
+        magGO = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
+        deltaAperGO = obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]]
+        gd, = np.where((magGO < 90.0) &
+                       (np.abs(deltaAperGO) < 0.5))
+
+        goodObs = goodObs[gd]
+        magGO = magGO[gd]
+        deltaAperGO = deltaAperGO[gd]
+        deltaAperErrGO = obsMagADUModelErr[goodObs]
+        xGO = obsX[goodObs]
+        yGO = obsY[goodObs]
+        ccdIndexGO = obsCCDIndex[goodObs]
+        bandIndexGO = obsBandIndex[goodObs]
+
+        xBin = np.floor((xGO*self.deltaAperFitPerCcdNx)/self.ccdOffsets['X_SIZE'][ccdIndexGO]).astype(np.int32)
+        yBin = np.floor((yGO*self.deltaAperFitPerCcdNy)/self.ccdOffsets['Y_SIZE'][ccdIndexGO]).astype(np.int32)
+
+        bandCcdHash = ccdIndexGO*(self.fgcmStars.nBands + 1) + bandIndexGO
+
+        h, rev = esutil.stat.histogram(bandCcdHash, rev=True)
+
+        # Arbitrary minimum number here
+        gdHash, = np.where(h > 100)
+
+        epsilonCcdMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
+                                  self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
+                                 dtype=np.float32) + self.illegalValue
+
+        for i in gdHash:
+            i1a = rev[rev[i]: rev[i + 1]]
+            cInd = ccdIndexGO[i1a[0]]
+            bInd = bandIndexGO[i1a[0]]
+
+            xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
+
+            h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
+
+            gdHash2, = np.where(h2 > 100)
+            for j in gdHash2:
+                i2a = rev2[rev2[j]: rev2[j + 1]]
+
+                xInd = xBin[i1a[i2a[0]]]
+                yInd = yBin[i1a[i2a[0]]]
+
+                x_flux = 10.**((magGO[i1a[i2a]] - self.njyZp)/(-2.5))
+                xvals = (2.5/np.log(10.)) / x_flux
+                yvals = deltaAperGO[i1a[i2a]]
+                yerr = deltaAperErrGO[i1a[i2a]]
+
+                # For outlier rejection
+                fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
+
+                epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0] / self.deltaAreaArcsec2
+
+        self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
+
+        if self.plotPath is not None:
+            for j, band in enumerate(self.fgcmPars.bands):
+                binnedArray = epsilonCcdMap[j, :, :, :]
+
+                fig = plt.figure(figsize=(8, 6))
+                fig.clf()
+
+                ax = fig.add_subplot(111)
+                plotCCDMapBinned2d(ax, self.ccdOffsets, binnedArray, 'Epsilon (nJy/arcsec2)')
+
+                text = r'$(%s)$' % (band)
+                ax.annotate(text,
+                            (0.1, 0.93), xycoords='axes fraction',
+                            ha='left', va='top', fontsize=18)
+                fig.tight_layout()
+
+                fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
+                                                             self.outfileBaseWithCycle,
+                                                             band))
+                plt.close(fig)
 
     def _starWorker(self, goodStarsAndObs):
         """
@@ -404,6 +514,23 @@ class FgcmDeltaAper(object):
         objDeltaAperMean[gd] = objDeltaAperMeanTemp[gd] / wtSum[gd]
 
         objDeltaAperMeanLock.release()
+
+    def _fitEpsilonWithOutlierRejection(self, xvals, yvals, yerr, madCut=3.0, errCut=5.0):
+        """
+        """
+        # First outlier rejection based on MAD
+        med = np.median(yvals)
+        sigma_mad = 1.4826*np.median(np.abs(yvals - med))
+        ok, = np.where(np.abs(yvals - med) < madCut*sigma_mad)
+
+        fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
+
+        # Second better rejection with residuals
+        resid = yvals - (fit[0]*xvals + fit[1])
+        ok, = np.where(np.abs(resid) < errCut*yerr)
+        fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
+
+        return fit, ok.size
 
     def __getstate__(self):
         # Don't try to pickle the logger.

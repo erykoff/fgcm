@@ -14,7 +14,7 @@ import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import Cheb2dField, _computeCCDOffsetSigns
 
 class FgcmSuperStarFlat(object):
     """
@@ -180,7 +180,9 @@ class FgcmSuperStarFlat(object):
             # with x/y, new sub-ccd
 
             # we will need the ccd offset signs
-            self._computeCCDOffsetSigns(goodObs)
+            # self._computeCCDOffsetSigns(goodObs)
+            _computeCCDOffsetSigns(self.ccdOffsets, self.ccdStartIndex,
+                                   self.fgcmStars, goodObs)
 
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
@@ -411,17 +413,8 @@ class FgcmSuperStarFlat(object):
                                                     self.epochNames[e]))
                 plt.close()
 
-
+    """
     def _computeCCDOffsetSigns(self, goodObs):
-        """
-        Internal method to figure out plotting signs
-
-        parameters
-        ----------
-        goodObs: int array
-           Array of good observations
-        """
-
         import scipy.stats
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
@@ -486,5 +479,5 @@ class FgcmSuperStarFlat(object):
                     else:
                         self.ccdOffsets['DECSIGN'][cInd] = 1
 
-
+                        """
 
