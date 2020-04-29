@@ -2,6 +2,7 @@ from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
 import numpy as np
+import healpy as hp
 import os
 import sys
 import esutil
@@ -145,6 +146,7 @@ class FgcmParameters(object):
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
+        self.deltaAperFitSpatialNside = fgcmConfig.deltaAperFitSpatialNside
 
         self.approxThroughput = fgcmConfig.approxThroughput
 
@@ -375,6 +377,10 @@ class FgcmParameters(object):
         # We also have the median delta aperture and epsilon per exposure
         self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
         self.compEpsilon = np.zeros(self.nExp, dtype='f8')
+        self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
+        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
+        self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
+        self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
 
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
@@ -476,12 +482,19 @@ class FgcmParameters(object):
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
 
+        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
         try:
             self.compMedDeltaAper = np.atleast_1d(inParams['COMPMEDDELTAAPER'][0])
             self.compEpsilon = np.atleast_1d(inParams['COMPEPSILON'][0])
+            self.compGlobalEpsilon = np.atleast_1d(inParams['COMPGLOBALEPSILON'][0])
+            self.compEpsilonMap = np.reshape(inParams['COMPEPSILONMAP'][0], (npix, self.nBands))
+            self.compEpsilonNStarMap = np.reshape(inParams['COMPEPSILONNSTARMAP'][0], (npix, self.nBands))
         except ValueError:
             self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
             self.compEpsilon = np.zeros(self.nExp, dtype='f8')
+            self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
+            self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
+            self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
@@ -908,45 +921,48 @@ class FgcmParameters(object):
         if (self.hasExternalTau):
             parInfo['TAUFILE'] = self.tauFile
 
-        dtype=[('EXPNUM', 'i8', self.expArray.size),
-               ('PARALPHA','f8',self.parAlpha.size),
-               ('PARO3','f8',self.parO3.size),
-               ('PARLNPWVINTERCEPT','f8',self.parLnPwvIntercept.size),
-               ('PARLNPWVSLOPE','f8',self.parLnPwvSlope.size),
-               ('PARLNPWVQUADRATIC','f8',self.parLnPwvQuadratic.size),
-               ('PARLNTAUINTERCEPT','f8',self.parLnTauIntercept.size),
-               ('PARLNTAUSLOPE','f8',self.parLnTauSlope.size),
-               ('PARQESYSINTERCEPT','f8',self.parQESysIntercept.size),
-               ('COMPQESYSSLOPE','f8',self.compQESysSlope.size),
-               ('PARFILTEROFFSET','f8',self.parFilterOffset.size),
-               ('PARFILTEROFFSETFITFLAG','i2',self.parFilterOffsetFitFlag.size),
-               ('COMPABSTHROUGHPUT', 'f8', self.compAbsThroughput.size),
-               ('COMPREFOFFSET', 'f8', self.compRefOffset.size),
-               ('COMPREFSIGMA', 'f8', self.compRefSigma.size),
-               ('COMPMIRRORCHROMATICITY', 'f8', self.compMirrorChromaticity.size),
-               ('MIRRORCHROMATICITYPIVOT', 'f8', self.mirrorChromaticityPivot.size),
-               ('COMPAPERCORRPIVOT','f8',self.compAperCorrPivot.size),
-               ('COMPAPERCORRSLOPE','f8',self.compAperCorrSlope.size),
-               ('COMPAPERCORRSLOPEERR','f8',self.compAperCorrSlopeErr.size),
-               ('COMPAPERCORRRANGE','f8',self.compAperCorrRange.size),
-               ('COMPMODELERREXPTIMEPIVOT', 'f8', self.compModelErrExptimePivot.size),
-               ('COMPMODELERRFWHMPIVOT', 'f8', self.compModelErrFwhmPivot.size),
-               ('COMPMODELERRSKYPIVOT', 'f8', self.compModelErrSkyPivot.size),
-               ('COMPMODELERRPARS', 'f8', self.compModelErrPars.size),
-               ('COMPEXPGRAY','f8',self.compExpGray.size),
-               ('COMPVARGRAY','f8',self.compVarGray.size),
-               ('COMPMEDDELTAAPER', 'f8', self.compMedDeltaAper.size),
-               ('COMPEPSILON', 'f8', self.compEpsilon.size),
-               ('COMPNGOODSTARPEREXP','i4',self.compNGoodStarPerExp.size),
-               ('COMPSIGFGCM','f8',self.compSigFgcm.size),
-               ('COMPSIGMACAL', 'f8', self.compSigmaCal.size),
-               ('COMPRETRIEVEDLNPWV','f8',self.compRetrievedLnPwv.size),
-               ('COMPRETRIEVEDLNPWVRAW','f8',self.compRetrievedLnPwvRaw.size),
-               ('COMPRETRIEVEDLNPWVFLAG','i2',self.compRetrievedLnPwvFlag.size),
-               ('PARRETRIEVEDLNPWVSCALE','f8'),
-               ('PARRETRIEVEDLNPWVOFFSET','f8'),
-               ('PARRETRIEVEDLNPWVNIGHTLYOFFSET','f8',self.parRetrievedLnPwvNightlyOffset.size),
-               ('COMPRETRIEVEDTAUNIGHT','f8',self.compRetrievedTauNight.size)]
+        dtype=[(self.expField, 'i8', (self.expArray.size, )),
+               ('PARALPHA', 'f8' , (self.parAlpha.size, )),
+               ('PARO3', 'f8', (self.parO3.size, )),
+               ('PARLNPWVINTERCEPT', 'f8' , (self.parLnPwvIntercept.size, )),
+               ('PARLNPWVSLOPE', 'f8', (self.parLnPwvSlope.size, )),
+               ('PARLNPWVQUADRATIC', 'f8' , (self.parLnPwvQuadratic.size, )),
+               ('PARLNTAUINTERCEPT', 'f8', (self.parLnTauIntercept.size, )),
+               ('PARLNTAUSLOPE', 'f8', (self.parLnTauSlope.size, )),
+               ('PARQESYSINTERCEPT', 'f8', (self.parQESysIntercept.size, )),
+               ('COMPQESYSSLOPE', 'f8', (self.compQESysSlope.size, )),
+               ('PARFILTEROFFSET', 'f8', (self.parFilterOffset.size, )),
+               ('PARFILTEROFFSETFITFLAG', 'i2', (self.parFilterOffsetFitFlag.size, )),
+               ('COMPABSTHROUGHPUT', 'f8', (self.compAbsThroughput.size, )),
+               ('COMPREFOFFSET', 'f8', (self.compRefOffset.size, )),
+               ('COMPREFSIGMA', 'f8', (self.compRefSigma.size, )),
+               ('COMPMIRRORCHROMATICITY', 'f8', (self.compMirrorChromaticity.size, )),
+               ('MIRRORCHROMATICITYPIVOT', 'f8', (self.mirrorChromaticityPivot.size, )),
+               ('COMPAPERCORRPIVOT', 'f8', (self.compAperCorrPivot.size, )),
+               ('COMPAPERCORRSLOPE', 'f8', (self.compAperCorrSlope.size, )),
+               ('COMPAPERCORRSLOPEERR', 'f8', (self.compAperCorrSlopeErr.size, )),
+               ('COMPAPERCORRRANGE', 'f8', (self.compAperCorrRange.size, )),
+               ('COMPMODELERREXPTIMEPIVOT', 'f8', (self.compModelErrExptimePivot.size, )),
+               ('COMPMODELERRFWHMPIVOT', 'f8', (self.compModelErrFwhmPivot.size, )),
+               ('COMPMODELERRSKYPIVOT', 'f8', (self.compModelErrSkyPivot.size, )),
+               ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
+               ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
+               ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPMEDDELTAAPER', 'f8', (self.compMedDeltaAper.size, )),
+               ('COMPEPSILON', 'f8', (self.compEpsilon.size, )),
+               ('COMPGLOBALEPSILON', 'f4', (self.compGlobalEpsilon.size, )),
+               ('COMPEPSILONMAP', 'f4', (self.compEpsilonMap.size, )),
+               ('COMPEPSILONNSTARMAP', 'i4', (self.compEpsilonNStarMap.size, )),
+               ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
+               ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
+               ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
+               ('COMPRETRIEVEDLNPWV', 'f8', (self.compRetrievedLnPwv.size, )),
+               ('COMPRETRIEVEDLNPWVRAW', 'f8', (self.compRetrievedLnPwvRaw.size, )),
+               ('COMPRETRIEVEDLNPWVFLAG', 'i2', (self.compRetrievedLnPwvFlag.size, )),
+               ('PARRETRIEVEDLNPWVSCALE', 'f8'),
+               ('PARRETRIEVEDLNPWVOFFSET', 'f8'),
+               ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8', (self.parRetrievedLnPwvNightlyOffset.size, )),
+               ('COMPRETRIEVEDTAUNIGHT', 'f8', (self.compRetrievedTauNight.size, ))]
 
         if (self.hasExternalPwv):
             dtype.extend([('PAREXTERNALLNPWVSCALE','f8'),
@@ -1002,6 +1018,9 @@ class FgcmParameters(object):
 
         pars['COMPMEDDELTAAPER'][:] = self.compMedDeltaAper
         pars['COMPEPSILON'][:] = self.compEpsilon
+        pars['COMPGLOBALEPSILON'][:] = self.compGlobalEpsilon
+        pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.flatten()
+        pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.flatten()
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
         pars['COMPSIGMACAL'][:] = self.compSigmaCal
