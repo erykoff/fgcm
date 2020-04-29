@@ -322,6 +322,8 @@ class FgcmDeltaAper(object):
         if self.plotPath is not None:
             for j, band in enumerate(self.fgcmStars.bands):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
+                if hpix.size < 2:
+                    continue
                 ra, dec = hp.pix2ang(self.deltaAperFitSpatialNside, hpix, lonlat=True)
                 st = np.argsort(offsetMap['epsilon'][hpix, j])
                 vmin = offsetMap['epsilon'][hpix[st[int(0.02*st.size)]], j]
