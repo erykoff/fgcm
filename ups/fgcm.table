@@ -1,9 +1,3 @@
-setupRequired(esutil)
-setupRequired(numpy)
-setupRequired(scipy)
-setupRequired(matplotlib)
-setupRequired(healpy)
-setupRequired(pyyaml)
 
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/lib/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
