@@ -136,7 +136,7 @@ class FgcmDeltaAper(object):
             # fit = np.polyfit(x, y, 1, w=1./yerr)
             fit, nStar = self._fitEpsilonWithOutlierRejection(x, y, yerr)
 
-            self.fgcmPars.compEpsilon[expIndex] = fit[0] / self.deltaAreaArcsec2
+            self.fgcmPars.compEpsilon[expIndex] = fit[0]/self.deltaAreaArcsec2
 
     def computeDeltaAperStars(self, debug=False):
         """
@@ -237,7 +237,7 @@ class FgcmDeltaAper(object):
             fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
                              bin_struct['Y'][u],
                              1, w=1./bin_struct['Y_ERR'][u])
-            globalEpsilon[i] = fit[0]
+            globalEpsilon[i] = fit[0] / self.deltaAreaArcsec2
             globalOffset[i] = fit[1]
 
             njy_per_arcsec2 = globalEpsilon[i] / self.deltaAreaArcsec2
@@ -298,20 +298,6 @@ class FgcmDeltaAper(object):
                 yerr = delta_err
 
                 fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-
-                """
-                # Need to do outlier rejection
-                med = np.median(yvals)
-                sigma_mad = 1.4826*np.median(np.abs(yvals - med))
-                ok, = np.where(np.abs(yvals - med) < 3.0*sigma_mad)
-
-                fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
-
-                # Second fit with better outlier rejection
-                resid = yvals - (fit[0]*xvals + fit[1])
-                ok, = np.where(np.abs(resid) < 5.0*yerr)
-                fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
-                """
                 offsetMap['nstar_fit'][i, j] = nStar
                 offsetMap['epsilon'][i, j] = fit[0]/self.deltaAreaArcsec2
 
@@ -411,7 +397,7 @@ class FgcmDeltaAper(object):
         h, rev = esutil.stat.histogram(bandCcdHash, rev=True)
 
         # Arbitrary minimum number here
-        gdHash, = np.where(h > 100)
+        gdHash, = np.where(h > 50)
 
         epsilonCcdMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
@@ -426,7 +412,7 @@ class FgcmDeltaAper(object):
 
             h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
 
-            gdHash2, = np.where(h2 > 100)
+            gdHash2, = np.where(h2 > 50)
             for j in gdHash2:
                 i2a = rev2[rev2[j]: rev2[j + 1]]
 
