@@ -355,6 +355,7 @@ class FgcmDeltaAper(object):
         from .fgcmUtilities import plotCCDMapBinned2d
 
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
 
         obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
@@ -383,6 +384,7 @@ class FgcmDeltaAper(object):
         goodObs = goodObs[gd]
         magGO = magGO[gd]
         deltaAperGO = deltaAperGO[gd]
+        magErrGO = objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
         deltaAperErrGO = obsMagADUModelErr[goodObs]
         xGO = obsX[goodObs]
         yGO = obsY[goodObs]
@@ -397,7 +399,7 @@ class FgcmDeltaAper(object):
         h, rev = esutil.stat.histogram(bandCcdHash, rev=True)
 
         # Arbitrary minimum number here
-        gdHash, = np.where(h > 50)
+        gdHash, = np.where(h > 10)
 
         epsilonCcdMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
@@ -408,26 +410,47 @@ class FgcmDeltaAper(object):
             cInd = ccdIndexGO[i1a[0]]
             bInd = bandIndexGO[i1a[0]]
 
+            # Some quantities here...
+            flux = 10.**((magGO[i1a] - self.njyZp)/(-2.5))
+            fluxErr = (2.5/np.log(10.))*magErrGO[i1a]
+
+            # Per band/ccd we need to compute the bright-end offset
+            # In the future, look at adding this information above?
+            st = np.argsort(magGO[i1a])
+            cutMag = magGO[i1a[st[int(0.25*st.size)]]]
+            bright, = np.where(magGO[i1a] < cutMag)
+            offset = np.median(deltaAperGO[i1a[bright]])
+
+            epsilonApprox = (np.log(10.)/2.5)*(deltaAperGO[i1a] - offset)*flux
+            epsilonErrApprox = np.abs(epsilonApprox)*np.sqrt((fluxErr/flux)**2. +
+                                                             (deltaAperErrGO[i1a]/(deltaAperGO[i1a] - offset))**2.)
+            epsilonMed = np.median(epsilonApprox)
+
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
             h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
 
-            gdHash2, = np.where(h2 > 50)
+            gdHash2, = np.where(h2 > 10)
             for j in gdHash2:
                 i2a = rev2[rev2[j]: rev2[j + 1]]
 
                 xInd = xBin[i1a[i2a[0]]]
                 yInd = yBin[i1a[i2a[0]]]
 
-                x_flux = 10.**((magGO[i1a[i2a]] - self.njyZp)/(-2.5))
-                xvals = (2.5/np.log(10.)) / x_flux
-                yvals = deltaAperGO[i1a[i2a]]
-                yerr = deltaAperErrGO[i1a[i2a]]
+                if i2a.size >= 500:
+                    # We can do the full fit
+                    xvals = (2.5/np.log(10.))/flux[i2a]
+                    yvals = deltaAperGO[i1a[i2a]] - offset
+                    yerr = deltaAperErrGO[i1a[i2a]]
 
-                # For outlier rejection
-                fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-
-                epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0] / self.deltaAreaArcsec2
+                    fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
+                    epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
+                else:
+                    # Do the "weighted mean" epsilon with quick outlier rejection
+                    ok2, = np.where(np.abs(epsilonApprox[i2a] - epsilonMed) < 3.0*epsilonErrApprox[i2a])
+                    wt = 1./epsilonErrApprox[i2a[ok2]]**2.
+                    wmean = np.sum(epsilonApprox[i2a[ok2]]*wt)/np.sum(wt)
+                    epsilonCcdMap[bInd, cInd, xInd, yInd] = wmean/self.deltaAreaArcsec2
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
 
