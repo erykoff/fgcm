@@ -422,8 +422,10 @@ class FgcmDeltaAper(object):
             offset = np.median(deltaAperGO[i1a[bright]])
 
             epsilonApprox = (np.log(10.)/2.5)*(deltaAperGO[i1a] - offset)*flux
-            epsilonErrApprox = np.abs(epsilonApprox)*np.sqrt((fluxErr/flux)**2. +
-                                                             (deltaAperErrGO[i1a]/(deltaAperGO[i1a] - offset))**2.)
+            relativeFluxErr2 = (fluxErr/flux)**2.
+            relativeDeltaAperErr2 = (deltaAperErrGO[i1a]/np.clip(deltaAperGO[i1a] - offset, 0.001, None))**2.
+            epsilonErrApprox = np.abs(epsilonApprox)*np.sqrt(relativeFluxErr2 +
+                                                             relativeDeltaAperErr2)
             epsilonMed = np.median(epsilonApprox)
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
