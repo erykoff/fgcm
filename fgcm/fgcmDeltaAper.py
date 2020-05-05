@@ -133,7 +133,6 @@ class FgcmDeltaAper(object):
             yerr = err[ok]
 
             # Will need to check for warnings here...
-            # fit = np.polyfit(x, y, 1, w=1./yerr)
             fit, nStar = self._fitEpsilonWithOutlierRejection(x, y, yerr)
 
             self.fgcmPars.compEpsilon[expIndex] = fit[0]/self.deltaAreaArcsec2
@@ -240,8 +239,6 @@ class FgcmDeltaAper(object):
             globalEpsilon[i] = fit[0] / self.deltaAreaArcsec2
             globalOffset[i] = fit[1]
 
-            njy_per_arcsec2 = globalEpsilon[i] / self.deltaAreaArcsec2
-
             # Store the value of njy_per_arcsec2
             self.fgcmPars.compGlobalEpsilon[i] = globalEpsilon[i]
             self.fgcmLog.info('Global background offset in %s band: %.5f nJy/arcsec2' %
@@ -262,7 +259,7 @@ class FgcmDeltaAper(object):
                 ax.plot(xplotvals, yplotvals, 'r-')
                 ax.set_xlabel('mag_std_%s' % (band))
                 ax.set_ylabel('delta_aper_%s' % (band))
-                ax.set_title('%s: %.4f nJy/arcsec2' % (band, njy_per_arcsec2))
+                ax.set_title('%s: %.4f nJy/arcsec2' % (band, globalEpsilon[i]))
                 fig.savefig('%s/%s_epsilon_global_%s.png' % (self.plotPath,
                                                              self.outfileBaseWithCycle,
                                                              band))
