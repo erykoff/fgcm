@@ -360,6 +360,7 @@ class FgcmDeltaAper(object):
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
         obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
         obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
@@ -387,31 +388,39 @@ class FgcmDeltaAper(object):
         yGO = obsY[goodObs]
         ccdIndexGO = obsCCDIndex[goodObs]
         bandIndexGO = obsBandIndex[goodObs]
+        lutFilterIndexGO = obsLUTFilterIndex[goodObs]
 
         xBin = np.floor((xGO*self.deltaAperFitPerCcdNx)/self.ccdOffsets['X_SIZE'][ccdIndexGO]).astype(np.int32)
         yBin = np.floor((yGO*self.deltaAperFitPerCcdNy)/self.ccdOffsets['Y_SIZE'][ccdIndexGO]).astype(np.int32)
 
-        bandCcdHash = ccdIndexGO*(self.fgcmStars.nBands + 1) + bandIndexGO
+        # bandCcdHash = ccdIndexGO*(self.fgcmStars.nBands + 1) + bandIndexGO
+        filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
-        h, rev = esutil.stat.histogram(bandCcdHash, rev=True)
+        # h, rev = esutil.stat.histogram(bandCcdHash, rev=True)
+        h, rev = esutil.stat.histogram(filterCcdHash, rev=True)
 
         # Arbitrary minimum number here
         gdHash, = np.where(h > 10)
 
-        epsilonCcdMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
+        epsilonCcdMap = np.zeros((self.fgcmPars.nLUTFilter, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
                                  dtype=np.float32) + self.illegalValue
+        epsilonCcdNStarMap = np.zeros((self.fgcmPars.nLUTFilter, self.fgcmPars.nCCD,
+                                       self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
+                                      dtype=np.int32)
+
 
         for i in gdHash:
             i1a = rev[rev[i]: rev[i + 1]]
             cInd = ccdIndexGO[i1a[0]]
-            bInd = bandIndexGO[i1a[0]]
+            # bInd = bandIndexGO[i1a[0]]
+            fInd = lutFilterIndexGO[i1a[0]]
 
             # Some quantities here...
             flux = 10.**((magGO[i1a] - self.njyZp)/(-2.5))
             fluxErr = (2.5/np.log(10.))*magErrGO[i1a]
 
-            # Per band/ccd we need to compute the bright-end offset
+            # Per filter/ccd we need to compute the bright-end offset
             # In the future, look at adding this information above?
             st = np.argsort(magGO[i1a])
             cutMag = magGO[i1a[st[int(0.25*st.size)]]]
@@ -443,18 +452,21 @@ class FgcmDeltaAper(object):
                     yerr = deltaAperErrGO[i1a[i2a]]
 
                     fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-                    epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
+                    epsilonCcdMap[fInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
+                    epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = nStar
                 else:
                     # Do the "weighted mean" epsilon with quick outlier rejection
                     ok2, = np.where(np.abs(epsilonApprox[i2a] - epsilonMed) < 3.0*epsilonErrApprox[i2a])
                     wt = 1./epsilonErrApprox[i2a[ok2]]**2.
                     wmean = np.sum(epsilonApprox[i2a[ok2]]*wt)/np.sum(wt)
-                    epsilonCcdMap[bInd, cInd, xInd, yInd] = wmean/self.deltaAreaArcsec2
+                    epsilonCcdMap[fInd, cInd, xInd, yInd] = wmean/self.deltaAreaArcsec2
+                    epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = ok2.size
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
+        self.fgcmPars.compEpsilonCcdNStarMap[:] = epsilonCcdNStarMap[:]
 
         if self.plotPath is not None:
-            for j, band in enumerate(self.fgcmPars.bands):
+            for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 binnedArray = epsilonCcdMap[j, :, :, :]
 
                 fig = plt.figure(figsize=(8, 6))
@@ -463,7 +475,7 @@ class FgcmDeltaAper(object):
                 ax = fig.add_subplot(111)
                 plotCCDMapBinned2d(ax, self.ccdOffsets, binnedArray, 'Epsilon (nJy/arcsec2)')
 
-                text = r'$(%s)$' % (band)
+                text = r'$(%s)$' % (filterName)
                 ax.annotate(text,
                             (0.1, 0.93), xycoords='axes fraction',
                             ha='left', va='top', fontsize=18)
@@ -471,7 +483,7 @@ class FgcmDeltaAper(object):
 
                 fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
                                                              self.outfileBaseWithCycle,
-                                                             band))
+                                                             filterName))
                 plt.close(fig)
 
     def _starWorker(self, goodStarsAndObs):

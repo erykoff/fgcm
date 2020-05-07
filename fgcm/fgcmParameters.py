@@ -386,9 +386,12 @@ class FgcmParameters(object):
         npix = hp.nside2npix(self.deltaAperFitSpatialNside)
         self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
         self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
-        self.compEpsilonCcdMap = np.zeros((self.nBands, self.nCCD,
+        self.compEpsilonCcdMap = np.zeros((self.nLUTFilter, self.nCCD,
                                            self.deltaAperFitPerCcdNx,
                                            self.deltaAperFitPerCcdNy), dtype='f4')
+        self.compEpsilonCcdNStarMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                                self.deltaAperFitPerCcdNx,
+                                                self.deltaAperFitPerCcdNy), dtype='i4')
 
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
@@ -497,19 +500,26 @@ class FgcmParameters(object):
             self.compGlobalEpsilon = np.atleast_1d(inParams['COMPGLOBALEPSILON'][0])
             self.compEpsilonMap = np.reshape(inParams['COMPEPSILONMAP'][0], (npix, self.nBands))
             self.compEpsilonNStarMap = np.reshape(inParams['COMPEPSILONNSTARMAP'][0], (npix, self.nBands))
-            self.compEpsilonCcdMap = np.reshape(inParams['COMPEPSILONCCDMAP'][0], (self.nBands,
+            self.compEpsilonCcdMap = np.reshape(inParams['COMPEPSILONCCDMAP'][0], (self.nLUTFilter,
                                                                                    self.nCCD,
                                                                                    self.deltaAperFitPerCcdNx,
                                                                                    self.deltaAperFitPerCcdNy))
+            self.compEpsilonCcdNStarMap = np.reshape(inParams['COMPEPSILONCCDNSTARMAP'][0], (self.nLUTFilter,
+                                                                                             self.nCCD,
+                                                                                             self.deltaAperFitPerCcdNx,
+                                                                                             self.deltaAperFitPerCcdNy))
         except ValueError:
             self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
             self.compEpsilon = np.zeros(self.nExp, dtype='f8')
             self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
             self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
             self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
-            self.compEpsilonCcdMap = np.zeros((self.nBands, self.nCCD,
-                                           self.deltaAperFitPerCcdNx,
-                                           self.deltaAperFitPerCcdNy), dtype='f4')
+            self.compEpsilonCcdMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                               self.deltaAperFitPerCcdNx,
+                                               self.deltaAperFitPerCcdNy), dtype='f4')
+            self.compEpsilonCcdNStarMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                                    self.deltaAperFitPerCcdNx,
+                                                    self.deltaAperFitPerCcdNy), dtype='i4')
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
@@ -991,6 +1001,7 @@ class FgcmParameters(object):
                ('COMPEPSILONMAP', 'f4', (self.compEpsilonMap.size, )),
                ('COMPEPSILONNSTARMAP', 'i4', (self.compEpsilonNStarMap.size, )),
                ('COMPEPSILONCCDMAP', 'f4', (self.compEpsilonCcdMap.size, )),
+               ('COMPEPSILONCCDNSTARMAP', 'i4', (self.compEpsilonCcdNStarMap.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
                ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
@@ -1060,6 +1071,7 @@ class FgcmParameters(object):
         pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.flatten()
         pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.flatten()
         pars['COMPEPSILONCCDMAP'][:] = self.compEpsilonCcdMap.flatten()
+        pars['COMPEPSILONCCDNSTARMAP'][:] = self.compEpsilonCcdNStarMap.flatten()
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
         pars['COMPSIGMACAL'][:] = self.compSigmaCal
