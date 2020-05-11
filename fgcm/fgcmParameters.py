@@ -386,6 +386,9 @@ class FgcmParameters(object):
         self.compEpsilonCcdMap = np.zeros((self.nBands, self.nCCD,
                                            self.deltaAperFitPerCcdNx,
                                            self.deltaAperFitPerCcdNy), dtype='f4')
+        self.compEpsilonCcdNStarMap = np.zeros((self.nBands, self.nCCD,
+                                                self.deltaAperFitPerCcdNx,
+                                                self.deltaAperFitPerCcdNy), dtype='i4')
 
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
@@ -498,6 +501,11 @@ class FgcmParameters(object):
                                                                                    self.nCCD,
                                                                                    self.deltaAperFitPerCcdNx,
                                                                                    self.deltaAperFitPerCcdNy))
+            self.compEpsilonCcdNStarMap = np.reshape(inParams['COMPEPSILONCCDNSTARMAP'][0], (self.nBands,
+                                                                                             self.nCCD,
+                                                                                             self.deltaAperFitPerCcdNx,
+                                                                                             self.deltaAperFitPerCcdNy))
+
         except ValueError:
             self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
             self.compEpsilon = np.zeros(self.nExp, dtype='f8')
@@ -507,6 +515,9 @@ class FgcmParameters(object):
             self.compEpsilonCcdMap = np.zeros((self.nBands, self.nCCD,
                                            self.deltaAperFitPerCcdNx,
                                            self.deltaAperFitPerCcdNy), dtype='f4')
+            self.compEpsilonCcdNStarMap = np.zeros((self.nBands, self.nCCD,
+                                                    self.deltaAperFitPerCcdNx,
+                                                    self.deltaAperFitPerCcdNy), dtype='i4')
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
@@ -966,6 +977,7 @@ class FgcmParameters(object):
                ('COMPEPSILONMAP', 'f4', (self.compEpsilonMap.size, )),
                ('COMPEPSILONNSTARMAP', 'i4', (self.compEpsilonNStarMap.size, )),
                ('COMPEPSILONCCDMAP', 'f4', (self.compEpsilonCcdMap.size, )),
+               ('COMPEPSILONCCDNSTARMAP', 'f4', (self.compEpsilonCcdNStarMap.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
                ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
@@ -1035,6 +1047,7 @@ class FgcmParameters(object):
         pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.flatten()
         pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.flatten()
         pars['COMPEPSILONCCDMAP'][:] = self.compEpsilonCcdMap.flatten()
+        pars['COMPEPSILONCCDNSTARMAP'][:] = self.compEpsilonCcdNStarMap.flatten()
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
         pars['COMPSIGMACAL'][:] = self.compSigmaCal

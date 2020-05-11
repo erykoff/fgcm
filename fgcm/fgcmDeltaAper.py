@@ -401,6 +401,9 @@ class FgcmDeltaAper(object):
         epsilonCcdMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
                                  dtype=np.float32) + self.illegalValue
+        epsilonCcdNStarMap = np.zeros((self.fgcmPars.nBands, self.fgcmPars.nCCD,
+                                       self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
+                                      dtype=np.int32)
 
         for i in gdHash:
             i1a = rev[rev[i]: rev[i + 1]]
@@ -444,14 +447,17 @@ class FgcmDeltaAper(object):
 
                     fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
                     epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
+                    epsilonCcdNStarMap[bInd, cInd, xInd, yInd] = nStar
                 else:
                     # Do the "weighted mean" epsilon with quick outlier rejection
                     ok2, = np.where(np.abs(epsilonApprox[i2a] - epsilonMed) < 3.0*epsilonErrApprox[i2a])
                     wt = 1./epsilonErrApprox[i2a[ok2]]**2.
                     wmean = np.sum(epsilonApprox[i2a[ok2]]*wt)/np.sum(wt)
                     epsilonCcdMap[bInd, cInd, xInd, yInd] = wmean/self.deltaAreaArcsec2
+                    epsilonCcdNStarMap[bInd, cInd, xInd, yInd] = -1*ok2.size
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
+        self.fgcmPars.compEpsilonNStarMap[:] = epsilonCcdNStarMap[:]
 
         if self.plotPath is not None:
             for j, band in enumerate(self.fgcmPars.bands):
