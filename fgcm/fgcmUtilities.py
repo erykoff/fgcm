@@ -672,10 +672,10 @@ def plotCCDMapBinned2d(ax, ccdOffsets, binnedArray, cbLabel, loHi=None,
         zGridPlotM = np.ma.masked_where(zGridPlot <= illegalValue, zGridPlot)
 
         ax.imshow(zGridPlotM,
-                   interpolation='bilinear',
-                   origin='lower',
-                   extent=extent,
-                   norm=cNorm)
+                  interpolation='bilinear',
+                  origin='lower',
+                  extent=extent,
+                  norm=cNorm)
 
     cb=None
     cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))

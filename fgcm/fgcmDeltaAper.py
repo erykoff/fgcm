@@ -107,8 +107,6 @@ class FgcmDeltaAper(object):
 
         for expIndex in expIndices:
             i1a = rev[rev[expIndex]: rev[expIndex + 1]]
-            # mag = objMagStdMean[obsObjIDIndex[obsIndex[goodObs[i1a]]],
-            #                     obsBandIndex[obsIndex[goodObs[i1a]]]]
             mag = objMagStdMean[obsObjIDIndex[goodObs[i1a]],
                                 obsBandIndex[goodObs[i1a]]]
 
@@ -228,14 +226,9 @@ class FgcmDeltaAper(object):
             delta_min = delta[r[st[int(0.02*st.size)]]]
             delta_max = delta[r[st[int(0.98*st.size)]]]
 
-            bin_struct = dataBinner(mag_std[r], delta[r], 0.2, [mag_min, mag_max])
-            u, = np.where(bin_struct['Y_ERR'] > 0.0)
+            fit, nStar, bin_struct = self._fitEpsilonBinned(mag_std[r], delta[r],
+                                                            np.ones(r.size), mag_min, mag_max, return_binstruct=True)
 
-            # Do nJy
-            bin_flux = 10.**((bin_struct['X'] - self.njyZp)/(-2.5))
-            fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
-                             bin_struct['Y'][u],
-                             1, w=1./bin_struct['Y_ERR'][u])
             globalEpsilon[i] = fit[0] / self.deltaAreaArcsec2
             globalOffset[i] = fit[1]
 
@@ -251,8 +244,8 @@ class FgcmDeltaAper(object):
                 ax = fig.add_subplot(111)
                 ax.hexbin(mag_std, delta, extent=[mag_min, mag_max,
                                                   delta_min, delta_max], bins='log')
-                ax.errorbar(bin_struct['X'][u], bin_struct['Y'][u],
-                            yerr=bin_struct['Y_ERR'][u], fmt='r.', markersize=10)
+                ax.errorbar(bin_struct['X'], bin_struct['Y'],
+                            yerr=bin_struct['Y_ERR'], fmt='r.', markersize=10)
                 xplotvals = np.linspace(mag_min, mag_max, 100)
                 xplotfluxvals = 10.**((xplotvals - self.njyZp)/(-2.5))
                 yplotvals = fit[0]*((2.5/np.log(10.0))/xplotfluxvals) + fit[1]
@@ -287,14 +280,14 @@ class FgcmDeltaAper(object):
                 magerr_std = objMagStdMeanErr[i1a[use], j]
                 delta = objDeltaAperMean[i1a[use], j]
 
-                x_flux = 10.**((mag_std - self.njyZp)/(-2.5))
                 delta_err = magerr_std
 
-                xvals = (2.5/np.log(10.)) / x_flux
-                yvals = delta
-                yerr = delta_err
+                st = np.argsort(mag_std)
+                mag_min = mag_std[st[int(0.02*st.size)]]
+                mag_max = mag_std[st[int(0.95*st.size)]]
+                fit, nStar = self._fitEpsilonBinned(mag_std, delta, delta_err,
+                                                    mag_min, mag_max)
 
-                fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
                 offsetMap['nstar_fit'][i, j] = nStar
                 offsetMap['epsilon'][i, j] = fit[0]/self.deltaAreaArcsec2
 
@@ -349,11 +342,17 @@ class FgcmDeltaAper(object):
             self.fgcmLog.info("Cannot compute background x/y correlations without x/y information")
             return
 
+        if not self.quietMode:
+            self.fgcmLog.info('Computing deltaAper per CCD')
+
         from .fgcmUtilities import plotCCDMapBinned2d
 
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objID = snmm.getArray(self.fgcmStars.objIDHandle)
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
 
         obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
 
@@ -387,6 +386,7 @@ class FgcmDeltaAper(object):
         yGO = obsY[goodObs]
         ccdIndexGO = obsCCDIndex[goodObs]
         bandIndexGO = obsBandIndex[goodObs]
+        objIDGO = objID[obsObjIDIndex[goodObs]]
 
         xBin = np.floor((xGO*self.deltaAperFitPerCcdNx)/self.ccdOffsets['X_SIZE'][ccdIndexGO]).astype(np.int32)
         yBin = np.floor((yGO*self.deltaAperFitPerCcdNy)/self.ccdOffsets['Y_SIZE'][ccdIndexGO]).astype(np.int32)
@@ -421,6 +421,10 @@ class FgcmDeltaAper(object):
             bright, = np.where(magGO[i1a] < cutMag)
             offset = np.median(deltaAperGO[i1a[bright]])
 
+            # set mag_min/max here
+            mag_min = magGO[i1a[st[int(0.02*st.size)]]]
+            mag_max = magGO[i1a[st[int(0.95*st.size)]]]
+
             epsilonApprox = (np.log(10.)/2.5)*(deltaAperGO[i1a] - offset)*flux
             relativeFluxErr2 = (fluxErr/flux)**2.
             relativeDeltaAperErr2 = (deltaAperErrGO[i1a]/np.clip(deltaAperGO[i1a] - offset, 0.001, None))**2.
@@ -439,13 +443,15 @@ class FgcmDeltaAper(object):
                 xInd = xBin[i1a[i2a[0]]]
                 yInd = yBin[i1a[i2a[0]]]
 
+                # Only take unique stars
+                u, ind = np.unique(objIDGO[i1a[i2a]], return_index=True)
+                i2a = i2a[ind]
+
                 if i2a.size >= 500:
                     # We can do the full fit
-                    xvals = (2.5/np.log(10.))/flux[i2a]
-                    yvals = deltaAperGO[i1a[i2a]] - offset
-                    yerr = deltaAperErrGO[i1a[i2a]]
+                    fit, nStar = self._fitEpsilonBinned(magGO[i1a[i2a]], deltaAperGO[i1a[i2a]], deltaAperErrGO[i1a[i2a]],
+                                                        mag_min, mag_max)
 
-                    fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
                     epsilonCcdMap[bInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
                     epsilonCcdNStarMap[bInd, cInd, xInd, yInd] = nStar
                 else:
@@ -457,7 +463,7 @@ class FgcmDeltaAper(object):
                     epsilonCcdNStarMap[bInd, cInd, xInd, yInd] = -1*ok2.size
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
-        self.fgcmPars.compEpsilonNStarMap[:] = epsilonCcdNStarMap[:]
+        self.fgcmPars.compEpsilonCcdNStarMap[:] = epsilonCcdNStarMap[:]
 
         if self.plotPath is not None:
             for j, band in enumerate(self.fgcmPars.bands):
@@ -547,6 +553,47 @@ class FgcmDeltaAper(object):
         fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
 
         return fit, ok.size
+
+    def _fitEpsilonBinned(self, mag, deltaAper, deltaAperErr, mag_min, mag_max,
+                          binSize=0.25, outlierNSig=3.0, return_binstruct=False):
+        """
+        """
+        startTime = time.time()
+
+        binStruct = dataBinner(mag, deltaAper, binSize, [mag_min, mag_max], nTrial=1)
+        u, = np.where(binStruct['N'] > np.mean(binStruct['N'][binStruct['N'] > 0])/5.)
+        binFlux = 10.**((binStruct['X'] - self.njyZp)/(-2.5))
+        fit0 = np.polyfit((2.5/np.log(10.0))/binFlux[u],
+                          binStruct['Y'][u], 1) #, w=1./binStruct['Y_ERR'][u])
+
+        # And 3sigma outlier rejection
+        flux = 10.**((mag - self.njyZp)/(-2.5))
+        resid = (deltaAper -
+                 (fit0[0]*((2.5/np.log(10.0))/flux) + fit0[1]))
+        gd, = np.where(np.abs(resid) < outlierNSig*deltaAperErr)
+
+        try:
+            binStruct = dataBinner(mag[gd], deltaAper[gd], binSize, [mag_min, mag_max], nTrial=20)
+            u, = np.where((binStruct['N'] > np.mean(binStruct['N'][binStruct['N'] > 0])/5.) &
+                          (binStruct['Y_ERR'] > 0.0))
+            binFlux = 10.**((binStruct['X'] - self.njyZp)/(-2.5))
+            fit = np.polyfit((2.5/np.log(10.0))/binFlux[u],
+                             binStruct['Y'][u], 1, w=1./binStruct['Y_ERR'][u])
+        except np.linalg.LinAlgError:
+            # Just revert to regular
+            binStruct = dataBinner(mag, deltaAper, binSize, [mag_min, mag_max])
+            u, = np.where((binStruct['N'] > np.mean(binStruct['N'][binStruct['N'] > 0])/5.) &
+                          (binStruct['Y_ERR'] > 0.0))
+            binFlux = 10.**((binStruct['X'] - self.njyZp)/(-2.5))
+            fit = np.polyfit((2.5/np.log(10.0))/binFlux[u],
+                             binStruct['Y'][u], 1, w=1./binStruct['Y_ERR'][u])
+
+        dt = time.time() - startTime
+
+        if return_binstruct:
+            return fit, np.sum(binStruct['N'][u]), binStruct[u]
+        else:
+            return fit, np.sum(binStruct['N'][u])
 
     def __getstate__(self):
         # Don't try to pickle the logger.

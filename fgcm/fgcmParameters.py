@@ -977,7 +977,7 @@ class FgcmParameters(object):
                ('COMPEPSILONMAP', 'f4', (self.compEpsilonMap.size, )),
                ('COMPEPSILONNSTARMAP', 'i4', (self.compEpsilonNStarMap.size, )),
                ('COMPEPSILONCCDMAP', 'f4', (self.compEpsilonCcdMap.size, )),
-               ('COMPEPSILONCCDNSTARMAP', 'f4', (self.compEpsilonCcdNStarMap.size, )),
+               ('COMPEPSILONCCDNSTARMAP', 'i4', (self.compEpsilonCcdNStarMap.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
                ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
