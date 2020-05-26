@@ -720,6 +720,54 @@ class FgcmChisq(object):
         # and release the lock.
         objMagStdMeanLock.release()
 
+        # Temporary, re: save reference
+        if self.fgcmStars.hasRefstars and not self.ignoreRef:
+            objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+
+            objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.fgcmStars.refMagHandle)
+            refMagErr = snmm.getArray(self.fgcmStars.refMagErrHandle)
+
+            use, = np.where(objRefIDIndex[goodStars] >= 0)
+            if use.size > 0:
+                goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndexGO] >= 0) &
+                                         ((objFlag[obsObjIDIndexGO] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+                tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
+                                                   obsBandIndexGO[goodRefObsGO]] < 90.0) &
+                                    (refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                            obsBandIndexGO[goodRefObsGO]] < 90.0))
+                if tempUse.size > 0:
+                    goodRefObsGO = goodRefObsGO[tempUse]
+
+                    tempCat = np.zeros(goodRefObsGO.size, dtype=[('obsMagStd', 'f4'),
+                                                                 ('obsMag', 'f4'),
+                                                                 ('deltaStd', 'f4'),
+                                                                 ('refMag', 'f4'),
+                                                                 ('refMagErr', 'f4'),
+                                                                 ('objRefIDIndex', 'i4'),
+                                                                 ('obsExpIndex', 'i4'),
+                                                                 ('obsBandIndex', 'i4'),
+                                                                 ('obsCCDIndex', 'i4')])
+                    tempCat['obsMagStd'] = obsMagStdGO[goodRefObsGO]
+                    try:
+                        tempCat['deltaAbsOffset'] = self.deltaAbsOffset[obsBandIndexGO[goodRefObsGO]]
+                    except AttributeError:
+                        pass
+                    tempCat['obsMag'] = obsMagGO[goodRefObsGO]
+                    tempCat['deltaStd'] = deltaStdGO[goodRefObsGO]
+                    tempCat['refMag'] = refMag[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                               obsBandIndexGO[goodRefObsGO]]
+                    tempCat['refMagErr'] = refMagErr[objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]],
+                                                     obsBandIndexGO[goodRefObsGO]]
+                    tempCat['objRefIDIndex'] = objRefIDIndex[obsObjIDIndexGO[goodRefObsGO]]
+                    tempCat['obsExpIndex'] = obsExpIndexGO[goodRefObsGO]
+                    tempCat['obsBandIndex'] = obsBandIndexGO[goodRefObsGO]
+                    tempCat['obsCCDIndex'] = obsCCDIndexGO[goodRefObsGO]
+
+                    import fitsio
+                    print('Outputting...')
+                    fitsio.write('bleargh.fits', tempCat)
+
         # this is the end of the _magWorker
 
     def _chisqWorker(self, goodStarsAndObs):
