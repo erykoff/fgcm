@@ -342,22 +342,22 @@ class FgcmStars(object):
         self.obsSecZenithHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADU: log raw ADU counts of individual observation
         ## FIXME: need to know default zeropoint?
-        self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADUErr: raw ADU counts error of individual observation
-        self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADUModelErr: modeled ADU counts error of individual observation
-        self.obsMagADUModelErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsMagADUModelErrHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsSuperStarApplied: SuperStar correction that was applied
-        self.obsSuperStarAppliedHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        self.obsSuperStarAppliedHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagStd: corrected (to standard passband) mag of individual observation
-        self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f4',syncAccess=True)
+        self.obsMagStdHandle = snmm.createArray(self.nStarObs,dtype='f8',syncAccess=True)
         if (obsX is not None and obsY is not None):
             self.hasXY = True
 
             #  obsX: x position on the CCD of the given observation
-            self.obsXHandle = snmm.createArray(self.nStarObs,dtype='f4')
+            self.obsXHandle = snmm.createArray(self.nStarObs,dtype='f8')
             #  obsY: y position on the CCD of the given observation
-            self.obsYHandle = snmm.createArray(self.nStarObs,dtype='f4')
+            self.obsYHandle = snmm.createArray(self.nStarObs,dtype='f8')
         else:
             # hasXY = False
             if self.superStarSubCCD:
@@ -388,9 +388,9 @@ class FgcmStars(object):
             # refID: matched ID of reference stars
             self.refIDHandle = snmm.createArray(self.nRefstars, dtype='i4')
             # refMag: absolute magnitudes of reference stars
-            self.refMagHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+            self.refMagHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f8')
             # refMagErr: absolute magnitude errors of reference stars
-            self.refMagErrHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
+            self.refMagErrHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f8')
 
         snmm.getArray(self.obsExpHandle)[:] = obsExp
         snmm.getArray(self.obsCCDHandle)[:] = obsCCD
@@ -649,15 +649,15 @@ class FgcmStars(object):
         # And we need to record the mean mag, error, SED slopes...
 
         #  objMagStdMean: mean standard magnitude of each object, per band
-        self.objMagStdMeanHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4',
+        self.objMagStdMeanHandle = snmm.createArray((self.nStars,self.nBands),dtype='f8',
                                                     syncAccess=True)
         #  objMagStdMeanErr: error on the mean standard mag of each object, per band
-        self.objMagStdMeanErrHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        self.objMagStdMeanErrHandle = snmm.createArray((self.nStars,self.nBands),dtype='f8')
         #  objSEDSlope: linearized approx. of SED slope of each object, per band
-        self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4',
+        self.objSEDSlopeHandle = snmm.createArray((self.nStars,self.nBands),dtype='f8',
                                                   syncAccess=True)
         #  objMagStdMeanNoChrom: mean std mag of each object, no chromatic correction, per band
-        self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars,self.nBands),dtype='f4')
+        self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars,self.nBands),dtype='f8')
 
         # note: if this takes too long it can be moved to the star computation,
         #       but it seems pretty damn fast (which may raise the question of
@@ -1136,7 +1136,7 @@ class FgcmStars(object):
         objMagStdMeanLock.release()
 
         # and make a temporary local copy of the SED
-        objSEDSlopeOI = np.zeros((objIndicesIn.size, self.nBands), dtype='f4')
+        objSEDSlopeOI = np.zeros((objIndicesIn.size, self.nBands), dtype='f8')
         objNGoodObsOI = objNGoodObs[objIndicesIn, :]
 
         # New mapping, nothing needs to be sequential, it's all configured
@@ -1221,7 +1221,7 @@ class FgcmStars(object):
         objMagStdMeanLock.release()
 
         # and make a temporary local copy of the SED
-        #objSEDSlopeOI = np.zeros((objIndicesIn.size,self.nBands),dtype='f4')
+        #objSEDSlopeOI = np.zeros((objIndicesIn.size,self.nBands),dtype='f8')
 
         # compute SED color...
         ## FIXME: make this configurable

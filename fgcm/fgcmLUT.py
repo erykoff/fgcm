@@ -791,28 +791,28 @@ class FgcmLUT(object):
         sizeTuple = (len(self.filterNames), self.pwv.size, self.o3.size,
                      self.tau.size, self.alpha.size, self.zenith.size, self.nCCDStep)
 
-        self.lutI0Handle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutI0Handle = snmm.createArray(sizeTuple,dtype='f8')
         snmm.getArray(self.lutI0Handle)[:, :, :, :, :, :, :] = \
             lutFlat['I0'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
 
-        self.lutI1Handle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutI1Handle = snmm.createArray(sizeTuple,dtype='f8')
         snmm.getArray(self.lutI1Handle)[:, :, :, :, :, :, :] = \
             lutFlat['I1'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
 
         # and read in the derivatives
 
         # create shared memory
-        self.lutDLnPwvHandle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDO3Handle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDLnTauHandle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDAlphaHandle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDSecZenithHandle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDLnPwvHandle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDO3Handle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDLnTauHandle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDAlphaHandle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDSecZenithHandle = snmm.createArray(sizeTuple,dtype='f8')
 
-        self.lutDLnPwvI1Handle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDO3I1Handle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDLnTauI1Handle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDAlphaI1Handle = snmm.createArray(sizeTuple,dtype='f4')
-        self.lutDSecZenithI1Handle = snmm.createArray(sizeTuple,dtype='f4')
+        self.lutDLnPwvI1Handle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDO3I1Handle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDLnTauI1Handle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDAlphaI1Handle = snmm.createArray(sizeTuple,dtype='f8')
+        self.lutDSecZenithI1Handle = snmm.createArray(sizeTuple,dtype='f8')
 
         snmm.getArray(self.lutDLnPwvHandle)[:, :, :, :, :, :, :] = \
             lutDerivFlat['D_LNPWV'].reshape(origSizeTuple)[usedLutFilterMark, :, :, :, :, :, :]
