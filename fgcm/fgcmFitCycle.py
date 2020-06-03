@@ -560,7 +560,7 @@ class FgcmFitCycle(object):
                 self.fgcmStars.saveStdStars(outStarFile, self.fgcmPars)
 
             # Auto-update photometric cuts
-            for i, b in enumerate(self.bands):
+            for i, b in enumerate(self.fgcmPars.bands):
                 self.fgcmConfig.expGrayPhotometricCutDict[b] = self.updatedPhotometricCut[i]
                 self.fgcmConfig.expGrayHighCutDict[b] = self.updatedHighCut[i]
 

@@ -890,7 +890,7 @@ class FgcmParameters(object):
                ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.lutFilterNames), )),
                ('BANDS', 'a%d' % (maxBandLen), (len(self.bands), )),
                ('FITBANDS', 'a%d' % (maxBandLen), (len(self.fitBands), )),
-               ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
+               # ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
                ('LNTAUUNIT', 'f8'),
                ('LNTAUSLOPEUNIT', 'f8'),
                ('ALPHAUNIT', 'f8'),
@@ -915,7 +915,7 @@ class FgcmParameters(object):
         parInfo['LUTFILTERNAMES'] = self.lutFilterNames
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
-        parInfo['NOTFITBANDS'] = self.notFitBands
+        # parInfo['NOTFITBANDS'] = self.notFitBands
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
