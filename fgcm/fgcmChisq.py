@@ -590,7 +590,10 @@ class FgcmChisq(object):
         qeSysGO = self.fgcmPars.expQESys[obsExpIndexGO]
         filterOffsetGO = self.fgcmPars.expFilterOffset[obsExpIndexGO]
 
-        obsMagGO = obsMagADU[goodObs] + 2.5*np.log10(I0GO) + qeSysGO + filterOffsetGO
+        # Explicitly update obsMagADU to float64 (internally is 32-bit)
+        # I0GO, qeSysGO, filterOffsetGO are 64 bit
+        obsMagGO = obsMagADU[goodObs].astype(np.float64) + \
+            2.5*np.log10(I0GO) + qeSysGO + filterOffsetGO
 
         if (self.fgcmGray is not None):
             # We want to apply the "CCD Gray Crunch"
@@ -619,15 +622,15 @@ class FgcmChisq(object):
                 obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
 
         # Compute the sub-selected error-squared, using model error when available
-        obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
+        obsMagErr2GO = obsMagADUModelErr[goodObs].astype(np.float64)**2.
 
         if (self.computeSEDSlopes):
             # first, compute mean mags (code same as below.  FIXME: consolidate, but how?)
 
             # make temp vars.  With memory overhead
 
-            wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-            objMagStdMeanTemp = np.zeros_like(objMagStdMean)
+            wtSum = np.zeros_like(objMagStdMean, dtype='f8')
+            objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
 
             add_at_2d(wtSum,
                    (obsObjIDIndexGO,obsBandIndexGO),
@@ -691,8 +694,8 @@ class FgcmChisq(object):
         #  indexing in the np.add.at() more difficult
 
         wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        objMagStdMeanTemp = np.zeros_like(objMagStdMean)
-        objMagStdMeanNoChromTemp = np.zeros_like(objMagStdMeanNoChrom)
+        objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
+        objMagStdMeanNoChromTemp = np.zeros_like(objMagStdMeanNoChrom, dtype='f8')
 
         add_at_2d(wtSum,
                (obsObjIDIndexGO,obsBandIndexGO),
@@ -806,7 +809,7 @@ class FgcmChisq(object):
                                        lutIndicesGO) / I0GO
 
         # Compute the sub-selected error-squared, using model error when available
-        obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
+        obsMagErr2GO = obsMagADUModelErr[goodObs].astype(np.float64)**2.
 
         obsMagStdLock.acquire()
 
