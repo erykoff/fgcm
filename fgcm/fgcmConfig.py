@@ -733,7 +733,7 @@ class FgcmConfig(object):
         # These need to be converted to lists of floats
         for i, b in enumerate(self.bands):
             configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCut[i])
-            configDict['expGrayHighCut'][b] = float(self.expGrayHighCut[i])
+            configDict['expGrayHighCutDict'][b] = float(self.expGrayHighCut[i])
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)

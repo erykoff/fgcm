@@ -278,25 +278,25 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo()
 
         # and make the new parameter arrays
-        self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.alphaStd
-        self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.o3Std
-        self.parLnTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float32) + fgcmLUT.lnTauStd
-        self.parLnTauSlope = np.zeros(self.campaignNights.size,dtype=np.float32)
+        self.parAlpha = np.zeros(self.campaignNights.size,dtype=np.float64) + fgcmLUT.alphaStd
+        self.parO3 = np.zeros(self.campaignNights.size,dtype=np.float64) + fgcmLUT.o3Std
+        self.parLnTauIntercept = np.zeros(self.campaignNights.size,dtype=np.float64) + fgcmLUT.lnTauStd
+        self.parLnTauSlope = np.zeros(self.campaignNights.size,dtype=np.float64)
         # these we will always have, won't always fit
-        self.parLnPwvIntercept = np.zeros(self.campaignNights.size, dtype=np.float32) + fgcmLUT.lnPwvStd
-        self.parLnPwvSlope = np.zeros(self.campaignNights.size, dtype=np.float32)
-        self.parLnPwvQuadratic = np.zeros(self.campaignNights.size, dtype=np.float32)
+        self.parLnPwvIntercept = np.zeros(self.campaignNights.size, dtype=np.float64) + fgcmLUT.lnPwvStd
+        self.parLnPwvSlope = np.zeros(self.campaignNights.size, dtype=np.float64)
+        self.parLnPwvQuadratic = np.zeros(self.campaignNights.size, dtype=np.float64)
 
         # parameters with per-epoch values
-        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float64)
+        self.parSuperStarFlat = np.zeros((self.nEpochs,self.nLUTFilter,self.nCCD,self.superStarNPar),dtype=np.float32)
         # The first term should be 1.0 with new flux units
         self.parSuperStarFlat[:, :, :, 0] = 1.0
 
         # parameters with per-wash values
 
         # We always have these parameters, even if we don't fit them
-        self.parQESysIntercept = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
-        self.compQESysSlope = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float32)
+        self.parQESysIntercept = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float64)
+        self.compQESysSlope = np.zeros((self.nBands, self.nWashIntervals), dtype=np.float64)
         self.compQESysSlopeApplied = np.zeros_like(self.compQESysSlope)
 
         # parameters for "absolute" offsets (and relative between filters)
@@ -890,7 +890,7 @@ class FgcmParameters(object):
                ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.lutFilterNames), )),
                ('BANDS', 'a%d' % (maxBandLen), (len(self.bands), )),
                ('FITBANDS', 'a%d' % (maxBandLen), (len(self.fitBands), )),
-               ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
+               # ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
                ('LNTAUUNIT', 'f8'),
                ('LNTAUSLOPEUNIT', 'f8'),
                ('ALPHAUNIT', 'f8'),
@@ -915,7 +915,7 @@ class FgcmParameters(object):
         parInfo['LUTFILTERNAMES'] = self.lutFilterNames
         parInfo['BANDS'] = self.bands
         parInfo['FITBANDS'] = self.fitBands
-        parInfo['NOTFITBANDS'] = self.notFitBands
+        # parInfo['NOTFITBANDS'] = self.notFitBands
 
         parInfo['HASEXTERNALPWV'] = self.hasExternalPwv
         if (self.hasExternalPwv):
@@ -1052,11 +1052,11 @@ class FgcmParameters(object):
         pwvIndex = np.clip(np.searchsorted(pwvTable['MJD'],self.expMJD),0,pwvTable.size-1)
         # this will be True or False...
         self.externalPwvFlag[:] = (np.abs(pwvTable['MJD'][pwvIndex] - self.expMJD) < externalPwvDeltaT)
-        self.externalLnPwv = np.zeros(self.nExp,dtype=np.float32)
+        self.externalLnPwv = np.zeros(self.nExp,dtype=np.float64)
         self.externalLnPwv[self.externalPwvFlag] = np.log(np.clip(pwvTable['PWV'][pwvIndex[self.externalPwvFlag]], self.pwvRange[0], self.pwvRange[1]))
 
         # and new PWV scaling pars!
-        self.parExternalLnPwvOffset = np.zeros(self.nCampaignNights,dtype=np.float32)
+        self.parExternalLnPwvOffset = np.zeros(self.nCampaignNights,dtype=np.float64)
         self.parExternalLnPwvScale = 1.0
 
         match, = np.where(self.externalPwvFlag)
@@ -1382,8 +1382,8 @@ class FgcmParameters(object):
         else:
             units = np.ones(self.nFitPars)
 
-        parLow = np.zeros(self.nFitPars,dtype=np.float32)
-        parHigh = np.zeros(self.nFitPars,dtype=np.float32)
+        parLow = np.zeros(self.nFitPars,dtype=np.float64)
+        parHigh = np.zeros(self.nFitPars,dtype=np.float64)
 
         if not self.useRetrievedPwv:
             u = units[self.parLnPwvInterceptLoc:
