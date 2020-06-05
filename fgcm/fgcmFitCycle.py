@@ -106,7 +106,7 @@ class FgcmFitCycle(object):
         self._setupWithFits()
         self.run()
 
-    def setStars(self, fgcmStars):
+    def setStars(self, fgcmStars, fgcmPars):
         """
         Record the star information.  This is a separate method to allow
          for memory to be cleared.
@@ -115,10 +115,13 @@ class FgcmFitCycle(object):
         ----------
         fgcmStars: FgcmStars
            Object with star information
+        fgcmPars: FgcmParameters
+           Parameter information
         """
         # this has to be done outside for memory issues
 
         self.fgcmStars = fgcmStars
+        self.fgcmStars.prepStars(fgcmPars)
 
     def setLUT(self, fgcmLUT):
         """
@@ -170,6 +173,7 @@ class FgcmFitCycle(object):
         # Read in the stars
         self.fgcmStars = FgcmStars(self.fgcmConfig)
         self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
+        self.fgcmStars.prepStars(self.fgcmPars)
 
         self.finishSetup()
 
@@ -560,7 +564,7 @@ class FgcmFitCycle(object):
                 self.fgcmStars.saveStdStars(outStarFile, self.fgcmPars)
 
             # Auto-update photometric cuts
-            for i, b in enumerate(self.bands):
+            for i, b in enumerate(self.fgcmPars.bands):
                 self.fgcmConfig.expGrayPhotometricCutDict[b] = self.updatedPhotometricCut[i]
                 self.fgcmConfig.expGrayHighCutDict[b] = self.updatedHighCut[i]
 
