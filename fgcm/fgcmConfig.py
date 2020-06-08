@@ -732,8 +732,8 @@ class FgcmConfig(object):
         # And update the photometric cuts...
         # These need to be converted to lists of floats
         for i, b in enumerate(self.bands):
-            configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCut[i])
-            configDict['expGrayHighCutDict'][b] = float(self.expGrayHighCut[i])
+            configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCutDict[b])
+            configDict['expGrayHighCutDict'][b] = float(self.expGrayHighCutDict[b])
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)

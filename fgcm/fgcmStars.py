@@ -532,17 +532,6 @@ class FgcmStars(object):
                 self.fgcmLog.info('Reserving %d stars from the fit.' % (nReserve))
                 objFlag[reserve] |= objFlagDict['RESERVED']
 
-                # If we have a "small" number of reference stars,
-                # these should not be held in reserve
-                if self.hasRefstars:
-                    if self.nRefstars < 100:
-                        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-                        cancel, = np.where(((objFlag & objFlagDict['RESERVED']) > 0) &
-                                           (objRefIDIndex >= 0))
-                        if cancel.size > 0:
-                            objFlag[cancel] &= ~objFlagDict['RESERVED']
-                            self.fgcmLog.info('Cancelling RESERVED flag on %d reference stars' % (cancel.size))
-
         self._needToComputeNobs = computeNobs
         self.starsLoaded = True
 
@@ -655,6 +644,18 @@ class FgcmStars(object):
             if not self.quietMode:
                 self.fgcmLog.info('Done matching reference stars in %.1f seconds.' %
                                   (time.time() - startTime))
+
+            # If we have a "small" number of reference stars,
+            # these should not be held in reserve
+            if self.reserveFraction > 0.0 and self.nRefStars < 100:
+                objFlag = snmm.getArray(self.objFlagHandle)
+                objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+                cancel, = np.where(((objFlag & objFlagDict['RESERVED']) > 0) &
+                                   (objRefIDIndex >= 0))
+                if cancel.size > 0:
+                    objFlag[cancel] &= ~objFlagDict['RESERVED']
+                    self.fgcmLog.info('Cancelling RESERVED flag on %d reference stars' % (cancel.size))
+
 
         # And we need to record the mean mag, error, SED slopes...
 
