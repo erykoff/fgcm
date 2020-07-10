@@ -116,6 +116,7 @@ class FgcmApplyZeropoints(object):
         # Read in the stars
         self.fgcmStars = FgcmStars(self.fgcmConfig)
         self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
+        self.fgcmStars.prepStars(self.fgcmPars)
 
         self.fgcmZpsToApply = FgcmZpsToApply(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
         self.fgcmZpsToApply.loadZeropointsFromFits()

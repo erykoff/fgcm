@@ -696,16 +696,17 @@ class FgcmStars(object):
         # Check the airmass range
         if ((np.min(obsSecZenith) < self.secZenithRange[0]) |
             (np.max(obsSecZenith) > self.secZenithRange[1])):
-            self.fgcmLog.warn("Input stars have a secZenith that is out of range of LUT."
-                              "Observed range is  %.2f to %.2f, and LUT goes from %.2f to %.2f" %
+            self.fgcmLog.warn("Input stars have a secZenith that is out of range of LUT. "
+                              "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" %
                               (np.min(obsSecZenith), np.max(obsSecZenith),
                                self.secZenithRange[0], self.secZenithRange[1]))
             bad, = np.where((obsSecZenith <= self.secZenithRange[0]) |
                             (obsSecZenith >= self.secZenithRange[1]))
-            self.fgcmLog.warn("Clipping %d observations out of airmass range" % (bad.size))
+            self.fgcmLog.warn("Marking %d observations out of airmass range as BAD_AIRMASS" % (bad.size))
             obsSecZenith[bad] = np.clip(obsSecZenith[bad],
-                                        obsSecZenithRange[0],
-                                        obsSecZenithRange[1])
+                                        self.secZenithRange[0],
+                                        self.secZenithRange[1])
+            obsFlag[bad] |= obsFlagDict['BAD_AIRMASS']
 
         if not self.quietMode:
             self.fgcmLog.info('Computed secZenith in %.1f seconds.' %
@@ -1782,7 +1783,7 @@ class FgcmStars(object):
         for i, goodBand in enumerate(goodBands):
             hdr['BAND%d' % (i)] = goodBand
 
-        fitsio.write(starFile, self.retrieveStdStarCatalog(fgcmPars), clobber=True, header=hdr)
+        fitsio.write(starFile, stdStars, clobber=True, header=hdr)
 
     def retrieveStdStarCatalog(self, fgcmPars):
         """
