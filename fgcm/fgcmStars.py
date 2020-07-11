@@ -647,7 +647,7 @@ class FgcmStars(object):
 
             # If we have a "small" number of reference stars,
             # these should not be held in reserve
-            if self.reserveFraction > 0.0 and self.nRefStars < 100:
+            if self.reserveFraction > 0.0 and self.nRefStars == 1:
                 objFlag = snmm.getArray(self.objFlagHandle)
                 objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
                 cancel, = np.where(((objFlag & objFlagDict['RESERVED']) > 0) &
