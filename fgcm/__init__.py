@@ -1,5 +1,3 @@
-from __future__ import division, absolute_import, print_function
-
 import os
 
 os.environ['MKL_NUM_THREADS'] = '1'

@@ -1,26 +1,14 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import esutil
 import os
 
-from .fgcmUtilities import _pickle_method
-
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
-
-import types
-try:
-    import copy_reg as copyreg
-except ImportError:
-    import copyreg
 
 import multiprocessing
 from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-copyreg.pickle(types.MethodType, _pickle_method)
 
 class FgcmZpsToApply(object):
     """
