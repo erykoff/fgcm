@@ -35,6 +35,17 @@ from .fgcmUtilities import MaxFitIterations
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
+import multiprocessing
+import platform
+
+
+# Fix for multiprocessing/matplotlib but on python <= 3.7 and macos >= 10.15
+if len(platform.mac_ver()[0]) > 0 and sys.version_info.major == 3 and sys.version_info.minor < 8:
+    parts = platform.mac_ver()[0].split('.')
+    if (int(parts[0]) > 10) or (int(parts[0]) == 10 and int(parts[0]) >= 15):
+        multiprocessing.set_start_method('forkserver')
+
+
 class FgcmFitCycle(object):
     """
     Class which runs the main FGCM fitter.
@@ -86,6 +97,10 @@ class FgcmFitCycle(object):
         self.initialCycle = False
         if (self.fgcmConfig.cycleNumber == 0):
             self.initialCycle = True
+
+        self.finalCycle = False
+        if (not self.fgcmConfig.resetParameters and self.fgcmConfig.maxIter == 0):
+            self.finalCycle = True
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -393,7 +408,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing FgcmChisq all + reserve stars')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
 
-        if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
+        # if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
+        if self.finalCycle and self.fgcmStars.hasRefstars:
             # Redo absolute offset here for total consistency with final
             # parameters and values
             if not self.quietMode:
@@ -471,36 +487,40 @@ class FgcmFitCycle(object):
 
 
         # Compute SuperStar Flats
-        self.fgcmLog.debug('FitCycle computing SuperStarFlats')
-        superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
-        superStarFlat.computeSuperStarFlats()
+        if not self.finalCycle:
+            self.fgcmLog.debug('FitCycle computing SuperStarFlats')
+            superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+            superStarFlat.computeSuperStarFlats()
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After computing superstar flats'))
 
         # Compute Aperture Corrections
-        self.fgcmLog.debug('FitCycle computing ApertureCorrections')
-        aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
-        aperCorr.computeApertureCorrections()
+        if not self.finalCycle:
+            self.fgcmLog.debug('FitCycle computing ApertureCorrections')
+            aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+            aperCorr.computeApertureCorrections()
 
-        if not self.quietMode:
-            self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
+            if not self.quietMode:
+                self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
         # Compute mirror chromaticity
-        if self.fgcmConfig.fitMirrorChromaticity:
+        if not self.finalCycle and self.fgcmConfig.fitMirrorChromaticity:
             self.fgcmLog.debug("FitCycle computing mirror chromaticity")
             mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
             mirChrom.computeMirrorChromaticity()
 
-        self.fgcmLog.debug('FitCycle computing qe sys slope')
-        self.fgcmQeSysSlope.computeQeSysSlope('final')
-        self.fgcmQeSysSlope.plotQeSysRefStars('final')
+        if not self.finalCycle:
+            self.fgcmLog.debug('FitCycle computing qe sys slope')
+            self.fgcmQeSysSlope.computeQeSysSlope('final')
+            self.fgcmQeSysSlope.plotQeSysRefStars('final')
 
-        if not self.quietMode:
-            self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
+            if not self.quietMode:
+                self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
 
-        # Compute mag error model (if configured)
-        self.fgcmModelMagErrs.computeMagErrorModel('postfit')
+        if not self.finalCycle:
+            # Compute mag error model (if configured)
+            self.fgcmModelMagErrs.computeMagErrorModel('postfit')
 
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
