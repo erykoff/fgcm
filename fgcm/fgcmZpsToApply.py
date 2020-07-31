@@ -38,6 +38,7 @@ class FgcmZpsToApply(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
         self.quietMode = fgcmConfig.quietMode
+        self.hasDeltaMagBkg = fgcmStars.hasDeltaMagBkg
 
         self.I10StdBand = fgcmConfig.I10StdBand
 
@@ -61,10 +62,15 @@ class FgcmZpsToApply(object):
 
         zps = fitsio.read(self.zpsToApplyFile, ext='ZPTS', lower=True)
 
+        if self.hasDeltaMagBkg:
+            deltaMagOffset = zps['fgcm_deltabkgmag']
+        else:
+            deltaMagOffset = 0.0
+
         self.loadZeropoints(zps[self.expField.lower()],
                             zps[self.ccdField.lower()],
                             zps['fgcm_flag'],
-                            zps['fgcm_zpt'],
+                            zps['fgcm_zpt'] + deltaMagOffset,
                             zps['fgcm_i10'])
 
         del zps

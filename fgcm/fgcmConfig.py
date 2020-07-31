@@ -140,6 +140,8 @@ class FgcmConfig(object):
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
+    deltaMagBkgOffsetPercentile = ConfigField(float, default=0.25)
+    deltaMagBkgPerCcd = ConfigField(bool, default=True)
     sigFgcmMaxErr = ConfigField(float, default=0.01)
     sigFgcmMaxEGrayDict = ConfigField(dict, default={})
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)

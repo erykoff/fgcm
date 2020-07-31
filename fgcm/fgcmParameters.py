@@ -325,6 +325,9 @@ class FgcmParameters(object):
         # Add in the mirror coating...
         self.compMirrorChromaticity = np.zeros((self.nLUTFilter, self.nCoatingIntervals + 1))
 
+        # And median SED slopes
+        self.compMedianSedSlope = np.zeros(self.nBands, dtype=np.float64)
+
         ## FIXME: need to completely refactor
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if (self.pwvFile is not None):
@@ -371,6 +374,8 @@ class FgcmParameters(object):
         self.compExpGray = np.zeros(self.nExp,dtype='f8')
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
         self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
+
+        self.compExpDeltaMagBkg = np.zeros(self.nExp, dtype='f8')
 
         # and sigFgcm
         self.compSigFgcm = np.zeros(self.nBands,dtype='f8')
@@ -437,6 +442,7 @@ class FgcmParameters(object):
         self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
         self.compMirrorChromaticity = inParams['COMPMIRRORCHROMATICITY'][0].reshape((self.nLUTFilter, self.nCoatingIntervals + 1))
         self.mirrorChromaticityPivot = np.atleast_1d(inParams['MIRRORCHROMATICITYPIVOT'][0])
+        self.compMedianSedSlope = np.atleast_1d(inParams['COMPMEDIANSEDSLOPE'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
         if self.hasExternalPwv:
@@ -471,6 +477,8 @@ class FgcmParameters(object):
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
+
+        self.compExpDeltaMagBkg = np.atleast_1d(inParams['COMPEXPDELTAMAGBKG'][0])
 
         self.compSigFgcm = np.atleast_1d(inParams['COMPSIGFGCM'][0])
         self.compSigmaCal = np.atleast_1d(inParams['COMPSIGMACAL'][0])
@@ -937,6 +945,7 @@ class FgcmParameters(object):
                ('COMPREFSIGMA', 'f8', (self.compRefSigma.size, )),
                ('COMPMIRRORCHROMATICITY', 'f8', (self.compMirrorChromaticity.size, )),
                ('MIRRORCHROMATICITYPIVOT', 'f8', (self.mirrorChromaticityPivot.size, )),
+               ('COMPMEDIANSEDSLOPE', 'f8', (self.compMedianSedSlope.size, )),
                ('COMPAPERCORRPIVOT', 'f8', (self.compAperCorrPivot.size, )),
                ('COMPAPERCORRSLOPE', 'f8', (self.compAperCorrSlope.size, )),
                ('COMPAPERCORRSLOPEERR', 'f8', (self.compAperCorrSlopeErr.size, )),
@@ -947,6 +956,7 @@ class FgcmParameters(object):
                ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
                ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
                ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPEXPDELTAMAGBKG', 'f8', (self.compExpDeltaMagBkg.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
                ('COMPSIGMACAL', 'f8', (self.compSigmaCal.size, )),
@@ -985,6 +995,7 @@ class FgcmParameters(object):
         pars['COMPREFSIGMA'][:] = self.compRefSigma
         pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.flatten()
         pars['MIRRORCHROMATICITYPIVOT'][:] = self.mirrorChromaticityPivot
+        pars['COMPMEDIANSEDSLOPE'][:] = self.compMedianSedSlope
 
         if (self.hasExternalPwv):
             pars['PAREXTERNALLNPWVSCALE'] = self.parExternalLnPwvScale
@@ -1008,6 +1019,8 @@ class FgcmParameters(object):
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
+
+        pars['COMPEXPDELTAMAGBKG'][:] = self.compExpDeltaMagBkg
 
         pars['COMPSIGFGCM'][:] = self.compSigFgcm
         pars['COMPSIGMACAL'][:] = self.compSigmaCal
