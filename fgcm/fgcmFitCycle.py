@@ -272,6 +272,10 @@ class FgcmFitCycle(object):
             self.fgcmLog.debug('FitCycle is running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
 
+        # Add in background offset terms if necessary
+        if self.fgcmStars.hasDeltaMagBkg:
+            self.fgcmGray.computeCCDAndExpDeltaMagBkg()
+
         # Flag stars with too few exposures
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.debug('FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
@@ -288,6 +292,9 @@ class FgcmFitCycle(object):
         if (not self.initialCycle):
             # get the SED from the chisq function
             self.fgcmChisq(parArray,computeSEDSlopes=True,includeReserve=True)
+
+            # Compute median SED slopes and apply
+            self.fgcmStars.fillMissingSedSlopes(self.fgcmPars)
 
             # flag stars that are outside the color cuts
             self.fgcmStars.performColorCuts()
@@ -308,6 +315,9 @@ class FgcmFitCycle(object):
             # run the bright observation algorithm, computing SEDs
             brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
             brightObs.brightestObsMeanMag(computeSEDSlopes=True)
+
+            # Compute median SED slopes and apply
+            self.fgcmStars.fillMissingSedSlopes(self.fgcmPars)
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('FitCycle Post Bright-Obs'))
@@ -438,6 +448,7 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
         self.fgcmGray.computeExpGrayColorSplit()
+
         # We can compute this now...
         self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCuts()
         if not self.quietMode:

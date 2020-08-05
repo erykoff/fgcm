@@ -145,6 +145,9 @@ class FgcmApplyZeropoints(object):
         if (not self.setupComplete):
             raise RuntimeError("Must complete applyZeropoints setup first!")
 
+        if self.fgcmStars.hasDeltaMagBkg:
+            self.fgcmStars.applyDeltaMagBkg()
+
         # Select good exposures based on the flag cuts
         # Can do this only for exposures that are ALL above the threshold.
 
@@ -168,10 +171,13 @@ class FgcmApplyZeropoints(object):
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
 
-        # Compute m^std and <m^std> using the zeropoints, no chromatic
-        #  corrections, no error modeling.
+        # Compute m^std and <m^std> using the zeropoints, compute SEDs,
+        # no error modeling.
 
         self.fgcmZpsToApply.applyZeropoints()
+
+        # Compute median SED slopes and apply
+        self.fgcmStars.fillMissingSedSlopes(self.fgcmPars)
 
         # Apply any color cuts
         self.fgcmStars.performColorCuts()

@@ -521,6 +521,7 @@ class FgcmChisq(object):
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
         obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsDeltaStd = snmm.getArray(self.fgcmStars.obsDeltaStdHandle)
 
         # and fgcmGray stuff (if desired)
         if (self.fgcmGray is not None):
@@ -662,6 +663,8 @@ class FgcmChisq(object):
         obsMagStdLock.acquire()
 
         obsMagStd[goodObs] = obsMagGO + deltaStdGO
+        obsDeltaStd[goodObs] = deltaStdGO
+
         # this is cut here
         obsMagStdGO = obsMagStd[goodObs]
 
