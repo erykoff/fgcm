@@ -1,6 +1,3 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import scipy.linalg as linalg
 import os
@@ -9,22 +6,11 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 
-from .fgcmUtilities import _pickle_method
-
-
-import types
-try:
-    import copy_reg as copyreg
-except ImportError:
-    import copyreg
-
 import multiprocessing
 from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-copyreg.pickle(types.MethodType, _pickle_method)
 
 class FgcmRetrieval(object):
     """

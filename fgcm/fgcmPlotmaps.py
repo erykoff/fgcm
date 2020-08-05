@@ -1,5 +1,3 @@
-from __future__ import division, absolute_import, print_function
-
 import os
 import matplotlib
 from collections import OrderedDict as odict
