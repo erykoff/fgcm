@@ -272,7 +272,7 @@ class FgcmFitCycle(object):
             self.fgcmLog.debug('FitCycle is running selectGoodExposures()')
             self.expSelector.selectGoodExposures()
 
-        # Add in background offset terms if necessary
+        # Add in local background offset terms if necessary
         if self.fgcmStars.hasDeltaMagBkg:
             self.fgcmGray.computeCCDAndExpDeltaMagBkg()
 
@@ -418,7 +418,6 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing FgcmChisq all + reserve stars')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True)
 
-        # if self.fgcmConfig.maxIter == 0 and self.fgcmStars.hasRefstars:
         if self.finalCycle and self.fgcmStars.hasRefstars:
             # Redo absolute offset here for total consistency with final
             # parameters and values
@@ -496,18 +495,16 @@ class FgcmFitCycle(object):
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
         #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray)
 
-
         # Compute SuperStar Flats
         if not self.finalCycle:
             self.fgcmLog.debug('FitCycle computing SuperStarFlats')
             superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
             superStarFlat.computeSuperStarFlats()
 
-        if not self.quietMode:
-            self.fgcmLog.info(getMemoryString('After computing superstar flats'))
+            if not self.quietMode:
+                self.fgcmLog.info(getMemoryString('After computing superstar flats'))
 
-        # Compute Aperture Corrections
-        if not self.finalCycle:
+            # Compute Aperture Corrections
             self.fgcmLog.debug('FitCycle computing ApertureCorrections')
             aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
             aperCorr.computeApertureCorrections()
@@ -515,13 +512,13 @@ class FgcmFitCycle(object):
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
 
-        # Compute mirror chromaticity
-        if not self.finalCycle and self.fgcmConfig.fitMirrorChromaticity:
-            self.fgcmLog.debug("FitCycle computing mirror chromaticity")
-            mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
-            mirChrom.computeMirrorChromaticity()
+            # Compute mirror chromaticity
+            if self.fgcmConfig.fitMirrorChromaticity:
+                self.fgcmLog.debug("FitCycle computing mirror chromaticity")
+                mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                mirChrom.computeMirrorChromaticity()
 
-        if not self.finalCycle:
+            # Compute QE sys slope
             self.fgcmLog.debug('FitCycle computing qe sys slope')
             self.fgcmQeSysSlope.computeQeSysSlope('final')
             self.fgcmQeSysSlope.plotQeSysRefStars('final')
@@ -529,7 +526,6 @@ class FgcmFitCycle(object):
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
 
-        if not self.finalCycle:
             # Compute mag error model (if configured)
             self.fgcmModelMagErrs.computeMagErrorModel('postfit')
 
