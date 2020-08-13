@@ -1,6 +1,3 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import os
 import sys
@@ -71,6 +68,7 @@ class FgcmZeropoints(object):
         self.expGrayRecoverCut = fgcmConfig.expGrayRecoverCut
         self.expGrayErrRecoverCut = fgcmConfig.expGrayErrRecoverCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
+        self.deltaMagBkgPerCcd = fgcmConfig.deltaMagBkgPerCcd
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
@@ -110,6 +108,7 @@ class FgcmZeropoints(object):
            'FGCM_FILTER': Delta-zeropoint due to the filter offset
            'FGCM_FLAT': Delta-zeropoint due to superStarFlat
            'FGCM_APERCORR': Delta-zeropoint due to aperture correction
+           'FGCM_DELTAMAGBKG': Delta-zeropoint due to background offset correction
            'FGCM_CTRANS': Transmission curve adjustment constant
            'EXPTIME': Exposure time (seconds)
            'FILTERNAME': Filter name
@@ -126,6 +125,7 @@ class FgcmZeropoints(object):
 
         # first, we need to get relevant quantities from shared memory.
         expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
+        expDeltaStd = snmm.getArray(self.fgcmGray.expDeltaStdHandle)
         expGrayErr = snmm.getArray(self.fgcmGray.expGrayErrHandle)
         expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
         expNGoodCCDs = snmm.getArray(self.fgcmGray.expNGoodCCDsHandle)
@@ -135,6 +135,7 @@ class FgcmZeropoints(object):
         expGrayRMSColorSplit = snmm.getArray(self.fgcmGray.expGrayRMSColorSplitHandle)
 
         ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
+        ccdDeltaStd = snmm.getArray(self.fgcmGray.ccdDeltaStdHandle)
         ccdGrayRMS = snmm.getArray(self.fgcmGray.ccdGrayRMSHandle)
         ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
         ccdNGoodStars = snmm.getArray(self.fgcmGray.ccdNGoodStarsHandle)
@@ -192,6 +193,8 @@ class FgcmZeropoints(object):
                       ('FGCM_FILTER','f8'),
                       ('FGCM_FLAT','f8'),
                       ('FGCM_APERCORR','f8'),
+                      ('FGCM_DELTAMAGBKG', 'f8'),
+                      ('FGCM_DELTACHROM', 'f8'),
                       ('FGCM_CTRANS', 'f4'),
                       ('EXPTIME','f4'),
                       ('FILTERNAME', 'a%d' % (maxFilterLen)),
@@ -252,6 +255,15 @@ class FgcmZeropoints(object):
             zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.ccdApertureCorrection[zpExpIndex, zpCCDIndex]
         else:
             zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
+
+        # Fill in the background correction
+        ccdDeltaMagBkg = snmm.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
+        if self.deltaMagBkgPerCcd:
+            ccdDeltaMagBkg = snmm.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
+            zpStruct['FGCM_DELTAMAGBKG'][:] = ccdDeltaMagBkg[zpExpIndex, zpCCDIndex]
+        else:
+            expDeltaMagBkg = snmm.getArray(self.fgcmGray.expDeltaMagBkgHandle)
+            zpStruct['FGCM_DELTAMAGBKG'][:] = expDeltaMagBkg[zpExpIndex]
 
         # Fill in the transmission adjustment constant
         zpStruct['FGCM_CTRANS'][:] = self.fgcmPars.expCTrans[zpExpIndex]
@@ -314,10 +326,18 @@ class FgcmZeropoints(object):
                                                          self.fgcmPars.expPmb[zpExpIndex],
                                                          lutIndices) / zpStruct['FGCM_I0'][:]
 
+        bad, = np.where((~np.isfinite(zpStruct['FGCM_I0'])) |
+                        (~np.isfinite(zpStruct['FGCM_I10'])))
+        if bad.size > 0:
+            self.fgcmLog.warn("There are %d ccds with bad I0/I10 values" % (bad.size))
+            zpStruct['FGCM_I0'][bad] = self.illegalValue
+            zpStruct['FGCM_I10'][bad] = self.illegalValue
+
         # Set the tilings, gray values, and zptvar
 
         zpStruct['FGCM_TILINGS'][:] = self.illegalValue
         zpStruct['FGCM_GRY'][:] = self.illegalValue
+        zpStruct['FGCM_DELTACHROM'][:] = self.illegalValue
         zpStruct['FGCM_ZPTVAR'][:] = self.illegalValue
 
         goodCCD, = np.where((ccdNGoodStars[zpExpIndex,zpCCDIndex] >=
@@ -328,6 +348,8 @@ class FgcmZeropoints(object):
                                                             zpCCDIndex[goodCCD]]
         zpStruct['FGCM_GRY'][goodCCD] = ccdGray[zpExpIndex[goodCCD],
                                                 zpCCDIndex[goodCCD]]
+        zpStruct['FGCM_DELTACHROM'][goodCCD] = ccdDeltaStd[zpExpIndex[goodCCD],
+                                                         zpCCDIndex[goodCCD]]
         zpStruct['FGCM_ZPTVAR'][goodCCD] = ccdGrayErr[zpExpIndex[goodCCD],
                                                       zpCCDIndex[goodCCD]]**2.
 
@@ -356,6 +378,7 @@ class FgcmZeropoints(object):
 
         zpStruct['FGCM_TILINGS'][badCCDGoodExp] = expNGoodTilings[zpExpIndex[badCCDGoodExp]]
         zpStruct['FGCM_GRY'][badCCDGoodExp] = expGray[zpExpIndex[badCCDGoodExp]]
+        zpStruct['FGCM_DELTACHROM'][badCCDGoodExp] = expDeltaStd[zpExpIndex[badCCDGoodExp]]
         # And fill in the chebyshev parameters if necessary
         if self.outputFgcmcalZpts and np.any(self.ccdGraySubCCD):
             # We need to alter the gray parameters to record the constant (interpolated)
@@ -445,6 +468,7 @@ class FgcmZeropoints(object):
                             (zpStruct['FGCM_DUST'][okZpIndex] > self.illegalValue) &
                             (zpStruct['FGCM_FILTER'][okZpIndex] > self.illegalValue) &
                             (zpStruct['FGCM_APERCORR'][okZpIndex] > self.illegalValue) &
+                            (zpStruct['FGCM_DELTAMAGBKG'][okZpIndex] > self.illegalValue) &
                             (zpStruct['FGCM_GRY'][okZpIndex] > self.illegalValue))
 
         okCCDZpIndex = okZpIndex[okCCDZpIndexFlag]
@@ -478,6 +502,7 @@ class FgcmZeropoints(object):
                              (zpStruct['FGCM_DUST'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_FILTER'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_APERCORR'][mehZpIndex] > self.illegalValue) &
+                             (zpStruct['FGCM_DELTAMAGBKG'][mehZpIndex] > self.illegalValue) &
                              (zpStruct['FGCM_GRY'][mehZpIndex] > self.illegalValue) &
                              (ccdNGoodStars[zpExpIndex[mehZpIndex],zpCCDIndex[mehZpIndex]] >=
                               self.minStarPerCCD) &
@@ -630,6 +655,7 @@ class FgcmZeropoints(object):
                 zpStruct['FGCM_DUST'][indices] +
                 zpStruct['FGCM_FILTER'][indices] +  # includes throughput correction
                 zpStruct['FGCM_APERCORR'][indices] +
+                zpStruct['FGCM_DELTAMAGBKG'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
                 self.zptABNoThroughput +
                 grayValue)
@@ -703,48 +729,6 @@ class FgcmZeropoints(object):
         zptChebPars[:, :] = (zptChebPars.T * 10.**(self._computeZpt(zpStruct, zpIndex, includeFlat=False, includeGray=includeGray) / (-2.5))).T
 
         return zptChebPars, zptChebSstarPars
-
-    #def _combineChebyshevPolynomials(self, xSize, ySize, pars1, pars2):
-    #    """
-    #    Combine two chebyshev 2d fields empirically
-
-    #    parameters
-    #    ----------
-    #    xSize: int
-    #       size in x direction
-    #    ySize: int
-    #       size in y direction
-    #    pars1: float array, (order1 + 1), (order1 + 1)
-    #       chebyshev parameters for first polynomial
-    #    pars2: float array, (order2 + 1), (order2 + 1)
-    #       chebyshev parameters for second polynomial
-
-    #    returns
-    #    -------
-    #    pars: float array (self.nChebPar)
-    #    """
-
-        # Empirically combine two sets of chebyshev polynomials...
-        # self.nChebPar is number of parameters (order is sqrt(nChebPar) - 1)
-        # We are not going to require triangularity because of the combination
-        # might be better served with higher order terms
-        # self.combineChebTriangular whether it is triangular.
-
-    #    order = int(np.sqrt(self.nChebPar)) - 1
-
-    #    xPos = np.random.rand(self.combineNStar) * xSize
-    #    yPos = np.random.rand(self.combineNStar) * ySize
-
-    #    field1 = Cheb2dField(xSize, ySize, pars1)
-    #    value1 = field1.evaluate(xPos, yPos)
-    #    field2 = Cheb2dField(xSize, ySize, pars2)
-    #    value2 = field2.evaluate(xPos, yPos)
-
-    #    value = value1 * value2
-
-    #    field = Cheb2dField.fit(xSize, ySize, order, xPos, yPos, value, triangular=False)
-
-    #    return field.pars.flatten()
 
     def _computeZptErr(self,zpStruct,zpExpIndex,zpIndex):
         """

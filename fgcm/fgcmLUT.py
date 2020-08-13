@@ -1,6 +1,3 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import scipy.interpolate as interpolate
 import scipy.integrate as integrate

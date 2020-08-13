@@ -1,6 +1,3 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import os
 import sys
@@ -143,6 +140,8 @@ class FgcmConfig(object):
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
     maxIter = ConfigField(int, default=50)
+    deltaMagBkgOffsetPercentile = ConfigField(float, default=0.25)
+    deltaMagBkgPerCcd = ConfigField(bool, default=False)
     sigFgcmMaxErr = ConfigField(float, default=0.01)
     sigFgcmMaxEGrayDict = ConfigField(dict, default={})
     ccdGrayMaxStarErr = ConfigField(float, default=0.10)
@@ -732,8 +731,8 @@ class FgcmConfig(object):
         # And update the photometric cuts...
         # These need to be converted to lists of floats
         for i, b in enumerate(self.bands):
-            configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCut[i])
-            configDict['expGrayHighCutDict'][b] = float(self.expGrayHighCut[i])
+            configDict['expGrayPhotometricCutDict'][b] = float(self.expGrayPhotometricCutDict[b])
+            configDict['expGrayHighCutDict'][b] = float(self.expGrayHighCutDict[b])
 
         with open(fileName,'w') as f:
             yaml.dump(configDict, stream=f)

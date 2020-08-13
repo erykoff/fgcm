@@ -1,6 +1,3 @@
-from __future__ import division, absolute_import, print_function
-from builtins import range
-
 import numpy as np
 import os
 import sys
@@ -73,6 +70,7 @@ class FgcmGray(object):
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
+        self.deltaMagBkgOffsetPercentile = fgcmConfig.deltaMagBkgOffsetPercentile
         self.expGrayCheckDeltaT = fgcmConfig.expGrayCheckDeltaT
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.bandFitIndex = fgcmConfig.bandFitIndex
@@ -104,6 +102,7 @@ class FgcmGray(object):
         # and the exp/ccd gray for the zeropoints
 
         self.ccdGrayHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
+        self.ccdDeltaStdHandle = snmm.createArray((self.fgcmPars.nExp, self.fgcmPars.nCCD), dtype='f8')
         self.ccdGrayRMSHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
         self.ccdGrayErrHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='f8')
         self.ccdNGoodObsHandle = snmm.createArray((self.fgcmPars.nExp,self.fgcmPars.nCCD),dtype='i4')
@@ -116,6 +115,7 @@ class FgcmGray(object):
             self.ccdGrayNPar = (order + 1) * (order + 1)
 
         self.expGrayHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
+        self.expDeltaStdHandle = snmm.createArray(self.fgcmPars.nExp, dtype='f8')
         self.expGrayRMSHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expGrayErrHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
         self.expNGoodStarsHandle = snmm.createArray(self.fgcmPars.nExp,dtype='i4')
@@ -126,6 +126,9 @@ class FgcmGray(object):
         self.expGrayRMSColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayErrColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='f8')
         self.expGrayNGoodStarsColorSplitHandle = snmm.createArray((self.fgcmPars.nExp, 3), dtype='i2')
+
+        self.ccdDeltaMagBkgHandle = snmm.createArray((self.fgcmPars.nExp, self.fgcmPars.nCCD), dtype='f8')
+        self.expDeltaMagBkgHandle = snmm.createArray(self.fgcmPars.nExp, dtype='f8')
 
         self.arraysPrepared = True
 
@@ -269,6 +272,7 @@ class FgcmGray(object):
 
         # values to set
         ccdGray = snmm.getArray(self.ccdGrayHandle)
+        ccdDeltaStd = snmm.getArray(self.ccdDeltaStdHandle)
         ccdGrayRMS = snmm.getArray(self.ccdGrayRMSHandle)
         ccdGrayErr = snmm.getArray(self.ccdGrayErrHandle)
         ccdNGoodObs = snmm.getArray(self.ccdNGoodObsHandle)
@@ -279,6 +283,7 @@ class FgcmGray(object):
             ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
 
         expGray = snmm.getArray(self.expGrayHandle)
+        expDeltaStd = snmm.getArray(self.expDeltaStdHandle)
         expGrayRMS = snmm.getArray(self.expGrayRMSHandle)
         expGrayErr = snmm.getArray(self.expGrayErrHandle)
         expNGoodCCDs = snmm.getArray(self.expNGoodCCDsHandle)
@@ -291,6 +296,7 @@ class FgcmGray(object):
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
 
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsDeltaStd = snmm.getArray(self.fgcmStars.obsDeltaStdHandle)
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
@@ -317,6 +323,8 @@ class FgcmGray(object):
         EGrayGO=EGrayGO[gd]
         EGrayErr2GO=EGrayErr2GO[gd]
 
+        obsDeltaStdGO = obsDeltaStd[goodObs]
+
         if np.any(self.ccdGraySubCCD):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
@@ -331,6 +339,7 @@ class FgcmGray(object):
         ## ccdGrayErr = Sqrt(1./Sum(1./EGrayErr^2))
 
         ccdGray[:,:] = 0.0
+        ccdDeltaStd[:, :] = 0.0
         ccdGrayRMS[:,:] = 0.0
         ccdGrayErr[:,:] = 0.0
         ccdNGoodObs[:,:] = 0
@@ -351,6 +360,12 @@ class FgcmGray(object):
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                   objNGoodObs[obsObjIDIndex[goodObs],
                               obsBandIndex[goodObs]])
+        np.add.at(ccdDeltaStd,
+                  (obsExpIndex[goodObs], obsCCDIndex[goodObs]),
+                  obsDeltaStdGO/EGrayErr2GO)
+
+        gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
+        ccdDeltaStd[gd] /= ccdGrayWt[gd]
 
         if not np.any(self.ccdGraySubCCD):
             np.add.at(ccdGray,
@@ -459,6 +474,7 @@ class FgcmGray(object):
         # set illegalValue for totally bad CCDs
         bad = np.where((ccdNGoodStars <= 2) | (ccdGrayWt <= 0.0))
         ccdGray[bad] = self.illegalValue
+        ccdDeltaStd[bad] = self.illegalValue
         ccdGrayRMS[bad] = self.illegalValue
         ccdGrayErr[bad] = self.illegalValue
 
@@ -485,6 +501,7 @@ class FgcmGray(object):
         # note: goodCCD[0] refers to the expIndex, goodCCD[1] to the CCDIndex
 
         expGray[:] = 0.0
+        expDeltaStd[:] = 0.0
         expGrayRMS[:] = 0.0
         expGrayErr[:] = 0.0
         expNGoodStars[:] = 0
@@ -512,10 +529,14 @@ class FgcmGray(object):
         np.add.at(expNGoodStars,
                   goodCCD[0],
                   ccdNGoodStars[goodCCD])
+        np.add.at(expDeltaStd,
+                  goodCCD[0],
+                  ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.)
 
         # need at least 3 or else computation can blow up
         gd, = np.where(expNGoodCCDs >= 3)
         expGray[gd] /= expGrayWt[gd]
+        expDeltaStd[gd] /= expGrayWt[gd]
         expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
@@ -523,10 +544,10 @@ class FgcmGray(object):
         # set illegal value for non-measurements
         bad, = np.where(expNGoodCCDs <= 2)
         expGray[bad] = self.illegalValue
+        expDeltaStd[bad] = self.illegalValue
         expGrayRMS[bad] = self.illegalValue
         expGrayErr[bad] = self.illegalValue
         expNGoodTilings[bad] = self.illegalValue
-
 
         self.fgcmPars.compExpGray[:] = expGray
         self.fgcmPars.compVarGray[gd] = expGrayRMS[gd]**2.
@@ -949,19 +970,86 @@ class FgcmGray(object):
         expGrayHighCut[:] = [float(f) for f in self.expGrayHighCut]
 
         for i in range(self.fgcmPars.nBands):
-            delta = np.clip(self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i], 0.001, 1e5)
+            delta = np.clip(self.autoPhotometricCutNSig * self.fgcmPars.compReservedRawRepeatability[i], 0.001, 1e5)
 
             cut = -1 * int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             # Clip the cut to a range from 2 times the input to 5 mmag
             expGrayPhotometricCut[i] = max(expGrayPhotometricCut[i]*2,
                                            min(cut, -0.005))
 
-            delta = np.clip(self.autoHighCutNSig * self.fgcmPars.compReservedRawCrunchedRepeatability[i], 0.001, 1e5)
+            delta = np.clip(self.autoHighCutNSig * self.fgcmPars.compReservedRawRepeatability[i], 0.001, 1e5)
             cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             expGrayHighCut[i] = max(0.005,
                                     min(cut, expGrayHighCut[i]*2))
 
         return (expGrayPhotometricCut, expGrayHighCut)
+
+    def computeCCDAndExpDeltaMagBkg(self):
+        """
+        Compute CCD and exposure delta-bkg offsets.
+        """
+        if not self.fgcmStars.hasDeltaMagBkg:
+            # There is nothing to compute.  Leave as 0s.
+            return
+
+        startTime = time.time()
+        self.fgcmLog.debug('Computing ccdDeltaMagBkg and ExpDeltaMagBkg.')
+
+        ccdDeltaMagBkg = snmm.getArray(self.ccdDeltaMagBkgHandle)
+        expDeltaMagBkg = snmm.getArray(self.expDeltaMagBkgHandle)
+
+        obsDeltaMagBkg = snmm.getArray(self.fgcmStars.obsDeltaMagBkgHandle)
+        obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+
+        goodObs, = np.where(obsFlag == 0)
+
+        # Do the exposures first
+        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+
+        expDeltaMagBkg[:] = self.illegalValue
+
+        use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            eInd = obsExpIndex[goodObs[i1a[0]]]
+
+            mag = obsMagADU[goodObs[i1a]]
+
+            st = np.argsort(mag)
+            bright, = np.where(mag < mag[st[int(self.deltaMagBkgOffsetPercentile*st.size)]])
+            expDeltaMagBkg[eInd] = np.median(obsDeltaMagBkg[goodObs[i1a[bright]]])
+
+        # Set the per-ccd defaults to the exposure numbers
+        ccdDeltaMagBkg[:, :] = np.repeat(expDeltaMagBkg, self.fgcmPars.nCCD).reshape(ccdDeltaMagBkg.shape)
+
+        # Do the exp/ccd second
+        expCcdHash = obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) + obsCCDIndex[goodObs]
+
+        h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+
+        # We need at least 3 for a median, and of those from the percentile...
+        use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            eInd = obsExpIndex[goodObs[i1a[0]]]
+            cInd = obsCCDIndex[goodObs[i1a[0]]]
+
+            mag = obsMagADU[goodObs[i1a]]
+
+            st = np.argsort(mag)
+            bright, = np.where(mag < mag[st[int(self.deltaMagBkgOffsetPercentile*st.size)]])
+            ccdDeltaMagBkg[eInd, cInd] = np.median(obsDeltaMagBkg[goodObs[i1a[bright]]])
+
+        self.fgcmPars.compExpDeltaMagBkg[:] = expDeltaMagBkg
+
+        if not self.quietMode:
+            self.fgcmLog.info('Computed ccdDeltaBkg and expDeltaBkg in %.2f seconds.' %
+                              (time.time() - startTime))
 
     def __getstate__(self):
         # Don't try to pickle the logger.
