@@ -130,6 +130,8 @@ class FgcmConfig(object):
     ccdGraySubCCDDict = ConfigField(dict, default={})
     ccdGraySubCCDChebyshevOrder = ConfigField(int, default=1)
     ccdGraySubCCDTriangular = ConfigField(bool, default=True)
+    ccdGrayFocalPlaneDict = ConfigField(dict, default={})
+    ccdGrayFocalPlaneChebyshevOrder = ConfigField(int, default=3)
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopeDict = ConfigField(dict, default={})
     illegalValue = ConfigField(float, default=-9999.0)
@@ -419,6 +421,8 @@ class FgcmConfig(object):
 
         self.ccdGraySubCCD = self._convertDictToBandList(self.ccdGraySubCCDDict,
                                                          bool, False, required=False)
+        self.ccdGrayFocalPlane = self._convertDictToBandList(self.ccdGrayFocalPlaneDict,
+                                                             bool, False, required=False)
         self.superStarSubCCD = self._convertDictToBandList(self.superStarSubCCDDict,
                                                            bool, False, required=False)
         self.aperCorrInputSlopes = self._convertDictToBandList(self.aperCorrInputSlopeDict,

@@ -64,6 +64,8 @@ class FgcmGray(object):
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.ccdGraySubCCDChebyshevOrder = fgcmConfig.ccdGraySubCCDChebyshevOrder
         self.ccdGraySubCCDTriangular = fgcmConfig.ccdGraySubCCDTriangular
+        self.ccdGrayFocalPlane = fgcmConfig.ccdGrayFocalPlane
+        self.ccdGrayFocalPlaneChebyshevOrder = fgcmConfig.ccdGrayFocalPlaneChebyshevOrder
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -329,6 +331,10 @@ class FgcmGray(object):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
+        if np.any(self.ccdGrayFocalPlane):
+            obsRAGO = snmm.getArray(self.fgcmStars.obsRAHandle)[goodObs]
+            obsDecGO = snmm.getArray(self.fgcmStars.obsDecHandle)[goodObs]
+
         self.fgcmLog.debug('FgcmGray using %d observations from %d good stars.' %
                            (goodObs.size,goodStars.size))
 
@@ -367,7 +373,61 @@ class FgcmGray(object):
         gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
         ccdDeltaStd[gd] /= ccdGrayWt[gd]
 
-        if not np.any(self.ccdGraySubCCD):
+        if np.any(self.ccdGrayFocalPlane):
+            # We are doing our full focal plane fits for bands that are set.
+            order = self.ccdGrayFocalPlaneChebyshevOrder
+            pars = np.zeros((order + 1, order + 1))
+            pars[0, 0] = 1.0
+
+            FGrayGO = 10.**(EGrayGO / (-2.5))
+            FGrayErrGO = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO) * FGrayGO
+
+            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+
+            use, = np.where(h >= 3)
+            for i in use:
+                i1a = rev[rev[i]: rev[i + 1]]
+
+                eInd = obsExpIndex[goodObs[i1a[0]]]
+                bInd = obsBandIndex[goodObs[i1a[0]]]
+
+                if not self.ccdGrayFocalPlane[bInd]:
+                    # We are not fitting the focal plane for this, skip.
+                    continue
+
+                raMed = np.median(obsRAGO[i1a])
+                decMed = np.median(obsDecGO[i1a])
+
+                deltaRA = (obsRAGO[i1a] - raMed)*np.cos(np.deg2rad(decMed))
+                deltaDec = obsDecGO[i1a] - decMed
+                offsetRA = np.min(deltaRA)
+                offsetDec = np.min(deltaDec)
+
+                try:
+                    field = Cheb2dField.fit(np.max(deltaRA - offsetRA),
+                                            np.max(deltaDec - offsetDec),
+                                            order,
+                                            deltaRA - offsetRA, deltaDec - offsetDec,
+                                            FGrayGO[i1a],
+                                            valueErr=FGrayErrGO[i1a],
+                                            triangular=False)
+                    fit = field.pars.flatten()
+                except (ValueError, RuntimeError, TypeError):
+                    # Revert to per-ccd fit?
+                    print("ARGH")
+                    import IPython
+                    IPython.embed()
+
+                # Anything to do with outliers????
+
+                print("Success?")
+                import IPython
+                IPython.embed()
+
+
+        if not np.any(self.ccdGraySubCCD) and not np.any(self.ccdGrayFocalPlane):
+            # This is when we _only_ have per-ccd gray, no focal plane, and
+            # we can do all of this at once.
             np.add.at(ccdGray,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                       EGrayGO/EGrayErr2GO)
@@ -384,8 +444,9 @@ class FgcmGray(object):
             ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
             ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
-        else:
-            # We are computing on the sub-ccd scale
+        elif np.any(~self.ccdGrayFocalPlane):
+            # We are computing on the sub-ccd scale for some bands, and
+            # at least 1 band does not have a focal plane fit
 
             # But first we need to finish the other stuff
             gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
@@ -425,9 +486,14 @@ class FgcmGray(object):
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
                 bInd = obsBandIndex[goodObs[i1a[0]]]
 
+                if self.ccdGrayFocalPlane[bInd]:
+                    # We already fit this above, so we can skip to the next.
+                    continue
+
                 ccdNGoodStars[eInd, cInd] = i1a.size
 
                 computeMean = False
+                skip = False
 
                 if not self.ccdGraySubCCD[bInd]:
                     fit = pars.flatten()
