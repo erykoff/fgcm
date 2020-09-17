@@ -293,10 +293,9 @@ class FgcmZeropoints(object):
 
         ## FIXME: will probably need some sort of rotation information at some point
 
-        ## FIXME: check that the signs are correct!
         # need secZenith for each exp/ccd pair
         ccdHA = (self.fgcmPars.expTelHA[zpExpIndex] -
-                 np.radians(self.ccdOffsets['DELTA_RA'][zpCCDIndex]))
+                 np.radians(self.ccdOffsets['DELTA_RA'][zpCCDIndex])*np.cos(self.fgcmPars.expTelDec[zpExpIndex]))
         ccdDec = (self.fgcmPars.expTelDec[zpExpIndex] +
                   np.radians(self.ccdOffsets['DELTA_DEC'][zpCCDIndex]))
         ccdSecZenith = 1./(np.sin(ccdDec) * self.fgcmPars.sinLatitude +

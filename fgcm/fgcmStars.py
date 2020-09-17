@@ -94,6 +94,8 @@ class FgcmStars(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
+        self.focalPlaneSigmaClip = fgcmConfig.focalPlaneSigmaClip
+
         self.magStdComputed = False
         self.allMagStdComputed = False
         self.sedSlopeComputed = False
@@ -694,14 +696,13 @@ class FgcmStars(object):
         objRARad = np.radians(snmm.getArray(self.objRAHandle))
         objDecRad = np.radians(snmm.getArray(self.objDecHandle))
         ## FIXME: deal with this at some point...
-        hi,=np.where(objRARad > np.pi)
-        objRARad[hi] -= 2*np.pi
+        # hi,=np.where(objRARad > np.pi)
+        # objRARad[hi] -= 2*np.pi
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
 
-        obsHARad = (fgcmPars.expTelHA[obsExpIndex] +
-                    fgcmPars.expTelRA[obsExpIndex] -
+        obsHARad = (fgcmPars.expTelHA[obsExpIndex] + fgcmPars.expTelRA[obsExpIndex] -
                     objRARad[obsObjIDIndex])
         tempSecZenith = 1./(np.sin(objDecRad[obsObjIDIndex]) * fgcmPars.sinLatitude +
                             np.cos(objDecRad[obsObjIDIndex]) * fgcmPars.cosLatitude *
@@ -1558,6 +1559,74 @@ class FgcmStars(object):
 
         # I had considered it might be necessary to flag bad exposures
         # at this point, but I don't think that's the case.
+
+    def performFocalPlaneOutlierCuts(self, fgcmPars, reset=False, ignoreRef=False):
+        """
+        Do focal plane outlier cuts per exposure.
+
+        Parameters
+        ----------
+        fgcmPars : `fgcmParameters`
+        reset : `bool`, optional
+           Reset the outlier flag
+        ignoreRef : `bool`, optional
+           Ignore reference stars
+        """
+
+        self.fgcmLog.debug('Computing focal plane outliers')
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+
+        if ignoreRef:
+            flagName = 'FOCALPLANE_OUTLIER'
+        else:
+            flagName = 'FOCALPLANE_OUTLIER_REF'
+
+        if reset:
+            # Reset the obsFlag...
+            if ignoreRef:
+                obsFlag &= ~obsFlagDict[flagName]
+            else:
+                obsFlag &= ~obsFlagDict[flagName]
+
+        goodStars = self.getGoodStarIndices(checkMinObs=True)
+        _, goodObs = self.getGoodObsIndices(goodStars)
+
+        # we need to compute E_gray == <mstd> - mstd for each observation
+        # compute EGray, GO for Good Obs
+        # EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
+        #            obsMagStd[goodObs])
+        EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
+
+        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+
+        nbad = 0
+
+        use, = np.where(h > 0)
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            med = np.median(EGrayGO[i1a])
+            sig = 1.4826*np.median(np.abs(EGrayGO[i1a] - med))
+            bad, = np.where(np.abs(EGrayGO[i1a] - med) > self.focalPlaneSigmaClip*sig)
+
+            obsFlag[goodObs[i1a[bad]]] |= obsFlagDict[flagName]
+
+            nbad += bad.size
+
+        self.fgcmLog.info("Marked %d observations (%.4f%%) as %s" %
+                          (nbad, 100.*float(nbad)/float(goodObs.size), flagName))
+
+        # Now we need to flag stars that might have fallen below our threshold
+        # when we flagged these outliers
+        goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
+        self.selectStarsMinObsExpIndex(goodExpsIndex, reset=reset)
 
     def applySuperStarFlat(self,fgcmPars):
         """

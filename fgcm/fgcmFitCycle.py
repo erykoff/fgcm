@@ -32,6 +32,7 @@ from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import MaxFitIterations
+from .fgcmUtilities import computeCCDOffsetSigns
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -260,6 +261,9 @@ class FgcmFitCycle(object):
         else:
             self.fgcmLog.info('Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
 
+        # Compute signs for CCD offsets
+        computeCCDOffsetSigns(self.fgcmStars, self.fgcmConfig.ccdOffsets)
+
         # Apply aperture corrections and SuperStar if available
         # select exposures...
         if (not self.initialCycle):
@@ -292,6 +296,9 @@ class FgcmFitCycle(object):
         if (not self.initialCycle):
             # get the SED from the chisq function
             self.fgcmChisq(parArray,computeSEDSlopes=True,includeReserve=True)
+
+            # And we need m^std values for all the exposures for outlier rejection
+            self.fgcmChisq(parArray, allExposures=True, includeReserve=True)
 
             # Compute median SED slopes and apply
             self.fgcmStars.fillMissingSedSlopes(self.fgcmPars)
@@ -384,6 +391,12 @@ class FgcmFitCycle(object):
         # Reset the superstar outlier flags and compute them now that we have
         # flagged good exposures, good nights, etc.
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
+
+        # Reset the focalplane outlier flags and compute them -- except on initial cycle
+        # We do this both including and excluding reference star magnitudes
+        if not self.initialCycle:
+            self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=True)
+            self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=False)
 
         # And compute the step units
         parArray = self.fgcmPars.getParArray(fitterUnits=False)

@@ -132,6 +132,7 @@ class FgcmConfig(object):
     ccdGraySubCCDTriangular = ConfigField(bool, default=True)
     ccdGrayFocalPlaneDict = ConfigField(dict, default={})
     ccdGrayFocalPlaneChebyshevOrder = ConfigField(int, default=3)
+    focalPlaneSigmaClip = ConfigField(float, default=5.0)
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopeDict = ConfigField(dict, default={})
     illegalValue = ConfigField(float, default=-9999.0)
