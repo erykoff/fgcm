@@ -1425,6 +1425,7 @@ class FgcmStars(object):
 
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
 
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         obsMagStd = snmm.getArray(self.obsMagStdHandle)
@@ -1447,7 +1448,9 @@ class FgcmStars(object):
             refMag = snmm.getArray(self.refMagHandle)
             refMagErr = snmm.getArray(self.refMagErrHandle)
 
-            goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
+            # Only use _good_ (non-outlier) reference stars in here.
+            goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndex[goodObs]] >= 0) &
+                                     ((objFlag[obsObjIDIndex[goodObs]] & objFlagDict['REFSTAR_OUTLIER']) == 0))
 
             if goodRefObsGO.size > 0:
                 obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
@@ -1600,8 +1603,6 @@ class FgcmStars(object):
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # compute EGray, GO for Good Obs
-        # EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
-        #            obsMagStd[goodObs])
         EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
 
         h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
