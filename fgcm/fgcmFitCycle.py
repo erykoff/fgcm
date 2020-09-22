@@ -456,6 +456,11 @@ class FgcmFitCycle(object):
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After recomputing chisq for all exposures'))
 
+        # If we are in the initial cycle, we can do outlier rejection now.
+        if self.initialCycle:
+            self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=True)
+            self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=False)
+
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
         self.fgcmGray.computeCCDAndExpGray()
