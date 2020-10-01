@@ -177,7 +177,7 @@ class FgcmSuperStarFlat(object):
             # with x/y, new sub-ccd
 
             # we will need the ccd offset signs
-            self._computeCCDOffsetSigns(goodObs)
+            # self._computeCCDOffsetSigns(goodObs)
 
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]

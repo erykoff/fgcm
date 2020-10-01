@@ -16,7 +16,9 @@ obsFlagDict = {'NO_EXPOSURE': 2**0,
                'SUPERSTAR_OUTLIER': 2**2,
                'NO_ZEROPOINT': 2**4,
                'BAD_MAG': 2**5,
-               'BAD_AIRMASS': 2**6}
+               'BAD_AIRMASS': 2**6,
+               'FOCALPLANE_OUTLIER': 2**7,
+               'FOCALPLANE_OUTLIER_REF': 2**8}
 
 # Dictionary of exposure flags
 expFlagDict = {'TOO_FEW_STARS':2**0,
@@ -619,3 +621,109 @@ def checkFlaggedExposuresPerBand(log, fgcmPars):
         inBandBad, = np.where(fgcmPars.expFlag[inBand] > 0)
         if inBandBad.size >= (inBand.size - 1):
             raise RuntimeError("FATAL: All observations in %s band have been cut!")
+
+
+def computeDeltaRA(a, b, dec=None, degrees=False):
+    """
+    Compute a - b for RAs.  Optionally scale by cos(dec).
+
+    Parameters
+    ----------
+    a : `float` or `np.ndarray`
+    b : `float` or `np.ndarray`
+    dec : `float` or `np.ndarray`
+    degrees : `bool`, optional
+    """
+    if degrees:
+        rotVal = 360.0
+    else:
+        rotVal = 2.0*np.pi
+
+    delta = (np.atleast_1d(a) - np.atleast_1d(b)) % rotVal
+    test, = np.where(delta > rotVal/2.)
+    delta[test] -= rotVal
+
+    if dec is not None and degrees:
+        delta *= np.cos(np.deg2rad(dec))
+    elif dec is not None:
+        delta *= np.cos(dec)
+
+    return delta
+
+
+def computeCCDOffsetSigns(fgcmStars, ccdOffsets):
+    """
+    Compute plotting signs for x/y to ra/dec conversions.
+
+    This will have to be rethought with rotation.
+
+    Parameters
+    ----------
+    fgcmStars : `fgcmStars`
+    """
+
+    import scipy.stats
+    import esutil
+    from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
+    obsObjIDIndex = snmm.getArray(fgcmStars.obsObjIDIndexHandle)
+    obsCCDIndex = snmm.getArray(fgcmStars.obsCCDHandle) - fgcmStars.ccdStartIndex
+    obsExpIndex = snmm.getArray(fgcmStars.obsExpIndexHandle)
+
+    obsX = snmm.getArray(fgcmStars.obsXHandle)
+    obsY = snmm.getArray(fgcmStars.obsYHandle)
+    objRA = snmm.getArray(fgcmStars.objRAHandle)
+    objDec = snmm.getArray(fgcmStars.objDecHandle)
+
+    h, rev = esutil.stat.histogram(obsCCDIndex, rev=True)
+
+    for i in range(h.size):
+        if h[i] == 0: continue
+
+        i1a = rev[rev[i]:rev[i+1]]
+
+        cInd = obsCCDIndex[i1a[0]]
+
+        if ccdOffsets['RASIGN'][cInd] == 0:
+            # choose a good exposure to work with
+            hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
+            maxInd = np.argmax(hTest)
+            testStars = revTest[revTest[maxInd]:revTest[maxInd + 1]]
+
+            testRA = objRA[obsObjIDIndex[i1a[testStars]]]
+            testDec = objDec[obsObjIDIndex[i1a[testStars]]]
+            testX = obsX[i1a[testStars]]
+            testY = obsY[i1a[testStars]]
+
+            corrXRA,_ = scipy.stats.pearsonr(testX, testRA)
+            corrYRA,_ = scipy.stats.pearsonr(testY, testRA)
+
+            if (np.abs(corrXRA) > np.abs(corrYRA)):
+                ccdOffsets['XRA'][cInd] = True
+            else:
+                ccdOffsets['XRA'][cInd] = False
+
+            if ccdOffsets['XRA'][cInd]:
+                # x is correlated with RA
+                if corrXRA < 0:
+                    ccdOffsets['RASIGN'][cInd] = -1
+                else:
+                    ccdOffsets['RASIGN'][cInd] = 1
+
+                corrYDec,_ = scipy.stats.pearsonr(testY, testDec)
+                if corrYDec < 0:
+                    ccdOffsets['DECSIGN'][cInd] = -1
+                else:
+                    ccdOffsets['DECSIGN'][cInd] = 1
+            else:
+                # y is correlated with RA
+                if corrYRA < 0:
+                    ccdOffsets['RASIGN'][cInd] = -1
+                else:
+                    ccdOffsets['RASIGN'][cInd] = 1
+
+                corrXDec,_ = scipy.stats.pearsonr(testX, testDec)
+                if corrXDec < 0:
+                    ccdOffsets['DECSIGN'][cInd] = -1
+                else:
+                    ccdOffsets['DECSIGN'][cInd] = 1
