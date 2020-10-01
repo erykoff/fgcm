@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import computeDeltaRA
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -64,6 +65,9 @@ class FgcmGray(object):
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.ccdGraySubCCDChebyshevOrder = fgcmConfig.ccdGraySubCCDChebyshevOrder
         self.ccdGraySubCCDTriangular = fgcmConfig.ccdGraySubCCDTriangular
+        self.ccdGrayFocalPlane = fgcmConfig.ccdGrayFocalPlane
+        self.ccdGrayFocalPlaneChebyshevOrder = fgcmConfig.ccdGrayFocalPlaneChebyshevOrder
+        self.ccdGrayFocalPlaneFitMinCcd = fgcmConfig.ccdGrayFocalPlaneFitMinCcd
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -329,6 +333,10 @@ class FgcmGray(object):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
+        if np.any(self.ccdGrayFocalPlane):
+            obsRAGO = snmm.getArray(self.fgcmStars.obsRAHandle)[goodObs]
+            obsDecGO = snmm.getArray(self.fgcmStars.obsDecHandle)[goodObs]
+
         self.fgcmLog.debug('FgcmGray using %d observations from %d good stars.' %
                            (goodObs.size,goodStars.size))
 
@@ -366,8 +374,167 @@ class FgcmGray(object):
 
         gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
         ccdDeltaStd[gd] /= ccdGrayWt[gd]
+        # This is set for everything here
+        ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
+        ccdGrayRMS[gd] = 0.0  # only used for per-ccd checks
 
-        if not np.any(self.ccdGraySubCCD):
+        if np.any(self.ccdGrayFocalPlane):
+
+            # We are doing our full focal plane fits for bands that are set.
+            order = self.ccdGrayFocalPlaneChebyshevOrder
+            pars = np.zeros((order + 1, order + 1))
+            pars[0, 0] = 1.0
+
+            FGrayGO = 10.**(EGrayGO / (-2.5))
+            FGrayErrGO = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO) * FGrayGO
+
+            # Get the ccd to x/y and delta-ra/delta-dec mapping
+            nstep = 50
+            deltaMapper = np.zeros(self.fgcmPars.nCCD, dtype=[('x', 'f8', nstep**2),
+                                                              ('y', 'f8', nstep**2),
+                                                              ('dra_cent', 'f8'),
+                                                              ('ddec_cent', 'f8'),
+                                                              ('delta_ra', 'f8', nstep**2),
+                                                              ('delta_dec', 'f8', nstep**2)])
+            for k in range(self.fgcmPars.nCCD):
+                xValues = np.linspace(0.0, self.ccdOffsets['X_SIZE'][k], nstep)
+                yValues = np.linspace(0.0, self.ccdOffsets['Y_SIZE'][k], nstep)
+                deltaMapper['x'][k, :] = np.repeat(xValues, yValues.size)
+                deltaMapper['y'][k, :] = np.tile(yValues, xValues.size)
+
+                # And translate these into delta_ra, delta_dec
+                raValues = np.linspace(self.ccdOffsets['DELTA_RA'][k] -
+                                       self.ccdOffsets['RASIGN'][k]*self.ccdOffsets['RA_SIZE'][k]/2.,
+                                       self.ccdOffsets['DELTA_RA'][k] +
+                                       self.ccdOffsets['RASIGN'][k]*self.ccdOffsets['RA_SIZE'][k]/2.,
+                                       nstep)
+                decValues = np.linspace(self.ccdOffsets['DELTA_DEC'][k] -
+                                        self.ccdOffsets['DECSIGN'][k]*self.ccdOffsets['DEC_SIZE'][k]/2.,
+                                        self.ccdOffsets['DELTA_DEC'][k] +
+                                        self.ccdOffsets['DECSIGN'][k]*self.ccdOffsets['DEC_SIZE'][k]/2.,
+                                        nstep)
+
+                if not self.ccdOffsets['XRA'][k]:
+                    # Swap axes
+                    deltaMapper['delta_ra'][k, :] = np.tile(raValues, decValues.size)
+                    deltaMapper['delta_dec'][k, :] = np.repeat(decValues, raValues.size)
+                    deltaMapper['dra_cent'][k] = raValues[nstep // 2]
+                    deltaMapper['ddec_cent'][k] = decValues[nstep // 2]
+                else:
+                    deltaMapper['delta_ra'][k, :] = np.repeat(raValues, decValues.size)
+                    deltaMapper['delta_dec'][k, :] = np.tile(decValues, raValues.size)
+                    deltaMapper['dra_cent'][k] = raValues[nstep // 2]
+                    deltaMapper['ddec_cent'][k] = decValues[nstep // 2]
+
+            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+
+            use, = np.where(h >= 3)
+            for i in use:
+                i1a = rev[rev[i]: rev[i + 1]]
+
+                eInd = obsExpIndex[goodObs[i1a[0]]]
+                bInd = obsBandIndex[goodObs[i1a[0]]]
+
+                if not self.ccdGrayFocalPlane[bInd]:
+                    # We are not fitting the focal plane for this, skip.
+                    continue
+
+                raCent = np.rad2deg(self.fgcmPars.expTelRA[eInd])
+                decCent = np.rad2deg(self.fgcmPars.expTelDec[eInd])
+
+                deltaRA = computeDeltaRA(obsRAGO[i1a], raCent, dec=decCent, degrees=True)
+                deltaDec = obsDecGO[i1a] - decCent
+                offsetRA = np.min(deltaRA)
+                offsetDec = np.min(deltaDec)
+
+                ccdGrayEvalNStars = np.zeros(self.fgcmPars.nCCD, dtype=np.int32)
+                np.add.at(ccdGrayEvalNStars,
+                          obsCCDIndex[goodObs[i1a]],
+                          1)
+                okCcd, = np.where(ccdGrayEvalNStars > 0)
+
+                fitFailed = False
+
+                if okCcd.size < self.ccdGrayFocalPlaneFitMinCcd:
+                    # Too few good ccds
+                    fitFailed = True
+                else:
+                    try:
+                        field = Cheb2dField.fit(np.max(deltaRA - offsetRA),
+                                                np.max(deltaDec - offsetDec),
+                                                order,
+                                                deltaRA - offsetRA, deltaDec - offsetDec,
+                                                FGrayGO[i1a],
+                                                valueErr=FGrayErrGO[i1a],
+                                                triangular=False)
+                    except (ValueError, RuntimeError, TypeError):
+                        # Log a warn and set to a single value...
+                        self.fgcmLog.warn("Full focal-plane fit failed on exposure %d" %
+                                          (self.fgcmPars.expArray[eInd]))
+                        fitFailed = True
+
+                if fitFailed:
+                    # Compute the focal-plane mean.
+                    # This should not be used very often.
+                    fit = pars.flatten()
+                    fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
+                              np.sum(1./EGrayErr2GO[i1a]))
+                    fit[0] = 10.**(fit[0]/(-2.5))
+
+                    ccdGray[eInd, :] = -2.5*np.log10(fit[0])
+                    if np.any(self.ccdGraySubCCD):
+                        ccdGraySubCCDPars[eInd, :, 0] = fit[0]
+                else:
+                    # Sucessful fit
+
+                    # Eval for all the points, and take the mean of the model for the overall
+                    # value
+
+                    ccdGrayEvalStars = field.evaluate(deltaRA - offsetRA,
+                                                      deltaDec - offsetDec)
+                    ccdGrayEval = np.zeros(self.fgcmPars.nCCD)
+                    ccdGrayEvalNStars = np.zeros(self.fgcmPars.nCCD, dtype=np.int32)
+                    np.add.at(ccdGrayEval,
+                              obsCCDIndex[goodObs[i1a]],
+                              ccdGrayEvalStars)
+                    np.add.at(ccdGrayEvalNStars,
+                              obsCCDIndex[goodObs[i1a]],
+                              1)
+                    ok, = np.where(ccdGrayEvalNStars > 0)
+                    ccdGrayEval[ok] /= ccdGrayEvalNStars[ok]
+
+                    ccdGray[eInd, ok] = -2.5*np.log10(ccdGrayEval[ok])
+
+                    if self.ccdGraySubCCD[bInd]:
+                        # Do the sub-ccd fit
+
+                        for cInd in ok:
+                            draOff = deltaMapper['delta_ra'][cInd, :] - offsetRA
+                            ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
+
+                            try:
+                                cField = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
+                                                         self.ccdOffsets['Y_SIZE'][cInd],
+                                                         self.ccdGraySubCCDChebyshevOrder,
+                                                         deltaMapper['x'][cInd, :],
+                                                         deltaMapper['y'][cInd, :],
+                                                         field.evaluate(draOff, ddecOff),
+                                                         triangular=self.ccdGraySubCCDTriangular)
+                                ccdGraySubCCDPars[eInd, cInd, :] = cField.pars.ravel()
+                            except (ValueError, RuntimeError, TypeError):
+                                self.fgcmLog.warn("Focal plane to ccd mapping fit failed on %d/%d" %
+                                                  (self.fgcmPars.expArray[eInd], cInd + self.ccdStartIndex))
+                                # Put in a filler here
+                                ccdGraySubCCDPars[eInd, cInd, 0] = ccdGrayEval
+
+                    elif np.any(self.ccdGraySubCCD):
+                        # Do one number per ccd in the parameters if we need to set any.
+                        ccdGraySubCCDPars[eInd, :, 0] = ccdGrayEval
+                        ccdGraySubCCDPars[eInd, ~ok, 0] = 1.0
+
+        if not np.any(self.ccdGraySubCCD) and not np.any(self.ccdGrayFocalPlane):
+            # This is when we _only_ have per-ccd gray, no focal plane, and
+            # we can do all of this at once.
             np.add.at(ccdGray,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                       EGrayGO/EGrayErr2GO)
@@ -382,15 +549,10 @@ class FgcmGray(object):
             tempRMS2[gd] = (ccdGrayRMS[gd]/ccdGrayWt[gd]) - (ccdGray[gd]**2.)
             ok = np.where(tempRMS2 > 0.0)
             ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
-            ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
 
-        else:
-            # We are computing on the sub-ccd scale
-
-            # But first we need to finish the other stuff
-            gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
-            ccdGrayErr[gd] = np.sqrt(1./ccdGrayWt[gd])
-            ccdGrayRMS[gd] = 0.0  # this is unused
+        elif np.any(~np.array(self.ccdGrayFocalPlane)):
+            # We are computing on the sub-ccd scale for some bands, and
+            # at least 1 band does not have a focal plane fit
 
             # This will probably have to be parallelized
             # For now, let's write some code to do it.
@@ -425,9 +587,14 @@ class FgcmGray(object):
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
                 bInd = obsBandIndex[goodObs[i1a[0]]]
 
+                if self.ccdGrayFocalPlane[bInd]:
+                    # We already fit this above, so we can skip to the next.
+                    continue
+
                 ccdNGoodStars[eInd, cInd] = i1a.size
 
                 computeMean = False
+                skip = False
 
                 if not self.ccdGraySubCCD[bInd]:
                     fit = pars.flatten()
