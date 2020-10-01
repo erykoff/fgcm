@@ -506,49 +506,27 @@ class FgcmGray(object):
                     ccdGray[eInd, ok] = -2.5*np.log10(ccdGrayEval[ok])
 
                     if self.ccdGraySubCCD[bInd]:
-                        # Do the sub-ccd fit -- only over the range of stars or else
-                        # we can get bad extrapolations.
-
-                        if (self.fgcmPars.expArray[eInd] == 36236):
-                            import IPython
-                            IPython.embed()
-
-                        minDeltaRA = np.zeros(self.fgcmPars.nCCD) + np.inf
-                        maxDeltaRA = np.zeros_like(minDeltaRA) - np.inf
-                        minDeltaDec = np.zeros_like(minDeltaRA) + np.inf
-                        maxDeltaDec = np.zeros_like(minDeltaRA) - np.inf
-
-                        np.fmin.at(minDeltaRA,
-                                   obsCCDIndex[goodObs[i1a]],
-                                   deltaRA - offsetRA)
-                        np.fmax.at(maxDeltaRA,
-                                   obsCCDIndex[goodObs[i1a]],
-                                   deltaRA - offsetRA)
-                        np.fmin.at(minDeltaDec,
-                                   obsCCDIndex[goodObs[i1a]],
-                                   deltaDec - offsetDec)
-                        np.fmax.at(maxDeltaDec,
-                                   obsCCDIndex[goodObs[i1a]],
-                                   deltaDec - offsetDec)
+                        # Do the sub-ccd fit
 
                         for cInd in ok:
                             draOff = deltaMapper['delta_ra'][cInd, :] - offsetRA
                             ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
 
-                            toFit, = np.where((draOff > minDeltaRA[cInd]) &
-                                              (draOff < maxDeltaRA[cInd]) &
-                                              (ddecOff > minDeltaDec[cInd]) &
-                                              (ddecOff < maxDeltaDec[cInd]))
+                            try:
+                                cField = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
+                                                         self.ccdOffsets['Y_SIZE'][cInd],
+                                                         self.ccdGraySubCCDChebyshevOrder,
+                                                         deltaMapper['x'][cInd, :],
+                                                         deltaMapper['y'][cInd, :],
+                                                         field.evaluate(draOff, ddecOff),
+                                                         triangular=self.ccdGraySubCCDTriangular)
+                                ccdGraySubCCDPars[eInd, cInd, :] = cField.pars.ravel()
+                            except (ValueError, RuntimeError, TypeError):
+                                self.fgcmLog.warn("Focal plane to ccd mapping fit failed on %d/%d" %
+                                                  (self.fgcmPars.expArray[eInd], cInd + self.ccdStartIndex))
+                                # Put in a filler here
+                                ccdGraySubCCDPars[eInd, cInd, 0] = ccdGrayEval
 
-                            cField = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
-                                                     self.ccdOffsets['Y_SIZE'][cInd],
-                                                     self.ccdGraySubCCDChebyshevOrder,
-                                                     deltaMapper['x'][cInd, toFit],
-                                                     deltaMapper['y'][cInd, toFit],
-                                                     field.evaluate(draOff[toFit],
-                                                                    ddecOff[toFit]),
-                                                     triangular=self.ccdGraySubCCDTriangular)
-                            ccdGraySubCCDPars[eInd, cInd, :] = cField.pars.ravel()
                     elif np.any(self.ccdGraySubCCD):
                         # Do one number per ccd in the parameters if we need to set any.
                         ccdGraySubCCDPars[eInd, :, 0] = ccdGrayEval
