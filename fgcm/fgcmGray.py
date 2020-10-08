@@ -385,8 +385,8 @@ class FgcmGray(object):
             pars = np.zeros((order + 1, order + 1))
             pars[0, 0] = 1.0
 
-            FGrayGO = 10.**(EGrayGO / (-2.5))
-            FGrayErrGO = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO) * FGrayGO
+            FGrayGO = 10.**(EGrayGO/(-2.5))
+            FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
             # Get the ccd to x/y and delta-ra/delta-dec mapping
             nstep = 50
@@ -704,7 +704,8 @@ class FgcmGray(object):
         gd, = np.where(expNGoodCCDs >= 3)
         expGray[gd] /= expGrayWt[gd]
         expDeltaStd[gd] /= expGrayWt[gd]
-        expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
+        expGrayRMS[gd] = np.sqrt(np.clip((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.),
+                                         0.0, None))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
 

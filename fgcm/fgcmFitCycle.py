@@ -393,10 +393,14 @@ class FgcmFitCycle(object):
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars, reset=True)
 
         # Reset the focalplane outlier flags and compute them -- except on initial cycle
-        # We do this both including and excluding reference star magnitudes
+        # We do this both including and excluding reference star magnitudes which will
+        # produce a different list of flagged stars/observations.
         if not self.initialCycle:
+            # Set FOCALPLANE_OUTLIER flag
             self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=True)
-            self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=False)
+            if self.fgcmStars.hasRefstars:
+                # Set FOCALPLANE_OUTLIER_REF flag
+                self.fgcmStars.performFocalPlaneOutlierCuts(self.fgcmPars, reset=True, ignoreRef=False)
 
         # And compute the step units
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
