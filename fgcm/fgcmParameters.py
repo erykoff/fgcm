@@ -641,11 +641,6 @@ class FgcmParameters(object):
         self.expTelRA = np.radians(expInfo['TELRA'])
         self.expTelDec = np.radians(expInfo['TELDEC'])
 
-        # and rotate?  This may need to be revisited.
-        hi,=np.where(self.expTelRA > np.pi)
-        if hi.size > 0:
-            self.expTelRA[hi] -= 2.0*np.pi
-
         # and get the secant of the Zenith angle
         self.sinLatitude = np.sin(np.radians(self.latitude))
         self.cosLatitude = np.cos(np.radians(self.latitude))
