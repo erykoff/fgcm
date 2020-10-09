@@ -176,8 +176,7 @@ class FgcmSuperStarFlat(object):
         else:
             # with x/y, new sub-ccd
 
-            # we will need the ccd offset signs
-            # self._computeCCDOffsetSigns(goodObs)
+            # Note that the ccd offset signs are now computed in fgcmFitCycle.
 
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
@@ -413,81 +412,3 @@ class FgcmSuperStarFlat(object):
                                                     self.fgcmPars.lutFilterNames[f],
                                                     self.epochNames[e]))
                 plt.close()
-
-
-    def _computeCCDOffsetSigns(self, goodObs):
-        """
-        Internal method to figure out plotting signs
-
-        parameters
-        ----------
-        goodObs: int array
-           Array of good observations
-        """
-
-        import scipy.stats
-
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-
-        obsX = snmm.getArray(self.fgcmStars.obsXHandle)
-        obsY = snmm.getArray(self.fgcmStars.obsYHandle)
-        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
-        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
-
-        h, rev = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
-
-        for i in range(h.size):
-            if h[i] == 0: continue
-
-            i1a = rev[rev[i]:rev[i+1]]
-
-            cInd = obsCCDIndex[goodObs[i1a[0]]]
-
-            if self.ccdOffsets['RASIGN'][cInd] == 0:
-                # choose a good exposure to work with
-                hTest, revTest = esutil.stat.histogram(obsExpIndex[goodObs[i1a]], rev=True)
-                maxInd = np.argmax(hTest)
-                testStars = revTest[revTest[maxInd]:revTest[maxInd+1]]
-
-                testRA = objRA[obsObjIDIndex[goodObs[i1a[testStars]]]]
-                testDec = objDec[obsObjIDIndex[goodObs[i1a[testStars]]]]
-                testX = obsX[goodObs[i1a[testStars]]]
-                testY = obsY[goodObs[i1a[testStars]]]
-
-                corrXRA,_ = scipy.stats.pearsonr(testX,testRA)
-                corrYRA,_ = scipy.stats.pearsonr(testY,testRA)
-
-                if (np.abs(corrXRA) > np.abs(corrYRA)):
-                    self.ccdOffsets['XRA'][cInd] = True
-                else:
-                    self.ccdOffsets['XRA'][cInd] = False
-
-                if self.ccdOffsets['XRA'][cInd]:
-                    # x is correlated with RA
-                    if corrXRA < 0:
-                        self.ccdOffsets['RASIGN'][cInd] = -1
-                    else:
-                        self.ccdOffsets['RASIGN'][cInd] = 1
-
-                    corrYDec,_ = scipy.stats.pearsonr(testY,testDec)
-                    if corrYDec < 0:
-                        self.ccdOffsets['DECSIGN'][cInd] = -1
-                    else:
-                        self.ccdOffsets['DECSIGN'][cInd] = 1
-                else:
-                    # y is correlated with RA
-                    if corrYRA < 0:
-                        self.ccdOffsets['RASIGN'][cInd] = -1
-                    else:
-                        self.ccdOffsets['RASIGN'][cInd] = 1
-
-                    corrXDec,_ = scipy.stats.pearsonr(testX,testDec)
-                    if corrXDec < 0:
-                        self.ccdOffsets['DECSIGN'][cInd] = -1
-                    else:
-                        self.ccdOffsets['DECSIGN'][cInd] = 1
-
-
-

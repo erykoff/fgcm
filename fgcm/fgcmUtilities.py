@@ -652,16 +652,16 @@ def computeDeltaRA(a, b, dec=None, degrees=False):
 
 
 def computeCCDOffsetSigns(fgcmStars, ccdOffsets):
-    """
-    Compute plotting signs for x/y to ra/dec conversions.
+    """Compute plotting signs for x/y to ra/dec conversions.
 
     This will have to be rethought with rotation.
 
     Parameters
     ----------
     fgcmStars : `fgcmStars`
+    ccdOffsets : `np.ndarray`
+       Table of ccd offset values
     """
-
     import scipy.stats
     import esutil
     from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
