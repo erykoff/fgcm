@@ -696,8 +696,9 @@ class FgcmStars(object):
         objRARad = np.radians(snmm.getArray(self.objRAHandle))
         objDecRad = np.radians(snmm.getArray(self.objDecHandle))
         ## FIXME: deal with this at some point...
-        # hi,=np.where(objRARad > np.pi)
-        # objRARad[hi] -= 2*np.pi
+        # FIXME: Will need a more elegant solution to how to deal with the ra 0/360
+        # discontinuity, especially when we add rotation.
+        # Now all the deltas are 0/360 aware.
         obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
@@ -1564,8 +1565,7 @@ class FgcmStars(object):
         # at this point, but I don't think that's the case.
 
     def performFocalPlaneOutlierCuts(self, fgcmPars, reset=False, ignoreRef=False):
-        """
-        Do focal plane outlier cuts per exposure.
+        """Do focal plane outlier cuts per exposure.
 
         Parameters
         ----------
@@ -1587,8 +1587,12 @@ class FgcmStars(object):
         obsFlag = snmm.getArray(self.obsFlagHandle)
 
         if ignoreRef:
+            # Without reference stars, these are simply FOCALPLANE_OUTLIERs
             flagName = 'FOCALPLANE_OUTLIER'
         else:
+            # With reference stars, we use a separate flag so that we
+            # can mark these bad observations specifically when we
+            # are using reference star magnitudes.
             flagName = 'FOCALPLANE_OUTLIER_REF'
 
         if reset:

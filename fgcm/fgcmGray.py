@@ -385,8 +385,8 @@ class FgcmGray(object):
             pars = np.zeros((order + 1, order + 1))
             pars[0, 0] = 1.0
 
-            FGrayGO = 10.**(EGrayGO / (-2.5))
-            FGrayErrGO = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO) * FGrayGO
+            FGrayGO = 10.**(EGrayGO/(-2.5))
+            FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
             # Get the ccd to x/y and delta-ra/delta-dec mapping
             nstep = 50
@@ -456,7 +456,7 @@ class FgcmGray(object):
                 fitFailed = False
 
                 if okCcd.size < self.ccdGrayFocalPlaneFitMinCcd:
-                    # Too few good ccds
+                    # Too few good ccds, use the fitFailed flag
                     fitFailed = True
                 else:
                     try:
@@ -474,16 +474,35 @@ class FgcmGray(object):
                         fitFailed = True
 
                 if fitFailed:
-                    # Compute the focal-plane mean.
-                    # This should not be used very often.
-                    fit = pars.flatten()
-                    fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
-                              np.sum(1./EGrayErr2GO[i1a]))
-                    fit[0] = 10.**(fit[0]/(-2.5))
+                    # Compute the means per-ccd.
+                    # This is used when the fit fails (ugh) or when there is not
+                    # enough coverage
 
-                    ccdGray[eInd, :] = -2.5*np.log10(fit[0])
+                    ccdGrayTemp = np.zeros(self.fgcmPars.nCCD)
+                    ccdGrayRMSTemp = np.zeros_like(ccdGrayTemp)
+
+                    np.add.at(ccdGrayTemp,
+                              obsCCDIndex[goodObs[i1a]],
+                              EGrayGO[i1a]/EGrayErr2GO[i1a])
+                    np.add.at(ccdGrayRMSTemp,
+                              obsCCDIndex[goodObs[i1a]],
+                              EGrayGO[i1a]**2./EGrayErr2GO[i1a])
+
+                    gdTemp, = np.where((ccdNGoodStars[eInd, :] >= 3) &
+                                       (ccdGrayWt[eInd, :] > 0.0) &
+                                       (ccdGrayRMSTemp > 0.0))
+                    ccdGrayTemp[gdTemp] /= ccdGrayWt[eInd, gdTemp]
+                    tempRMS2 = np.zeros_like(ccdGrayRMSTemp)
+                    tempRMS2[gdTemp] = (ccdGrayRMSTemp[gdTemp]/ccdGrayWt[eInd, gdTemp]) - ccdGrayTemp[gdTemp]**2.
+                    ok, = np.where(tempRMS2 > 0.0)
+
+                    ccdGray[eInd, ok] = ccdGrayTemp[ok]
+                    ccdGrayRMS[eInd, ok] = np.sqrt(tempRMS2[ok])
+
+                    # If we have any sub-ccd pars, we need to store the flux parametrized
+                    # version as well
                     if np.any(self.ccdGraySubCCD):
-                        ccdGraySubCCDPars[eInd, :, 0] = fit[0]
+                        ccdGraySubCCDPars[eInd, ok, 0] = 10.**(ccdGray[eInd, ok]/(-2.5))
                 else:
                     # Sucessful fit
 
@@ -704,7 +723,8 @@ class FgcmGray(object):
         gd, = np.where(expNGoodCCDs >= 3)
         expGray[gd] /= expGrayWt[gd]
         expDeltaStd[gd] /= expGrayWt[gd]
-        expGrayRMS[gd] = np.sqrt((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.))
+        expGrayRMS[gd] = np.sqrt(np.clip((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.),
+                                         0.0, None))
         expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
         expNGoodTilings[gd] /= expNGoodCCDs[gd]
 
