@@ -5,7 +5,6 @@ import os
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
 import multiprocessing
-from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -138,7 +137,8 @@ class FgcmZpsToApply(object):
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
-        proc = multiprocessing.Process()
+        mp_ctx = multiprocessing.get_context('fork')
+        proc = mp_ctx.Process()
         workerIndex = proc._identity[0] + 1
         proc = None
 
@@ -157,7 +157,7 @@ class FgcmZpsToApply(object):
 
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-        pool = Pool(processes=self.nCore)
+        pool = mp_ctx.Pool(processes=self.nCore)
         pool.map(self._worker, workerList, chunksize=1)
 
         pool.close()
