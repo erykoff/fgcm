@@ -9,7 +9,6 @@ from .fgcmUtilities import objFlagDict
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
 import multiprocessing
-from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -112,7 +111,8 @@ class FgcmComputeStepUnits(object):
         # going to have one or the other, and this doesn't care which is which
         self.nSums += 2 * self.fgcmPars.nFitPars
 
-        proc = multiprocessing.Process()
+        mp_ctx = multiprocessing.get_context("fork")
+        proc = mp_ctx.Process()
         workerIndex = proc._identity[0]+1
         proc = None
 
@@ -141,7 +141,7 @@ class FgcmComputeStepUnits(object):
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
         # make a pool
-        pool = Pool(processes=self.nCore)
+        pool = mp_ctx.Pool(processes=self.nCore)
         # Compute magnitudes
         pool.map(self._stepWorker, workerList, chunksize=1)
 

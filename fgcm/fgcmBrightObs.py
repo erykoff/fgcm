@@ -7,7 +7,6 @@ import time
 from .fgcmChisq import FgcmChisq
 
 import multiprocessing
-from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -143,7 +142,8 @@ class FgcmBrightObs(object):
                                (nSections,time.time() - prepStartTime))
 
             # make a pool
-            pool = Pool(processes=self.nCore)
+            mp_ctx = multiprocessing.get_context("fork")
+            pool = mp_ctx.Pool(processes=self.nCore)
             pool.map(self._worker,workerList,chunksize=1)
             pool.close()
             pool.join()
