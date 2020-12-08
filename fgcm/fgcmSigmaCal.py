@@ -7,7 +7,6 @@ import time
 from .fgcmUtilities import retrievalFlagDict
 
 import multiprocessing
-from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -183,7 +182,8 @@ class FgcmSigmaCal(object):
         for i, s in enumerate(sigmaCals):
             self.sigmaCal = s
 
-            pool = Pool(processes=self.nCore)
+            mp_ctx = multiprocessing.get_context("fork")
+            pool = mp_ctx.Pool(processes=self.nCore)
             pool.map(self._worker, workerList, chunksize=1)
             pool.close()
             pool.join()
