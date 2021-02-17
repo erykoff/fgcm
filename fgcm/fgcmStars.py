@@ -377,7 +377,7 @@ class FgcmStars(object):
             self.fgcmLog.info('PSF Candidate Flags found')
 
             # psfCandidate: bool flag if this is a single-epoch psf candidate
-            self.psfCandidateHandle = snmm.createArray(self.nStarObs, dtype=np.bool)
+            self.psfCandidateHandle = snmm.createArray(self.nStarObs, dtype=bool)
         if obsDeltaMagBkg is not None:
             # Do not use if all 0s
             if np.min(obsDeltaMagBkg) != 0.0 and np.max(obsDeltaMagBkg) != 0.0:
@@ -469,6 +469,12 @@ class FgcmStars(object):
             else:
                 snmm.getArray(self.obsLUTFilterIndexHandle)[use] = filterIndex
                 snmm.getArray(self.obsBandIndexHandle)[use] = bandIndex
+
+        # Check for minimum number of bands
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        ok, = np.where(obsBandIndex >= 0)
+        if (len(np.unique(obsBandIndex[ok])) < 2):
+            raise NotImplementedError("Cannot run fgcmcal with fewer than 2 bands of data.")
 
         if not self.quietMode:
             self.fgcmLog.info('Observations matched in %.1f seconds.' %
