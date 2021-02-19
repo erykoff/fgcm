@@ -752,7 +752,7 @@ class FgcmLUT(object):
 
         # We cut down these to those filters that are defined in the map
         usedFilterNames = self.filterToBand.keys()
-        usedLutFilterMark = np.zeros(len(self.filterNames), dtype=np.bool)
+        usedLutFilterMark = np.zeros(len(self.filterNames), dtype=bool)
         for i, f in enumerate(self.filterNames):
             if f in usedFilterNames:
                 usedLutFilterMark[i] = True

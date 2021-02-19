@@ -403,7 +403,7 @@ class FgcmConfig(object):
 
         # Cut the LUT filter names to those that are actually used
         usedFilterNames = self.filterToBand.keys()
-        usedLutFilterMark = np.zeros(len(self.lutFilterNames), dtype=np.bool)
+        usedLutFilterMark = np.zeros(len(self.lutFilterNames), dtype=bool)
         for i, f in enumerate(self.lutFilterNames):
             if f in usedFilterNames:
                 usedLutFilterMark[i] = True
@@ -467,7 +467,7 @@ class FgcmConfig(object):
 
         # read in the ccd offset file...also append a place to store sign/rotation
         dtype = ccdOffsets.dtype.descr
-        dtype.extend([('XRA', np.bool),
+        dtype.extend([('XRA', bool),
                       ('RASIGN', 'i2'),
                       ('DECSIGN', 'i2')])
 
@@ -492,9 +492,11 @@ class FgcmConfig(object):
         test=np.searchsorted(self.epochMJDs,self.mjdRange)
 
         if test.min() == 0:
-            raise ValueError("Exposure start MJD is out of epoch range!")
+            self.fgcmLog.warn("Exposure start MJD before epoch range.  Adding additional epoch.")
+            self.epochMJDs = np.insert(self.epochMJDs, 0, self.mjdRange[0] - 1.0)
         if test.max() == self.epochMJDs.size:
-            raise ValueError("Exposure end MJD is out of epoch range!")
+            self.fgcmLog.warn("Exposure end MJD after epoch range.  Adding additional epoch.")
+            self.epochMJDs = np.insert(self.epochMJDs, len(self.epochMJDs), self.mjdRange[1] + 1.0)
 
         # crop to valid range
         self.epochMJDs = self.epochMJDs[test[0]-1:test[1]+1]
@@ -519,7 +521,7 @@ class FgcmConfig(object):
         self.coatingMJDs = self.coatingMJDs[gd]
 
         # Deal with fit band, notfit band, required, and notrequired indices
-        bandFitFlag = np.zeros(len(self.bands), dtype=np.bool)
+        bandFitFlag = np.zeros(len(self.bands), dtype=bool)
         bandNotFitFlag = np.zeros_like(bandFitFlag)
         bandRequiredFlag = np.zeros_like(bandFitFlag)
 
