@@ -301,7 +301,7 @@ class FgcmParameters(object):
         # for the same band.  In the future we can add "primary absolute calibrators"
         # to the fit, and turn these on.
         self.parFilterOffset = np.zeros(self.nLUTFilter, dtype=np.float64)
-        self.parFilterOffsetFitFlag = np.zeros(self.nLUTFilter, dtype=np.bool)
+        self.parFilterOffsetFitFlag = np.zeros(self.nLUTFilter, dtype=bool)
         for i, f in enumerate(self.lutFilterNames):
             band = self.filterToBand[f]
             nBand = 0
@@ -329,14 +329,14 @@ class FgcmParameters(object):
         self.compMedianSedSlope = np.zeros(self.nBands, dtype=np.float64)
 
         ## FIXME: need to completely refactor
-        self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
+        self.externalPwvFlag = np.zeros(self.nExp,dtype=bool)
         if (self.pwvFile is not None):
             self.fgcmLog.info('Found external PWV file.')
             self.pwvFile = self.pwvFile
             self.hasExternalPwv = True
             self.loadExternalPwv(self.externalPwvDeltaT)
 
-        self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
+        self.externalTauFlag = np.zeros(self.nExp,dtype=bool)
         if (self.tauFile is not None):
             self.fgcmLog.info('Found external tau file.')
             self.tauFile = self.tauFile
@@ -421,8 +421,8 @@ class FgcmParameters(object):
         self._loadEpochAndWashInfo()
 
         # look at external...
-        self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(np.bool)
-        self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(np.bool)
+        self.hasExternalPwv = inParInfo['HASEXTERNALPWV'][0].astype(bool)
+        self.hasExternalTau = inParInfo['HASEXTERNALTAU'][0].astype(bool)
 
         ## and copy the parameters
         self.parAlpha = np.atleast_1d(inParams['PARALPHA'][0])
@@ -436,7 +436,7 @@ class FgcmParameters(object):
         self.compQESysSlope = inParams['COMPQESYSSLOPE'][0].reshape((self.nBands, self.nWashIntervals))
         self.compQESysSlopeApplied = self.compQESysSlope.copy()
         self.parFilterOffset = np.atleast_1d(inParams['PARFILTEROFFSET'][0])
-        self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(np.bool)
+        self.parFilterOffsetFitFlag = np.atleast_1d(inParams['PARFILTEROFFSETFITFLAG'][0]).astype(bool)
         self.compAbsThroughput = np.atleast_1d(inParams['COMPABSTHROUGHPUT'][0])
         self.compRefOffset = np.atleast_1d(inParams['COMPREFOFFSET'][0])
         self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
@@ -444,7 +444,7 @@ class FgcmParameters(object):
         self.mirrorChromaticityPivot = np.atleast_1d(inParams['MIRRORCHROMATICITYPIVOT'][0])
         self.compMedianSedSlope = np.atleast_1d(inParams['COMPMEDIANSEDSLOPE'][0])
 
-        self.externalPwvFlag = np.zeros(self.nExp,dtype=np.bool)
+        self.externalPwvFlag = np.zeros(self.nExp,dtype=bool)
         if self.hasExternalPwv:
             self.pwvFile = str(inParInfo['PWVFILE'][0]).rstrip()
             self.hasExternalPwv = True
@@ -452,7 +452,7 @@ class FgcmParameters(object):
             self.parExternalLnPwvScale = inParams['PAREXTERNALLNPWVSCALE'][0]
             self.parExternalLnPwvOffset[:] = np.atleast_1d(inParams['PAREXTERNALLNPWVOFFSET'][0])
 
-        self.externalTauFlag = np.zeros(self.nExp,dtype=np.bool)
+        self.externalTauFlag = np.zeros(self.nExp,dtype=bool)
         if self.hasExternalTau:
             self.tauFile = str(inParInfo['TAUFILE'][0]).rstrip()
             self.hasExternalTau = True
@@ -650,8 +650,8 @@ class FgcmParameters(object):
         # link exposures to bands
         self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
-        self.hasExposuresInFilter = np.ones(self.nLUTFilter, dtype=np.bool)
-        self.hasExposuresInBand = np.zeros(self.nBands, dtype=np.bool)
+        self.hasExposuresInFilter = np.ones(self.nLUTFilter, dtype=bool)
+        self.hasExposuresInBand = np.zeros(self.nBands, dtype=bool)
         expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
 
         expFilterNameIsEncoded = False
@@ -687,7 +687,7 @@ class FgcmParameters(object):
             self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
 
         # Flag exposures that are not in the fit bands
-        self.expNotFitBandFlag = np.zeros(self.nExp, dtype=np.bool)
+        self.expNotFitBandFlag = np.zeros(self.nExp, dtype=bool)
         if self.nNotFitBands > 0:
             a, b = esutil.numpy_util.match(self.bandNotFitIndex, self.expBandIndex)
             self.expNotFitBandFlag[b] = True

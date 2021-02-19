@@ -832,7 +832,7 @@ class FgcmChisq(object):
         #  Compute derivatives...
 
         # Default mask is not to mask
-        maskGO = np.ones(goodObs.size, dtype=np.bool)
+        maskGO = np.ones(goodObs.size, dtype=bool)
 
         useRefstars = False
         if self.fgcmStars.hasRefstars and not self.ignoreRef:

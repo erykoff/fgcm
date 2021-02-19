@@ -126,6 +126,8 @@ class FgcmSigmaRef(object):
                                    gmiGRS[okColor[st[-1]]]])
             gmiCutNames = ['All', 'Blue25', 'Middle50', 'Red25']
 
+            message = None
+
             for bandIndex, band in enumerate(self.fgcmStars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                     continue

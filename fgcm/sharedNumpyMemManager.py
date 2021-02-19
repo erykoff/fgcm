@@ -97,7 +97,7 @@ class SharedNumpyMemManager(object):
             ctype = ctypes.c_int64
         elif (dtype == np.int16):
             ctype = ctypes.c_int16
-        elif (dtype == np.bool):
+        elif (dtype == bool):
             ctype = ctypes.c_bool
         else:
             raise ValueError("Unsupported dtype")
