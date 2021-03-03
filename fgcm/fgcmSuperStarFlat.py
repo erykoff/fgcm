@@ -132,7 +132,7 @@ class FgcmSuperStarFlat(object):
         if not np.any(self.superStarSubCCD) or doNotUseSubCCD:
             # do not use subCCD x/y information (or x/y not available)
 
-            mark = np.ones(goodObs.size, dtype=np.bool)
+            mark = np.ones(goodObs.size, dtype=bool)
 
             # Next, we sort by epoch, band
             superStarWt = np.zeros_like(superStarFlatCenter)

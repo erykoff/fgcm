@@ -365,7 +365,7 @@ class FgcmComputeStepUnits(object):
         # Note that we don't care if something is a refstar or not for this
 
         # Default mask is not to mask
-        maskGO = np.ones(goodObs.size, dtype=np.bool)
+        maskGO = np.ones(goodObs.size, dtype=bool)
 
         # which observations are actually used in the fit?
         useGO, = np.where(maskGO)
