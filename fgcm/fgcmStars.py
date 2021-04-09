@@ -91,7 +91,7 @@ class FgcmStars(object):
         self.filterToBand = fgcmConfig.filterToBand
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
-        self.superStarSubCCD = fgcmConfig.superStarSubCCD
+        self.superStarSubCCD = any(fgcmConfig.superStarSubCCD)
         self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
 
         self.focalPlaneSigmaClip = fgcmConfig.focalPlaneSigmaClip

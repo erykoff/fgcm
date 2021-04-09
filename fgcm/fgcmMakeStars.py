@@ -6,6 +6,7 @@ import glob
 import healpy as hp
 
 from .fgcmLogger import FgcmLogger
+from .fgcmUtilities import Matcher
 
 
 class FgcmMakeStars(object):
@@ -38,8 +39,6 @@ class FgcmMakeStars(object):
        Maximum number of stars in each healpix.  Will randomly sample down to this density.
     primaryBands: string
        List of primary bands
-    matchNSide: int
-       Healpix nside to do smatch matching.  Should just be 4096.
     coarseNSide: int
        Healpix nside to break down into coarse pixels (save memory)
     brightStarFile: string, optional
@@ -282,16 +281,6 @@ class FgcmMakeStars(object):
         objCat: numpy recarray
            Catalog of unique objects selected from primary band
         """
-
-        # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-            self.fgcmLog.info("Using smatch for matching.")
-        except ImportError:
-            hasSmatch = False
-            self.fgcmLog.info("Using htm for matching.")
-
         if (raArray.size != decArray.size):
             raise ValueError("raArray, decArray must be same length.")
         if (raArray.size != filterNameArray.size):
@@ -376,141 +365,56 @@ class FgcmMakeStars(object):
                     self.fgcmLog.info("Nothing found for pixel %d" % (ipring[p1a[0]]))
                     continue
 
-                esutil.numpy_util.to_native(raArrayUse, inplace=True)
-                esutil.numpy_util.to_native(decArrayUse, inplace=True)
+                with Matcher(raArrayUse, decArrayUse) as matcher:
+                    idx = matcher.query_self(self.starConfig['matchRadius']/3600.,
+                                             min_match=self.starConfig['minPerBand'])
+#                idx = match_to_self(raArrayUse, decArrayUse,
+#                                    self.starConfig['matchRadius']/3600.,
+#                                    min_match=self.starConfig['minPerBand'])
 
-                if hasSmatch:
-                    # faster match...
-                    self.fgcmLog.info("Starting smatch...")
-                    matches = smatch.match(raArrayUse, decArrayUse,
-                                           self.starConfig['matchRadius'] / 3600.0,
-                                           raArrayUse, decArrayUse,
-                                           nside=self.starConfig['matchNSide'], maxmatch=0)
-                    i1 = matches['i1']
-                    i2 = matches['i2']
-                    self.fgcmLog.info("Finished smatch.")
-                else:
-                    # slower htm matching...
-                    htm = esutil.htm.HTM(11)
+                count = len(idx)
 
-                    matcher = esutil.htm.Matcher(11, raArrayUse, decArrayUse)
-                    matches = matcher.match(raArrayUse, decArrayUse,
-                                            self.starConfig['matchRadius'] / 3600.0,
-                                            maxmatch=0)
-                    i1 = matches[1]
-                    i2 = matches[0]
-
-                """
-                # Try this instead...
-
-                counter = np.zeros(raArrayUse.size, dtype=np.int64)
-                minId = np.zeros(raArrayUse.size, dtype=np.int64) + raArrayUse.size + 1
-                raMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
-                decMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
-
-                # Count the number of observations of each matched observation
-                np.add.at(counter, i1, 1)
-                # Find the minimum id of the match to key on a unique value
-                # for each
-                np.fmin.at(minId, i2, i1)
-                # Compute the mean ra/dec
-                np.add.at(raMeanAll, i1, raArrayUse[i2])
-                raMeanAll /= counter
-                np.add.at(decMeanAll, i1, decArrayUse[i2])
-                decMeanAll /= counter
-
-                uId = np.unique(minId)
-
-                bandPixelCatTemp = np.zeros(uId.size, dtype=dtype)
-                bandPixelCatTemp['ra'] = raMeanAll[uId]
-                bandPixelCatTemp['dec'] = decMeanAll[uId]
-
-                # Any extra quantities?
-                if len(self.starConfig['quantitiesToAverage']) > 0:
-                    for quant in enumerate(self.starConfig['quantitiesToAverage']):
-                        quantMeanAll = np.zeros(raArrayUse.size, dtype=np.float64)
-                        np.add.at(quantMeanAll, i1, extraQuantityArrays[quant][p1a[useFlag[i2]]])
-                        quantMeanAll /= counter
-                        bandPixelCatTemp[quant] = quantMeanAll[uId]
-                        """
-
-                # This is the official working version, but slower
-                fakeId = np.arange(p1a.size)
-                hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
-
-                if (hist.max() == 1):
-                    self.fgcmLog.warn("No matches found for pixel %d, band %s!" %
-                                      (ipring[p1a[0]], primaryBand))
-                    continue
-
-                maxObs = hist.max()
-
-                # how many unique objects do we have?
-                histTemp = hist.copy()
-                count=0
-                for j in range(histTemp.size):
-                    jj = fakeId[j]
-                    if (histTemp[jj] >= self.starConfig['minPerBand']):
-                        i1a = rev[rev[jj]: rev[jj + 1]]
-                        histTemp[i2[i1a]] = 0
-                        count = count + 1
-
-                # make a temporary catalog...
                 bandPixelCatTemp = np.zeros(count, dtype=dtype)
 
-                # Rotate.  This works for DES, but maybe not in general?
-                raTemp = raArrayUse.copy()
+                # Rotate if necessary...
+                rotated = False
+                if raArrayUse.min() > 60.0 and raArrayUse.max() > 300.0:
+                    # Even for very large pixels it looks like we span the 360.0 pole
+                    raTemp = raArrayUse.copy()
+                    raTemp[raTemp > 180.0] -= 360.0
+                else:
+                    raTemp = raArrayUse
 
-                hi, = np.where(raTemp > 180.0)
-                raTemp[hi] -= 360.0
+                for i, row in enumerate(idx):
+                    row = np.array(row)
+                    bandPixelCatTemp['ra'][i] = np.sum(raArrayUse[row])/len(row)
+                    bandPixelCatTemp['dec'][i] = np.sum(decArrayUse[row])/len(row)
 
-                # Compute mean ra/dec
-                index = 0
-                for j in range(hist.size):
-                    jj = fakeId[j]
-                    if (hist[jj] >= self.starConfig['minPerBand']):
-                        i1a = rev[rev[jj]: rev[jj + 1]]
-                        starInd = i2[i1a]
-                        # make sure this doesn't get used again
-                        hist[starInd] = 0
-                        bandPixelCatTemp['ra'][index] = np.sum(raTemp[starInd]) / starInd.size
-                        bandPixelCatTemp['dec'][index] = np.sum(decArrayUse[starInd]) / starInd.size
-                        if hasExtraQuantities:
-                            for quant in self.starConfig['quantitiesToAverage']:
-                                ok, = np.where((extraQuantityArraysUse[quant + '_err'][starInd] > 0.0))
-                                wt = 1./extraQuantityArraysUse[quant + '_err'][starInd[ok]]**2.
-                                bandPixelCatTemp[quant][index] = np.sum(wt * extraQuantityArraysUse[quant][starInd[ok]]) / np.sum(wt)
-
-                        index = index + 1
+                    if hasExtraQuantities:
+                        for quant in self.starConfig['quantitiesToAverage']:
+                            ok, = np.where(extraQuantityArraysUse[quant + '_err'][row] > 0.0)
+                            wt = 1./extraQuantityArraysUse[quant + '_err'][row[ok]]
+                            bandPixelCatTemp[quant][i] = np.sum(wt*extraQuantityArraysUse[quant][row[ok]])/np.sum(wt)
 
                 # Restore negative RAs
-                lo, = np.where(bandPixelCatTemp['ra'] < 0.0)
-                bandPixelCatTemp['ra'][lo] += 360.0
+                bandPixelCatTemp['ra'][bandPixelCatTemp['ra'] < 0.0] += 360.0
 
-                # Match to previously pixel catalog if available, and remove dupes
+                # Match to previous band pixel catalog if available, and remove duplicates
                 if bandPixelCat is None:
-                    # First time through, these are all new objects
                     bandPixelCat = bandPixelCatTemp
                     self.fgcmLog.info(" Found %d primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
                 else:
-                    # We already have objects, need to match/append
-                    if hasSmatch:
-                        bandMatches = smatch.match(bandPixelCat['ra'], bandPixelCat['dec'],
-                                                   self.starConfig['matchRadius'] / 3600.0,
-                                                   bandPixelCatTemp['ra'], bandPixelCatTemp['dec'],
-                                                   maxmatch=0)
-                        i1b = matches['i1']
-                        i2b = matches['i2']
-                    else:
-                        matcher = esutil.htm.Matcher(11, bandPixelCat['ra'], bandPixelCat['dec'])
-                        matches = matcher.match(bandPixelCatTemp['ra'], bandPixelCatTemp['dec'],
-                                                self.starConfig['matchRadius'] / 3600.0,
-                                                maxmatch=0)
-                        i1b = matches[1]
-                        i2b = matches[0]
+                    with Matcher(bandPixelCatTemp['ra'], bandPixelCatTemp['dec']) as matcher:
+                        idx = matcher.query_radius(bandPixelCat['ra'], bandPixelCat['dec'],
+                                                   self.starConfig['matchRadius']/3600.0)
 
-                    # Remove all matches from the temp catalog
-                    bandPixelCatTemp = np.delete(bandPixelCatTemp, i2b)
+#                    idx = match_to_other(bandPixelCatTemp['ra'], bandPixelCatTemp['dec'],
+#                                         self.starConfig['matchRadius']/3600.0,
+#                                         bandPixelCat['ra'], bandPixelCat['dec'])
+
+                    # Any object that has a match should be removed
+                    matchedIndices = np.array([i for i in range(len(idx)) if len(idx[i]) > 0])
+                    bandPixelCatTemp = np.delete(bandPixelCatTemp, matchedIndices)
                     self.fgcmLog.info(" Found %d new primary stars in %s band" % (bandPixelCatTemp.size, primaryBand))
 
                     bandPixelCat = np.append(bandPixelCat, bandPixelCatTemp)
@@ -542,59 +446,49 @@ class FgcmMakeStars(object):
 
         if (cutBrightStars):
             self.fgcmLog.info("Matching to bright stars for masking...")
-            if (hasSmatch):
-                # faster smatch...
-                matches = smatch.match(brightStarRA, brightStarDec, brightStarRadius,
-                                       self.objCat['ra'], self.objCat['dec'], nside=self.starConfig['matchNSide'],
-                                       maxmatch=0)
-                i1=matches['i1']
-                i2=matches['i2']
-            else:
-                # slower htm matching...
-                htm = esutil.htm.HTM(11)
 
-                matcher = esutil.htm.Matcher(10, brightStarRA, brightStarDec)
-                matches = matcher.match(self.objCat['ra'], self.objCat['dec'], brightStarRadius,
-                                        maxmatch=0)
-                # matches[0] -> m1 -> array from matcher.match() call (self.objCat)
-                # matches[1] -> m2 -> array from htm.Matcher() (brightStar)
-                i1=matches[1]
-                i2=matches[0]
+            with Matcher(self.objCat['ra'], self.objCat['dec']) as matcher:
+                idx = matcher.query_radius(brightStarRA, brightStarDec,
+                                           np.max(brightStarRadius))
+
+#            idx = match_to_other(self.objCat['ra'], self.objCat['dec'],
+#                                 np.max(brightStarRadius),
+#                                 brightStarRA, brightStarDec)
+
+            matched = np.zeros(self.objCat.size, dtype=bool)
+            for j in range(len(idx)):
+                if len(idx[j]) > 0:
+                    ds = esutil.coords.sphdist(self.objCat['ra'][j], self.objCat['dec'][j],
+                                               brightStarRA[idx[j]], brightStarDec[idx[j]])
+                    ok, = np.where(ds < brightStarRadius[idx[j]])
+                    if ok.size > 0:
+                        matched[j] = True
 
             self.fgcmLog.info("Cutting %d objects too near bright stars." % (i2.size))
-            self.objCat = np.delete(self.objCat,i2)
+            self.objCat = np.delete(self.objCat, np.where(matched)[0])
 
         # and remove stars with near neighbors
         self.fgcmLog.info("Matching stars to neighbors...")
-        if (hasSmatch):
-            # faster smatch...
 
-            matches=smatch.match(self.objCat['ra'], self.objCat['dec'],
-                                 self.starConfig['isolationRadius']/3600.0,
-                                 self.objCat['ra'], self.objCat['dec'],
-                                 nside=self.starConfig['matchNSide'], maxmatch=0)
-            i1=matches['i1']
-            i2=matches['i2']
-        else:
-            # slower htm matching...
-            htm = esutil.htm.HTM(11)
+        # Only those objects that have more than 1 match (self + other)
+        # have neighbors and should be removed.
+        with Matcher(self.objCat['ra'], self.objCat['dec']) as matcher:
+            idx = matcher.query_self(self.starConfig['isolationRadius']/3600.0, min_match=2)
 
-            matcher = esutil.htm.Matcher(11, self.objCat['ra'], self.objCat['dec'])
-            matches = matcher.match(self.objCat['ra'], self.objCat['dec'],
-                                    self.starConfig['isolationRadius']/3600.0,
-                                    maxmatch = 0)
-            i1=matches[1]
-            i2=matches[0]
+        # idx = match_to_self(self.objCat['ra'], self.objCat['dec'],
+        #                    self.starConfig['isolationRadius']/3600.0,
+        #                    min_match=2)
 
-        use,=np.where(i1 != i2)
+        neighbor_indices = []
+        for row in idx:
+            neighbor_indices.extend(row)
 
-        if (use.size > 0):
-            neighbored = np.unique(i2[use])
+        if len(neighbor_indices) > 0:
+            neighbored = np.unique(neighbor_indices)
             self.fgcmLog.info("Cutting %d objects within %.2f arcsec of a neighbor" %
-                  (neighbored.size, self.starConfig['isolationRadius']))
-            self.objCat = np.delete(self.objCat, neighbored)
+                              (neighbored.size, self.starConfig['isolationRadius']))
 
-        # and we're done
+            self.objCat = np.delete(self.objCat, neighbored)
 
     def makeMatchedStars(self, raArray, decArray, filterNameArray):
         """
@@ -613,13 +507,6 @@ class FgcmMakeStars(object):
 
         if (self.objCat is None):
             raise ValueError("Must run makePrimaryStars first")
-
-        # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-        except ImportError:
-            hasSmatch = False
 
         if (raArray.size != decArray.size or
             raArray.size != filterNameArray.size):
@@ -645,51 +532,39 @@ class FgcmMakeStars(object):
 
         self.fgcmLog.info("Matching positions to observations...")
 
-        if (hasSmatch):
-            # faster smatch...
+        with Matcher(self.objCat['ra'], self.objCat['dec']) as matcher:
+            idx, i1, i2, dist = matcher.query_radius(raArray, decArray,
+                                                     self.starConfig['matchRadius']/3600.0,
+                                                     return_indices=True)
+        # idx = match_to_other(self.objCat['ra'], self.objCat['dec'],
+        #                      self.starConfig['matchRadius']/3600.0,
+        #                     raArray, decArray)
 
-            matches=smatch.match(self.objCat['ra'], self.objCat['dec'],
-                                 self.starConfig['matchRadius']/3600.0,
-                                 raArray, decArray,
-                                 nside=self.starConfig['matchNSide'],
-                                 maxmatch=0)
-            i1=matches['i1']
-            i2=matches['i2']
-        else:
-            # slower htm matching...
-            htm = esutil.htm.HTM(11)
+        nObsPerObj = np.array([len(row) for row in idx])
 
-            matcher = esutil.htm.Matcher(11, self.objCat['ra'], self.objCat['dec'])
-            matches = matcher.match(raArray, decArray,
-                                    self.starConfig['matchRadius']/3600.,
-                                    maxmatch=0)
-            # matches[0] -> m1 -> array from matcher.match() call (ra/decArray)
-            # matches[1] -> m2 -> array from htm.Matcher() (self.objCat)
-            i2 = matches[0]
-            i1 = matches[1]
-
-        self.fgcmLog.info("Collating observations")
-        nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
-
-        if (nObsPerObj.size != self.objCat.size):
-            raise ValueError("Number of primary stars (%d) does not match observations (%d)." %
-                             (self.objCat.size, nObsPerObj.size))
-
-        # and our simple classifier
+        # Our simple classifier
         #    1 is a good star, 0 is bad.
         objClass = np.zeros(self.objCat.size, dtype='i2')
 
-        # We may have no "required" bands beyond being in one of the primary bands
         if len(self.starConfig['requiredBands']) > 0:
-
-            # which stars have at least minPerBand observations in each required band?
+            # Which stars have at least minPerBand observations in each required band?
             reqBands = np.array(self.starConfig['requiredBands'], dtype=bandArray.dtype)
 
-            # this could be made more efficient
+            # We need indices for this code
+            # i1 = np.zeros(nObsPerObj.sum(), dtype=np.int32)
+            # i2 = np.zeros_like(i1)
+            # counter = 0
+            # for i, row in enumerate(idx):
+            #     i1[counter: counter + nObsPerObj[i]] = i
+            #     i2[counter: counter + nObsPerObj[i]] = row
+            #     counter += nObsPerObj[i]
+
+            # This could be made more efficient
             self.fgcmLog.info("Computing number of observations per band")
             nObs = np.zeros((reqBands.size, self.objCat.size), dtype='i4')
             for i in range(reqBands.size):
-                use,=np.where(bandArray[i2] == reqBands[i])
+                use, = np.where(bandArray[i2] == reqBands[i])
+
                 hist = esutil.stat.histogram(i1[use], min=0, max=self.objCat.size-1)
                 nObs[i,:] = hist
 
@@ -706,13 +581,8 @@ class FgcmMakeStars(object):
         self.fgcmLog.info("There are %d stars with at least %d observations in each required band." %
               (gd.size, self.starConfig['minPerBand']))
 
-
         # cut the density of stars down with sampling.
-
-        theta = (90.0 - self.objCat['dec'][gd])*np.pi/180.
-        phi = self.objCat['ra'][gd]*np.pi/180.
-
-        ipring = hp.ang2pix(self.starConfig['densNSide'], theta, phi)
+        ipring = hp.ang2pix(self.starConfig['densNSide'], self.objCat['ra'], self.objCat['dec'], lonlat=True)
         hist, rev = esutil.stat.histogram(ipring, rev=True)
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
@@ -724,7 +594,7 @@ class FgcmMakeStars(object):
             objClass[gd[cut]] = 0
 
         # redo the good object selection after sampling
-        gd,=np.where(objClass == 1)
+        gd, = np.where(objClass == 1)
 
         dtype = [('fgcm_id','i4'),
                  ('ra','f8'),
@@ -763,10 +633,8 @@ class FgcmMakeStars(object):
         ctr = 0
         self.fgcmLog.info("Spooling out %d observation indices." % (nTotObs))
         for i in gd:
-            self.obsIndexCat[ctr:ctr+nObsPerObj[i]] = i2[obsInd[obsInd[i]:obsInd[i+1]]]
-            ctr+=nObsPerObj[i]
-
-        # and we're done
+            self.obsIndexCat[ctr: ctr + nObsPerObj[i]] = idx[i]
+            ctr += nObsPerObj[i]
 
     def makeReferenceMatches(self, refLoader):
         """
@@ -777,14 +645,6 @@ class FgcmMakeStars(object):
         refLoader: `object`
            Object which has refLoader.getFgcmReferenceStarsHealpix
         """
-
-        # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-        except ImportError:
-            hasSmatch = False
-
         ipring = hp.ang2pix(self.starConfig['coarseNSide'],
                             np.radians(90.0 - self.objIndexCat['dec']),
                             np.radians(self.objIndexCat['ra']))
@@ -832,29 +692,10 @@ class FgcmMakeStars(object):
                 # No stars in this pixel.  That's okay.
                 continue
 
-            if hasSmatch:
-                matches = smatch.match(self.objIndexCat['ra'][p1a],
-                                       self.objIndexCat['dec'][p1a],
-                                       self.starConfig['matchRadius']/3600.0,
-                                       refCat['ra'], refCat['dec'],
-                                       nside=self.starConfig['matchNSide'],
-                                       maxmatch=1)
-                i1 = matches['i1']
-                i2 = matches['i2']
-            else:
-                htm = esutil.htm.HTM(11)
-
-                matcher = esutil.htm.Matcher(11,
-                                             self.objIndexCat['ra'][p1a],
-                                             self.objIndexCat['dec'][p1a])
-                matches = matcher.match(refCat['ra'], refCat['dec'],
-                                        self.starConfig['matchRadius']/3600.0,
-                                        maxmatch=1)
-
-                # matches[0] -> m1 -> array from matcher.match() call (refCat)
-                # matches[1] -> m2 -> array from htm.Matcher() (self.objIndexCat)
-                i2 = matches[0]
-                i1 = matches[1]
+            with Matcher(self.objIndexCat['ra'][p1a], self.objIndexCat['dec'][p1a]) as matcher:
+                idx, i1, i2, d = matcher.query_knn(refCat['ra'], refCat['dec'], k=1,
+                                                   distance_upper_bound=self.starConfig['matchRadius']/3600.0,
+                                                   return_indices=True)
 
             # i1 -> objIndexCat[p1a]
             # i2 -> refCat
