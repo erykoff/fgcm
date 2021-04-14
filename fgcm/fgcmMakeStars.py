@@ -373,7 +373,8 @@ class FgcmMakeStars(object):
                     extraQuantityArraysUse = extraQuantityArrays[p1a[useFlag]]
 
                 if raArrayUse.size == 0:
-                    self.fgcmLog.info("Nothing found for pixel %d" % (ipring[p1a[0]]))
+                    self.fgcmLog.info("  No observations in pixel %d, %s band" %
+                                      (ipring[p1a[0]], primaryBand))
                     continue
 
                 esutil.numpy_util.to_native(raArrayUse, inplace=True)
@@ -439,7 +440,7 @@ class FgcmMakeStars(object):
                 hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
 
                 if (hist.max() == 1):
-                    self.fgcmLog.warn("No matches found for pixel %d, band %s!" %
+                    self.fgcmLog.warn("  No matches found for pixel %d, %s band" %
                                       (ipring[p1a[0]], primaryBand))
                     continue
 
