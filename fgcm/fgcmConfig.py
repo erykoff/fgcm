@@ -480,11 +480,6 @@ class FgcmConfig(object):
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
 
-        if self.epochNames is None:
-            self.epochNames = []
-            for i in range(self.epochMJDs.size):
-                self.epochNames.append('epoch%d' % (i))
-
         # are they sorted?
         if (self.epochMJDs != np.sort(self.epochMJDs)).any():
             raise ValueError("epochMJDs must be sorted in ascending order")
@@ -494,9 +489,18 @@ class FgcmConfig(object):
         if test.min() == 0:
             self.fgcmLog.warn("Exposure start MJD before epoch range.  Adding additional epoch.")
             self.epochMJDs = np.insert(self.epochMJDs, 0, self.mjdRange[0] - 1.0)
+            if self.epochNames is not None:
+                self.epochNames.insert(0, 'epoch-pre')
         if test.max() == self.epochMJDs.size:
             self.fgcmLog.warn("Exposure end MJD after epoch range.  Adding additional epoch.")
             self.epochMJDs = np.insert(self.epochMJDs, len(self.epochMJDs), self.mjdRange[1] + 1.0)
+            if self.epochNames is not None:
+                self.epochNames.insert(len(self.epochNames), 'epoch-post')
+
+        if self.epochNames is None:
+            self.epochNames = []
+            for i in range(self.epochMJDs.size):
+                self.epochNames.append('epoch%d' % (i))
 
         # crop to valid range
         self.epochMJDs = self.epochMJDs[test[0]-1:test[1]+1]
@@ -764,12 +768,7 @@ class FgcmConfig(object):
     def _setDefaultLengths(self):
         """
         """
-
-        # Check the fudge factors...
-        type(self).__dict__['sedTermDict']._length = len(self.bands)
-
-        # And the epoch names
-        type(self).__dict__['epochNames']._length = len(self.epochMJDs)
+        pass
 
     def _convertDictToBandList(self, inputDict, dtype, default,
                                required=False, ndarray=False, dictName=''):
