@@ -620,7 +620,7 @@ def checkFlaggedExposuresPerBand(log, fgcmPars):
         inBand, = np.where(fgcmPars.expBandIndex == i)
         inBandBad, = np.where(fgcmPars.expFlag[inBand] > 0)
         if inBandBad.size >= (inBand.size - 1):
-            raise RuntimeError("FATAL: All observations in %s band have been cut!")
+            raise RuntimeError("FATAL: All observations in %s band have been cut!" % (band,))
 
 
 def computeDeltaRA(a, b, dec=None, degrees=False):
