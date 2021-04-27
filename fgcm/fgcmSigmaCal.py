@@ -379,4 +379,6 @@ class FgcmSigmaCal(object):
         del state['fgcmLog']
         return state
 
-
+    def freeSharedMemory(self):
+        """Free shared memory"""
+        snmm.freeArray(self.objChi2Handle)

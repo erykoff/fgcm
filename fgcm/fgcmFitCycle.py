@@ -546,8 +546,8 @@ class FgcmFitCycle(object):
         #   if we don't the zeropoints before convergence will be wrong.
 
         self.fgcmLog.debug('FitCycle computing SigmaCal')
-        sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
-        sigCal.run()
+        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
+        self.sigCal.run()
 
         if self.fgcmStars.hasRefstars:
             self.fgcmLog.debug('FitCycle computing SigmaRef')
@@ -696,3 +696,10 @@ class FgcmFitCycle(object):
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
 
+    def freeSharedMemory(self):
+        """Free all shared memory."""
+        self.fgcmLUT.freeSharedMemory()
+        self.fgcmGray.freeSharedMemory()
+        self.fgcmRetrieval.freeSharedMemory()
+        self.sigCal.freeSharedMemory()
+        self.fgcmStars.freeSharedMemory()
