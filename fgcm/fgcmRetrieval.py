@@ -315,3 +315,11 @@ class FgcmRetrieval(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def freeSharedMemory(self):
+        """Free shared memory"""
+        if not self.arraysPrepared:
+            return
+
+        snmm.freeArray(self.r0Handle)
+        snmm.freeArray(self.r10Handle)
