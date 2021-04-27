@@ -1093,3 +1093,19 @@ class FgcmLUT(object):
         #  but the noise in g-r is going to cause things to bounce around.  Pout.
 
         return self.sedLUT['FPRIME'][indices,:]
+
+    def freeSharedMemory(self):
+        """Free shared memory in the LUT"""
+        snmm.freeArray(self.lutI0Handle)
+        snmm.freeArray(self.lutI1Handle)
+        snmm.freeArray(self.lutDLnPwvHandle)
+        snmm.freeArray(self.lutDO3Handle)
+        snmm.freeArray(self.lutDLnTauHandle)
+        snmm.freeArray(self.lutDAlphaHandle)
+        snmm.freeArray(self.lutDSecZenithHandle)
+        snmm.freeArray(self.lutDLnPwvI1Handle)
+        snmm.freeArray(self.lutDO3I1Handle)
+        snmm.freeArray(self.lutDLnTauI1Handle)
+        snmm.freeArray(self.lutDAlphaI1Handle)
+        snmm.freeArray(self.lutDSecZenithI1Handle)
+

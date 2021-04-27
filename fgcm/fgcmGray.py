@@ -1244,3 +1244,33 @@ class FgcmGray(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def freeSharedMemory(self):
+        """Free shared memory"""
+        if not self.arraysPrepared:
+            return
+
+        snmm.freeArray(self.expGrayForInitialSelectionHandle)
+        snmm.freeArray(self.expGrayRMSForInitialSelectionHandle)
+        snmm.freeArray(self.expNGoodStarForInitialSelectionHandle)
+        snmm.freeArray(self.ccdGrayHandle)
+        snmm.freeArray(self.ccdDeltaStdHandle)
+        snmm.freeArray(self.ccdGrayRMSHandle)
+        snmm.freeArray(self.ccdGrayErrHandle)
+        snmm.freeArray(self.ccdNGoodObsHandle)
+        snmm.freeArray(self.ccdNGoodStarsHandle)
+        snmm.freeArray(self.ccdNGoodTilingsHandle)
+        if np.any(self.ccdGraySubCCD):
+            snmm.freeArray(self.ccdGraySubCCDParsHandle)
+        snmm.freeArray(self.expGrayHandle)
+        snmm.freeArray(self.expDeltaStdHandle)
+        snmm.freeArray(self.expGrayRMSHandle)
+        snmm.freeArray(self.expGrayErrHandle)
+        snmm.freeArray(self.expNGoodStarsHandle)
+        snmm.freeArray(self.expNGoodCCDsHandle)
+        snmm.freeArray(self.expNGoodTilingsHandle)
+        snmm.freeArray(self.expGrayColorSplitHandle)
+        snmm.freeArray(self.expGrayRMSColorSplitHandle)
+        snmm.freeArray(self.expGrayErrColorSplitHandle)
+        snmm.freeArray(self.expGrayNGoodStarsColorSplitHandle)
+        snmm.freeArray(self.ccdDeltaMagBkgHandle)
