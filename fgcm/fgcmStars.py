@@ -1986,3 +1986,50 @@ class FgcmStars(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         return state
+
+    def freeSharedMemory(self):
+        """Free shared memory"""
+        snmm.freeArray(self.obsIndexHandle)
+        snmm.freeArray(self.obsExpHandle)
+        snmm.freeArray(self.obsExpIndexHandle)
+        snmm.freeArray(self.obsCCDHandle)
+        snmm.freeArray(self.obsBandIndexHandle)
+        snmm.freeArray(self.obsLUTFilterIndexHandle)
+        snmm.freeArray(self.obsFlagHandle)
+        snmm.freeArray(self.obsRAHandle)
+        snmm.freeArray(self.obsDecHandle)
+        snmm.freeArray(self.obsSecZenithHandle)
+        snmm.freeArray(self.obsMagADUHandle)
+        snmm.freeArray(self.obsMagADUErrHandle)
+        snmm.freeArray(self.obsMagADUModelErrHandle)
+        snmm.freeArray(self.obsSuperStarAppliedHandle)
+        snmm.freeArray(self.obsMagStdHandle)
+        snmm.freeArray(self.obsDeltaStdHandle)
+        if self.hasXY:
+            snmm.freeArray(self.obsXHandle)
+            snmm.freeArray(self.obsYHandle)
+        if self.hasPsfCandidate:
+            snmm.freeArray(self.psfCandidateHandle)
+        if self.hasDeltaMagBkg:
+            snmm.freeArray(self.obsDeltaMagBkgHandle)
+        if self.hasRefstars:
+            snmm.freeArray(self.refIDHandle)
+            snmm.freeArray(self.refMagHandle)
+            snmm.freeArray(self.refMagErrHandle)
+        snmm.freeArray(self.objIDHandle)
+        snmm.freeArray(self.objRAHandle)
+        snmm.freeArray(self.objDecHandle)
+        snmm.freeArray(self.objObsIndexHandle)
+        snmm.freeArray(self.objNobsHandle)
+        snmm.freeArray(self.objNGoodObsHandle)
+        snmm.freeArray(self.objNTotalObsHandle)
+        if self.hasPsfCandidate:
+            snmm.freeArray(self.objNPsfCandidateHandle)
+        snmm.freeArray(self.objFlagHandle)
+        snmm.freeArray(self.obsObjIDIndexHandle)
+        if self.hasRefstars:
+            snmm.freeArray(self.objRefIDIndexHandle)
+        snmm.freeArray(self.objMagStdMeanHandle)
+        snmm.freeArray(self.objMagStdMeanErrHandle)
+        snmm.freeArray(self.objSEDSlopeHandle)
+        snmm.freeArray(self.objMagStdMeanNoChromHandle)
