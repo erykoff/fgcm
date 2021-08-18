@@ -62,6 +62,9 @@ class FgcmMakeStars(object):
         if 'quantitiesToAverage' not in starConfig:
             starConfig['quantitiesToAverage'] = []
 
+        if 'randomSeed' not in starConfig:
+            starConfig['randomSeed'] = None
+
         self.objCat = None
 
         # Note that the order doesn't matter for the making of the stars
@@ -709,6 +712,8 @@ class FgcmMakeStars(object):
 
 
         # cut the density of stars down with sampling.
+        if self.starConfig['randomSeed'] is not None:
+            np.random.seed(seed=self.starConfig['randomSeed'])
 
         theta = (90.0 - self.objCat['dec'][gd])*np.pi/180.
         phi = self.objCat['ra'][gd]*np.pi/180.
