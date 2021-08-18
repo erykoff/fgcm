@@ -130,7 +130,7 @@ class FgcmApertureCorrection(object):
             # remove any empty bins...
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
             if (gd.size < 3):
-                self.fgcmLog.warn('Could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
+                self.fgcmLog.warning('Could not compute aperture correction for band %s (too few exposures)' % (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = originalSlope[i]
                 self.fgcmPars.compAperCorrPivot[i] = originalPivot[i]
                 self.fgcmPars.compAperCorrRange[:, i] = originalRange[:, i]
@@ -167,7 +167,7 @@ class FgcmApertureCorrection(object):
                 continue
 
             if ((cov[0,0] < 0.0) or (not np.isfinite(cov[0,0]))) :
-                self.fgcmLog.warn('Aperture correction computation failed for band %s' %
+                self.fgcmLog.warning('Aperture correction computation failed for band %s' %
                                  (self.fgcmPars.bands[i]))
                 self.fgcmPars.compAperCorrSlope[i] = originalSlope[i]
                 self.fgcmPars.compAperCorrPivot[i] = originalPivot[i]

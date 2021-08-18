@@ -220,8 +220,8 @@ class FgcmSuperStarFlat(object):
                         fit = pars.flatten()
                         computeMean = True
                     elif (i1a.size < 10 * pars.size):
-                        self.fgcmLog.warn("Insufficient stars for chebyshev fit (%d, %d, %d), setting to mean"
-                                          % (epInd, fiInd, cInd))
+                        self.fgcmLog.warning("Insufficient stars for chebyshev fit (%d, %d, %d), setting to mean"
+                                             % (epInd, fiInd, cInd))
                         fit = pars.flatten()
                         computeMean = True
                     else:
@@ -253,14 +253,14 @@ class FgcmSuperStarFlat(object):
 
                         if (fit[0] == 0.0 or fit[0] == 1.0 or
                             (fit[0] < 0.0)):
-                            self.fgcmLog.warn("Fit failed on (%d, %d, %d), setting to mean"
-                                              % (epInd, fiInd, cInd))
+                            self.fgcmLog.warning("Fit failed on (%d, %d, %d), setting to mean"
+                                                 % (epInd, fiInd, cInd))
                             fit = pars.flatten()
                             computeMean = True
 
                 except (ValueError, RuntimeError, TypeError):
-                    self.fgcmLog.warn("Fit failed to converge (%d, %d, %d), setting to mean"
-                                      % (epInd, fiInd, cInd))
+                    self.fgcmLog.warning("Fit failed to converge (%d, %d, %d), setting to mean"
+                                         % (epInd, fiInd, cInd))
                     fit = pars.flatten()
                     computeMean = True
 

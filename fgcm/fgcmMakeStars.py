@@ -443,8 +443,8 @@ class FgcmMakeStars(object):
                 hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
 
                 if (hist.max() == 1):
-                    self.fgcmLog.warn("  No matches found for pixel %d, %s band" %
-                                      (ipring[p1a[0]], primaryBand))
+                    self.fgcmLog.warning("  No matches found for pixel %d, %s band" %
+                                         (ipring[p1a[0]], primaryBand))
                     continue
 
                 maxObs = hist.max()
