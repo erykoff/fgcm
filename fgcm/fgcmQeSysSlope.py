@@ -219,7 +219,7 @@ class FgcmQeSysSlope(object):
                 ax.legend(loc=3)
 
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD), fontsize=16)
-            ax.set_ylabel('$2.5 \log_{10} (S^{\mathrm{optics}})\,(\mathrm{mmag})$', fontsize=16)
+            ax.set_ylabel(r'$2.5 \log_{10} (S^{\mathrm{optics}})\,(\mathrm{mmag})$', fontsize=16)
             ax.tick_params(axis='both', which='major', labelsize=14)
 
             # Make the vertical wash markers
