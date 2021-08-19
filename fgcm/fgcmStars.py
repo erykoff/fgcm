@@ -456,7 +456,7 @@ class FgcmStars(object):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except KeyError:
-                self.fgcmLog.warn('Observations with filter %s not in config' % (filterName))
+                self.fgcmLog.warning('Observations with filter %s not in config' % (filterName))
                 bandIndex = -1
 
             # obsFilterName is an array from fits/numpy.  filterName needs to be encoded to match
@@ -723,13 +723,13 @@ class FgcmStars(object):
         # Check the airmass range
         if ((np.min(obsSecZenith) < self.secZenithRange[0]) |
             (np.max(obsSecZenith) > self.secZenithRange[1])):
-            self.fgcmLog.warn("Input stars have a secZenith that is out of range of LUT. "
-                              "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" %
-                              (np.min(obsSecZenith), np.max(obsSecZenith),
-                               self.secZenithRange[0], self.secZenithRange[1]))
+            self.fgcmLog.warning("Input stars have a secZenith that is out of range of LUT. "
+                                 "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" %
+                                 (np.min(obsSecZenith), np.max(obsSecZenith),
+                                  self.secZenithRange[0], self.secZenithRange[1]))
             bad, = np.where((obsSecZenith <= self.secZenithRange[0]) |
                             (obsSecZenith >= self.secZenithRange[1]))
-            self.fgcmLog.warn("Marking %d observations out of airmass range as BAD_AIRMASS" % (bad.size))
+            self.fgcmLog.warning("Marking %d observations out of airmass range as BAD_AIRMASS" % (bad.size))
             obsSecZenith[bad] = np.clip(obsSecZenith[bad],
                                         self.secZenithRange[0],
                                         self.secZenithRange[1])
@@ -1337,7 +1337,7 @@ class FgcmStars(object):
         if not self.hasRefstars:
             # should this Raise because it's programmer error, or just pass because
             # it's harmless?
-            self.fgcmLog.warn("Cannot compute abs offset without reference stars.")
+            self.fgcmLog.warning("Cannot compute abs offset without reference stars.")
             return np.zeros(self.nBands)
 
         # Set things up

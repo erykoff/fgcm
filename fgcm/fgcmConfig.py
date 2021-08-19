@@ -311,7 +311,7 @@ class FgcmConfig(object):
         if (self.resetParameters) :
             self.fgcmLog.info('Will reset atmosphere parameters')
         if (self.noChromaticCorrections) :
-            self.fgcmLog.warn('No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
+            self.fgcmLog.warning('No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
         if (self.plotPath is not None and not os.path.isdir(self.plotPath)):
             try:
@@ -487,12 +487,12 @@ class FgcmConfig(object):
         test=np.searchsorted(self.epochMJDs,self.mjdRange)
 
         if test.min() == 0:
-            self.fgcmLog.warn("Exposure start MJD before epoch range.  Adding additional epoch.")
+            self.fgcmLog.warning("Exposure start MJD before epoch range.  Adding additional epoch.")
             self.epochMJDs = np.insert(self.epochMJDs, 0, self.mjdRange[0] - 1.0)
             if self.epochNames is not None:
                 self.epochNames.insert(0, 'epoch-pre')
         if test.max() == self.epochMJDs.size:
-            self.fgcmLog.warn("Exposure end MJD after epoch range.  Adding additional epoch.")
+            self.fgcmLog.warning("Exposure end MJD after epoch range.  Adding additional epoch.")
             self.epochMJDs = np.insert(self.epochMJDs, len(self.epochMJDs), self.mjdRange[1] + 1.0)
             if self.epochNames is not None:
                 self.epochNames.insert(len(self.epochNames), 'epoch-post')
@@ -565,7 +565,7 @@ class FgcmConfig(object):
 
         # Check for input aperture corrections.
         if self.aperCorrFitNBins == 0 and np.any(self.aperCorrInputSlopes == self.illegalValue):
-            self.fgcmLog.warn("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopeDict")
+            self.fgcmLog.warning("Aperture corrections will not be fit; strongly recommend setting aperCorrInputSlopeDict")
 
         # Check the sed mapping dictionaries
         # First, make sure every band is listed in the sedTermDict
