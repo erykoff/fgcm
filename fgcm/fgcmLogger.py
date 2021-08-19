@@ -75,6 +75,18 @@ class FgcmLogger(object):
            String to write to log
         """
 
+        self.warning(logString)
+
+    def warning(self, logString):
+        """
+        Log at warning level.
+
+        parameters
+        ----------
+        logString: string
+           String to write to log
+        """
+
         self.log('WARN', logString)
 
     def debug(self,logString):

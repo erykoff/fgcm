@@ -469,8 +469,8 @@ class FgcmGray(object):
                                                 triangular=False)
                     except (ValueError, RuntimeError, TypeError):
                         # Log a warn and set to a single value...
-                        self.fgcmLog.warn("Full focal-plane fit failed on exposure %d" %
-                                          (self.fgcmPars.expArray[eInd]))
+                        self.fgcmLog.warning("Full focal-plane fit failed on exposure %d" %
+                                             (self.fgcmPars.expArray[eInd]))
                         fitFailed = True
 
                 if fitFailed:
@@ -541,8 +541,8 @@ class FgcmGray(object):
                                                          triangular=self.ccdGraySubCCDTriangular)
                                 ccdGraySubCCDPars[eInd, cInd, :] = cField.pars.ravel()
                             except (ValueError, RuntimeError, TypeError):
-                                self.fgcmLog.warn("Focal plane to ccd mapping fit failed on %d/%d" %
-                                                  (self.fgcmPars.expArray[eInd], cInd + self.ccdStartIndex))
+                                self.fgcmLog.warning("Focal plane to ccd mapping fit failed on %d/%d" %
+                                                     (self.fgcmPars.expArray[eInd], cInd + self.ccdStartIndex))
                                 # Put in a filler here
                                 ccdGraySubCCDPars[eInd, cInd, 0] = ccdGrayEval
 
