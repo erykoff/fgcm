@@ -328,7 +328,7 @@ class FgcmZeropoints(object):
         bad, = np.where((~np.isfinite(zpStruct['FGCM_I0'])) |
                         (~np.isfinite(zpStruct['FGCM_I10'])))
         if bad.size > 0:
-            self.fgcmLog.warn("There are %d ccds with bad I0/I10 values" % (bad.size))
+            self.fgcmLog.warning("There are %d ccds with bad I0/I10 values" % (bad.size))
             zpStruct['FGCM_I0'][bad] = self.illegalValue
             zpStruct['FGCM_I10'][bad] = self.illegalValue
 

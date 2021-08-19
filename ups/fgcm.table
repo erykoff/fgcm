@@ -1,4 +1,3 @@
-
-envAppend(PYTHONPATH, ${PRODUCT_DIR}/lib/python)
-envAppend(PATH, ${PRODUCT_DIR}/bin)
+envPrepend(PYTHONPATH, ${PRODUCT_DIR}/)
+envPrepend(PATH, ${PRODUCT_DIR}/scripts)
 

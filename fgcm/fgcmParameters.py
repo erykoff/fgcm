@@ -665,7 +665,7 @@ class FgcmParameters(object):
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except Exception as inst:
-                self.fgcmLog.warn('Exposures with filter %s not in config' % (filterName))
+                self.fgcmLog.warning('Exposures with filter %s not in config' % (filterName))
                 continue
 
             # note that for Py3 we need to encode filterName to match to the numpy array
@@ -683,7 +683,7 @@ class FgcmParameters(object):
 
         bad,=np.where(self.expLUTFilterIndex < 0)
         if (bad.size > 0):
-            self.fgcmLog.warn('%d exposures with band not in LUT! Will not be fit.' % (bad.size))
+            self.fgcmLog.warning('%d exposures with band not in LUT! Will not be fit.' % (bad.size))
             self.expFlag[bad] = self.expFlag[bad] | expFlagDict['BAND_NOT_IN_LUT']
 
         # Flag exposures that are not in the fit bands
