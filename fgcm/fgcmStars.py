@@ -1404,7 +1404,7 @@ class FgcmStars(object):
         gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
         objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= deltaAbsOffset[gdMeanBand]
 
-    def computeEGray(self, goodObs, ignoreRef=False, onlyObsErr=False):
+    def computeEGray(self, goodObs, ignoreRef=True, onlyObsErr=False):
         """
         Compute the delta-mag between the observed and true value (EGray) for a set of
         observations (goodObs).
@@ -1417,7 +1417,7 @@ class FgcmStars(object):
         ----------
         goodObs: `np.array`
            Array of indices of good observations
-        ignoreRef: `bool`, default=False
+        ignoreRef: `bool`, default=True
            Ignore reference stars.
         onlyObsErr: `bool`, default=False
            Only use the observational error (for non-ref stars)
