@@ -919,8 +919,9 @@ class FgcmGray(object):
         expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
         expGray = snmm.getArray(self.expGrayHandle)
 
-        expUse,=np.where((self.fgcmPars.expFlag == 0) &
-                         (expNGoodStars > self.minStarPerExp))
+        expUse, = np.where((self.fgcmPars.expFlag == 0) &
+                           (expNGoodStars > self.minStarPerExp) &
+                           (expGray > self.illegalValue))
 
         for i in range(self.fgcmPars.nBands):
             inBand, = np.where(self.fgcmPars.expBandIndex[expUse] == i)
@@ -1102,8 +1103,9 @@ class FgcmGray(object):
         expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
         expGray = snmm.getArray(self.expGrayHandle)
 
-        expUse,=np.where((self.fgcmPars.expFlag == 0) &
-                         (expNGoodStars > self.minStarPerExp))
+        expUse, = np.where((self.fgcmPars.expFlag == 0) &
+                           (expNGoodStars > self.minStarPerExp) &
+                           (expGray > self.illegalValue))
 
         expGrayPhotometricCut = np.zeros(self.fgcmPars.nBands)
         expGrayHighCut = np.zeros_like(expGrayPhotometricCut)
@@ -1133,6 +1135,11 @@ class FgcmGray(object):
             cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             expGrayHighCut[i] = max(0.005,
                                     min(cut, expGrayHighCut[i]*2))
+
+            self.fgcmLog.info("ExpGray cut (%s band): %.4f" % (self.fgcmPars.bands[i],
+                                                               expGrayPhotometricCut[i]))
+            self.fgcmLog.info("ExpGray high cut (%s band): %.4f" % (self.fgcmPars.bands[i],
+                                                                    expGrayHighCut[i]))
 
         return (expGrayPhotometricCut, expGrayHighCut)
 
@@ -1168,6 +1175,11 @@ class FgcmGray(object):
             cut = int(np.ceil(delta / self.autoPhotometricCutStep)) * self.autoPhotometricCutStep
             expGrayHighCut[i] = max(0.005,
                                     min(cut, expGrayHighCut[i]*2))
+
+            self.fgcmLog.info("ExpGray repeatability cut (%s band): %.4f" % (self.fgcmPars.bands[i],
+                                                                             expGrayPhotometricCut[i]))
+            self.fgcmLog.info("ExpGray repeatability cut (%s band): %.4f" % (self.fgcmPars.bands[i],
+                                                                             expGrayHighCut[i]))
 
         return (expGrayPhotometricCut, expGrayHighCut)
 
