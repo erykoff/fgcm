@@ -32,7 +32,7 @@ from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import MaxFitIterations
-from .fgcmUtilities import computeCCDOffsetSigns
+from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -48,7 +48,8 @@ class FgcmFitCycle(object):
     useFits: bool, optional
        Read in files using fitsio?
     noFitsDict: dict, optional
-       Dict with lutIndex/lutStd/expInfo/ccdOffsets if useFits == False
+       Dict with lutIndex/lutStd/expInfo/[ccdOffsets or focalPlaneProjector]
+       if useFits == False
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
@@ -64,9 +65,10 @@ class FgcmFitCycle(object):
             if (('lutIndex' not in noFitsDict) or
                 ('lutStd' not in noFitsDict) or
                 ('expInfo' not in noFitsDict) or
-                ('ccdOffsets' not in noFitsDict)):
-                raise ValueError("if useFits is False, must supply lutIndex, lutStd, expInfo, ccdOffsets in noFitsDict")
-
+                (('ccdOffsets' not in noFitsDict) and
+                 ('focalPlaneProjector' not in noFitsDict))):
+                raise ValueError("if useFits is False, must supply lutIndex, lutStd, expInfo, "
+                                 "[ccdOffsets or focalPlaneProjector] in noFitsDict")
 
         if self.useFits:
             # Everything can be loaded from fits
@@ -77,8 +79,9 @@ class FgcmFitCycle(object):
                                          noFitsDict['lutIndex'],
                                          noFitsDict['lutStd'],
                                          noFitsDict['expInfo'],
-                                         noFitsDict['ccdOffsets'],
-                                         noOutput=noOutput)
+                                         noOutput=noOutput,
+                                         ccdOffsets=noFitsDict.get('ccdOffsets'),
+                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'))
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
         self.quietMode = self.fgcmConfig.quietMode
@@ -251,8 +254,14 @@ class FgcmFitCycle(object):
         else:
             self.fgcmLog.info('Fit cycle %d starting...' % (self.fgcmConfig.cycleNumber))
 
-        # Compute signs for CCD offsets
-        computeCCDOffsetSigns(self.fgcmStars, self.fgcmConfig.ccdOffsets)
+        # Compute signs for CCD offsets if necessary
+        if isinstance(self.fgcmConfig.focalPlaneProjector, FocalPlaneProjectorFromOffsets):
+            self.fgcmConfig.focalPlaneProjector.computeCCDOffsetSigns(self.fgcmStars)
+        self.deltaMapperDefault = self.fgcmConfig.focalPlaneProjector(int(self.fgcmConfig.defaultCameraOrientation))
+        self.fgcmPars.setDeltaMapperDefault(self.deltaMapperDefault)
+        self.fgcmChisq.setDeltaMapperDefault(self.deltaMapperDefault)
+        self.fgcmGray.setDeltaMapperDefault(self.deltaMapperDefault)
+        self.fgcmStars.setDeltaMapperDefault(self.deltaMapperDefault)
 
         # Apply aperture corrections and SuperStar if available
         # select exposures...
@@ -360,6 +369,7 @@ class FgcmFitCycle(object):
                 # Might need option here for no ref stars!
                 # Something with the > 1.0.  WTF?
                 preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+                preSuperStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True, forceZeroMean=True)
 
                 self.fgcmLog.debug('FitCycle is applying pre-computed SuperStarFlat')
@@ -511,6 +521,7 @@ class FgcmFitCycle(object):
         if not self.finalCycle:
             self.fgcmLog.debug('FitCycle computing SuperStarFlats')
             superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+            superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
             superStarFlat.computeSuperStarFlats()
 
             if not self.quietMode:

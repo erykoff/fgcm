@@ -7,13 +7,13 @@ import scipy.optimize
 
 import matplotlib.pyplot as plt
 
-
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
 
 class FgcmGray(object):
     """
@@ -80,7 +80,6 @@ class FgcmGray(object):
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.bandRequiredIndex = fgcmConfig.bandRequiredIndex
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.quietMode = fgcmConfig.quietMode
 
         self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
@@ -90,6 +89,10 @@ class FgcmGray(object):
         self.autoHighCutNSig = fgcmConfig.autoHighCutNSig
 
         self.arraysPrepared = False
+
+        self.focalPlaneProjector = fgcmConfig.focalPlaneProjector
+        self.defaultCameraOrientation = fgcmConfig.defaultCameraOrientation
+        self.deltaMapperDefault = None
 
         self._prepareGrayArrays()
 
@@ -135,6 +138,16 @@ class FgcmGray(object):
         self.expDeltaMagBkgHandle = snmm.createArray(self.fgcmPars.nExp, dtype='f8')
 
         self.arraysPrepared = True
+
+    def setDeltaMapperDefault(self, deltaMapperDefault):
+        """
+        Set the deltaMapperDefault array.
+
+        Parameters
+        ----------
+        deltaMapperDefault : `np.recarray`
+        """
+        self.deltaMapperDefault = deltaMapperDefault
 
     def computeExpGrayForInitialSelection(self):
         """
@@ -388,44 +401,6 @@ class FgcmGray(object):
             FGrayGO = 10.**(EGrayGO/(-2.5))
             FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
-            # Get the ccd to x/y and delta-ra/delta-dec mapping
-            nstep = 50
-            deltaMapper = np.zeros(self.fgcmPars.nCCD, dtype=[('x', 'f8', nstep**2),
-                                                              ('y', 'f8', nstep**2),
-                                                              ('dra_cent', 'f8'),
-                                                              ('ddec_cent', 'f8'),
-                                                              ('delta_ra', 'f8', nstep**2),
-                                                              ('delta_dec', 'f8', nstep**2)])
-            for k in range(self.fgcmPars.nCCD):
-                xValues = np.linspace(0.0, self.ccdOffsets['X_SIZE'][k], nstep)
-                yValues = np.linspace(0.0, self.ccdOffsets['Y_SIZE'][k], nstep)
-                deltaMapper['x'][k, :] = np.repeat(xValues, yValues.size)
-                deltaMapper['y'][k, :] = np.tile(yValues, xValues.size)
-
-                # And translate these into delta_ra, delta_dec
-                raValues = np.linspace(self.ccdOffsets['DELTA_RA'][k] -
-                                       self.ccdOffsets['RASIGN'][k]*self.ccdOffsets['RA_SIZE'][k]/2.,
-                                       self.ccdOffsets['DELTA_RA'][k] +
-                                       self.ccdOffsets['RASIGN'][k]*self.ccdOffsets['RA_SIZE'][k]/2.,
-                                       nstep)
-                decValues = np.linspace(self.ccdOffsets['DELTA_DEC'][k] -
-                                        self.ccdOffsets['DECSIGN'][k]*self.ccdOffsets['DEC_SIZE'][k]/2.,
-                                        self.ccdOffsets['DELTA_DEC'][k] +
-                                        self.ccdOffsets['DECSIGN'][k]*self.ccdOffsets['DEC_SIZE'][k]/2.,
-                                        nstep)
-
-                if not self.ccdOffsets['XRA'][k]:
-                    # Swap axes
-                    deltaMapper['delta_ra'][k, :] = np.tile(raValues, decValues.size)
-                    deltaMapper['delta_dec'][k, :] = np.repeat(decValues, raValues.size)
-                    deltaMapper['dra_cent'][k] = raValues[nstep // 2]
-                    deltaMapper['ddec_cent'][k] = decValues[nstep // 2]
-                else:
-                    deltaMapper['delta_ra'][k, :] = np.repeat(raValues, decValues.size)
-                    deltaMapper['delta_dec'][k, :] = np.tile(decValues, raValues.size)
-                    deltaMapper['dra_cent'][k] = raValues[nstep // 2]
-                    deltaMapper['ddec_cent'][k] = decValues[nstep // 2]
-
             h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
 
             use, = np.where(h >= 3)
@@ -438,6 +413,8 @@ class FgcmGray(object):
                 if not self.ccdGrayFocalPlane[bInd]:
                     # We are not fitting the focal plane for this, skip.
                     continue
+
+                deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[eInd]))
 
                 raCent = np.rad2deg(self.fgcmPars.expTelRA[eInd])
                 decCent = np.rad2deg(self.fgcmPars.expTelDec[eInd])
@@ -532,8 +509,8 @@ class FgcmGray(object):
                             ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
 
                             try:
-                                cField = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
-                                                         self.ccdOffsets['Y_SIZE'][cInd],
+                                cField = Cheb2dField.fit(deltaMapper['x_size'][cInd],
+                                                         deltaMapper['y_size'][cInd],
                                                          self.ccdGraySubCCDChebyshevOrder,
                                                          deltaMapper['x'][cInd, :],
                                                          deltaMapper['y'][cInd, :],
@@ -624,8 +601,8 @@ class FgcmGray(object):
                     computeMean = True
                 else:
                     try:
-                        field = Cheb2dField.fit(self.ccdOffsets['X_SIZE'][cInd],
-                                                self.ccdOffsets['Y_SIZE'][cInd],
+                        field = Cheb2dField.fit(self.deltaMapperDefault['x_size'][cInd],
+                                                self.deltaMapperDefault['y_size'][cInd],
                                                 order,
                                                 obsXGO[i1a], obsYGO[i1a],
                                                 FGrayGO[i1a],
@@ -650,8 +627,8 @@ class FgcmGray(object):
                 ccdGraySubCCDPars[eInd, cInd, :] = fit
                 # Set the CCD Gray in the center
                 # unsure if this should be the mean over all the stars...
-                field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
-                                    self.ccdOffsets['Y_SIZE'][cInd],
+                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                    self.deltaMapperDefault['y_size'][cInd],
                                     fit)
                 ccdGray[eInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
@@ -1255,6 +1232,7 @@ class FgcmGray(object):
 
         state = self.__dict__.copy()
         del state['fgcmLog']
+        del state['focalPlaneProjector']
         return state
 
     def freeSharedMemory(self):

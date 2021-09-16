@@ -38,7 +38,6 @@ class FgcmRetrieveAtmosphere(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.useNightlyRetrievedPwv = fgcmConfig.useNightlyRetrievedPwv
         self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.quietMode = fgcmConfig.quietMode
 
     def r1ToPwv(self, fgcmRetrieval):

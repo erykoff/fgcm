@@ -254,21 +254,8 @@ def histoGauss(ax,array):
 
     return coeff
 
+"""
 def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
-    """
-    Plot the map of CCDs.
-
-    parameters
-    ----------
-    ax: plot axis object
-    ccdOffsets: ccdOffset recarray
-    values: float array
-       Values for each ccd
-    cbLabel: string
-       Color bar label
-    loHi: tuple [2], optional
-       (lo, hi) or else scaling is computed from data.
-    """
 
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
@@ -326,6 +313,8 @@ def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
+"""
+
 
 class Cheb2dField(object):
     """
@@ -481,21 +470,9 @@ class Cheb2dField(object):
 
         return self.evaluate(xy[0, :], xy[1, :], flatpars)
 
+
+"""
 def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
-    """
-    Plot CCD map with Chebyshev fits for each CCD
-
-    parameters
-    ----------
-    ax: plot axis object
-    ccdOffsets: ccdOffset recarray
-    parArray: float array (nCCD, nPars)
-    cbLabel: string
-       Color bar label
-    loHi: tuple [2], optional
-       (lo, hi) or else scaling is computed from data.
-    """
-
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
     import matplotlib.cm as cmx
@@ -575,6 +552,158 @@ def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
+"""
+
+
+def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
+    """
+    Plot CCD map with single values for each CCD.
+
+    Parameters
+    ----------
+    ax :
+        plot axis object
+    deltaMapper : `np.recarray`
+        Delta x/y, ra/dec mapper.
+    values : `np.ndarray`
+        Values for each ccd.
+    cbLabel :  `str`
+        Color bar label
+    loHi : tuple [2], optional
+        (lo, hi) if set.  Otherwise, scaling is computed from data.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+
+    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
+                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
+                    np.max(deltaMapper['delta_dec']) + 0.02]
+
+    if loHi is None:
+        st = np.argsort(values)
+
+        lo = values[st[int(0.02*st.size)]]
+        hi = values[st[int(0.98*st.size)]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z = [[0, 0], [0, 0]]
+    levels = np.linspace(lo, hi, num=150)
+    CS3 = plt.contourf(Z, levels, cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRaRange[0], plotRaRange[1])
+    ax.set_ylim(plotDecRange[0], plotDecRange[1])
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$', fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    zGrid = np.zeros_like(deltaMapper['x'])
+    for k in range(deltaMapper.size):
+        zGrid[k, :] = values[k]
+
+    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+                s=0.1,
+                c=zGrid.ravel(),
+                vmin=lo, vmax=hi)
+
+    cb = None
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None
+
+
+def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
+    """
+    Plot CCD map with Chebyshev fits for each CCD.
+
+    Parameters
+    ----------
+    ax :
+        plot axis object
+    deltaMapper : `np.recarray`
+        Delta x/y, ra/dec mapper.
+    parArray : `np.ndarray`
+        Chebyshev parameter array (nCCD, nPars)
+    cbLabel :  `str`
+        Color bar label
+    loHi : tuple [2], optional
+        (lo, hi) if set.  Otherwise, scaling is computed from data.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+    plt.set_cmap('rainbow')
+
+    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
+                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
+                    np.max(deltaMapper['delta_dec']) + 0.02]
+
+    centralValues = np.zeros(len(deltaMapper))
+    for i in range(deltaMapper.size):
+        field = Cheb2dField(deltaMapper['x_size'][i],
+                            deltaMapper['y_size'][i],
+                            parArray[i, :])
+        centralValues[i] = -2.5*np.log10(field.evaluateCenter())*1000.0
+
+    if loHi is None:
+        st = np.argsort(centralValues)
+        lo = centralValues[st[int(0.02*st.size)]]
+        hi = centralValues[st[int(0.98*st.size)]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z = [[0, 0], [0, 0]]
+    levels = np.linspace(lo, hi, num=150)
+    CS3 = plt.contourf(Z, levels, cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRaRange[0], plotRaRange[1])
+    ax.set_ylim(plotDecRange[0], plotDecRange[1])
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$', fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    zGrid = np.zeros_like(deltaMapper['x'])
+    for k in range(deltaMapper.size):
+        field = Cheb2dField(deltaMapper['x_size'][k],
+                            deltaMapper['y_size'][k],
+                            parArray[k, :])
+        zGrid[k, :] = -2.5*np.log10(np.clip(field.evaluate(deltaMapper['x'][k, :],
+                                                           deltaMapper['y'][k, :]),
+                                                           0.1,
+                                                           None))*1000.0
+
+    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+                s=0.1,
+                c=zGrid.ravel(),
+                vmin=lo, vmax=hi)
+
+    cb = None
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None
+
 
 
 def logFlaggedExposuresPerBand(log, fgcmPars, flagName, raiseAllBad=True):
@@ -651,79 +780,180 @@ def computeDeltaRA(a, b, dec=None, degrees=False):
     return delta
 
 
-def computeCCDOffsetSigns(fgcmStars, ccdOffsets):
-    """Compute plotting signs for x/y to ra/dec conversions.
+class FocalPlaneProjectorFromOffsets(object):
+    """Create a focalPlaneProjector that returns the formatted
+    ccdOffsetsTable.
 
-    This will have to be rethought with rotation.
+    This is for backwards compatibility and straight DECam processing.
 
     Parameters
     ----------
-    fgcmStars : `fgcmStars`
     ccdOffsets : `np.ndarray`
-       Table of ccd offset values
+        CCD offset table
     """
-    import scipy.stats
-    import esutil
-    from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+    def __init__(self, ccdOffsets):
+        # Convert from input to internal format.
+        dtype = ccdOffsets.dtype.descr
+        dtype.extend([('XRA', bool),
+                      ('RASIGN', 'i2'),
+                      ('DECSIGN', 'i2')])
+        self.ccdOffsets = np.zeros(ccdOffsets.size, dtype=dtype)
+        for name in ccdOffsets.dtype.names:
+            self.ccdOffsets[name][:] = ccdOffsets[name][:]
 
-    obsObjIDIndex = snmm.getArray(fgcmStars.obsObjIDIndexHandle)
-    obsCCDIndex = snmm.getArray(fgcmStars.obsCCDHandle) - fgcmStars.ccdStartIndex
-    obsExpIndex = snmm.getArray(fgcmStars.obsExpIndexHandle)
+        self._deltaMapper = None
+        self._computedSigns = False
 
-    obsX = snmm.getArray(fgcmStars.obsXHandle)
-    obsY = snmm.getArray(fgcmStars.obsYHandle)
-    objRA = snmm.getArray(fgcmStars.objRAHandle)
-    objDec = snmm.getArray(fgcmStars.objDecHandle)
+    def __call__(self, orientation, nstep=50):
+        """
+        Make a focal plane projection mapping.
 
-    h, rev = esutil.stat.histogram(obsCCDIndex, rev=True)
+        Parameters
+        ----------
+        orientation : `int`
+            Camera "orientation".  Unused for FocalPlaneProjectorFromOffsets
+            which does not support arbitrary orientations.
+        nstep : `int`
+            Number of steps in x/y per detector for the mapping.
 
-    for i in range(h.size):
-        if h[i] == 0: continue
+        Returns
+        -------
+        projectionMapping : `np.darray`
+            A projection mapping object with x, y, x_size, y_size,
+            delta_ra_cent, delta_dec_cent, delta_ra, delta_dec for
+            each detector id.
+        """
+        if self._deltaMapper is not None:
+            # Return cached value
+            return self._deltaMapper
 
-        i1a = rev[rev[i]:rev[i+1]]
+        if not self._computedSigns:
+            raise RuntimeError("Cannot make a projection mapping without first "
+                               "running computeCCDOffsetSigns")
 
-        cInd = obsCCDIndex[i1a[0]]
+        deltaMapper = np.zeros(len(self.ccdOffsets), dtype=[('id', 'i4'),
+                                                            ('x', 'f8', nstep**2),
+                                                            ('y', 'f8', nstep**2),
+                                                            ('x_size', 'i4'),
+                                                            ('y_size', 'i4'),
+                                                            ('delta_ra_cent', 'f8'),
+                                                            ('delta_dec_cent', 'f8'),
+                                                            ('delta_ra', 'f8', nstep**2),
+                                                            ('delta_dec', 'f8', nstep**2)])
+        deltaMapper['id'] = np.arange(len(self.ccdOffsets))
 
-        if ccdOffsets['RASIGN'][cInd] == 0:
-            # choose a good exposure to work with
-            hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
-            maxInd = np.argmax(hTest)
-            testStars = revTest[revTest[maxInd]:revTest[maxInd + 1]]
+        for i in range(len(self.ccdOffsets)):
+            xSize = int(self.ccdOffsets[i]['X_SIZE'])
+            ySize = int(self.ccdOffsets[i]['Y_SIZE'])
 
-            testRA = objRA[obsObjIDIndex[i1a[testStars]]]
-            testDec = objDec[obsObjIDIndex[i1a[testStars]]]
-            testX = obsX[i1a[testStars]]
-            testY = obsY[i1a[testStars]]
+            xValues = np.linspace(0.0, xSize, nstep)
+            yValues = np.linspace(0.0, ySize, nstep)
 
-            corrXRA,_ = scipy.stats.pearsonr(testX, testRA)
-            corrYRA,_ = scipy.stats.pearsonr(testY, testRA)
+            deltaMapper['x'][i, :] = np.repeat(xValues, yValues.size)
+            deltaMapper['y'][i, :] = np.tile(yValues, xValues.size)
+            deltaMapper['x_size'][i] = xSize
+            deltaMapper['y_size'][i] = ySize
 
-            if (np.abs(corrXRA) > np.abs(corrYRA)):
-                ccdOffsets['XRA'][cInd] = True
+            deltaMapper['delta_ra_cent'][i] = self.ccdOffsets[i]['DELTA_RA']
+            deltaMapper['delta_dec_cent'][i] = self.ccdOffsets[i]['DELTA_DEC']
+
+            # And translate these into delta_ra, delta_dec
+            raValues = np.linspace(self.ccdOffsets['DELTA_RA'][i] -
+                                   self.ccdOffsets['RASIGN'][i]*self.ccdOffsets['RA_SIZE'][i]/2.,
+                                   self.ccdOffsets['DELTA_RA'][i] +
+                                   self.ccdOffsets['RASIGN'][i]*self.ccdOffsets['RA_SIZE'][i]/2.,
+                                   nstep)
+            decValues = np.linspace(self.ccdOffsets['DELTA_DEC'][i] -
+                                    self.ccdOffsets['DECSIGN'][i]*self.ccdOffsets['DEC_SIZE'][i]/2.,
+                                    self.ccdOffsets['DELTA_DEC'][i] +
+                                    self.ccdOffsets['DECSIGN'][i]*self.ccdOffsets['DEC_SIZE'][i]/2.,
+                                    nstep)
+
+            if not self.ccdOffsets['XRA'][i]:
+                # Swap axes
+                deltaMapper['delta_ra'][i, :] = np.tile(raValues, decValues.size)
+                deltaMapper['delta_dec'][i, :] = np.repeat(decValues, raValues.size)
             else:
-                ccdOffsets['XRA'][cInd] = False
+                deltaMapper['delta_ra'][i, :] = np.repeat(raValues, decValues.size)
+                deltaMapper['delta_dec'][i, :] = np.tile(decValues, raValues.size)
+        self._deltaMapper = deltaMapper
 
-            if ccdOffsets['XRA'][cInd]:
-                # x is correlated with RA
-                if corrXRA < 0:
-                    ccdOffsets['RASIGN'][cInd] = -1
-                else:
-                    ccdOffsets['RASIGN'][cInd] = 1
+        return deltaMapper
 
-                corrYDec,_ = scipy.stats.pearsonr(testY, testDec)
-                if corrYDec < 0:
-                    ccdOffsets['DECSIGN'][cInd] = -1
-                else:
-                    ccdOffsets['DECSIGN'][cInd] = 1
-            else:
-                # y is correlated with RA
-                if corrYRA < 0:
-                    ccdOffsets['RASIGN'][cInd] = -1
-                else:
-                    ccdOffsets['RASIGN'][cInd] = 1
+    def computeCCDOffsetSigns(self, fgcmStars):
+        """Compute plotting signs for x/y to ra/dec conversions.
 
-                corrXDec,_ = scipy.stats.pearsonr(testX, testDec)
-                if corrXDec < 0:
-                    ccdOffsets['DECSIGN'][cInd] = -1
+        This does not support rotations; you need a proper
+        focalPlaneProjector for that (only supported via lsst dm).
+
+        Parameters
+        ----------
+        fgcmStars : `fgcmStars`
+        """
+        import scipy.stats
+        import esutil
+        from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
+        obsObjIDIndex = snmm.getArray(fgcmStars.obsObjIDIndexHandle)
+        obsCCDIndex = snmm.getArray(fgcmStars.obsCCDHandle) - fgcmStars.ccdStartIndex
+        obsExpIndex = snmm.getArray(fgcmStars.obsExpIndexHandle)
+
+        obsX = snmm.getArray(fgcmStars.obsXHandle)
+        obsY = snmm.getArray(fgcmStars.obsYHandle)
+        objRA = snmm.getArray(fgcmStars.objRAHandle)
+        objDec = snmm.getArray(fgcmStars.objDecHandle)
+
+        h, rev = esutil.stat.histogram(obsCCDIndex, rev=True)
+
+        for i in range(h.size):
+            if h[i] == 0: continue
+
+            i1a = rev[rev[i]:rev[i+1]]
+
+            cInd = obsCCDIndex[i1a[0]]
+
+            if self.ccdOffsets['RASIGN'][cInd] == 0:
+                # choose a good exposure to work with
+                hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
+                maxInd = np.argmax(hTest)
+                testStars = revTest[revTest[maxInd]:revTest[maxInd + 1]]
+
+                testRA = objRA[obsObjIDIndex[i1a[testStars]]]
+                testDec = objDec[obsObjIDIndex[i1a[testStars]]]
+                testX = obsX[i1a[testStars]]
+                testY = obsY[i1a[testStars]]
+
+                corrXRA,_ = scipy.stats.pearsonr(testX, testRA)
+                corrYRA,_ = scipy.stats.pearsonr(testY, testRA)
+
+                if (np.abs(corrXRA) > np.abs(corrYRA)):
+                    self.ccdOffsets['XRA'][cInd] = True
                 else:
-                    ccdOffsets['DECSIGN'][cInd] = 1
+                    self.ccdOffsets['XRA'][cInd] = False
+
+                if self.ccdOffsets['XRA'][cInd]:
+                    # x is correlated with RA
+                    if corrXRA < 0:
+                        self.ccdOffsets['RASIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['RASIGN'][cInd] = 1
+
+                    corrYDec,_ = scipy.stats.pearsonr(testY, testDec)
+                    if corrYDec < 0:
+                        self.ccdOffsets['DECSIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['DECSIGN'][cInd] = 1
+                else:
+                    # y is correlated with RA
+                    if corrYRA < 0:
+                        self.ccdOffsets['RASIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['RASIGN'][cInd] = 1
+
+                    corrXDec,_ = scipy.stats.pearsonr(testX, testDec)
+                    if corrXDec < 0:
+                        self.ccdOffsets['DECSIGN'][cInd] = -1
+                    else:
+                        self.ccdOffsets['DECSIGN'][cInd] = 1
+
+        self._computedSigns = True
