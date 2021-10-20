@@ -65,7 +65,6 @@ class FgcmChisq(object):
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
         self.saveParsForDebugging = fgcmConfig.saveParsForDebugging
@@ -82,6 +81,8 @@ class FgcmChisq(object):
             self.useSedLUT = True
         else:
             self.useSedLUT = False
+
+        self.deltaMapperDefault = None
 
         self.resetFitChisqList()
 
@@ -119,6 +120,16 @@ class FgcmChisq(object):
         self.matchesCached = False
         self.goodObs = None
         self.goodStarsSub = None
+
+    def setDeltaMapperDefault(self, deltaMapperDefault):
+        """
+        Set the deltaMapperDefault array.
+
+        Parameters
+        ----------
+        deltaMapperDefault : `np.recarray`
+        """
+        self.deltaMapperDefault = deltaMapperDefault
 
     def __call__(self,fitParams,fitterUnits=False,computeDerivatives=False,computeSEDSlopes=False,useMatchCache=False,computeAbsThroughput=False,ignoreRef=False,debug=False,allExposures=False,includeReserve=False,fgcmGray=None):
         """
@@ -600,8 +611,8 @@ class FgcmChisq(object):
                     i1a = rev[rev[i]: rev[i + 1]]
                     eInd = obsExpIndexGO[ok[i1a[0]]]
                     cInd = obsCCDIndexGO[ok[i1a[0]]]
-                    field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
-                                        self.ccdOffsets['Y_SIZE'][cInd],
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                        self.deltaMapperDefault['y_size'][cInd],
                                         ccdGraySubCCDPars[eInd, cInd, :])
                     fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
                     obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))

@@ -150,11 +150,12 @@ class FgcmParameters(object):
 
         self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevOrder + 1) *
                               (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
+
+        self.deltaMapperDefault = None
 
         if np.any(fgcmConfig.aperCorrInputSlopes == fgcmConfig.illegalValue):
             self.aperCorrInputSlopes = None
@@ -165,6 +166,16 @@ class FgcmParameters(object):
             self._initializeNewParameters(expInfo, fgcmLUT)
         else:
             self._loadOldParameters(expInfo, inParInfo, inParams, inSuperStar)
+
+    def setDeltaMapperDefault(self, deltaMapperDefault):
+        """
+        Set the deltaMapperDefault array.
+
+        Parameters
+        ----------
+        deltaMapperDefault : `np.recarray`
+        """
+        self.deltaMapperDefault = deltaMapperDefault
 
     @classmethod
     def newParsWithFits(cls, fgcmConfig, fgcmLUT):
@@ -640,6 +651,9 @@ class FgcmParameters(object):
         self.expTelHA = np.radians(expInfo['TELHA'])
         self.expTelRA = np.radians(expInfo['TELRA'])
         self.expTelDec = np.radians(expInfo['TELDEC'])
+
+        # Get the camera rotation in degrees
+        self.expTelRot = expInfo['TELROT']
 
         # and get the secant of the Zenith angle
         self.sinLatitude = np.sin(np.radians(self.latitude))
@@ -1700,8 +1714,8 @@ class FgcmParameters(object):
         for e in range(self.nEpochs):
             for f in range(self.nLUTFilter):
                 for c in range(self.nCCD):
-                    field = Cheb2dField(self.ccdOffsets['X_SIZE'][c],
-                                        self.ccdOffsets['Y_SIZE'][c],
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][c],
+                                        self.deltaMapperDefault['y_size'][c],
                                         self.parSuperStarFlat[e, f, c, :])
                     superStarFlatCenter[e, f, c] = -2.5 * np.log10(field.evaluateCenter())
 

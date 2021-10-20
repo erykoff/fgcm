@@ -26,7 +26,8 @@ class FgcmApplyZeropoints(object):
     useFits: bool, optional
        Read in files using fitsio?
     noFitsDict: dict, optional
-       Dict with lutIndex/lutStd/expInfo/ccdOffsets if useFits == False
+       Dict with lutIndex/lutStd/expInfo/[ccdOffsets or focalPlaneProjector]
+       if useFits == False
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
@@ -42,8 +43,10 @@ class FgcmApplyZeropoints(object):
             if (('lutIndex' not in noFitsDict) or
                 ('lutStd' not in noFitsDict) or
                 ('expInfo' not in noFitsDict) or
-                ('ccdOffsets' not in noFitsDict)):
-                raise ValueError("if useFits is False, must supply lutIndex, lutStd, expInfo, ccdOffsets in noFitsDict")
+                (('ccdOffsets' not in noFitsDict) and
+                 ('focalPlaneProjector' not in noFitsDict))):
+                raise ValueError("if useFits is False, must supply lutIndex, lutStd, expInfo, "
+                                 "[ccdOffsets or focalPlaneProjector] in noFitsDict")
 
         if self.useFits:
             # Everything can be loaded from fits
@@ -54,8 +57,9 @@ class FgcmApplyZeropoints(object):
                                          noFitsDict['lutIndex'],
                                          noFitsDict['lutStd'],
                                          noFitsDict['expInfo'],
-                                         noFitsDict['ccdOffsets'],
-                                         noOutput=noOutput)
+                                         noOutput=noOutput,
+                                         ccdOffsets=noFitsDict.get('ccdOffsets'),
+                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'))
 
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
