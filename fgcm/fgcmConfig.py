@@ -3,6 +3,7 @@ import os
 import sys
 import yaml
 
+from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 from .fgcmLogger import FgcmLogger
 
 class ConfigField(object):
@@ -82,12 +83,15 @@ class FgcmConfig(object):
        All the information from the LUT standard values
     expInfo: numpy recarray
        Info about each exposure
-    ccdOffsets: numpy recarray
-       Info about CCD positional offsets and sizes
     checkFiles: bool, default=False
        Check that all fits files exist
     noOutput: bool, default=False
        Do not create an output directory.
+    ccdOffsets : `np.ndarray`, optional
+        CCD Offset table.
+    focalPlaneProjector : `FocalPlaneProjector`, optional
+        A focal plane projector object to generate the
+        focal plane mapping at an arbitrary angle.
     """
 
     bands = ConfigField(list, required=True)
@@ -110,6 +114,7 @@ class FgcmConfig(object):
     expField = ConfigField(str, default='EXPNUM')
     ccdField = ConfigField(str, default='CCDNUM')
     latitude = ConfigField(float, required=True)
+    defaultCameraOrientation = ConfigField(float, default=0.0)
     seeingField = ConfigField(str, default='SEEING')
     seeingSubExposure = ConfigField(bool, default=False)
     deepFlag = ConfigField(str, default='DEEPFLAG')
@@ -231,7 +236,7 @@ class FgcmConfig(object):
     zpsToApplyFile = ConfigField(str, required=False)
     maxFlagZpsToApply = ConfigField(int, default=2)
 
-    def __init__(self, configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=False, noOutput=False):
+    def __init__(self, configDict, lutIndex, lutStd, expInfo, checkFiles=False, noOutput=False, ccdOffsets=None, focalPlaneProjector=None):
 
         self._setVarsFromDict(configDict)
 
@@ -465,17 +470,15 @@ class FgcmConfig(object):
         self.mjdRange = np.array([np.min(expInfo['MJD']),np.max(expInfo['MJD'])])
         self.nExp = expInfo.size
 
-        # read in the ccd offset file...also append a place to store sign/rotation
-        dtype = ccdOffsets.dtype.descr
-        dtype.extend([('XRA', bool),
-                      ('RASIGN', 'i2'),
-                      ('DECSIGN', 'i2')])
-
-        self.ccdOffsets = np.zeros(ccdOffsets.size, dtype=dtype)
-        for name in ccdOffsets.dtype.names:
-            self.ccdOffsets[name][:] = ccdOffsets[name][:]
-
-        # FIXME: check that ccdOffsets has the required information!
+        if ccdOffsets is None and focalPlaneProjector is None:
+            raise ValueError("Must supply either ccdOffsets or focalPlaneProjector")
+        elif ccdOffsets is not None and focalPlaneProjector is not None:
+            raise ValueError("Must supply only one of ccdOffsets or focalPlaneProjector")
+        elif focalPlaneProjector is not None:
+            self.focalPlaneProjector = focalPlaneProjector
+        else:
+            # Use old ccd offsets, so create a translator
+            self.focalPlaneProjector = FocalPlaneProjectorFromOffsets(ccdOffsets)
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
@@ -707,8 +710,7 @@ class FgcmConfig(object):
 
         ccdOffsets = fitsio.read(configDict['ccdOffsetFile'], ext=1)
 
-        return cls(configDict, lutIndex, lutStd, expInfo, ccdOffsets, checkFiles=True, noOutput=noOutput)
-
+        return cls(configDict, lutIndex, lutStd, expInfo, checkFiles=True, noOutput=noOutput, ccdOffsets=ccdOffsets)
 
     def saveConfigForNextCycle(self,fileName,parFile,flagStarFile):
         """

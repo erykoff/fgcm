@@ -42,7 +42,6 @@ class FgcmSuperStarFlat(object):
 
         self.illegalValue = fgcmConfig.illegalValue
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.epochNames = fgcmConfig.epochNames
@@ -54,6 +53,16 @@ class FgcmSuperStarFlat(object):
         self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
+
+    def setDeltaMapperDefault(self, deltaMapperDefault):
+        """
+        Set the deltaMapperDefault array.
+
+        Parameters
+        ----------
+        deltaMapperDefault : `np.recarray`
+        """
+        self.deltaMapperDefault = deltaMapperDefault
 
     def computeSuperStarFlats(self, doPlots=True, doNotUseSubCCD=False, onlyObsErr=False, forceZeroMean=False):
         """
@@ -235,8 +244,8 @@ class FgcmSuperStarFlat(object):
 
                         FGrayGOInd = 10.**(EGrayGO[i1a] / (-2.5))
                         FGrayErrGOInd = (np.log(10.) / 2.5) * np.sqrt(EGrayErr2GO[i1a]) * FGrayGOInd
-                        field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
-                                            self.ccdOffsets['Y_SIZE'][cInd],
+                        field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                            self.deltaMapperDefault['y_size'][cInd],
                                             pars)
                         fit, cov = scipy.optimize.curve_fit(field,
                                                             np.vstack((obsXGO[i1a],
@@ -273,8 +282,8 @@ class FgcmSuperStarFlat(object):
                 superStarNGoodStars[epInd, fiInd, cInd] = i1a.size
 
                 # compute the central value for use with the delta
-                field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
-                                    self.ccdOffsets['Y_SIZE'][cInd],
+                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                    self.deltaMapperDefault['y_size'][cInd],
                                     fit)
                 superStarFlatCenter[epInd, fiInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
@@ -375,10 +384,10 @@ class FgcmSuperStarFlat(object):
 
                 if not self.superStarSubCCD:
                     # New flux parameters
-                    plotCCDMap(ax, self.ccdOffsets[use], -2.5 * np.log10(superStarPars[e, f, use, 0]) * 1000.0,
+                    plotCCDMap(ax, self.deltaMapperDefault[use], -2.5 * np.log10(superStarPars[e, f, use, 0]) * 1000.0,
                                'SuperStar (mmag)')
                 else:
-                    plotCCDMap2d(ax, self.ccdOffsets[use], superStarPars[e, f, use, :],
+                    plotCCDMap2d(ax, self.deltaMapperDefault[use], superStarPars[e, f, use, :],
                                  'SuperStar (mmag)')
 
                 # and annotate
@@ -393,7 +402,7 @@ class FgcmSuperStarFlat(object):
                 # right side plot the deltas
                 ax=fig.add_subplot(122)
 
-                plotCCDMap(ax, self.ccdOffsets[use], deltaSuperStar[e,f,use]*1000.0,
+                plotCCDMap(ax, self.deltaMapperDefault[use], deltaSuperStar[e, f, use]*1000.0,
                            'Central Delta-SuperStar (mmag)')
 
                 # and annotate
