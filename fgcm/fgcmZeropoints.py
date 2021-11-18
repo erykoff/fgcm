@@ -59,7 +59,8 @@ class FgcmZeropoints(object):
         self.plotPath = fgcmConfig.plotPath
         self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
-        self.ccdOffsets = fgcmConfig.ccdOffsets
+        self.focalPlaneProjector = fgcmConfig.focalPlaneProjector
+        self.defaultCameraOrientation = fgcmConfig.defaultCameraOrientation
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.maxCCDGrayErr = fgcmConfig.maxCCDGrayErr
@@ -143,6 +144,8 @@ class FgcmZeropoints(object):
 
         r0 = snmm.getArray(self.fgcmRetrieval.r0Handle)
         r10 = snmm.getArray(self.fgcmRetrieval.r10Handle)
+
+        deltaMapperDefault = self.focalPlaneProjector(int(self.defaultCameraOrientation))
 
         # and we need to make sure we have the parameters, and
         #  set these to the exposures
@@ -237,8 +240,8 @@ class FgcmZeropoints(object):
 
         # Set the x/y sizes
         if self.outputFgcmcalZpts:
-            zpStruct['FGCM_FZPT_XYMAX'][:, 0] = self.ccdOffsets['X_SIZE'][zpCCDIndex]
-            zpStruct['FGCM_FZPT_XYMAX'][:, 1] = self.ccdOffsets['Y_SIZE'][zpCCDIndex]
+            zpStruct['FGCM_FZPT_XYMAX'][:, 0] = deltaMapperDefault['x_size'][zpCCDIndex]
+            zpStruct['FGCM_FZPT_XYMAX'][:, 1] = deltaMapperDefault['y_size'][zpCCDIndex]
 
         # fill in the superstar flat
         zpStruct['FGCM_FLAT'][:] = self.fgcmPars.expCCDSuperStar[zpExpIndex,
@@ -294,10 +297,23 @@ class FgcmZeropoints(object):
         ## FIXME: will probably need some sort of rotation information at some point
 
         # need secZenith for each exp/ccd pair
+        deltaRA = np.zeros(zpStruct.size)
+        deltaDec = np.zeros(zpStruct.size)
+        h, rev = esutil.stat.histogram(zpExpIndex, rev=True)
+        ok, = np.where(h > 0)
+        for i in ok:
+            i1a = rev[rev[i]: rev[i + 1]]
+            # rot = self.fgcmPars.expTelRot[zpExpIndex[i1a[0]]]
+            # ccdIndex = zpCCDIndex[i1a]
+
+            deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[zpExpIndex[i1a[0]]]))
+            deltaRA[i1a] = deltaMapper['delta_ra_cent'][zpCCDIndex[i1a]]
+            deltaDec[i1a] = deltaMapper['delta_dec_cent'][zpCCDIndex[i1a]]
+
         ccdHA = (self.fgcmPars.expTelHA[zpExpIndex] -
-                 np.radians(self.ccdOffsets['DELTA_RA'][zpCCDIndex])*np.cos(self.fgcmPars.expTelDec[zpExpIndex]))
+                 np.radians(deltaRA[zpCCDIndex])*np.cos(self.fgcmPars.expTelDec[zpExpIndex]))
         ccdDec = (self.fgcmPars.expTelDec[zpExpIndex] +
-                  np.radians(self.ccdOffsets['DELTA_DEC'][zpCCDIndex]))
+                  np.radians(deltaDec[zpCCDIndex]))
         ccdSecZenith = 1./(np.sin(ccdDec) * self.fgcmPars.sinLatitude +
                            np.cos(ccdDec) * self.fgcmPars.cosLatitude * np.cos(ccdHA))
 
@@ -566,7 +582,7 @@ class FgcmZeropoints(object):
                                            self.plotPath, self.outfileBaseWithCycle)
 
             plotter.makeR1I1Plots()
-            plotter.makeR1I1Maps(self.ccdOffsets, ccdField=self.ccdField)
+            plotter.makeR1I1Maps(deltaMapperDefault, ccdField=self.ccdField)
             plotter.makeR1I1TemporalResidualPlots()
 
             if not self.quietMode:
@@ -901,13 +917,13 @@ class FgcmZeropointPlotter(object):
                                                filterName))
             plt.close(fig)
 
-    def makeR1I1Maps(self, ccdOffsets, ccdField='CCDNUM'):
+    def makeR1I1Maps(self, deltaMapper, ccdField='CCDNUM'):
         """
         Make R1, I1, and R1-I1 maps.
 
         parameters
         ----------
-        ccdOffsets: ccd offset struct
+        deltaMapper: ccd offset struct
         ccdField: string, default='CCDNUM'
         """
 
@@ -969,13 +985,13 @@ class FgcmZeropointPlotter(object):
 
                 try:
                     if (plotType == 'R1'):
-                        plotCCDMap(ax, ccdOffsets[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
+                        plotCCDMap(ax, deltaMapper[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
                     elif (plotType == 'I1'):
-                        plotCCDMap(ax, ccdOffsets[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
+                        plotCCDMap(ax, deltaMapper[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
                     else:
                         # for the residuals, center at zero, but use lo/hi
                         amp = np.abs((hi - lo)/2.)
-                        plotCCDMap(ax, ccdOffsets[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
+                        plotCCDMap(ax, deltaMapper[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
                 except ValueError:
                     continue
 

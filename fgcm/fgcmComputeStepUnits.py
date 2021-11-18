@@ -51,7 +51,6 @@ class FgcmComputeStepUnits(object):
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
         self.freezeStdAtmosphere = fgcmConfig.freezeStdAtmosphere
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
-        self.ccdOffsets = fgcmConfig.ccdOffsets
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
         self.stepUnitReference = fgcmConfig.stepUnitReference

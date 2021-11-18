@@ -112,7 +112,6 @@ class FgcmStars(object):
         self.nRefStars = 0
         self.hasPsfCandidate = False
         self.hasDeltaMagBkg = False
-        self.ccdOffsets = fgcmConfig.ccdOffsets
 
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
@@ -120,8 +119,20 @@ class FgcmStars(object):
 
         self.missingSedValues = np.zeros(self.nBands)
 
+        self.deltaMapperDefault = None
+
         self.starsLoaded = False
         self.starsPrepped = False
+
+    def setDeltaMapperDefault(self, deltaMapperDefault):
+        """
+        Set the deltaMapperDefault array.
+
+        Parameters
+        ----------
+        deltaMapperDefault : `np.recarray`
+        """
+        self.deltaMapperDefault = deltaMapperDefault
 
     def loadStarsFromFits(self,fgcmPars,computeNobs=True):
         """
@@ -1660,10 +1671,8 @@ class FgcmStars(object):
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
 
         # two different tracks, if x/y available or not.
-
         if self.hasXY:
             # With x/y information
-
             from .fgcmUtilities import Cheb2dField
 
             # Scale X and Y
@@ -1688,8 +1697,8 @@ class FgcmStars(object):
                 fiInd = fgcmPars.expLUTFilterIndex[obsExpIndex[i1a[0]]]
                 cInd = obsCCDIndex[i1a[0]]
 
-                field = Cheb2dField(self.ccdOffsets['X_SIZE'][cInd],
-                                    self.ccdOffsets['Y_SIZE'][cInd],
+                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                    self.deltaMapperDefault['y_size'][cInd],
                                     fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :])
                 fluxScale = field.evaluate(obsX[i1a], obsY[i1a])
                 obsSuperStarApplied[i1a] = -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
