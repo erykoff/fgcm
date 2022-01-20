@@ -2,6 +2,7 @@ import numpy as np
 import os
 import sys
 import esutil
+import healpy as hp
 
 import matplotlib.pyplot as plt
 
@@ -145,6 +146,9 @@ class FgcmParameters(object):
         self.useRetrievedTauInit = fgcmConfig.useRetrievedTauInit
         self.modelMagErrors = fgcmConfig.modelMagErrors
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
+        self.deltaAperFitSpatialNside = fgcmConfig.deltaAperFitSpatialNside
+        self.deltaAperFitPerCcdNx = fgcmConfig.deltaAperFitPerCcdNx
+        self.deltaAperFitPerCcdNy = fgcmConfig.deltaAperFitPerCcdNy
 
         self.approxThroughput = fgcmConfig.approxThroughput
 
@@ -275,10 +279,6 @@ class FgcmParameters(object):
         expInfo: numpy recarrat
         fgcmLUT: FgcmLUT
         """
-
-        # link band indices
-        # self._makeBandIndices()
-
         # load the exposure information
         self._loadExposureInfo(expInfo)
 
@@ -386,6 +386,20 @@ class FgcmParameters(object):
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
         self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
 
+        # We also have the median delta aperture and epsilon per exposure
+        self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
+        self.compEpsilon = np.zeros(self.nExp, dtype='f8')
+        self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
+        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
+        self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
+        self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
+        self.compEpsilonCcdMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                           self.deltaAperFitPerCcdNx,
+                                           self.deltaAperFitPerCcdNy), dtype='f4')
+        self.compEpsilonCcdNStarMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                                self.deltaAperFitPerCcdNx,
+                                                self.deltaAperFitPerCcdNy), dtype='i4')
+
         self.compExpDeltaMagBkg = np.zeros(self.nExp, dtype='f8')
 
         # and sigFgcm
@@ -488,6 +502,34 @@ class FgcmParameters(object):
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
+
+        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
+        try:
+            self.compMedDeltaAper = np.atleast_1d(inParams['COMPMEDDELTAAPER'][0])
+            self.compEpsilon = np.atleast_1d(inParams['COMPEPSILON'][0])
+            self.compGlobalEpsilon = np.atleast_1d(inParams['COMPGLOBALEPSILON'][0])
+            self.compEpsilonMap = np.reshape(inParams['COMPEPSILONMAP'][0], (npix, self.nBands))
+            self.compEpsilonNStarMap = np.reshape(inParams['COMPEPSILONNSTARMAP'][0], (npix, self.nBands))
+            self.compEpsilonCcdMap = np.reshape(inParams['COMPEPSILONCCDMAP'][0], (self.nLUTFilter,
+                                                                                   self.nCCD,
+                                                                                   self.deltaAperFitPerCcdNx,
+                                                                                   self.deltaAperFitPerCcdNy))
+            self.compEpsilonCcdNStarMap = np.reshape(inParams['COMPEPSILONCCDNSTARMAP'][0], (self.nLUTFilter,
+                                                                                             self.nCCD,
+                                                                                             self.deltaAperFitPerCcdNx,
+                                                                                             self.deltaAperFitPerCcdNy))
+        except ValueError:
+            self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
+            self.compEpsilon = np.zeros(self.nExp, dtype='f8')
+            self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
+            self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
+            self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
+            self.compEpsilonCcdMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                               self.deltaAperFitPerCcdNx,
+                                               self.deltaAperFitPerCcdNy), dtype='f4')
+            self.compEpsilonCcdNStarMap = np.zeros((self.nLUTFilter, self.nCCD,
+                                                    self.deltaAperFitPerCcdNx,
+                                                    self.deltaAperFitPerCcdNy), dtype='i4')
 
         self.compExpDeltaMagBkg = np.atleast_1d(inParams['COMPEXPDELTAMAGBKG'][0])
 
@@ -904,7 +946,6 @@ class FgcmParameters(object):
                ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.lutFilterNames), )),
                ('BANDS', 'a%d' % (maxBandLen), (len(self.bands), )),
                ('FITBANDS', 'a%d' % (maxBandLen), (len(self.fitBands), )),
-               # ('NOTFITBANDS', 'a%d' % (maxBandLen), (len(self.notFitBands), )),
                ('LNTAUUNIT', 'f8'),
                ('LNTAUSLOPEUNIT', 'f8'),
                ('ALPHAUNIT', 'f8'),
@@ -965,6 +1006,13 @@ class FgcmParameters(object):
                ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
                ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
                ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPMEDDELTAAPER', 'f8', (self.compMedDeltaAper.size, )),
+               ('COMPEPSILON', 'f8', (self.compEpsilon.size, )),
+               ('COMPGLOBALEPSILON', 'f4', (self.compGlobalEpsilon.size, )),
+               ('COMPEPSILONMAP', 'f4', (self.compEpsilonMap.size, )),
+               ('COMPEPSILONNSTARMAP', 'i4', (self.compEpsilonNStarMap.size, )),
+               ('COMPEPSILONCCDMAP', 'f4', (self.compEpsilonCcdMap.size, )),
+               ('COMPEPSILONCCDNSTARMAP', 'i4', (self.compEpsilonCcdNStarMap.size, )),
                ('COMPEXPDELTAMAGBKG', 'f8', (self.compExpDeltaMagBkg.size, )),
                ('COMPNGOODSTARPEREXP', 'i4', (self.compNGoodStarPerExp.size, )),
                ('COMPSIGFGCM', 'f8', (self.compSigFgcm.size, )),
@@ -1028,6 +1076,14 @@ class FgcmParameters(object):
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
+
+        pars['COMPMEDDELTAAPER'][:] = self.compMedDeltaAper
+        pars['COMPEPSILON'][:] = self.compEpsilon
+        pars['COMPGLOBALEPSILON'][:] = self.compGlobalEpsilon
+        pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.flatten()
+        pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.flatten()
+        pars['COMPEPSILONCCDMAP'][:] = self.compEpsilonCcdMap.flatten()
+        pars['COMPEPSILONCCDNSTARMAP'][:] = self.compEpsilonCcdNStarMap.flatten()
 
         pars['COMPEXPDELTAMAGBKG'][:] = self.compExpDeltaMagBkg
 

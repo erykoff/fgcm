@@ -108,6 +108,7 @@ class FgcmStars(object):
         self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
         self.hasXY = False
+        self.hasDeltaAper = False
         self.hasRefstars = False
         self.nRefStars = 0
         self.hasPsfCandidate = False
@@ -242,6 +243,12 @@ class FgcmStars(object):
             obsX = None
             obsY = None
 
+        if ('DELTA_APER' in obs.dtype.names):
+            self.fgcmLog.info('Found DELTA_APER in input observations')
+            obsDeltaAper = obs['DELTA_APER']
+        else:
+            obsDeltaAper = None
+
         # process
         self.loadStars(fgcmPars,
                        obs[self.expField],
@@ -258,6 +265,7 @@ class FgcmStars(object):
                        pos['NOBS'],
                        obsX=obsX,
                        obsY=obsY,
+                       obsDeltaAper=obsDeltaAper,
                        refID=refID,
                        refMag=refMag,
                        refMagErr=refMagErr,
@@ -275,7 +283,7 @@ class FgcmStars(object):
                   obsExp, obsCCD, obsRA, obsDec, obsMag, obsMagErr, obsFilterName,
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
                   psfCandidate=None, refID=None, refMag=None, refMagErr=None,
-                  obsDeltaMagBkg=None,
+                  obsDeltaMagBkg=None, obsDeltaAper=None,
                   flagID=None, flagFlag=None, computeNobs=True):
         """
         Load stars from arrays
@@ -317,6 +325,8 @@ class FgcmStars(object):
            Set to >90 for no magnitude.
         obsDeltaMagBkg: float array, optional
            Delta-mag per observation due to local background offset.
+        obsDeltaAper: float array, optional
+           delta_aper for each observation
         obsX: float array, optional
            x position for each observation
         obsY: float array, optional
@@ -395,6 +405,11 @@ class FgcmStars(object):
                 self.hasDeltaMagBkg = True
                 self.fgcmLog.info('Delta-mag from local background found')
                 self.obsDeltaMagBkgHandle = snmm.createArray(self.nStarObs, dtype='f4')
+        if obsDeltaAper is not None:
+            self.hasDeltaAper = True
+
+            #  obsDeltaAper: delta mag for smaller - larger aperture
+            self.obsDeltaAperHandle = snmm.createArray(self.nStarObs, dtype='f4')
 
         if (refID is not None and refMag is not None and refMagErr is not None):
             self.hasRefstars = True
@@ -437,6 +452,8 @@ class FgcmStars(object):
             snmm.getArray(self.psfCandidateHandle)[:] = psfCandidate
         if self.hasDeltaMagBkg:
             snmm.getArray(self.obsDeltaMagBkgHandle)[:] = obsDeltaMagBkg
+        if self.hasDeltaAper:
+            snmm.getArray(self.obsDeltaAperHandle)[:] = obsDeltaAper
 
         if self.hasRefstars:
             # And filter out bad signal to noise, per band, if desired,
@@ -707,6 +724,8 @@ class FgcmStars(object):
                                                   syncAccess=True)
         #  objMagStdMeanNoChrom: mean std mag of each object, no chromatic correction, per band
         self.objMagStdMeanNoChromHandle = snmm.createArray((self.nStars, self.nBands), dtype='f8')
+        if self.hasDeltaAper:
+            self.objDeltaAperMeanHandle = snmm.createArray((self.nStars, self.nBands), dtype='f4', syncAccess=True)
 
         startTime=time.time()
         self.fgcmLog.debug('Computing secZenith for each star observation...')
@@ -1972,6 +1991,9 @@ class FgcmStars(object):
                ('MAGERR_STD', 'f4', goodBands.size)]
         if self.hasPsfCandidate:
             dtype.append(('NPSFCAND', 'i4', goodBands.size))
+        if self.hasDeltaAper:
+            objDeltaAperMean = snmm.getArray(self.objDeltaAperMeanHandle)
+            dtype.append(('DELTA_APER', 'f4', goodBands.size))
 
         outCat = np.zeros(goodStars.size, dtype=dtype)
 
@@ -1986,6 +2008,8 @@ class FgcmStars(object):
             outCat['MAGERR_STD'][:, i] = objMagStdMeanErr[goodStars, goodBand]
             if self.hasPsfCandidate:
                 outCat['NPSFCAND'][:, i] = objNPsfCandidate[goodStars, goodBand]
+            if self.hasDeltaAper:
+                outCat['DELTA_APER'][:, i] = objDeltaAperMean[goodStars, goodBand]
 
         return outCat, goodBandNames
 
