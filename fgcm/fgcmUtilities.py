@@ -621,16 +621,22 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
     ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
     ax.tick_params(axis='both', which='major', labelsize=14)
 
+    nx = binnedArray.shape[1]
+    ny = binnedArray.shape[2]
+
     zGrid = np.zeros_like(deltaMapper['x'])
     for k in range(deltaMapper.size):
-        xBin = np.floor(deltaMapper[k]['x']/deltaMapper[k]['x_size']).astype(np.int32)
-        yBin = np.floor(deltaMapper[k]['y']/deltaMapper[k]['y_size']).astype(np.int32)
+        xBin = np.floor((nx - 1)*deltaMapper[k]['x']/deltaMapper[k]['x_size']).astype(np.int32)
+        yBin = np.floor((ny - 1)*deltaMapper[k]['y']/deltaMapper[k]['y_size']).astype(np.int32)
 
         zGrid[k, :] = binnedArray[k, xBin, yBin]
 
-    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+    use, = np.where(zGrid.ravel() > illegalValue)
+
+    plt.scatter(deltaMapper['delta_ra'].ravel()[use],
+                deltaMapper['delta_dec'].ravel()[use],
                 s=0.1,
-                c=zGrid.ravel(),
+                c=zGrid.ravel()[use],
                 vmin=lo, vmax=hi)
 
     cb = None
