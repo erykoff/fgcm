@@ -1043,14 +1043,14 @@ class FgcmParameters(object):
         pars['PARLNPWVINTERCEPT'][:] = self.parLnPwvIntercept
         pars['PARLNPWVSLOPE'][:] = self.parLnPwvSlope
         pars['PARLNPWVQUADRATIC'][:] = self.parLnPwvQuadratic
-        pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept.flatten()
-        pars['COMPQESYSSLOPE'][:] = self.compQESysSlope.flatten()
+        pars['PARQESYSINTERCEPT'][:] = self.parQESysIntercept.ravel()
+        pars['COMPQESYSSLOPE'][:] = self.compQESysSlope.ravel()
         pars['PARFILTEROFFSET'][:] = self.parFilterOffset
         pars['PARFILTEROFFSETFITFLAG'][:] = self.parFilterOffsetFitFlag
         pars['COMPABSTHROUGHPUT'][:] = self.compAbsThroughput
         pars['COMPREFOFFSET'][:] = self.compRefOffset
         pars['COMPREFSIGMA'][:] = self.compRefSigma
-        pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.flatten()
+        pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.ravel()
         pars['MIRRORCHROMATICITYPIVOT'][:] = self.mirrorChromaticityPivot
         pars['COMPMEDIANSEDSLOPE'][:] = self.compMedianSedSlope
 
@@ -1066,12 +1066,12 @@ class FgcmParameters(object):
         pars['COMPAPERCORRPIVOT'][:] = self.compAperCorrPivot
         pars['COMPAPERCORRSLOPE'][:] = self.compAperCorrSlope
         pars['COMPAPERCORRSLOPEERR'][:] = self.compAperCorrSlopeErr
-        pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange.flatten()
+        pars['COMPAPERCORRRANGE'][:] = self.compAperCorrRange.ravel()
 
         pars['COMPMODELERREXPTIMEPIVOT'][:] = self.compModelErrExptimePivot
         pars['COMPMODELERRFWHMPIVOT'][:] = self.compModelErrFwhmPivot
         pars['COMPMODELERRSKYPIVOT'][:] = self.compModelErrSkyPivot
-        pars['COMPMODELERRPARS'][:] = self.compModelErrPars.flatten()
+        pars['COMPMODELERRPARS'][:] = self.compModelErrPars.ravel()
 
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
@@ -1080,10 +1080,10 @@ class FgcmParameters(object):
         pars['COMPMEDDELTAAPER'][:] = self.compMedDeltaAper
         pars['COMPEPSILON'][:] = self.compEpsilon
         pars['COMPGLOBALEPSILON'][:] = self.compGlobalEpsilon
-        pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.flatten()
-        pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.flatten()
-        pars['COMPEPSILONCCDMAP'][:] = self.compEpsilonCcdMap.flatten()
-        pars['COMPEPSILONCCDNSTARMAP'][:] = self.compEpsilonCcdNStarMap.flatten()
+        pars['COMPEPSILONMAP'][:] = self.compEpsilonMap.ravel()
+        pars['COMPEPSILONNSTARMAP'][:] = self.compEpsilonNStarMap.ravel()
+        pars['COMPEPSILONCCDMAP'][:] = self.compEpsilonCcdMap.ravel()
+        pars['COMPEPSILONCCDNSTARMAP'][:] = self.compEpsilonCcdNStarMap.ravel()
 
         pars['COMPEXPDELTAMAGBKG'][:] = self.compExpDeltaMagBkg
 
@@ -1425,7 +1425,7 @@ class FgcmParameters(object):
             u = units[self.parQESysInterceptLoc:
                           self.parQESysInterceptLoc + self.parQESysIntercept.size]
             parArray[self.parQESysInterceptLoc:
-                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.flatten() * u
+                         self.parQESysInterceptLoc + self.parQESysIntercept.size] = self.parQESysIntercept.ravel() * u
 
         u = units[self.parFilterOffsetLoc:
                      self.parFilterOffsetLoc + self.nLUTFilter]
