@@ -473,7 +473,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
                 vmin=lo, vmax=hi)
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -554,7 +554,7 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
                 vmin=lo, vmax=hi)
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -640,7 +640,7 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
                 vmin=lo, vmax=hi)
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
