@@ -59,13 +59,13 @@ class FgcmDeltaAper(object):
         self.deltaAperOuterRadiusArcsec = fgcmConfig.deltaAperOuterRadiusArcsec
         self.deltaAperFitMinNgoodObs = fgcmConfig.deltaAperFitMinNgoodObs
 
+        self.epsilonNormalized = True
         if self.deltaAperOuterRadiusArcsec == 0.0 and self.deltaAperInnerRadiusArcsec == 0.0:
             self.fgcmLog.warn('No aperture radii set.  Epsilon is unnormalized.')
-            self.deltaAreaArcsec2 = 1.0
-        else:
-            self.deltaAreaArcsec2 = np.pi*(self.deltaAperOuterRadiusArcsec**2. -
-                                           self.deltaAperInnerRadiusArcsec**2.)
+            self.epsilonNormalized = False
+
         self.njyZp = 48.6 - 9*2.5
+        self.k = 2.5/np.log(10.)
 
     def computeDeltaAperExposures(self):
         """
@@ -124,7 +124,7 @@ class FgcmDeltaAper(object):
             # Will need to check for warnings here...
             fit, nStar = self._fitEpsilonWithOutlierRejection(x, y, yerr)
 
-            self.fgcmPars.compEpsilon[expIndex] = fit[0]/self.deltaAreaArcsec2
+            self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
 
     def computeDeltaAperStars(self, debug=False):
         """
@@ -225,7 +225,7 @@ class FgcmDeltaAper(object):
             fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
                              bin_struct['Y'][u],
                              1, w=1./bin_struct['Y_ERR'][u])
-            globalEpsilon[i] = fit[0] / self.deltaAreaArcsec2
+            globalEpsilon[i] = self._normalizeEpsilon(fit)
             globalOffset[i] = fit[1]
 
             # Store the value of njy_per_arcsec2
@@ -285,7 +285,7 @@ class FgcmDeltaAper(object):
 
                 fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
                 offsetMap['nstar_fit'][i, j] = nStar
-                offsetMap['epsilon'][i, j] = fit[0]/self.deltaAreaArcsec2
+                offsetMap['epsilon'][i, j] = self._normalizeEpsilon(fit)
 
         # Store the offsetmap in njy_per_arcsec2
         self.fgcmPars.compEpsilonMap[:, :] = offsetMap['epsilon']
@@ -408,8 +408,15 @@ class FgcmDeltaAper(object):
             cutMag = magGO[i1a[st[int(0.25*st.size)]]]
             bright, = np.where(magGO[i1a] < cutMag)
             offset = np.median(deltaAperGO[i1a[bright]])
+            c = 10.**(offset/2.5)
 
-            epsilonApprox = (np.log(10.)/2.5)*(deltaAperGO[i1a] - offset)*flux
+            if self.epsilonNormalized:
+                norm = self.k*np.pi*(self.deltaAperOuterRadiusArcsec**2. -
+                                     c*self.deltaAperInnerRadiusArcsec**2.)/c
+            else:
+                norm = 1.0
+
+            epsilonApprox = (deltaAperGO[i1a] - offset)*flux/norm
             relativeFluxErr2 = (fluxErr/flux)**2.
             relativeDeltaAperErr2 = (deltaAperErrGO[i1a]/np.clip(deltaAperGO[i1a] - offset, 0.001, None))**2.
             epsilonErrApprox = np.abs(epsilonApprox)*np.sqrt(relativeFluxErr2 +
@@ -434,14 +441,14 @@ class FgcmDeltaAper(object):
                     yerr = deltaAperErrGO[i1a[i2a]]
 
                     fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-                    epsilonCcdMap[fInd, cInd, xInd, yInd] = fit[0]/self.deltaAreaArcsec2
+                    epsilonCcdMap[fInd, cInd, xInd, yInd] = self._normalizeEpsilon(fit)
                     epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = nStar
                 else:
                     # Do the "weighted mean" epsilon with quick outlier rejection
                     ok2, = np.where(np.abs(epsilonApprox[i2a] - epsilonMed) < 3.0*epsilonErrApprox[i2a])
                     wt = 1./epsilonErrApprox[i2a[ok2]]**2.
                     wmean = np.sum(epsilonApprox[i2a[ok2]]*wt)/np.sum(wt)
-                    epsilonCcdMap[fInd, cInd, xInd, yInd] = wmean/self.deltaAreaArcsec2
+                    epsilonCcdMap[fInd, cInd, xInd, yInd] = wmean
                     epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = ok2.size
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
@@ -535,6 +542,27 @@ class FgcmDeltaAper(object):
         fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
 
         return fit, ok.size
+
+    def _normalizeEpsilon(self, fit):
+        """Compute normalized epsilon value.
+
+        Returns raw fit slope if no aperture radii were set.
+
+        Parameters
+        ----------
+        fit : `iterable`
+            Fit parameters (slope, intercept).
+
+        Returns
+        -------
+        epsilon : `float`
+        """
+        if not self.epsilonNormalized:
+            return fit[0]
+
+        c = 10.**(fit[1]/2.5)
+        return (c*fit[0])/(self.k*np.pi*(self.deltaAperOuterRadiusArcsec**2.
+                                         - c*self.deltaAperInnerRadiusArcsec**2.))
 
     def __getstate__(self):
         # Don't try to pickle the logger.
