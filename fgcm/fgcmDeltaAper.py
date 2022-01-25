@@ -383,26 +383,8 @@ class FgcmDeltaAper(object):
             flux = 10.**((magGO[i1a] - self.njyZp)/(-2.5))
             fluxErr = (2.5/np.log(10.))*magErrGO[i1a]
 
-            # Per filter/ccd we need to compute the bright-end offset
-            # In the future, look at adding this information above?
-            st = np.argsort(magGO[i1a])
-            cutMag = magGO[i1a[st[int(0.25*st.size)]]]
-            bright, = np.where(magGO[i1a] < cutMag)
-            offset = np.median(deltaAperGO[i1a[bright]])
-            c = 10.**(offset/2.5)
-
-            if self.epsilonNormalized:
-                norm = self.k*np.pi*(self.deltaAperOuterRadiusArcsec**2. -
-                                     c*self.deltaAperInnerRadiusArcsec**2.)/c
-            else:
-                norm = 1.0
-
-            epsilonApprox = (deltaAperGO[i1a] - offset)*flux/norm
-            relativeFluxErr2 = (fluxErr/flux)**2.
-            relativeDeltaAperErr2 = (deltaAperErrGO[i1a]/np.clip(deltaAperGO[i1a] - offset, 0.001, None))**2.
-            epsilonErrApprox = np.abs(epsilonApprox)*np.sqrt(relativeFluxErr2 +
-                                                             relativeDeltaAperErr2)
-            epsilonMed = np.median(epsilonApprox)
+            # Default normalization
+            norm = 1.0
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
@@ -415,22 +397,18 @@ class FgcmDeltaAper(object):
                 xInd = xBin[i1a[i2a[0]]]
                 yInd = yBin[i1a[i2a[0]]]
 
-                if i2a.size >= 500:
-                    # We can do the full fit
-                    xvals = (2.5/np.log(10.))/flux[i2a]
-                    yvals = deltaAperGO[i1a[i2a]] - offset
-                    yerr = deltaAperErrGO[i1a[i2a]]
+                # Use median statistics for this experimental mode
+                st = np.argsort(magGO[i1a[i2a]])
+                cutMag = magGO[i1a[i2a[st[int(0.25*st.size)]]]]
+                offset = np.median(deltaAperGO[i1a[i2a[magGO[i1a[i2a]] < cutMag]]])
+                c = 10.**(offset/2.5)
 
-                    fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-                    epsilonCcdMap[fInd, cInd, xInd, yInd] = self._normalizeEpsilon(fit)
-                    epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = nStar
-                else:
-                    # Do the "weighted mean" epsilon with quick outlier rejection
-                    ok2, = np.where(np.abs(epsilonApprox[i2a] - epsilonMed) < 3.0*epsilonErrApprox[i2a])
-                    wt = 1./epsilonErrApprox[i2a[ok2]]**2.
-                    wmean = np.sum(epsilonApprox[i2a[ok2]]*wt)/np.sum(wt)
-                    epsilonCcdMap[fInd, cInd, xInd, yInd] = wmean
-                    epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = ok2.size
+                if self.epsilonNormalized:
+                    norm = self.k*np.pi*(self.deltaAperOuterRadiusArcsec**2. -
+                                         c*self.deltaAperInnerRadiusArcsec**2.)/c
+
+                epsilonCcdMap[fInd, cInd, xInd, yInd] = np.median((deltaAperGO[i1a[i2a]] - offset)*flux[i2a]/norm)
+                epsilonCcdNStarMap[fInd, cInd, xInd, yInd] = i2a.size
 
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
         self.fgcmPars.compEpsilonCcdNStarMap[:] = epsilonCcdNStarMap[:]
