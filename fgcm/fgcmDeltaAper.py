@@ -115,14 +115,7 @@ class FgcmDeltaAper(object):
             bright, = np.where(mag[ok] < cutMag)
             self.fgcmPars.compMedDeltaAper[expIndex] = np.median(deltaAper[ok[bright]])
 
-            # Next, we take the full thing and compute epsilon (nJy)
-            flux = 10.**((mag[ok] - self.njyZp)/(-2.5))
-            x = (2.5/np.log(10.)) / flux
-            y = deltaAper[ok]
-            yerr = err[ok]
-
-            # Will need to check for warnings here...
-            fit, nStar = self._fitEpsilonWithOutlierRejection(x, y, yerr)
+            fit, _ = self._fitEpsilonWithDataBinner(mag[ok], deltaAper[ok])
 
             self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
 
@@ -210,21 +203,8 @@ class FgcmDeltaAper(object):
             else:
                 r = np.arange(mag_std.size)
 
-            st = np.argsort(mag_std[r])
-            mag_min = mag_std[r[st[int(0.01*st.size)]]]
-            mag_max = mag_std[r[st[int(0.95*st.size)]]]
-            st = np.argsort(delta[r])
-            delta_min = delta[r[st[int(0.02*st.size)]]]
-            delta_max = delta[r[st[int(0.98*st.size)]]]
+            fit, bin_struct = self._fitEpsilonWithDataBinner(mag_std[r], delta[r])
 
-            bin_struct = dataBinner(mag_std[r], delta[r], 0.2, [mag_min, mag_max])
-            u, = np.where(bin_struct['Y_ERR'] > 0.0)
-
-            # Do nJy
-            bin_flux = 10.**((bin_struct['X'] - self.njyZp)/(-2.5))
-            fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
-                             bin_struct['Y'][u],
-                             1, w=1./bin_struct['Y_ERR'][u])
             globalEpsilon[i] = self._normalizeEpsilon(fit)
             globalOffset[i] = fit[1]
 
@@ -235,13 +215,21 @@ class FgcmDeltaAper(object):
 
             if self.plotPath is not None:
                 # Do plots
+
+                st = np.argsort(mag_std[r])
+                mag_min = mag_std[r[st[int(0.01*st.size)]]]
+                mag_max = mag_std[r[st[int(0.95*st.size)]]]
+                st = np.argsort(delta[r])
+                delta_min = delta[r[st[int(0.02*st.size)]]]
+                delta_max = delta[r[st[int(0.98*st.size)]]]
+
                 fig = plt.figure(1, figsize=(8, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
                 ax.hexbin(mag_std, delta, extent=[mag_min, mag_max,
                                                   delta_min, delta_max], bins='log')
-                ax.errorbar(bin_struct['X'][u], bin_struct['Y'][u],
-                            yerr=bin_struct['Y_ERR'][u], fmt='r.', markersize=10)
+                ax.errorbar(bin_struct['X'], bin_struct['Y'],
+                            yerr=bin_struct['Y_ERR'], fmt='r.', markersize=10)
                 xplotvals = np.linspace(mag_min, mag_max, 100)
                 xplotfluxvals = 10.**((xplotvals - self.njyZp)/(-2.5))
                 yplotvals = fit[0]*((2.5/np.log(10.0))/xplotfluxvals) + fit[1]
@@ -273,18 +261,11 @@ class FgcmDeltaAper(object):
                     continue
 
                 mag_std = objMagStdMean[i1a[use], j]
-                magerr_std = objMagStdMeanErr[i1a[use], j]
                 delta = objDeltaAperMean[i1a[use], j]
 
-                x_flux = 10.**((mag_std - self.njyZp)/(-2.5))
-                delta_err = magerr_std
+                fit, _ = self._fitEpsilonWithDataBinner(mag_std, delta)
 
-                xvals = (2.5/np.log(10.)) / x_flux
-                yvals = delta
-                yerr = delta_err
-
-                fit, nStar = self._fitEpsilonWithOutlierRejection(xvals, yvals, yerr)
-                offsetMap['nstar_fit'][i, j] = nStar
+                offsetMap['nstar_fit'][i, j] = len(mag_std)
                 offsetMap['epsilon'][i, j] = self._normalizeEpsilon(fit)
 
         # Store the offsetmap in njy_per_arcsec2
@@ -528,6 +509,29 @@ class FgcmDeltaAper(object):
 
     def _fitEpsilonWithOutlierRejection(self, xvals, yvals, yerr, madCut=3.0, errCut=5.0):
         """
+        Fit epsilon with outlier rejection.
+
+        This doesn't work so good.
+
+        Parameters
+        ----------
+        xvals : `np.ndarray`
+            x values.
+        yvals : `np.ndarray`
+            y values.
+        yerr : `np.ndarray`
+            y error values.
+        madCut : `float`, optional
+            Initial median-absolute-deviation cut.
+        errCut : `float`, optional
+            Secondary nsigma error cut.
+
+        Returns
+        -------
+        fit : `tuple`
+            Fit parameters.
+        size : `int`
+            Number of stars in final fit.
         """
         # First outlier rejection based on MAD
         med = np.median(yvals)
@@ -542,6 +546,41 @@ class FgcmDeltaAper(object):
         fit = np.polyfit(xvals[ok], yvals[ok], 1, w=1./yerr[ok])
 
         return fit, ok.size
+
+    def _fitEpsilonWithDataBinner(self, mag, delta_aper, binsize=0.2):
+        """
+        Fit epsilon with binned data.
+
+        This works much better.
+
+        Parameters
+        ----------
+        mag : `np.ndarray`
+            Magnitude values
+        delta_aper : `np.ndarray`
+            Delta-aper values.
+        binsize : `float`, optional
+            Magnitude bin size.
+
+        Returns
+        -------
+        fit : `tuple`
+            Fit parameters
+        bin_struct : `np.recarray`
+            Binned data structure.
+        """
+        st = np.argsort(mag)
+        mag_min = mag[st[int(0.01*st.size)]]
+        mag_max = mag[st[int(0.95*st.size)]]
+
+        bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max])
+        u, = np.where(bin_struct['Y_ERR'] > 0.0)
+
+        bin_flux = 10.**((bin_struct['X'] - self.njyZp)/(-2.5))
+        fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
+                         bin_struct['Y'][u],
+                         1, w=1./bin_struct['Y_ERR'][u])
+        return fit, bin_struct[u]
 
     def _normalizeEpsilon(self, fit):
         """Compute normalized epsilon value.
