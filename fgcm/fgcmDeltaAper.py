@@ -303,7 +303,7 @@ class FgcmDeltaAper(object):
                 ax.set_aspect('equal')
                 xlim = ax.get_xlim()
                 ax.set_xlim(xlim[1], xlim[0])
-                cb = plt.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5))
+                cb = plt.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5), ax=ax)
                 cb.set_label('epsilon (nJy/arcsec2)')
                 fig.savefig('%s/%s_epsilon_map_%s.png' % (self.plotPath,
                                                           self.outfileBaseWithCycle,
