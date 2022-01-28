@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 from .fgcmUtilities import dataBinner
 
 import multiprocessing
-from multiprocessing import Pool
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -161,7 +160,8 @@ class FgcmDeltaAper(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            pool = Pool(processes=self.nCore)
+            mp_ctx = multiprocessing.get_context('fork')
+            pool = mp_ctx.Pool(processes=self.nCore)
             pool.map(self._starWorker, workerList, chunksize=1)
             pool.close()
             pool.join()
