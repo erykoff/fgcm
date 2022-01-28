@@ -217,6 +217,18 @@ class FgcmConfig(object):
     saveParsForDebugging = ConfigField(bool, default=False)
     doPlots = ConfigField(bool, default=True)
 
+    deltaAperFitMinNgoodObs = ConfigField(int, default=2)
+    deltaAperFitPerCcdNx = ConfigField(int, default=8)
+    deltaAperFitPerCcdNy = ConfigField(int, default=16)
+    deltaAperFitSpatialNside = ConfigField(int, default=64)
+    deltaAperFitSpatialMinStar = ConfigField(int, default=500)
+    deltaAperInnerRadiusArcsec = ConfigField(float, default=0.0)
+    deltaAperOuterRadiusArcsec = ConfigField(float, default=0.0)
+    doComputeDeltaAperExposures = ConfigField(bool, default=False)
+    doComputeDeltaAperStars = ConfigField(bool, default=True)
+    doComputeDeltaAperMap = ConfigField(bool, default=False)
+    doComputeDeltaAperPerCcd = ConfigField(bool, default=False)
+
     pwvFile = ConfigField(str, required=False)
     externalPwvDeltaT = ConfigField(float, default=0.1)
     tauFile = ConfigField(str, required=False)
