@@ -170,22 +170,14 @@ class FgcmDeltaAper(object):
             self.fgcmLog.info('Finished DeltaAper in %.2f seconds.' %
                               (time.time() - startTime))
 
-    def computeEpsilonMap(self):
-        """
-        Compute global epsilon and local maps.
-        """
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
-        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
-        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
-
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
         globalEpsilon = np.zeros(self.fgcmStars.nBands) + self.illegalValue
         globalOffset = np.zeros(self.fgcmPars.nBands) + self.illegalValue
 
-        # We start with the global fits
+        # Compute global offsets here.
         for i, band in enumerate(self.fgcmStars.bands):
             use, = np.where((objNGoodObs[:, i] >= self.deltaAperFitMinNgoodObs) &
                             (np.abs(objDeltaAperMean[:, i]) < 0.5) &
@@ -242,7 +234,19 @@ class FgcmDeltaAper(object):
                                                              band))
                 plt.close(fig)
 
-        # And then do the mapping
+    def computeEpsilonMap(self):
+        """
+        Compute global epsilon and local maps.
+        """
+        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
+        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
+
+        # Do the mapping
         ipring = hp.ang2pix(self.deltaAperFitSpatialNside,
                             objRA, objDec, lonlat=True)
         h, rev = esutil.stat.histogram(ipring, min=0, max=hp.nside2npix(self.deltaAperFitSpatialNside) - 1, rev=True)
