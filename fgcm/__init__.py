@@ -40,3 +40,4 @@ from .fgcmComputeStepUnits import FgcmComputeStepUnits
 from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
 from .fgcmZpsToApply import FgcmZpsToApply
 from .fgcmApplyZeropoints import FgcmApplyZeropoints
+from .fgcmDeltaAper import FgcmDeltaAper
