@@ -757,7 +757,7 @@ class FgcmStars(object):
                                  "Observed range is %.2f to %.2f, and LUT goes from %.2f to %.2f" %
                                  (np.min(obsSecZenith), np.max(obsSecZenith),
                                   self.secZenithRange[0], self.secZenithRange[1]))
-            bad, = np.where((obsSecZenith <= self.secZenithRange[0]) |
+            bad, = np.where((obsSecZenith < self.secZenithRange[0]) |
                             (obsSecZenith >= self.secZenithRange[1]))
             self.fgcmLog.warning("Marking %d observations out of airmass range as BAD_AIRMASS" % (bad.size))
             obsSecZenith[bad] = np.clip(obsSecZenith[bad],
