@@ -360,8 +360,8 @@ class FgcmDeltaAper(object):
         bandIndexGO = obsBandIndex[goodObs]
         lutFilterIndexGO = obsLUTFilterIndex[goodObs]
 
-        xBin = np.floor((xGO*self.deltaAperFitPerCcdNx)/self.deltaMapper[ccdIndexGO]['x_size']).astype(np.int32)
-        yBin = np.floor((yGO*self.deltaAperFitPerCcdNy)/self.deltaMapper[ccdIndexGO]['y_size']).astype(np.int32)
+        xBin = np.floor((xGO*self.deltaAperFitPerCcdNx)/self.deltaMapper['x_size'][ccdIndexGO]).astype(np.int32)
+        yBin = np.floor((yGO*self.deltaAperFitPerCcdNy)/self.deltaMapper['y_size'][ccdIndexGO]).astype(np.int32)
 
         filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
