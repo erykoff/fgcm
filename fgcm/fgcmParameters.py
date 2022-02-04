@@ -151,6 +151,7 @@ class FgcmParameters(object):
         self.deltaAperFitPerCcdNy = fgcmConfig.deltaAperFitPerCcdNy
 
         self.approxThroughput = fgcmConfig.approxThroughput
+        self.defaultTelRot = fgcmConfig.defaultTelRot
 
         self.superStarNPar = ((fgcmConfig.superStarSubCCDChebyshevOrder + 1) *
                               (fgcmConfig.superStarSubCCDChebyshevOrder + 1))
@@ -695,7 +696,10 @@ class FgcmParameters(object):
         self.expTelDec = np.radians(expInfo['TELDEC'])
 
         # Get the camera rotation in degrees
-        self.expTelRot = expInfo['TELROT']
+        try:
+            self.expTelRot = expInfo['TELROT']
+        except ValueError:
+            self.expTelRot = np.zeros(len(self.expTelHA)) + self.defaultTelRot
 
         # and get the secant of the Zenith angle
         self.sinLatitude = np.sin(np.radians(self.latitude))

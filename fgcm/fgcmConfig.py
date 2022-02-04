@@ -169,6 +169,7 @@ class FgcmConfig(object):
     sigmaCalFitPercentile = ConfigField(list, default=[0.05, 0.15], length=2)
     sigmaCalPlotPercentile = ConfigField(list, default=[0.05, 0.95], length=2)
     sigma0Phot = ConfigField(float, default=0.003)
+    defaultTelRot = ConfigField(float, default=0.0)
     logLevel = ConfigField(str, default='INFO')
     quietMode = ConfigField(bool, default=False)
     useRepeatabilityForExpGrayCutsDict = ConfigField(dict, default={})
