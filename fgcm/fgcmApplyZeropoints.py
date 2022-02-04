@@ -11,6 +11,7 @@ from .fgcmStars import FgcmStars
 from .fgcmLUT import FgcmLUT
 from .fgcmZpsToApply import FgcmZpsToApply
 from .fgcmDeltaAper import FgcmDeltaAper
+from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 
 from .fgcmUtilities import getMemoryString, expFlagDict, obsFlagDict
 
@@ -149,6 +150,10 @@ class FgcmApplyZeropoints(object):
 
         if (not self.setupComplete):
             raise RuntimeError("Must complete applyZeropoints setup first!")
+
+        # Compute signs for CCD offsets if necessary
+        if isinstance(self.fgcmConfig.focalPlaneProjector, FocalPlaneProjectorFromOffsets):
+            self.fgcmConfig.focalPlaneProjector.computeCCDOffsetSigns(self.fgcmStars)
 
         if self.fgcmStars.hasDeltaMagBkg:
             self.fgcmStars.applyDeltaMagBkg()
