@@ -63,7 +63,7 @@ class FgcmDeltaAper(object):
             self.fgcmLog.warn('No aperture radii set.  Epsilon is unnormalized.')
             self.epsilonNormalized = False
 
-        self.njyZp = 48.6 - 9*2.5
+        self.njyZp = 8.9 + 9*2.5
         self.k = 2.5/np.log(10.)
 
     def computeDeltaAperExposures(self):
@@ -247,6 +247,7 @@ class FgcmDeltaAper(object):
         objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
 
         # Do the mapping
+        self.fgcmLog.info("Computing delta-aper epsilon spatial map at nside %d" % self.deltaAperFitSpatialNside)
         ipring = hp.ang2pix(self.deltaAperFitSpatialNside,
                             objRA, objDec, lonlat=True)
         h, rev = esutil.stat.histogram(ipring, min=0, max=hp.nside2npix(self.deltaAperFitSpatialNside) - 1, rev=True)
@@ -417,6 +418,23 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compEpsilonCcdMap[:] = epsilonCcdMap[:]
         self.fgcmPars.compEpsilonCcdNStarMap[:] = epsilonCcdNStarMap[:]
 
+        scaleRange = np.zeros((self.fgcmPars.nLUTFilter, 2))
+        scaleMedian = np.zeros(self.fgcmPars.nLUTFilter)
+        for j in range(self.fgcmPars.nLUTFilter):
+            flatArray = epsilonCcdMap[j, :, :, :].ravel()
+            gd, = np.where(flatArray > self.illegalValue)
+            if gd.size == 0:
+                continue
+            st = np.argsort(flatArray[gd])
+            scaleMedian[j] = flatArray[gd[st[int(0.5*st.size)]]]
+            scaleRange[j, 0] = flatArray[gd[st[int(0.05*st.size)]]]
+            scaleRange[j, 1] = flatArray[gd[st[int(0.95*st.size)]]]
+
+        # ignore bands that have a range > 10
+        deltaRange = scaleRange[:, 1] - scaleRange[:, 0]
+        filtersToMatchRange, = np.where(deltaRange < 20.0)
+        matchedDelta = np.max(deltaRange[filtersToMatchRange])
+
         if self.plotPath is not None:
             for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 binnedArray = epsilonCcdMap[j, :, :, :]
@@ -436,6 +454,31 @@ class FgcmDeltaAper(object):
                 fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
                                                              self.outfileBaseWithCycle,
                                                              filterName))
+                plt.close(fig)
+
+                # And replot with matched scale
+                loHi = [scaleMedian[j] - matchedDelta,
+                        scaleMedian[j] + matchedDelta]
+
+                fig = plt.figure(figsize=(8, 6))
+                fig.clf()
+
+                ax = fig.add_subplot(111)
+                plotCCDMapBinned2d(ax,
+                                   self.deltaMapper,
+                                   binnedArray,
+                                   'Epsilon (nJy/arcsec2)',
+                                   loHi=loHi)
+
+                text = r'$(%s)$' % (filterName)
+                ax.annotate(text,
+                            (0.1, 0.93), xycoords='axes fraction',
+                            ha='left', va='top', fontsize=18)
+                fig.tight_layout()
+
+                fig.savefig('%s/%s_epsilon_perccd_%s_matchscale.png' % (self.plotPath,
+                                                                        self.outfileBaseWithCycle,
+                                                                        filterName))
                 plt.close(fig)
 
     def _starWorker(self, goodStarsAndObs):
