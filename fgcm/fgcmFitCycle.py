@@ -485,11 +485,11 @@ class FgcmFitCycle(object):
                 self.fgcmDeltaAper.computeDeltaAperExposures()
             if self.fgcmConfig.doComputeDeltaAperStars:
                 self.fgcmDeltaAper.computeDeltaAperStars()
-                # Only run if we have the values per stars.
+                # Only run if we have the values per star.
                 if self.fgcmConfig.doComputeDeltaAperMap:
                     self.fgcmDeltaAper.computeEpsilonMap()
-                if self.fgcmConfig.doComputeDeltaAperPerCcd:
-                    self.fgcmDeltaAper.computeEpsilonPerCcd()
+            if self.fgcmConfig.doComputeDeltaAperPerCcd:
+                self.fgcmDeltaAper.computeEpsilonPerCcd()
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
