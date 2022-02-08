@@ -467,10 +467,11 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     for k in range(deltaMapper.size):
         zGrid[k, :] = values[k]
 
-    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-                s=0.1,
-                c=zGrid.ravel(),
-                vmin=lo, vmax=hi)
+    ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+               s=0.1,
+               c=zGrid.ravel(),
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
 
     cb = None
     cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
@@ -548,10 +549,11 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
                                                            0.1,
                                                            None))*1000.0
 
-    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-                s=0.1,
-                c=zGrid.ravel(),
-                vmin=lo, vmax=hi)
+    ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+               s=0.1,
+               c=zGrid.ravel(),
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
 
     cb = None
     cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
@@ -626,18 +628,19 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
 
     zGrid = np.zeros_like(deltaMapper['x'])
     for k in range(deltaMapper.size):
-        xBin = np.floor((nx - 1)*deltaMapper[k]['x']/deltaMapper[k]['x_size']).astype(np.int32)
-        yBin = np.floor((ny - 1)*deltaMapper[k]['y']/deltaMapper[k]['y_size']).astype(np.int32)
+        xBin = np.floor(nx*np.clip(deltaMapper['x'][k, :], None, deltaMapper['x_size'][k] - 0.1)/deltaMapper['x_size'][k]).astype(np.int32)
+        yBin = np.floor(ny*np.clip(deltaMapper['y'][k, :], None, deltaMapper['y_size'][k] - 0.1)/deltaMapper['y_size'][k]).astype(np.int32)
 
         zGrid[k, :] = binnedArray[k, xBin, yBin]
 
     use, = np.where(zGrid.ravel() > illegalValue)
 
-    plt.scatter(deltaMapper['delta_ra'].ravel()[use],
-                deltaMapper['delta_dec'].ravel()[use],
-                s=0.1,
-                c=zGrid.ravel()[use],
-                vmin=lo, vmax=hi)
+    ax.scatter(deltaMapper['delta_ra'].ravel()[use],
+               deltaMapper['delta_dec'].ravel()[use],
+               s=0.1,
+               c=zGrid.ravel()[use],
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
 
     cb = None
     cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
@@ -744,7 +747,7 @@ class FocalPlaneProjectorFromOffsets(object):
         self._deltaMapper = None
         self._computedSigns = False
 
-    def __call__(self, orientation, nstep=50):
+    def __call__(self, orientation, nstep=100):
         """
         Make a focal plane projection mapping.
 
@@ -840,31 +843,37 @@ class FocalPlaneProjectorFromOffsets(object):
 
         obsX = snmm.getArray(fgcmStars.obsXHandle)
         obsY = snmm.getArray(fgcmStars.obsYHandle)
-        objRA = snmm.getArray(fgcmStars.objRAHandle)
-        objDec = snmm.getArray(fgcmStars.objDecHandle)
+        obsRA = snmm.getArray(fgcmStars.obsRAHandle)
+        obsDec = snmm.getArray(fgcmStars.obsDecHandle)
 
-        h, rev = esutil.stat.histogram(obsCCDIndex, rev=True)
+        if obsX.size > 10_000_000:
+            sub = np.random.choice(obsX.size, size=10_000_000, replace=False)
+        else:
+            sub = np.arange(obsX.size)
+
+        h, rev = esutil.stat.histogram(obsCCDIndex[sub], rev=True)
 
         for i in range(h.size):
             if h[i] == 0: continue
 
-            i1a = rev[rev[i]:rev[i+1]]
+            i1a = sub[rev[rev[i]:rev[i + 1]]]
 
             cInd = obsCCDIndex[i1a[0]]
 
             if self.ccdOffsets['RASIGN'][cInd] == 0:
                 # choose a good exposure to work with
                 hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
-                maxInd = np.argmax(hTest)
-                testStars = revTest[revTest[maxInd]:revTest[maxInd + 1]]
+                # Exclude the first index which will be invalid exposures.
+                maxInd = np.argmax(hTest[1: ]) + 1
+                testStars = revTest[revTest[maxInd]: revTest[maxInd + 1]]
 
-                testRA = objRA[obsObjIDIndex[i1a[testStars]]]
-                testDec = objDec[obsObjIDIndex[i1a[testStars]]]
+                testRA = obsRA[i1a[testStars]]
+                testDec = obsDec[i1a[testStars]]
                 testX = obsX[i1a[testStars]]
                 testY = obsY[i1a[testStars]]
 
-                corrXRA,_ = scipy.stats.pearsonr(testX, testRA)
-                corrYRA,_ = scipy.stats.pearsonr(testY, testRA)
+                corrXRA, _ = scipy.stats.pearsonr(testX, testRA)
+                corrYRA, _ = scipy.stats.pearsonr(testY, testRA)
 
                 if (np.abs(corrXRA) > np.abs(corrYRA)):
                     self.ccdOffsets['XRA'][cInd] = True
@@ -878,7 +887,7 @@ class FocalPlaneProjectorFromOffsets(object):
                     else:
                         self.ccdOffsets['RASIGN'][cInd] = 1
 
-                    corrYDec,_ = scipy.stats.pearsonr(testY, testDec)
+                    corrYDec, _ = scipy.stats.pearsonr(testY, testDec)
                     if corrYDec < 0:
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:
@@ -890,7 +899,7 @@ class FocalPlaneProjectorFromOffsets(object):
                     else:
                         self.ccdOffsets['RASIGN'][cInd] = 1
 
-                    corrXDec,_ = scipy.stats.pearsonr(testX, testDec)
+                    corrXDec, _ = scipy.stats.pearsonr(testX, testDec)
                     if corrXDec < 0:
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:

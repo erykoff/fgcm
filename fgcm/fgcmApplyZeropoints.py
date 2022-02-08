@@ -217,8 +217,8 @@ class FgcmApplyZeropoints(object):
                 self.fgcmDeltaAper.computeDeltaAperStars()
                 if self.fgcmConfig.doComputeDeltaAperMap:
                     self.fgcmDeltaAper.computeEpsilonMap()
-                if self.fgcmConfig.doComputeDeltaAperPerCcd:
-                    self.fgcmDeltaAper.computeEpsilonPerCcd()
+            if self.fgcmConfig.doComputeDeltaAperPerCcd:
+                self.fgcmDeltaAper.computeEpsilonPerCcd()
 
             if self.useFits:
                 outParFile = '%s/%s_applied_parameters.fits' % (self.fgcmConfig.outputPath,
