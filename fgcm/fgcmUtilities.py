@@ -254,67 +254,6 @@ def histoGauss(ax,array):
 
     return coeff
 
-"""
-def plotCCDMap(ax, ccdOffsets, values, cbLabel, loHi=None):
-
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
-    import matplotlib.colors as colors
-    import matplotlib.cm as cmx
-
-    cm = plt.get_cmap('rainbow')
-
-    plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
-                   ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
-    plotDecRange = [ccdOffsets['DELTA_DEC'].min() - ccdOffsets['DEC_SIZE'].max()/2.,
-                    ccdOffsets['DELTA_DEC'].max() + ccdOffsets['DEC_SIZE'].max()/2.]
-
-    if (loHi is None):
-        st=np.argsort(values)
-
-        lo=values[st[int(0.02*st.size)]]
-        hi=values[st[int(0.98*st.size)]]
-    else:
-        lo = loHi[0]
-        hi = loHi[1]
-
-    cNorm = colors.Normalize(vmin=lo, vmax=hi)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
-
-    Z=[[0,0],[0,0]]
-    levels=np.linspace(lo,hi,num=150)
-    CS3=plt.contourf(Z,levels,cmap=cm)
-
-    ax.clear()
-
-    ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
-    ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
-    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
-    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
-    ax.tick_params(axis='both',which='major',labelsize=14)
-
-    for k in range(values.size):
-        off=[ccdOffsets['DELTA_RA'][k],
-             ccdOffsets['DELTA_DEC'][k]]
-
-        ax.add_patch(
-            patches.Rectangle(
-                (off[0]-ccdOffsets['RA_SIZE'][k]/2.,
-                 off[1]-ccdOffsets['DEC_SIZE'][k]/2.),
-                ccdOffsets['RA_SIZE'][k],
-                ccdOffsets['DEC_SIZE'][k],
-                edgecolor="none",
-                facecolor=scalarMap.to_rgba(values[k]))
-            )
-
-    cb=None
-    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
-
-    cb.set_label('%s' % (cbLabel), fontsize=14)
-
-    return None
-"""
-
 
 class Cheb2dField(object):
     """
@@ -471,90 +410,6 @@ class Cheb2dField(object):
         return self.evaluate(xy[0, :], xy[1, :], flatpars)
 
 
-"""
-def plotCCDMap2d(ax, ccdOffsets, parArray, cbLabel, loHi=None):
-    import matplotlib.pyplot as plt
-    import matplotlib.colors as colors
-    import matplotlib.cm as cmx
-
-    cm = plt.get_cmap('rainbow')
-    plt.set_cmap('rainbow')
-
-    plotRARange = [ccdOffsets['DELTA_RA'].min() - ccdOffsets['RA_SIZE'].max()/2.,
-                   ccdOffsets['DELTA_RA'].max() + ccdOffsets['RA_SIZE'].max()/2.]
-    plotDecRange = [ccdOffsets['DELTA_DEC'].min() - ccdOffsets['DEC_SIZE'].max()/2.,
-                    ccdOffsets['DELTA_DEC'].max() + ccdOffsets['DEC_SIZE'].max()/2.]
-
-    # compute central values...
-    centralValues = np.zeros(ccdOffsets.size)
-
-    for i in range(ccdOffsets.size):
-        field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[i, :])
-        centralValues[i] = -2.5 * np.log10(field.evaluateCenter()) * 1000.0
-
-    if (loHi is None):
-        st=np.argsort(centralValues)
-
-        lo = centralValues[st[int(0.02*st.size)]]
-        hi = centralValues[st[int(0.98*st.size)]]
-    else:
-        lo = loHi[0]
-        hi = loHi[1]
-
-    cNorm = colors.Normalize(vmin=lo, vmax=hi)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
-
-    Z=[[0,0],[0,0]]
-    levels=np.linspace(lo,hi,num=150)
-    CS3=plt.contourf(Z,levels,cmap=cm)
-
-    ax.clear()
-
-    ax.set_xlim(plotRARange[0]-0.05,plotRARange[1]+0.05)
-    ax.set_ylim(plotDecRange[0]-0.05,plotDecRange[1]+0.05)
-    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$',fontsize=16)
-    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$',fontsize=16)
-    ax.tick_params(axis='both',which='major',labelsize=14)
-
-    for k in range(ccdOffsets.size):
-        xValues = np.linspace(0.0, ccdOffsets['X_SIZE'][i], 50)
-        yValues = np.linspace(0.0, ccdOffsets['Y_SIZE'][i], 50)
-
-        xGrid = np.repeat(xValues, yValues.size)
-        yGrid = np.tile(yValues, xValues.size)
-
-        field = Cheb2dField(ccdOffsets['X_SIZE'][i], ccdOffsets['Y_SIZE'][i], parArray[k, :])
-        zGrid = -2.5 * np.log10(np.clip(field.evaluate(xGrid, yGrid), 0.1, None)) * 1000.0
-
-        # This seems to be correct
-        extent = [ccdOffsets['DELTA_RA'][k] -
-                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_RA'][k] +
-                  ccdOffsets['RASIGN'][k]*ccdOffsets['RA_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] -
-                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.,
-                  ccdOffsets['DELTA_DEC'][k] +
-                  ccdOffsets['DECSIGN'][k]*ccdOffsets['DEC_SIZE'][k]/2.]
-
-        zGridPlot = zGrid.reshape(xValues.size, yValues.size)
-        if ccdOffsets['XRA'][k]:
-            zGridPlot = zGridPlot.T
-
-        plt.imshow(zGridPlot,
-                   interpolation='bilinear',
-                   origin='lower',
-                   extent=extent,
-                   norm=cNorm)
-
-    cb=None
-    cb = plt.colorbar(CS3,ticks=np.linspace(lo,hi,5))
-
-    cb.set_label('%s' % (cbLabel), fontsize=14)
-
-    return None
-"""
-
-
 def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     """
     Plot CCD map with single values for each CCD.
@@ -612,13 +467,14 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     for k in range(deltaMapper.size):
         zGrid[k, :] = values[k]
 
-    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-                s=0.1,
-                c=zGrid.ravel(),
-                vmin=lo, vmax=hi)
+    ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+               s=0.1,
+               c=zGrid.ravel(),
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -693,17 +549,104 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
                                                            0.1,
                                                            None))*1000.0
 
-    plt.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-                s=0.1,
-                c=zGrid.ravel(),
-                vmin=lo, vmax=hi)
+    ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
+               s=0.1,
+               c=zGrid.ravel(),
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5))
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
 
+
+def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegalValue=-9999):
+    """
+    Plot CCD map with binned values for each CCD.
+
+    Parameters
+    ----------
+    ax :
+        plot axis object
+    deltaMapper : `np.recarray`
+        Delta x/y, ra/dec mapper.
+    binnedArray : `np.ndarray`
+        Binned values (nCCD, nx, ny)
+    cbLabel :  `str`
+        Color bar label
+    loHi : tuple [2], optional
+        (lo, hi) if set.  Otherwise, scaling is computed from data.
+    illegalValue: float
+       Sentinel for blank values
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+
+    cm = plt.get_cmap('rainbow')
+    plt.set_cmap('rainbow')
+
+    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
+                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
+                    np.max(deltaMapper['delta_dec']) + 0.02]
+
+    if loHi is None:
+        flatArray = binnedArray.ravel()
+        gd, = np.where(flatArray > illegalValue)
+
+        if gd.size < 2:
+            # Nothing to plot here
+            return
+
+        st = np.argsort(flatArray[gd])
+        lo = flatArray[gd[st[int(0.02*st.size)]]]
+        hi = flatArray[gd[st[int(0.98*st.size)]]]
+    else:
+        lo = loHi[0]
+        hi = loHi[1]
+
+    cNorm = colors.Normalize(vmin=lo, vmax=hi)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+
+    Z = [[0, 0], [0, 0]]
+    levels = np.linspace(lo, hi, num=150)
+    CS3 = plt.contourf(Z, levels, cmap=cm)
+
+    ax.clear()
+
+    ax.set_xlim(plotRaRange[0], plotRaRange[1])
+    ax.set_ylim(plotDecRange[0], plotDecRange[1])
+    ax.set_xlabel(r'$\delta\,\mathrm{R.A.}$', fontsize=16)
+    ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    nx = binnedArray.shape[1]
+    ny = binnedArray.shape[2]
+
+    zGrid = np.zeros_like(deltaMapper['x'])
+    for k in range(deltaMapper.size):
+        xBin = np.floor(nx*np.clip(deltaMapper['x'][k, :], None, deltaMapper['x_size'][k] - 0.1)/deltaMapper['x_size'][k]).astype(np.int32)
+        yBin = np.floor(ny*np.clip(deltaMapper['y'][k, :], None, deltaMapper['y_size'][k] - 0.1)/deltaMapper['y_size'][k]).astype(np.int32)
+
+        zGrid[k, :] = binnedArray[k, xBin, yBin]
+
+    use, = np.where(zGrid.ravel() > illegalValue)
+
+    ax.scatter(deltaMapper['delta_ra'].ravel()[use],
+               deltaMapper['delta_dec'].ravel()[use],
+               s=0.1,
+               c=zGrid.ravel()[use],
+               vmin=lo, vmax=hi)
+    ax.set_aspect('equal')
+
+    cb = None
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
+    cb.set_label('%s' % (cbLabel), fontsize=14)
+
+    return None
 
 
 def logFlaggedExposuresPerBand(log, fgcmPars, flagName, raiseAllBad=True):
@@ -804,7 +747,7 @@ class FocalPlaneProjectorFromOffsets(object):
         self._deltaMapper = None
         self._computedSigns = False
 
-    def __call__(self, orientation, nstep=50):
+    def __call__(self, orientation, nstep=100):
         """
         Make a focal plane projection mapping.
 
@@ -900,31 +843,37 @@ class FocalPlaneProjectorFromOffsets(object):
 
         obsX = snmm.getArray(fgcmStars.obsXHandle)
         obsY = snmm.getArray(fgcmStars.obsYHandle)
-        objRA = snmm.getArray(fgcmStars.objRAHandle)
-        objDec = snmm.getArray(fgcmStars.objDecHandle)
+        obsRA = snmm.getArray(fgcmStars.obsRAHandle)
+        obsDec = snmm.getArray(fgcmStars.obsDecHandle)
 
-        h, rev = esutil.stat.histogram(obsCCDIndex, rev=True)
+        if obsX.size > 10_000_000:
+            sub = np.random.choice(obsX.size, size=10_000_000, replace=False)
+        else:
+            sub = np.arange(obsX.size)
+
+        h, rev = esutil.stat.histogram(obsCCDIndex[sub], rev=True)
 
         for i in range(h.size):
             if h[i] == 0: continue
 
-            i1a = rev[rev[i]:rev[i+1]]
+            i1a = sub[rev[rev[i]:rev[i + 1]]]
 
             cInd = obsCCDIndex[i1a[0]]
 
             if self.ccdOffsets['RASIGN'][cInd] == 0:
                 # choose a good exposure to work with
                 hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
-                maxInd = np.argmax(hTest)
-                testStars = revTest[revTest[maxInd]:revTest[maxInd + 1]]
+                # Exclude the first index which will be invalid exposures.
+                maxInd = np.argmax(hTest[1: ]) + 1
+                testStars = revTest[revTest[maxInd]: revTest[maxInd + 1]]
 
-                testRA = objRA[obsObjIDIndex[i1a[testStars]]]
-                testDec = objDec[obsObjIDIndex[i1a[testStars]]]
+                testRA = obsRA[i1a[testStars]]
+                testDec = obsDec[i1a[testStars]]
                 testX = obsX[i1a[testStars]]
                 testY = obsY[i1a[testStars]]
 
-                corrXRA,_ = scipy.stats.pearsonr(testX, testRA)
-                corrYRA,_ = scipy.stats.pearsonr(testY, testRA)
+                corrXRA, _ = scipy.stats.pearsonr(testX, testRA)
+                corrYRA, _ = scipy.stats.pearsonr(testY, testRA)
 
                 if (np.abs(corrXRA) > np.abs(corrYRA)):
                     self.ccdOffsets['XRA'][cInd] = True
@@ -938,7 +887,7 @@ class FocalPlaneProjectorFromOffsets(object):
                     else:
                         self.ccdOffsets['RASIGN'][cInd] = 1
 
-                    corrYDec,_ = scipy.stats.pearsonr(testY, testDec)
+                    corrYDec, _ = scipy.stats.pearsonr(testY, testDec)
                     if corrYDec < 0:
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:
@@ -950,7 +899,7 @@ class FocalPlaneProjectorFromOffsets(object):
                     else:
                         self.ccdOffsets['RASIGN'][cInd] = 1
 
-                    corrXDec,_ = scipy.stats.pearsonr(testX, testDec)
+                    corrXDec, _ = scipy.stats.pearsonr(testX, testDec)
                     if corrXDec < 0:
                         self.ccdOffsets['DECSIGN'][cInd] = -1
                     else:

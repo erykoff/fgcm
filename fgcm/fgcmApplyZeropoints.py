@@ -10,6 +10,8 @@ from .fgcmParameters import FgcmParameters
 from .fgcmStars import FgcmStars
 from .fgcmLUT import FgcmLUT
 from .fgcmZpsToApply import FgcmZpsToApply
+from .fgcmDeltaAper import FgcmDeltaAper
+from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 
 from .fgcmUtilities import getMemoryString, expFlagDict, obsFlagDict
 
@@ -149,6 +151,10 @@ class FgcmApplyZeropoints(object):
         if (not self.setupComplete):
             raise RuntimeError("Must complete applyZeropoints setup first!")
 
+        # Compute signs for CCD offsets if necessary
+        if isinstance(self.fgcmConfig.focalPlaneProjector, FocalPlaneProjectorFromOffsets):
+            self.fgcmConfig.focalPlaneProjector.computeCCDOffsetSigns(self.fgcmStars)
+
         if self.fgcmStars.hasDeltaMagBkg:
             self.fgcmStars.applyDeltaMagBkg()
 
@@ -201,6 +207,25 @@ class FgcmApplyZeropoints(object):
         # Recompute m^std and <m^std> using the zeropoints, with chromatic corrections
         #  and with error modeling.
         self.fgcmZpsToApply.applyZeropoints()
+
+        if self.fgcmStars.hasDeltaAper:
+            self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
+                                               self.fgcmStars)
+            if self.fgcmConfig.doComputeDeltaAperExposures:
+                self.fgcmDeltaAper.computeDeltaAperExposures()
+            if self.fgcmConfig.doComputeDeltaAperStars:
+                self.fgcmDeltaAper.computeDeltaAperStars()
+                if self.fgcmConfig.doComputeDeltaAperMap:
+                    self.fgcmDeltaAper.computeEpsilonMap()
+            if self.fgcmConfig.doComputeDeltaAperPerCcd:
+                self.fgcmDeltaAper.computeEpsilonPerCcd()
+
+            if self.useFits:
+                outParFile = '%s/%s_applied_parameters.fits' % (self.fgcmConfig.outputPath,
+                                                                self.fgcmConfig.outfileBaseWithCycle)
+                self.fgcmPars.saveParsFits(outParFile)
+
+
 
         # Output the stars.
         if self.fgcmConfig.outputStars:
