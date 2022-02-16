@@ -65,6 +65,9 @@ class FgcmMakeStars(object):
         if 'randomSeed' not in starConfig:
             starConfig['randomSeed'] = None
 
+        if 'useHtm' not in starConfig:
+            starConfig['useHtm'] = False
+
         self.objCat = None
 
         # Note that the order doesn't matter for the making of the stars
@@ -287,13 +290,17 @@ class FgcmMakeStars(object):
         """
 
         # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-            self.fgcmLog.info("Using smatch for matching.")
-        except ImportError:
-            hasSmatch = False
+        if self.starConfig['useHtm']:
             self.fgcmLog.info("Using htm for matching.")
+            hasSmatch = False
+        else:
+            try:
+                import smatch
+                hasSmatch = True
+                self.fgcmLog.info("Using smatch for matching.")
+            except ImportError:
+                hasSmatch = False
+                self.fgcmLog.info("Using htm for matching.")
 
         if (raArray.size != decArray.size):
             raise ValueError("raArray, decArray must be same length.")
@@ -619,11 +626,14 @@ class FgcmMakeStars(object):
             raise ValueError("Must run makePrimaryStars first")
 
         # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-        except ImportError:
+        if self.starConfig['useHtm']:
             hasSmatch = False
+        else:
+            try:
+                import smatch
+                hasSmatch = True
+            except ImportError:
+                hasSmatch = False
 
         if (raArray.size != decArray.size or
             raArray.size != filterNameArray.size):
@@ -785,11 +795,14 @@ class FgcmMakeStars(object):
         """
 
         # can we use the better smatch code?
-        try:
-            import smatch
-            hasSmatch = True
-        except ImportError:
+        if self.starConfig['useHtm']:
             hasSmatch = False
+        else:
+            try:
+                import smatch
+                hasSmatch = True
+            except ImportError:
+                hasSmatch = False
 
         ipring = hp.ang2pix(self.starConfig['coarseNSide'],
                             np.radians(90.0 - self.objIndexCat['dec']),
