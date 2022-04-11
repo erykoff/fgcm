@@ -89,6 +89,7 @@ class FgcmStars(object):
         self.bandNotFitIndex = fgcmConfig.bandNotFitIndex
         self.lutFilterNames = fgcmConfig.lutFilterNames
         self.filterToBand = fgcmConfig.filterToBand
+        self.colorSplitBands = fgcmConfig.colorSplitBands
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
 
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
@@ -2012,6 +2013,73 @@ class FgcmStars(object):
                 outCat['DELTA_APER'][:, i] = objDeltaAperMean[goodStars, goodBand]
 
         return outCat, goodBandNames
+
+    def plotRefStarColorTermResiduals(self, fgcmPars):
+        """
+        Plot reference star color-term residuals.
+
+        Parameters
+        ----------
+        fgcmPars : `fgcm.FgcmParameters`
+        """
+        if not self.hasRefstars:
+            self.fgcmLog.info("No reference stars for color term residual plots.")
+
+        if self.plotPath is None:
+            return
+
+        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+        refMag = snmm.getArray(self.refMagHandle)
+
+        goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+
+        # Select only stars that have reference magnitudes
+        use, = np.where(objRefIDIndex[goodStars] >= 0)
+        goodRefStars = goodStars[use]
+
+        # Compute "g-i" based on the configured colorSplitIndices
+        gmiGRS = (objMagStdMean[goodRefStars, self.colorSplitIndices[0]] -
+                  objMagStdMean[goodRefStars, self.colorSplitIndices[1]])
+
+        okColor, = np.where((objMagStdMean[goodRefStars, self.colorSplitIndices[0]] < 90.0) &
+                            (objMagStdMean[goodRefStars, self.colorSplitIndices[1]] < 90.0))
+
+        for bandIndex, band in enumerate(self.bands):
+            if not fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
+
+            fig = plt.figure(figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]], bandIndex] < 90.0) &
+                               (objMagStdMean[goodRefStars[okColor], bandIndex] < 90.0))
+            refUse = okColor[refUse]
+
+            delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+                     refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+
+            st = np.argsort(delta)
+            ylow = delta[st[int(0.02*refUse.size)]]
+            yhigh = delta[st[int(0.98*refUse.size)]]
+            st = np.argsort(gmiGRS[refUse])
+            xlow = gmiGRS[refUse[st[int(0.02*refUse.size)]]]
+            xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
+
+            ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
+            ax.set_title('%s band' % (band))
+            ax.set_xlabel('%s - %s' % (self.colorSplitBands[0], self.colorSplitBands[1]))
+            ax.set_ylabel('%s_std - %s_ref' % (band, band))
+
+            fig.tight_layout()
+            fig.savefig('%s/%s_refresidvscol_%s.png' % (self.plotPath,
+                                                        self.outfileBaseWithCycle,
+                                                        band))
+            plt.close(fig)
 
     def __getstate__(self):
         # Don't try to pickle the logger.
