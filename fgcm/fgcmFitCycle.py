@@ -581,6 +581,8 @@ class FgcmFitCycle(object):
             sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
             sigRef.computeSigmaRef()
 
+            self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
+
         # Make Zeropoints
         # We always want to compute these because of the plots
         # In the future we might want to streamline if something is bogging down.
@@ -674,7 +676,7 @@ class FgcmFitCycle(object):
         computeAbsThroughput = self.fgcmStars.hasRefstars
 
         try:
-            fun = optimize.optimize.MemoizeJac(self.fgcmChisq)
+            fun = optimize._optimize.MemoizeJac(self.fgcmChisq)
             jac = fun.derivative
 
             res = optimize.minimize(fun,
