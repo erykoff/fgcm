@@ -145,6 +145,7 @@ class FgcmConfig(object):
     sedBoundaryTermDict = ConfigField(dict, required=True)
     sedTermDict = ConfigField(dict, required=True)
     starColorCuts = ConfigField(list, required=True)
+    refStarColorCuts = ConfigField(list, required=False, default=[])
     quantityCuts = ConfigField(list, default=[])
     cycleNumber = ConfigField(int, default=0)
     outfileBase = ConfigField(str, required=True)
@@ -187,6 +188,7 @@ class FgcmConfig(object):
     refStarOutlierNSig = ConfigField(float, default=4.0)
     applyRefStarColorCuts = ConfigField(bool, default=True)
     useRefStarsWithInstrument = ConfigField(bool, default=True)
+    useExposureReferenceOffset = ConfigField(bool, default=False)
 
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
@@ -577,6 +579,16 @@ class FgcmConfig(object):
             if (not isinstance(cCut[1],int)) :
                 if (cCut[1] not in self.bands):
                     raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
+                cCut[1] = list(self.bands).index(cCut[1])
+
+        for cCut in self.refStarColorCuts:
+            if not isinstance(cCut[0], int):
+                if cCut[0] not in self.bands:
+                    raise ValueError("refStarColorCut band %s not in list of bands!" % (cCut[0]))
+                cCut[0] = list(self.bands).index(cCut[0])
+            if not isinstance(cCut[1], int):
+                if cCut[1] not in self.bands:
+                    raise ValueError("refStarColorCut band %s not in list of bands!" % (cCut[1]))
                 cCut[1] = list(self.bands).index(cCut[1])
 
         # Check for input aperture corrections.

@@ -583,6 +583,8 @@ class FgcmFitCycle(object):
 
             self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
 
+            self.fgcmGray.computeExposureReferenceOffsets()
+
         # Make Zeropoints
         # We always want to compute these because of the plots
         # In the future we might want to streamline if something is bogging down.

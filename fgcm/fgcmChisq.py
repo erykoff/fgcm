@@ -67,6 +67,7 @@ class FgcmChisq(object):
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
         self.useRefStarsWithInstrument = fgcmConfig.useRefStarsWithInstrument
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
+        self.useExposureReferenceOffset = fgcmConfig.useExposureReferenceOffset
         self.saveParsForDebugging = fgcmConfig.saveParsForDebugging
         self.quietMode = fgcmConfig.quietMode
 
@@ -620,6 +621,12 @@ class FgcmChisq(object):
                 # Regular non-sub-ccd
                 obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
 
+            if self.useExposureReferenceOffset:
+                # Apply the reference offsets as well.
+                # (There will probably be a sign error)
+                ok, = np.where(self.fgcmPars.compExpRefOffset[obsExpIndexGO] > self.illegalValue)
+                obsMagGO[ok] += self.fgcmPars.compExpRefOffset[obsExpIndexGO[ok]]
+
         # Compute the sub-selected error-squared, using model error when available
         obsMagErr2GO = obsMagADUModelErr[goodObs].astype(np.float64)**2.
 
@@ -861,8 +868,9 @@ class FgcmChisq(object):
                 # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
+                mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
                 goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndexGO] >= 0) &
-                                         ((objFlag[obsObjIDIndexGO] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+                                         ((objFlag[obsObjIDIndexGO] & mask) == 0))
 
                 # And check that these are all quality observations
                 tempUse, = np.where((objMagStdMean[obsObjIDIndexGO[goodRefObsGO],
