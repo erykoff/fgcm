@@ -79,6 +79,7 @@ class FgcmZeropoints(object):
         self.I1StdBand = fgcmConfig.I1StdBand
         self.lambdaStdBand = fgcmConfig.lambdaStdBand
         self.outputFgcmcalZpts = fgcmConfig.outputFgcmcalZpts
+        self.useExposureReferenceOffset = fgcmConfig.useExposureReferenceOffset
         self.quietMode = fgcmConfig.quietMode
 
     def computeZeropoints(self):
@@ -192,6 +193,7 @@ class FgcmZeropoints(object):
                       ('FGCM_FPGRY_CSPLIT', 'f8', 3),
                       ('FGCM_FPGRY_CSPLITERR', 'f8', 3),
                       ('FGCM_FPGRY_CSPLITVAR', 'f8', 3),
+                      ('FGCM_FPREF', 'f8'),
                       ('FGCM_DUST','f8'),
                       ('FGCM_FILTER','f8'),
                       ('FGCM_FLAT','f8'),
@@ -370,6 +372,12 @@ class FgcmZeropoints(object):
 
         self.fgcmLog.info('%d CCDs are Good (>=%d stars; err <= %.3f)' %
                          (goodCCD.size, self.minStarPerCCD, self.maxCCDGrayErr))
+
+        # Record FGCM_FPREF (focal-plane reference offset).
+        zpStruct['FGCM_FPREF'] = self.illegalValue
+
+        fpRefOk, = np.where(self.fgcmPars.compExpRefOffset[zpExpIndex] > self.illegalValue)
+        zpStruct['FGCM_FPREF'][fpRefOk] = self.fgcmPars.compExpRefOffset[zpExpIndex[fpRefOk]]
 
         # check: if this has too few stars on the ccd OR the ccd error is too big
         #        AND the exposure has enough ccds
@@ -665,6 +673,12 @@ class FgcmZeropoints(object):
         else:
             grayValue = np.zeros_like(zpStruct['FGCM_GRY'][indices])
 
+        if self.useExposureReferenceOffset:
+            fpRefValue = zpStruct['FGCM_FPREF'][indices]
+            fpRefValue[fpRefValue <= self.illegalValue] = 0.0
+        else:
+            fpRefValue = np.zeros_like(zpStruct['FGCM_FPREF'][indices])
+
         return (2.5*np.log10(zpStruct['FGCM_I0'][indices]) +
                 flatValue +
                 zpStruct['FGCM_DUST'][indices] +
@@ -673,7 +687,8 @@ class FgcmZeropoints(object):
                 zpStruct['FGCM_DELTAMAGBKG'][indices] +
                 2.5*np.log10(zpStruct['EXPTIME'][indices]) +
                 self.zptABNoThroughput +
-                grayValue)
+                grayValue +
+                fpRefValue)
 
     def _computeZptChebPars(self, zpStruct, zpIndex):
         """

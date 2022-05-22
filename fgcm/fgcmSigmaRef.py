@@ -66,8 +66,10 @@ class FgcmSigmaRef(object):
 
         # Select only stars that have reference magnitudes
         # and that are not flagged as outliers
+        # We allow all the reference colors in to get color range statistics.
+        mask = objFlagDict['REFSTAR_OUTLIER']
         use, = np.where((objRefIDIndex[goodStars] >= 0) &
-                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+                        ((objFlag[goodStars] & mask) == 0))
         goodRefStars = goodStars[use]
 
         # We need to have a branch of "small-number" and "large number" of reference stars
