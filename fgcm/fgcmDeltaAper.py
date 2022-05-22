@@ -116,7 +116,8 @@ class FgcmDeltaAper(object):
 
             fit, _ = self._fitEpsilonWithDataBinner(mag[ok], deltaAper[ok])
 
-            self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
+            if fit is not None:
+                self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
 
     def computeDeltaAperStars(self, debug=False):
         """
@@ -197,15 +198,16 @@ class FgcmDeltaAper(object):
 
             fit, bin_struct = self._fitEpsilonWithDataBinner(mag_std[r], delta[r])
 
-            globalEpsilon[i] = self._normalizeEpsilon(fit)
-            globalOffset[i] = fit[1]
+            if fit is not None:
+                globalEpsilon[i] = self._normalizeEpsilon(fit)
+                globalOffset[i] = fit[1]
 
             # Store the value of njy_per_arcsec2
             self.fgcmPars.compGlobalEpsilon[i] = globalEpsilon[i]
             self.fgcmLog.info('Global background offset in %s band: %.5f nJy/arcsec2' %
                               (band, globalEpsilon[i]))
 
-            if self.plotPath is not None:
+            if self.plotPath is not None and fit is not None:
                 # Do plots
 
                 st = np.argsort(mag_std[r])
@@ -270,8 +272,9 @@ class FgcmDeltaAper(object):
 
                 fit, _ = self._fitEpsilonWithDataBinner(mag_std, delta)
 
-                offsetMap['nstar_fit'][i, j] = len(mag_std)
-                offsetMap['epsilon'][i, j] = self._normalizeEpsilon(fit)
+                if fit is not None:
+                    offsetMap['nstar_fit'][i, j] = len(mag_std)
+                    offsetMap['epsilon'][i, j] = self._normalizeEpsilon(fit)
 
         # Store the offsetmap in njy_per_arcsec2
         self.fgcmPars.compEpsilonMap[:, :] = offsetMap['epsilon']
@@ -600,6 +603,9 @@ class FgcmDeltaAper(object):
 
         bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max])
         u, = np.where(bin_struct['Y_ERR'] > 0.0)
+
+        if u.size < 5:
+            return None, None
 
         bin_flux = 10.**((bin_struct['X'] - self.njyZp)/(-2.5))
         fit = np.polyfit((2.5/np.log(10.0))/bin_flux[u],
