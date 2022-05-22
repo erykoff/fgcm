@@ -8,7 +8,8 @@ objFlagDict = {'TOO_FEW_OBS':2**0,
                'TEMPORARY_BAD_STAR':2**3,
                'RESERVED':2**4,
                'REFSTAR_OUTLIER': 2**5,
-               'BAD_QUANTITY': 2**6}
+               'BAD_QUANTITY': 2**6,
+               'REFSTAR_BAD_COLOR': 2**7}
 
 # Dictionary of observation flags
 obsFlagDict = {'NO_EXPOSURE': 2**0,

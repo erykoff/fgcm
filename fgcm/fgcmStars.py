@@ -62,6 +62,7 @@ class FgcmStars(object):
         self.notFitBands = fgcmConfig.notFitBands
         self.nNotFitBands = len(fgcmConfig.notFitBands)
         self.starColorCuts = fgcmConfig.starColorCuts
+        self.refStarColorCuts = fgcmConfig.refStarColorCuts
         self.quantityCuts = fgcmConfig.quantityCuts
         self.sigma0Phot = fgcmConfig.sigma0Phot
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
@@ -1018,20 +1019,24 @@ class FgcmStars(object):
                       1)
 
     def getGoodStarIndices(self, includeReserve=False, onlyReserve=False, checkMinObs=False,
-                           checkHasColor=False):
+                           checkHasColor=False, removeRefstarOutliers=False, removeRefstarBadcols=False):
         """
         Get the good star indices.
 
         parameters
         ----------
-        includeReserve: bool, default=False
-           optional to include reserved stars
-        onlyReserve: bool, default=False
-           optional to only include reserved stars
-        checkMinObs: bool, default=False
-           Extra(?) check for minimum number of observations
-        checkHasColor: bool, default=False
-           Check that the stars have the g-i or equivalent color
+        includeReserve : `bool`, optional
+            Include reserved stars?
+        onlyReserve : `bool`, optional
+            Only include reserved stars?
+        checkMinObs : `bool`, optional
+            Extra(?) check for minimum number of observations
+        checkHasColor : `bool`, optional
+            Check that the stars have the g-i or equivalent color?
+        removeRefstarOutliers : `bool`, optional
+            Remove reference star outliers.
+        removeRefstarBadcols : `bool`, optional
+            Remove reference stars with "bad colors".
 
         returns
         -------
@@ -1045,6 +1050,11 @@ class FgcmStars(object):
                 objFlagDict['VARIABLE'] |
                 objFlagDict['TEMPORARY_BAD_STAR'] |
                 objFlagDict['RESERVED'])
+
+        if removeRefstarOutliers:
+            mask |= objFlagDict['REFSTAR_OUTLIER']
+        if removeRefstarBadcols:
+            mask |= objFlagDict['REFSTAR_BAD_COLOR']
 
         if includeReserve or onlyReserve:
             mask &= ~objFlagDict['RESERVED']
@@ -1381,8 +1391,9 @@ class FgcmStars(object):
 
         goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
+        mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
         use, = np.where((objRefIDIndex[goodStars] >= 0) &
-                        ((objFlag[goodStars] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+                        ((objFlag[goodStars] & mask) == 0))
         goodRefStars = goodStars[use]
 
         deltaOffsetRef = np.zeros(self.nBands)
@@ -1487,8 +1498,9 @@ class FgcmStars(object):
             refMagErr = snmm.getArray(self.refMagErrHandle)
 
             # Only use _good_ (non-outlier) reference stars in here.
+            mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
             goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndex[goodObs]] >= 0) &
-                                     ((objFlag[obsObjIDIndex[goodObs]] & objFlagDict['REFSTAR_OUTLIER']) == 0))
+                                     ((objFlag[obsObjIDIndex[goodObs]] & mask) == 0))
 
             if goodRefObsGO.size > 0:
                 obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
@@ -1522,6 +1534,10 @@ class FgcmStars(object):
         # Only cut stars where we have a color, and are *not* reference stars
 
         for cCut in self.starColorCuts:
+            self.fgcmLog.info('Applying color cut: %.3f < %s-%s < %.3f' % (cCut[2],
+                                                                           self.bands[cCut[0]],
+                                                                           self.bands[cCut[1]],
+                                                                           cCut[3]))
             ok, = np.where((objMagStdMean[:, cCut[0]] < 90.0) &
                            (objMagStdMean[:, cCut[1]] < 90.0))
 
@@ -1532,6 +1548,7 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
+        # This config says "apply standard color cuts to reference stars"
         if self.hasRefstars and not self.applyRefStarColorCuts:
             objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
             cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
@@ -1539,6 +1556,33 @@ class FgcmStars(object):
             if cancel.size > 0:
                 objFlag[cancel] &= ~objFlagDict['BAD_COLOR']
                 self.fgcmLog.info('Cancelling BAD_COLOR flag on %d reference stars' % (cancel.size))
+
+        if self.hasRefstars:
+            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            refMag = snmm.getArray(self.refMagHandle)
+
+            for cCut in self.refStarColorCuts:
+                self.fgcmLog.info('Applying reference star color cut: %.3f < %s-%s < %.3f' % (cCut[2],
+                                                                                              self.bands[cCut[0]],
+                                                                                              self.bands[cCut[1]],
+                                                                                              cCut[3]))
+                # First cut based on refstar colors
+                ok, = np.where((refMag[objRefIDIndex, cCut[0]] < 90.0) &
+                               (refMag[objRefIDIndex, cCut[1]] < 90.0))
+
+                thisColor = refMag[objRefIDIndex[ok], cCut[0]] - refMag[objRefIDIndex[ok], cCut[1]]
+                bad, = np.where((thisColor < cCut[2]) | (thisColor > cCut[3]))
+                objFlag[ok[bad]] |= objFlagDict['REFSTAR_BAD_COLOR']
+                self.fgcmLog.info('Flag %d stars with REFSTAR_BAD_COLOR (ref colors)' % (bad.size))
+
+                # Next cut based on std colors
+                ok, = np.where((objMagStdMean[:, cCut[0]] < 90.0) &
+                               (objMagStdMean[:, cCut[1]] < 90.0))
+
+                thisColor = objMagStdMean[ok, cCut[0]] - objMagStdMean[ok, cCut[1]]
+                bad, = np.where((thisColor < cCut[2]) | (thisColor > cCut[3]))
+                objFlag[ok[bad]] |= objFlagDict['REFSTAR_BAD_COLOR']
+                self.fgcmLog.info('Flag %d stars with REFSTAR_BAD_COLOR (std colors)' % (bad.size))
 
     def performSuperStarOutlierCuts(self, fgcmPars, reset=False):
         """
@@ -2024,6 +2068,7 @@ class FgcmStars(object):
         """
         if not self.hasRefstars:
             self.fgcmLog.info("No reference stars for color term residual plots.")
+            return
 
         if self.plotPath is None:
             return
@@ -2035,51 +2080,62 @@ class FgcmStars(object):
         objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
         refMag = snmm.getArray(self.refMagHandle)
 
-        goodStars = self.getGoodStarIndices(includeReserve=True, checkMinObs=True)
+        for mode in ['all', 'cut']:
+            if (mode == 'all'):
+                goodStars = self.getGoodStarIndices(includeReserve=True,
+                                                    checkMinObs=True,
+                                                    removeRefstarOutliers=True)
+            else:
+                goodStars = self.getGoodStarIndices(includeReserve=True,
+                                                    checkMinObs=True,
+                                                    removeRefstarOutliers=True,
+                                                    removeRefstarBadcols=True)
 
-        # Select only stars that have reference magnitudes
-        use, = np.where(objRefIDIndex[goodStars] >= 0)
-        goodRefStars = goodStars[use]
+            # Select only stars that have reference magnitudes
+            use, = np.where(objRefIDIndex[goodStars] >= 0)
+            goodRefStars = goodStars[use]
 
-        # Compute "g-i" based on the configured colorSplitIndices
-        gmiGRS = (objMagStdMean[goodRefStars, self.colorSplitIndices[0]] -
-                  objMagStdMean[goodRefStars, self.colorSplitIndices[1]])
+            # Compute "g-i" based on the configured colorSplitIndices
+            gmiGRS = (objMagStdMean[goodRefStars, self.colorSplitIndices[0]] -
+                      objMagStdMean[goodRefStars, self.colorSplitIndices[1]])
 
-        okColor, = np.where((objMagStdMean[goodRefStars, self.colorSplitIndices[0]] < 90.0) &
-                            (objMagStdMean[goodRefStars, self.colorSplitIndices[1]] < 90.0))
+            okColor, = np.where((objMagStdMean[goodRefStars, self.colorSplitIndices[0]] < 90.0) &
+                                (objMagStdMean[goodRefStars, self.colorSplitIndices[1]] < 90.0))
 
-        for bandIndex, band in enumerate(self.bands):
-            if not fgcmPars.hasExposuresInBand[bandIndex]:
-                continue
+            plt.set_cmap('viridis')
+            for bandIndex, band in enumerate(self.bands):
+                if not fgcmPars.hasExposuresInBand[bandIndex]:
+                    continue
 
-            fig = plt.figure(figsize=(8, 6))
-            fig.clf()
-            ax = fig.add_subplot(111)
+                fig = plt.figure(figsize=(8, 6))
+                fig.clf()
+                ax = fig.add_subplot(111)
 
-            refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]], bandIndex] < 90.0) &
-                               (objMagStdMean[goodRefStars[okColor], bandIndex] < 90.0))
-            refUse = okColor[refUse]
+                refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]], bandIndex] < 90.0) &
+                                   (objMagStdMean[goodRefStars[okColor], bandIndex] < 90.0))
+                refUse = okColor[refUse]
 
-            delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
-                     refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
+                delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
+                         refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
 
-            st = np.argsort(delta)
-            ylow = delta[st[int(0.02*refUse.size)]]
-            yhigh = delta[st[int(0.98*refUse.size)]]
-            st = np.argsort(gmiGRS[refUse])
-            xlow = gmiGRS[refUse[st[int(0.02*refUse.size)]]]
-            xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
+                st = np.argsort(delta)
+                ylow = delta[st[int(0.02*refUse.size)]]
+                yhigh = delta[st[int(0.98*refUse.size)]]
+                st = np.argsort(gmiGRS[refUse])
+                xlow = gmiGRS[refUse[st[int(0.02*refUse.size)]]]
+                xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
 
-            ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
-            ax.set_title('%s band' % (band))
-            ax.set_xlabel('%s - %s' % (self.colorSplitBands[0], self.colorSplitBands[1]))
-            ax.set_ylabel('%s_std - %s_ref' % (band, band))
+                ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
+                ax.set_title('%s band' % (band))
+                ax.set_xlabel('%s - %s' % (self.colorSplitBands[0], self.colorSplitBands[1]))
+                ax.set_ylabel('%s_std - %s_ref' % (band, band))
 
-            fig.tight_layout()
-            fig.savefig('%s/%s_refresidvscol_%s.png' % (self.plotPath,
-                                                        self.outfileBaseWithCycle,
-                                                        band))
-            plt.close(fig)
+                fig.tight_layout()
+                fig.savefig('%s/%s_refresidvscol_%s_%s.png' % (self.plotPath,
+                                                               self.outfileBaseWithCycle,
+                                                               band,
+                                                               mode))
+                plt.close(fig)
 
     def __getstate__(self):
         # Don't try to pickle the logger.
