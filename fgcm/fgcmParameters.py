@@ -510,7 +510,6 @@ class FgcmParameters(object):
         try:
             self.compExpRefOffset = np.atleast_1d(inParams['COMPEXPREFOFFSET'][0])
         except:
-            # FIXME
             self.compExpRefOffset = np.zeros(self.nExp, dtype='f8')
 
         npix = hp.nside2npix(self.deltaAperFitSpatialNside)
