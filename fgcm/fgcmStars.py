@@ -1548,7 +1548,7 @@ class FgcmStars(object):
 
             self.fgcmLog.info('Flag %d stars of %d with BAD_COLOR' % (bad.size,self.nStars))
 
-        # This config says "apply standard color cuts to reference stars"
+        # This config says "apply starColorCuts to reference stars"
         if self.hasRefstars and not self.applyRefStarColorCuts:
             objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
             cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
@@ -2066,6 +2066,8 @@ class FgcmStars(object):
         ----------
         fgcmPars : `fgcm.FgcmParameters`
         """
+        from .fgcmUtilities import dataBinner
+
         if not self.hasRefstars:
             self.fgcmLog.info("No reference stars for color term residual plots.")
             return
@@ -2126,7 +2128,16 @@ class FgcmStars(object):
                 xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
 
                 ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
-                ax.set_title('%s band' % (band))
+
+                binstruct = dataBinner(gmiGRS[refUse], delta, 0.1, [xlow, xhigh], nTrial=10)
+                ok, = np.where(binstruct['N'] > 0)
+                ax.plot(binstruct['X'][ok], binstruct['Y'][ok], 'r--')
+
+                if mode == 'all':
+                    title = '%s band: Ref stars, full color range' % (band)
+                else:
+                    title = '%s band: Ref stars, cut color range (used in calibration)' % (band)
+                ax.set_title(title)
                 ax.set_xlabel('%s - %s' % (self.colorSplitBands[0], self.colorSplitBands[1]))
                 ax.set_ylabel('%s_std - %s_ref' % (band, band))
 
