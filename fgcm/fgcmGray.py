@@ -1230,7 +1230,11 @@ class FgcmGray(object):
                               (time.time() - startTime))
 
     def computeExposureReferenceOffsets(self):
-        """Compute exposure reference offsets."""
+        """Compute exposure reference offsets.
+
+        This method computes per-exposure offsets between the calibrated stars and the reference
+        stars for an end-of-calibration "fixup".
+        """
         if not self.fgcmStars.hasRefstars:
             # Nothing to do here
             return

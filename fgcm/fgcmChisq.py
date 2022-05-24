@@ -623,7 +623,6 @@ class FgcmChisq(object):
 
             if self.useExposureReferenceOffset:
                 # Apply the reference offsets as well.
-                # (There will probably be a sign error)
                 ok, = np.where(self.fgcmPars.compExpRefOffset[obsExpIndexGO] > self.illegalValue)
                 obsMagGO[ok] += self.fgcmPars.compExpRefOffset[obsExpIndexGO[ok]]
 

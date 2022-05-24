@@ -572,21 +572,25 @@ class FgcmConfig(object):
         #  note that self.starColorCuts is a copy so that we don't overwrite.
 
         for cCut in self.starColorCuts:
-            if (not isinstance(cCut[0],int)) :
-                if (cCut[0] not in self.bands):
+            if (not isinstance(cCut[0], int)) :
+                cCut[0] = cCut[0].strip()
+                if cCut[0] not in self.bands:
                     raise ValueError("starColorCut band %s not in list of bands!" % (cCut[0]))
                 cCut[0] = list(self.bands).index(cCut[0])
-            if (not isinstance(cCut[1],int)) :
-                if (cCut[1] not in self.bands):
+            if (not isinstance(cCut[1], int)) :
+                cCut[1] = cCut[1].strip()
+                if cCut[1] not in self.bands:
                     raise ValueError("starColorCut band %s not in list of bands!" % (cCut[1]))
                 cCut[1] = list(self.bands).index(cCut[1])
 
         for cCut in self.refStarColorCuts:
             if not isinstance(cCut[0], int):
+                cCut[0] = cCut[0].strip()
                 if cCut[0] not in self.bands:
                     raise ValueError("refStarColorCut band %s not in list of bands!" % (cCut[0]))
                 cCut[0] = list(self.bands).index(cCut[0])
             if not isinstance(cCut[1], int):
+                cCut[1] = cCut[1].strip()
                 if cCut[1] not in self.bands:
                     raise ValueError("refStarColorCut band %s not in list of bands!" % (cCut[1]))
                 cCut[1] = list(self.bands).index(cCut[1])
