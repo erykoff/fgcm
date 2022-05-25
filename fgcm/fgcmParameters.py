@@ -387,6 +387,9 @@ class FgcmParameters(object):
         self.compVarGray = np.zeros(self.nExp,dtype='f8')
         self.compNGoodStarPerExp = np.zeros(self.nExp,dtype='i4')
 
+        # Per-Exposure Reference offset
+        self.compExpRefOffset = np.zeros(self.nExp, dtype='f8')
+
         # We also have the median delta aperture and epsilon per exposure
         self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
         self.compEpsilon = np.zeros(self.nExp, dtype='f8')
@@ -503,6 +506,11 @@ class FgcmParameters(object):
         self.compExpGray = np.atleast_1d(inParams['COMPEXPGRAY'][0])
         self.compVarGray = np.atleast_1d(inParams['COMPVARGRAY'][0])
         self.compNGoodStarPerExp = np.atleast_1d(inParams['COMPNGOODSTARPEREXP'][0])
+
+        try:
+            self.compExpRefOffset = np.atleast_1d(inParams['COMPEXPREFOFFSET'][0])
+        except:
+            self.compExpRefOffset = np.zeros(self.nExp, dtype='f8')
 
         npix = hp.nside2npix(self.deltaAperFitSpatialNside)
         try:
@@ -1010,6 +1018,7 @@ class FgcmParameters(object):
                ('COMPMODELERRPARS', 'f8', (self.compModelErrPars.size, )),
                ('COMPEXPGRAY', 'f8', (self.compExpGray.size, )),
                ('COMPVARGRAY', 'f8', (self.compVarGray.size, )),
+               ('COMPEXPREFOFFSET', 'f8', (self.compExpRefOffset.size, )),
                ('COMPMEDDELTAAPER', 'f8', (self.compMedDeltaAper.size, )),
                ('COMPEPSILON', 'f8', (self.compEpsilon.size, )),
                ('COMPGLOBALEPSILON', 'f4', (self.compGlobalEpsilon.size, )),
@@ -1080,6 +1089,8 @@ class FgcmParameters(object):
         pars['COMPEXPGRAY'][:] = self.compExpGray
         pars['COMPVARGRAY'][:] = self.compVarGray
         pars['COMPNGOODSTARPEREXP'][:] = self.compNGoodStarPerExp
+
+        pars['COMPEXPREFOFFSET'][:] = self.compExpRefOffset
 
         pars['COMPMEDDELTAAPER'][:] = self.compMedDeltaAper
         pars['COMPEPSILON'][:] = self.compEpsilon

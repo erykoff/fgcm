@@ -11,6 +11,7 @@ from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
+from .fgcmUtilities import expFlagDict
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -283,7 +284,8 @@ class FgcmGray(object):
             raise ValueError("Must run FgcmChisq to compute magStd before computeCCDAndExpGray")
 
         startTime = time.time()
-        self.fgcmLog.debug('Computing CCDGray and ExpGray.')
+        if not self.quietMode:
+            self.fgcmLog.info('Computing CCDGray and ExpGray.')
 
         # Note: this computes the gray values for all exposures, good and bad
 
@@ -1226,6 +1228,129 @@ class FgcmGray(object):
         if not self.quietMode:
             self.fgcmLog.info('Computed ccdDeltaBkg and expDeltaBkg in %.2f seconds.' %
                               (time.time() - startTime))
+
+    def computeExposureReferenceOffsets(self):
+        """Compute exposure reference offsets.
+
+        This method computes per-exposure offsets between the calibrated stars and the reference
+        stars for an end-of-calibration "fixup".
+        """
+        if not self.fgcmStars.hasRefstars:
+            # Nothing to do here
+            return
+
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+
+        objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
+        refMag = snmm.getArray(self.fgcmStars.refMagHandle)
+
+        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
+
+        # Add in the gray values
+        obsExpIndexGO = obsExpIndex[goodObs]
+        obsCCDIndexGO = obsCCDIndex[goodObs]
+        obsBandIndexGO = obsBandIndex[goodObs]
+        obsMagStdGO = obsMagStd[goodObs]
+
+        ccdGray = snmm.getArray(self.ccdGrayHandle)
+        if np.any(self.ccdGraySubCCD):
+            ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
+
+        ok, = np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
+
+        if np.any(self.ccdGraySubCCD):
+            obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
+            obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+            expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
+                          obsCCDIndexGO[ok])
+            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+            use, = np.where(h > 0)
+            for i in use:
+                i1a = rev[rev[i]: rev[i + 1]]
+                eInd = obsExpIndexGO[ok[i1a[0]]]
+                cInd = obsCCDIndexGO[ok[i1a[0]]]
+                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                    self.deltaMapperDefault['y_size'][cInd],
+                                    ccdGraySubCCDPars[eInd, cInd, :])
+                fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                obsMagStdGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+        else:
+            # Regular non-sub-ccd
+            obsMagStdGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
+
+        goodRefObsGO, = np.where(objRefIDIndex[obsObjIDIndex[goodObs]] >= 0)
+
+        obsUse, = np.where((obsMagStd[goodObs[goodRefObsGO]] < 90.0) &
+                           (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                                   obsBandIndex[goodObs[goodRefObsGO]]] < 90.0))
+
+        goodRefObsGO = goodRefObsGO[obsUse]
+
+        EGrayGRO = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
+                           obsBandIndex[goodObs[goodRefObsGO]]] -
+                    obsMagStdGO[goodRefObsGO])
+
+        # And then this can be split per exposure.
+
+        h, rev = esutil.stat.histogram(obsExpIndexGO[goodRefObsGO], rev=True)
+
+        use, = np.where(h >= self.minStarPerExp)
+
+        self.fgcmPars.compExpRefOffset[:] = self.illegalValue
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            eInd = obsExpIndexGO[goodRefObsGO[i1a[0]]]
+            bInd = obsBandIndexGO[goodRefObsGO[i1a[0]]]
+
+            self.fgcmPars.compExpRefOffset[eInd] = np.median(EGrayGRO[i1a])
+
+        # Do plots if necessary.
+        if self.plotPath is None:
+            return
+
+        rejectMask = (expFlagDict['TOO_FEW_STARS'] |
+                      expFlagDict['NO_STARS'] |
+                      expFlagDict['BAND_NOT_IN_LUT'])
+
+        expUse, = np.where((self.fgcmPars.expFlag & rejectMask) == 0)
+
+        for i in range(self.fgcmPars.nBands):
+            inBand, = np.where((self.fgcmPars.expBandIndex[expUse] == i) &
+                               (self.fgcmPars.compExpRefOffset[expUse] > self.illegalValue))
+
+            if inBand.size == 0:
+                continue
+
+            fig = plt.figure(1, figsize=(8, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            coeff = histoGauss(ax, self.fgcmPars.compExpRefOffset[expUse[inBand]]*1000.0)
+            coeff[1] /= 1000.0
+            coeff[2] /= 1000.0
+
+            ax.tick_params(axis='both', which='major', labelsize=14)
+            ax.locator_params(axis='x', nbins=5)
+
+            text=r'$(%s)$' % (self.fgcmPars.bands[i]) + '\n' + \
+                r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
+                r'$\mu = %.2f$' % (coeff[1]*1000.0) + '\n' + \
+                r'$\sigma = %.2f$' % (coeff[2]*1000.0)
+
+            ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right', va='top', fontsize=16)
+            ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{ref}}\,(\mathrm{mmag})$', fontsize=16)
+            ax.set_ylabel(r'# of Exposures',fontsize=14)
+
+            fig.savefig('%s/%s_expref_%s.png' % (self.plotPath,
+                                                 self.outfileBaseWithCycle,
+                                                 self.fgcmPars.bands[i]))
+            plt.close(fig)
 
     def __getstate__(self):
         # Don't try to pickle the logger.
