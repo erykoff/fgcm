@@ -2115,6 +2115,8 @@ class FgcmStars(object):
 
                 refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]], bandIndex] < 90.0) &
                                    (objMagStdMean[goodRefStars[okColor], bandIndex] < 90.0))
+                if refUse.size == 0:
+                    continue
                 refUse = okColor[refUse]
 
                 delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
@@ -2129,9 +2131,11 @@ class FgcmStars(object):
 
                 ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
 
-                binstruct = dataBinner(gmiGRS[refUse], delta, 0.1, [xlow, xhigh], nTrial=10)
-                ok, = np.where(binstruct['N'] > 0)
-                ax.plot(binstruct['X'][ok], binstruct['Y'][ok], 'r--')
+                # Only do the binning if we have data
+                if xhigh > xlow and refUse.size > 10:
+                    binstruct = dataBinner(gmiGRS[refUse], delta, 0.1, [xlow, xhigh], nTrial=10)
+                    ok, = np.where(binstruct['N'] > 0)
+                    ax.plot(binstruct['X'][ok], binstruct['Y'][ok], 'r--')
 
                 if mode == 'all':
                     title = '%s band: Ref stars, full color range' % (band)
