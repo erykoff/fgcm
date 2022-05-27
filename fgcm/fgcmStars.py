@@ -2115,6 +2115,8 @@ class FgcmStars(object):
 
                 refUse, = np.where((refMag[objRefIDIndex[goodRefStars[okColor]], bandIndex] < 90.0) &
                                    (objMagStdMean[goodRefStars[okColor], bandIndex] < 90.0))
+                if refUse.size == 0:
+                    continue
                 refUse = okColor[refUse]
 
                 delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
