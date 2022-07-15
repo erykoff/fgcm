@@ -128,7 +128,7 @@ A list of dependencies includes the following:
 * matplotlib
 * esutil
 * fitsio (for standalone running)
-* healpy
+* hpgeom
 * pyyaml
 * smatch (optional, for the fastest object matching)
 * mpl_toolkits (optional, for fancy coverage map plotting)
