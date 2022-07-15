@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 import esutil
-import healpy as hp
+import hpgeom as hpg
 
 import matplotlib.pyplot as plt
 
@@ -394,7 +394,7 @@ class FgcmParameters(object):
         self.compMedDeltaAper = np.zeros(self.nExp, dtype='f8')
         self.compEpsilon = np.zeros(self.nExp, dtype='f8')
         self.compGlobalEpsilon = np.zeros(self.nBands, dtype='f4')
-        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
+        npix = hpg.nside_to_npixel(self.deltaAperFitSpatialNside)
         self.compEpsilonMap = np.zeros((npix, self.nBands), dtype='f4')
         self.compEpsilonNStarMap = np.zeros((npix, self.nBands), dtype='i4')
         self.compEpsilonCcdMap = np.zeros((self.nLUTFilter, self.nCCD,
@@ -512,7 +512,7 @@ class FgcmParameters(object):
         except:
             self.compExpRefOffset = np.zeros(self.nExp, dtype='f8')
 
-        npix = hp.nside2npix(self.deltaAperFitSpatialNside)
+        npix = hpg.nside_to_npixel(self.deltaAperFitSpatialNside)
         try:
             self.compMedDeltaAper = np.atleast_1d(inParams['COMPMEDDELTAAPER'][0])
             self.compEpsilon = np.atleast_1d(inParams['COMPEPSILON'][0])

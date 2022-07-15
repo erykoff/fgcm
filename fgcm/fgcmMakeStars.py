@@ -3,7 +3,7 @@ import os
 import sys
 import esutil
 import glob
-import healpy as hp
+import hpgeom as hpg
 
 from .fgcmLogger import FgcmLogger
 
@@ -335,9 +335,7 @@ class FgcmMakeStars(object):
         pixelCats = []
 
         # Split into pixels
-        ipring = hp.ang2pix(self.starConfig['coarseNSide'],
-                            (90.0 - decArray) * np.pi / 180.,
-                            raArray * np.pi / 180.)
+        ipring = hpg.angle_to_pixel(self.starConfig['coarseNSide'], raArray, decArray, nest=False)
         hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         gdpix, = np.where(hpix > 0)
@@ -725,10 +723,12 @@ class FgcmMakeStars(object):
         if self.starConfig['randomSeed'] is not None:
             np.random.seed(seed=self.starConfig['randomSeed'])
 
-        theta = (90.0 - self.objCat['dec'][gd])*np.pi/180.
-        phi = self.objCat['ra'][gd]*np.pi/180.
-
-        ipring = hp.ang2pix(self.starConfig['densNSide'], theta, phi)
+        ipring = hpg.angle_to_pixel(
+            self.starConfig['densNSide'],
+            self.objCat['ra'][gd],
+            self.objCat['dec'][gd],
+            nest=False
+        )
         hist, rev = esutil.stat.histogram(ipring, rev=True)
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
@@ -804,9 +804,12 @@ class FgcmMakeStars(object):
             except ImportError:
                 hasSmatch = False
 
-        ipring = hp.ang2pix(self.starConfig['coarseNSide'],
-                            np.radians(90.0 - self.objIndexCat['dec']),
-                            np.radians(self.objIndexCat['ra']))
+        ipring = hpg.angle_to_pixel(
+            self.starConfig['coarseNSide'],
+            self.objIndexCat['ra'],
+            self.objIndexCat['dec'],
+            nest=False
+        )
         hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         pixelCats = []
@@ -836,8 +839,8 @@ class FgcmMakeStars(object):
                                          self.objIndexCat['ra'][p1a], self.objIndexCat['dec'][p1a])
             rad = dist.max()
 
-            # Note nside2resol returns radians of the pixel along a side...
-            if rad < np.degrees(hp.nside2resol(self.starConfig['coarseNSide'])/2.):
+            # Note nside_to_resolution returns length (degrees) of the pixel along a side...
+            if rad < hpg.nside_to_resolution(self.starConfig['coarseNSide'])/2.:
                 # If it's a smaller radius, read the circle
                 refCat = refLoader.getFgcmReferenceStarsSkyCircle(meanRA, meanDec, rad,
                                                                   self.starConfig['referenceFilterNames'])
