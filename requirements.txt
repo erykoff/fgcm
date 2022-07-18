@@ -4,4 +4,4 @@ pyyaml
 fitsio
 matplotlib
 esutil
-healpy
+hpgeom
