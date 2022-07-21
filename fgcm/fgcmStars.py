@@ -1167,13 +1167,11 @@ class FgcmStars(object):
             # Requested not to do plots
             return
 
-        import healpy as hp
-        try:
-            from .fgcmPlotmaps import plot_hpxmap
-        except ImportError:
-            self.fgcmLog.info("Map plotting not available.  Sorry!")
-            return
+        # This is not currently used.
+        # FIXME: add skyproj plotting.
+        return
 
+    """
         mask = (objFlagDict['TOO_FEW_OBS'] |
                 objFlagDict['BAD_COLOR'] |
                 objFlagDict['VARIABLE'] |
@@ -1206,6 +1204,8 @@ class FgcmStars(object):
         fig.savefig('%s/%s_%sGoodStars.png' % (self.plotPath, self.outfileBaseWithCycle,
                                                mapType))
         plt.close(fig)
+    """
+
 
     def computeObjectSEDSlopes(self,objIndicesIn):
         """

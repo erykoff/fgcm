@@ -1,8 +1,5 @@
-from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
-
 import numpy as np
-import healpy as hp
+import hpgeom as hpg
 import os
 import sys
 import esutil
@@ -150,7 +147,7 @@ class FgcmDeltaAper(object):
             goodStarsList = np.array_split(goodStars, nSections)
 
             splitValues = np.zeros(nSections - 1,dtype='i4')
-            for i in xrange(1, nSections):
+            for i in range(1, nSections):
                 splitValues[i - 1] = goodStarsList[i][0]
 
             splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
@@ -250,9 +247,8 @@ class FgcmDeltaAper(object):
 
         # Do the mapping
         self.fgcmLog.info("Computing delta-aper epsilon spatial map at nside %d" % self.deltaAperFitSpatialNside)
-        ipring = hp.ang2pix(self.deltaAperFitSpatialNside,
-                            objRA, objDec, lonlat=True)
-        h, rev = esutil.stat.histogram(ipring, min=0, max=hp.nside2npix(self.deltaAperFitSpatialNside) - 1, rev=True)
+        ipring = hpg.angle_to_pixel(self.deltaAperFitSpatialNside, objRA, objDec, nest=False)
+        h, rev = esutil.stat.histogram(ipring, min=0, max=hpg.nside_to_npixel(self.deltaAperFitSpatialNside) - 1, rev=True)
 
         offsetMap = np.zeros(h.size, dtype=[('nstar_fit', 'i4', (self.fgcmStars.nBands, )),
                                             ('epsilon', 'f4', (self.fgcmStars.nBands, ))])
@@ -285,7 +281,7 @@ class FgcmDeltaAper(object):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
                 if hpix.size < 2:
                     continue
-                ra, dec = hp.pix2ang(self.deltaAperFitSpatialNside, hpix, lonlat=True)
+                ra, dec = hpg.pixel_to_angle(self.deltaAperFitSpatialNside, hpix, nest=False)
                 st = np.argsort(offsetMap['epsilon'][hpix, j])
                 vmin = offsetMap['epsilon'][hpix[st[int(0.02*st.size)]], j]
                 vmax = offsetMap['epsilon'][hpix[st[int(0.98*st.size)]], j]
