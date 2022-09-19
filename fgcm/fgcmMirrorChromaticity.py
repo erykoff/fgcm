@@ -149,45 +149,44 @@ class FgcmMirrorChromaticity(object):
                 ok, = np.where((expGrayColorSplitWt[:, 0] > 0.0) &
                                (expGrayColorSplitWt[:, 1] > 0.0))
 
-                deltaColorRaw = (expGrayColorSplitRaw[ok, 0] - expGrayColorSplitRaw[ok, 1]) * 1000.0
-                st = np.argsort(deltaColorRaw)
-                extent = [np.min(self.fgcmPars.expMJD[ok] - firstMJD),
-                          np.max(self.fgcmPars.expMJD[ok] - firstMJD),
-                          deltaColorRaw[st[int(0.01*deltaColorRaw.size)]],
-                          deltaColorRaw[st[int(0.99*deltaColorRaw.size)]]]
+                if ok.size > 0:
+                    deltaColorRaw = (expGrayColorSplitRaw[ok, 0] - expGrayColorSplitRaw[ok, 1]) * 1000.0
+                    st = np.argsort(deltaColorRaw)
+                    extent = [np.min(self.fgcmPars.expMJD[ok] - firstMJD),
+                              np.max(self.fgcmPars.expMJD[ok] - firstMJD),
+                              deltaColorRaw[st[int(0.01*deltaColorRaw.size)]],
+                              deltaColorRaw[st[int(0.99*deltaColorRaw.size)]]]
 
-                plt.set_cmap('viridis')
+                    plt.set_cmap('viridis')
 
-                fig = plt.figure(1, figsize=(8, 6))
-                fig.clf()
+                    fig = plt.figure(1, figsize=(8, 6))
+                    fig.clf()
 
-                ax = fig.add_subplot(111)
-                ax.hexbin(self.fgcmPars.expMJD[ok] - firstMJD,
-                          (expGrayColorSplitRaw[ok, 0] - expGrayColorSplitRaw[ok, 1]) * 1000.0,
-                          bins='log', extent=extent)
+                    ax = fig.add_subplot(111)
+                    ax.hexbin(self.fgcmPars.expMJD[ok] - firstMJD,
+                              (expGrayColorSplitRaw[ok, 0] - expGrayColorSplitRaw[ok, 1]) * 1000.0,
+                              bins='log', extent=extent)
 
-                ylim = ax.get_ylim()
-                for i in range(self.fgcmPars.nCoatingIntervals):
-                    ax.plot([self.fgcmPars.coatingMJDs[i] - firstMJD,
-                             self.fgcmPars.coatingMJDs[i] - firstMJD],
-                            ylim, 'r--')
-                    u, = np.where(self.fgcmPars.expCoatingIndex[ok] == i)
-                    ax.plot(self.fgcmPars.expMJD[ok[u]] - firstMJD, delta[ok[u]] * 1000.0, 'r--')
-                ax.set_xlabel('MJD - %.0f' % (firstMJD))
-                ax.set_ylabel('EXP_GRAY (%s) (red25) - EXP_GRAY (%s) (blue25) (mmag)' %
-                              (self.fgcmPars.lutFilterNames[filterIndex],
-                               self.fgcmPars.lutFilterNames[filterIndex]))
+                    ylim = ax.get_ylim()
+                    for i in range(self.fgcmPars.nCoatingIntervals):
+                        ax.plot([self.fgcmPars.coatingMJDs[i] - firstMJD,
+                                 self.fgcmPars.coatingMJDs[i] - firstMJD],
+                                ylim, 'r--')
+                        u, = np.where(self.fgcmPars.expCoatingIndex[ok] == i)
+                        ax.plot(self.fgcmPars.expMJD[ok[u]] - firstMJD, delta[ok[u]] * 1000.0, 'r--')
+                    ax.set_xlabel('MJD - %.0f' % (firstMJD))
+                    ax.set_ylabel('EXP_GRAY (%s) (red25) - EXP_GRAY (%s) (blue25) (mmag)' %
+                                  (self.fgcmPars.lutFilterNames[filterIndex],
+                                   self.fgcmPars.lutFilterNames[filterIndex]))
 
-                text=r'$(%s)$' % (self.fgcmPars.lutFilterNames[filterIndex])
-                ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
+                    text=r'$(%s)$' % (self.fgcmPars.lutFilterNames[filterIndex])
+                    ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
 
-                plt.savefig('%s/%s_compare-redblue-mirrorchrom_%s.png' % (self.plotPath,
-                                                                          self.outfileBaseWithCycle,
-                                                                          self.fgcmPars.lutFilterNames[filterIndex]))
+                    plt.savefig('%s/%s_compare-redblue-mirrorchrom_%s.png' % (self.plotPath,
+                                                                              self.outfileBaseWithCycle,
+                                                                              self.fgcmPars.lutFilterNames[filterIndex]))
 
-                plt.close(fig)
-
-
+                    plt.close(fig)
 
         # Clear things out of memory
         self.blueStarsInFilter = None
