@@ -1003,17 +1003,18 @@ class FgcmGray(object):
 
         deepUse,=np.where(self.fgcmPars.expDeepFlag[expUse] == 1)
 
-        ax.hexbin(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
-                  expGray[expUse[deepUse]]*1000.0, bins='log')
-        ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
-        ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
+        if deepUse.size > 0:
+            ax.hexbin(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
+                      expGray[expUse[deepUse]]*1000.0, bins='log')
+            ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
+            ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
-        ax.set_title(r'$\mathrm{Deep Fields}$')
+            ax.set_title(r'$\mathrm{Deep Fields}$')
 
-        if self.plotPath is not None:
-            fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
-                                                        self.outfileBaseWithCycle))
-        plt.close(fig)
+            if self.plotPath is not None:
+                fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
+                                                            self.outfileBaseWithCycle))
+            plt.close(fig)
 
         # And plot correlations of EXP^gray between pairs of bands
         for ind, bandIndex0 in enumerate(self.bandFitIndex[:-2]):
