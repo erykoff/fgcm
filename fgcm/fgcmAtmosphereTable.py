@@ -246,33 +246,33 @@ class FgcmAtmosphereTable(object):
             parStruct = pyfits.getdata(self.atmosphereTableFile, ext=('PARS', 1))
 
 
-        self.elevation = parStruct['ELEVATION'][0]
-        self.pmbElevation = parStruct['PMBELEVATION'][0]
-        self.pmbStd = parStruct['PMBSTD'][0]
-        self.pwvStd = parStruct['PWVSTD'][0]
-        self.o3Std = parStruct['O3STD'][0]
-        self.tauStd = parStruct['TAUSTD'][0]
-        self.alphaStd = parStruct['ALPHASTD'][0]
-        self.secZenithStd = parStruct['AIRMASSSTD'][0]
-        self.lambdaRange = parStruct['LAMBDARANGE'][0]
-        self.lambdaStep = parStruct['LAMBDASTEP'][0]
-        self.lambdaNorm = parStruct['LAMBDANORM'][0]
+        self.elevation = parStruct['ELEVATION'][0].astype(np.float64)
+        self.pmbElevation = parStruct['PMBELEVATION'][0].astype(np.float64)
+        self.pmbStd = parStruct['PMBSTD'][0].astype(np.float64)
+        self.pwvStd = parStruct['PWVSTD'][0].astype(np.float64)
+        self.o3Std = parStruct['O3STD'][0].astype(np.float64)
+        self.tauStd = parStruct['TAUSTD'][0].astype(np.float64)
+        self.alphaStd = parStruct['ALPHASTD'][0].astype(np.float64)
+        self.secZenithStd = parStruct['AIRMASSSTD'][0].astype(np.float64)
+        self.lambdaRange = parStruct['LAMBDARANGE'][0].astype(np.float64)
+        self.lambdaStep = parStruct['LAMBDASTEP'][0].astype(np.float64)
+        self.lambdaNorm = parStruct['LAMBDANORM'][0].astype(np.float64)
 
-        self.atmLambda = parStruct['ATMLAMBDA'][0]
-        self.atmStdTrans = parStruct['ATMSTDTRANS'][0]
+        self.atmLambda = parStruct['ATMLAMBDA'][0].astype(np.float64)
+        self.atmStdTrans = parStruct['ATMSTDTRANS'][0].astype(np.float64)
 
-        self.pmb = parStruct['PMB'][0]
-        self.pmbDelta = parStruct['PMBDELTA'][0]
-        self.lnPwv = parStruct['LNPWV'][0]
-        self.lnPwvDelta = parStruct['LNPWVDELTA'][0]
-        self.o3 = parStruct['O3'][0]
-        self.o3Delta = parStruct['O3DELTA'][0]
-        self.lnTau = parStruct['LNTAU'][0]
-        self.lnTauDelta = parStruct['LNTAUDELTA'][0]
-        self.alpha = parStruct['ALPHA'][0]
-        self.alphaDelta = parStruct['ALPHADELTA'][0]
-        self.secZenith = parStruct['SECZENITH'][0]
-        self.secZenithDelta = parStruct['SECZENITHDELTA'][0]
+        self.pmb = parStruct['PMB'][0].astype(np.float64)
+        self.pmbDelta = parStruct['PMBDELTA'][0].astype(np.float64)
+        self.lnPwv = parStruct['LNPWV'][0].astype(np.float64)
+        self.lnPwvDelta = parStruct['LNPWVDELTA'][0].astype(np.float64)
+        self.o3 = parStruct['O3'][0].astype(np.float64)
+        self.o3Delta = parStruct['O3DELTA'][0].astype(np.float64)
+        self.lnTau = parStruct['LNTAU'][0].astype(np.float64)
+        self.lnTauDelta = parStruct['LNTAUDELTA'][0].astype(np.float64)
+        self.alpha = parStruct['ALPHA'][0].astype(np.float64)
+        self.alphaDelta = parStruct['ALPHADELTA'][0].astype(np.float64)
+        self.secZenith = parStruct['SECZENITH'][0].astype(np.float64)
+        self.secZenithDelta = parStruct['SECZENITHDELTA'][0].astype(np.float64)
 
         if fits_package == 'fitsio':
             self.pwvAtmTable = fitsio.read(self.atmosphereTableFile, ext='PWVATM')
