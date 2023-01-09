@@ -471,11 +471,12 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
                s=0.1,
                c=zGrid.ravel(),
-               vmin=lo, vmax=hi)
+               vmin=lo, vmax=hi,
+               cmap=cm)
     ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -503,7 +504,6 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
     import matplotlib.cm as cmx
 
     cm = plt.get_cmap('rainbow')
-    plt.set_cmap('rainbow')
 
     plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
                    np.max(deltaMapper['delta_ra']) + 0.02]
@@ -553,11 +553,12 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
     ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
                s=0.1,
                c=zGrid.ravel(),
-               vmin=lo, vmax=hi)
+               vmin=lo, vmax=hi,
+               cmap=cm)
     ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -587,7 +588,6 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
     import matplotlib.cm as cmx
 
     cm = plt.get_cmap('rainbow')
-    plt.set_cmap('rainbow')
 
     plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
                    np.max(deltaMapper['delta_ra']) + 0.02]
@@ -640,11 +640,12 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
                deltaMapper['delta_dec'].ravel()[use],
                s=0.1,
                c=zGrid.ravel()[use],
-               vmin=lo, vmax=hi)
+               vmin=lo, vmax=hi,
+               cmap=cm)
     ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax)
+    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
