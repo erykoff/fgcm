@@ -345,7 +345,7 @@ class FgcmStars(object):
 
         # FIXME: check that these are all the same length!
 
-        self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i4')
+        self.obsIndexHandle = snmm.createArray(obsRA.size, dtype='i8')
         snmm.getArray(self.obsIndexHandle)[:] = np.arange(obsRA.size)
 
         # need to stuff into shared memory objects.
@@ -429,7 +429,7 @@ class FgcmStars(object):
             self.nRefstars = refID.size
 
             # refID: matched ID of reference stars
-            self.refIDHandle = snmm.createArray(self.nRefstars, dtype='i4')
+            self.refIDHandle = snmm.createArray(self.nRefstars, dtype='i8')
             # refMag: absolute magnitudes of reference stars
             self.refMagHandle = snmm.createArray((self.nRefstars, self.nBands), dtype='f4')
             # refMagErr: absolute magnitude errors of reference stars
@@ -514,13 +514,13 @@ class FgcmStars(object):
         self.nStars = objID.size
 
         #  objID: unique object ID
-        self.objIDHandle = snmm.createArray(self.nStars,dtype='i4')
+        self.objIDHandle = snmm.createArray(self.nStars,dtype='i8')
         #  objRA: mean RA for object
         self.objRAHandle = snmm.createArray(self.nStars,dtype='f8')
         #  objDec: mean Declination for object
         self.objDecHandle = snmm.createArray(self.nStars,dtype='f8')
         #  objObsIndex: for each object, the first
-        self.objObsIndexHandle = snmm.createArray(self.nStars,dtype='i4')
+        self.objObsIndexHandle = snmm.createArray(self.nStars,dtype='i8')
         #  objNobs: number of observations of this object (all bands)
         self.objNobsHandle = snmm.createArray(self.nStars,dtype='i4')
         #  objNGoodObsHandle: number of good observations, per band
@@ -655,7 +655,7 @@ class FgcmStars(object):
 
         startTime = time.time()
         self.fgcmLog.debug('Indexing star observations...')
-        self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
+        self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i8')
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objID = snmm.getArray(self.objIDHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
@@ -674,7 +674,7 @@ class FgcmStars(object):
             # self.refIdHandle
             startTime = time.time()
             self.fgcmLog.debug('Matching reference star IDs')
-            self.objRefIDIndexHandle = snmm.createArray(self.nStars, dtype='i4')
+            self.objRefIDIndexHandle = snmm.createArray(self.nStars, dtype='i8')
             objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
 
             # Set the default to -1 (no match)
