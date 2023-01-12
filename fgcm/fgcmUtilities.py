@@ -449,9 +449,6 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
         lo = loHi[0]
         hi = loHi[1]
 
-    cNorm = colors.Normalize(vmin=lo, vmax=hi)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
-
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
     CS3 = plt.contourf(Z, levels, cmap=cm)
@@ -524,9 +521,6 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
     else:
         lo = loHi[0]
         hi = loHi[1]
-
-    cNorm = colors.Normalize(vmin=lo, vmax=hi)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
 
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
@@ -608,9 +602,6 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
     else:
         lo = loHi[0]
         hi = loHi[1]
-
-    cNorm = colors.Normalize(vmin=lo, vmax=hi)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
 
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
