@@ -5,6 +5,7 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 import scipy.optimize
+import warnings
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import dataBinner
@@ -144,8 +145,8 @@ class FgcmApertureCorrection(object):
             binStruct['Y_ERR'] = np.sqrt(binStruct['Y_ERR']**2. + 0.001**2.)
 
             try:
-                with np.warnings.catch_warnings():
-                    np.warnings.simplefilter("ignore")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
 
                     # This fit might throw a warning, but we check for bad fits below
                     # so we can ignore these internal warnings

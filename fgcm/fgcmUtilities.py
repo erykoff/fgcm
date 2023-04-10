@@ -200,6 +200,7 @@ def histoGauss(ax,array):
     import scipy.optimize
     import matplotlib.pyplot as plt
     import esutil
+    import warnings
 
     if array.size < 5:
         return np.array([1.0, 0.0, 1.0])
@@ -214,8 +215,8 @@ def histoGauss(ax,array):
         np.std(array)]
 
     try:
-        with np.warnings.catch_warnings():
-            np.warnings.simplefilter("ignore")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
             # This fit might throw a warning, which we don't need now.
             # Note that in the future if we use the output from this fit in an
