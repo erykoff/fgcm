@@ -1,6 +1,7 @@
 import numpy as np
 import esutil
 import time
+import warnings
 
 import matplotlib.pyplot as plt
 
@@ -1244,8 +1245,8 @@ class FgcmStars(object):
             index0 = self.bands.index(boundaryTerm['primary'])
             index1 = self.bands.index(boundaryTerm['secondary'])
 
-            with np.warnings.catch_warnings():
-                np.warnings.simplefilter("ignore")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
 
                 S[boundaryTermName] = (-1. / self.magConstant) * (objMagStdMeanOI[:, index0] - objMagStdMeanOI[:, index1]) / ((self.lambdaStdBand[index0] - self.lambdaStdBand[index1]))
 
