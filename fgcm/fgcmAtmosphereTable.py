@@ -316,7 +316,12 @@ class FgcmAtmosphereTable(object):
                                  np.log(self.atmConfig['pwvRange'][1]),
                                  num=self.atmConfig['pwvSteps'])
         self.lnPwvDelta = self.lnPwv[1] - self.lnPwv[0]
-        lnPwvPlus = np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta)
+        # We never want this to go above 20 mm.
+        lnPwvPlus = np.clip(
+            np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta),
+            0.0,
+            np.log(20.0)
+        )
         pwvPlus = np.exp(lnPwvPlus)
 
         self.o3 = np.linspace(self.atmConfig['o3Range'][0],
