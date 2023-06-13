@@ -354,7 +354,7 @@ class FgcmStars(object):
         self.nStarObs = obsRA.size
 
         #  obsExp: exposure number of individual observation (pointed by obsIndex)
-        self.obsExpHandle = snmm.createArray(self.nStarObs,dtype='i4')
+        self.obsExpHandle = snmm.createArray(self.nStarObs, dtype='i8')
         #  obsExpIndex: exposure index
         self.obsExpIndexHandle = snmm.createArray(self.nStarObs,dtype='i4')
         #  obsCCD: ccd number of individual observation
