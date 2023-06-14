@@ -715,6 +715,12 @@ class FgcmParameters(object):
 
         self.expPmb = expInfo['PMB']
 
+        bad, = np.where(~np.isfinite(self.expPmb))
+        if bad.size > 0:
+            self.fgcmLog.warning('Found %d exposures without valid barometric pressure; ' % (bad.size)
+                                 'setting to standard value.')
+            self.expPmb[bad] = self.pmbStd
+
         # link exposures to bands
         self.expBandIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
