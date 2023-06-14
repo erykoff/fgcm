@@ -186,6 +186,7 @@ class FgcmConfig(object):
 
     refStarSnMin = ConfigField(float, default=20.0)
     refStarOutlierNSig = ConfigField(float, default=4.0)
+    refStarMaxFracUse = ConfigField(float, default=0.5)
     applyRefStarColorCuts = ConfigField(bool, default=True)
     useRefStarsWithInstrument = ConfigField(bool, default=True)
     useExposureReferenceOffset = ConfigField(bool, default=False)

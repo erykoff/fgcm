@@ -108,6 +108,7 @@ class FgcmStars(object):
         self.approxThroughput = fgcmConfig.approxThroughput
 
         self.refStarSnMin = fgcmConfig.refStarSnMin
+        self.refStarMaxFracUse = fgcmConfig.refStarMaxFracUse
         self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
         self.hasXY = False
@@ -687,6 +688,21 @@ class FgcmStars(object):
 
             a, b = esutil.numpy_util.match(refID, objID)
             objRefIDIndex[b] = a
+
+            # Check for fraction of reference stars, and downsample if necessary.
+            refMatches, = np.where(objRefIDIndex >= 0)
+            if (refMatches.size/objRefIDIndex.size > self.refStarMaxFracUse):
+                self.fgcmLog.info("Fraction of reference star matches is greater than "
+                                  "refStarMaxFracUse (%.2f); down-sampling." % (self.refStarMaxFracUse))
+                nTarget = int(0.5*objRefIDIndex.size)
+                nMatch = refMatches.size
+                nToRemove = nMatch - nTarget
+
+                remove = np.random.choice(refMatches.size,
+                                          size=nToRemove,
+                                          replace=False)
+                refMag[objRefIDIndex[refMatches[remove]], :] = 99.0
+                objRefIDIndex[refMatches[remove]] = -1
 
             # Compute the fraction of stars that are reference stars
             for i, band in enumerate(self.bands):
