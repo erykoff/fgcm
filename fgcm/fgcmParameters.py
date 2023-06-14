@@ -717,7 +717,7 @@ class FgcmParameters(object):
 
         bad, = np.where(~np.isfinite(self.expPmb))
         if bad.size > 0:
-            self.fgcmLog.warning('Found %d exposures without valid barometric pressure; ' % (bad.size)
+            self.fgcmLog.warning(f'Found {bad.size} exposures without valid barometric pressure; '
                                  'setting to standard value.')
             self.expPmb[bad] = self.pmbStd
 
