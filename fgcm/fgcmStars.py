@@ -2146,7 +2146,12 @@ class FgcmStars(object):
                 xlow = gmiGRS[refUse[st[int(0.02*refUse.size)]]]
                 xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
 
-                ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
+                if refUse.size >= 1000:
+                    ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
+                else:
+                    ax.plot(gmiGRS[refUse], delta, 'k.')
+                    ax.set_xlim(xlow, xhigh)
+                    ax.set_ylim(ylow, yhigh)
 
                 # Only do the binning if we have data
                 if xhigh > xlow and refUse.size > 10:
