@@ -412,7 +412,7 @@ class Cheb2dField(object):
         return self.evaluate(xy[0, :], xy[1, :], flatpars)
 
 
-def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
+def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
     """
     Plot CCD map with single values for each CCD.
 
@@ -428,16 +428,21 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
         Color bar label
     loHi : tuple [2], optional
         (lo, hi) if set.  Otherwise, scaling is computed from data.
+    cmap : `matplotlib.colors.Colormap`, optional
+        Color map to use.
     """
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.colors as colors
     import matplotlib.cm as cmx
 
-    cm = plt.get_cmap('rainbow')
+    if cmap is None:
+        cm = plt.get_cmap('rainbow')
+    else:
+        cm = cmap
 
-    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
-                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotRaRange = [np.max(deltaMapper['delta_ra']) + 0.02,
+                   np.min(deltaMapper['delta_ra']) - 0.02]
     plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
                     np.max(deltaMapper['delta_dec']) + 0.02]
 
@@ -489,7 +494,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     return None
 
 
-def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
+def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
     """
     Plot CCD map with Chebyshev fits for each CCD.
 
@@ -505,15 +510,20 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
         Color bar label
     loHi : tuple [2], optional
         (lo, hi) if set.  Otherwise, scaling is computed from data.
+    cmap : `maplotlib.colors.Colormap`, optional
+        Colormap to use.
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
     import matplotlib.cm as cmx
 
-    cm = plt.get_cmap('rainbow')
+    if cmap is None:
+        cm = plt.get_cmap('rainbow')
+    else:
+        cm = cmap
 
-    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
-                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotRaRange = [np.max(deltaMapper['delta_ra']) + 0.02,
+                   np.min(deltaMapper['delta_ra']) - 0.02]
     plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
                     np.max(deltaMapper['delta_dec']) + 0.02]
 
