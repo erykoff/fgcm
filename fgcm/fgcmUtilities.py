@@ -457,6 +457,12 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
     levels = np.linspace(lo, hi, num=150)
     CS3 = plt.contourf(Z, levels, cmap=cm)
 
+    useCentersForScaling = True
+    markerSize = 0.1
+    if len(deltaMapper) < 10:
+        useCentersForScaling = False
+        markerSize = 10.0
+
     ax.clear()
 
     ax.set_xlim(plotRaRange[0], plotRaRange[1])
@@ -470,7 +476,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None):
         zGrid[k, :] = values[k]
 
     ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-               s=0.1,
+               s=markerSize,
                c=zGrid.ravel(),
                vmin=lo, vmax=hi,
                cmap=cm)
@@ -511,6 +517,13 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
     plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
                     np.max(deltaMapper['delta_dec']) + 0.02]
 
+    # If there are fewer than 10, use the values for the scaling, not the centers.
+    useCentersForScaling = True
+    markerSize = 0.1
+    if len(deltaMapper) < 10:
+        useCentersForScaling = False
+        markerSize = 10.0
+
     centralValues = np.zeros(len(deltaMapper))
     for i in range(deltaMapper.size):
         field = Cheb2dField(deltaMapper['x_size'][i],
@@ -518,10 +531,25 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
                             parArray[i, :])
         centralValues[i] = -2.5*np.log10(field.evaluateCenter())*1000.0
 
+    zGrid = np.zeros_like(deltaMapper['x'])
+    for k in range(deltaMapper.size):
+        field = Cheb2dField(deltaMapper['x_size'][k],
+                            deltaMapper['y_size'][k],
+                            parArray[k, :])
+        zGrid[k, :] = -2.5*np.log10(np.clip(field.evaluate(deltaMapper['x'][k, :],
+                                                           deltaMapper['y'][k, :]),
+                                                           0.1,
+                                                           None))*1000.0
+
     if loHi is None:
-        st = np.argsort(centralValues)
-        lo = centralValues[st[int(0.02*st.size)]]
-        hi = centralValues[st[int(0.98*st.size)]]
+        if useCentersForScaling:
+            st = np.argsort(centralValues)
+            lo = centralValues[st[int(0.02*st.size)]]
+            hi = centralValues[st[int(0.98*st.size)]]
+        else:
+            st = np.argsort(zGrid.ravel())
+            lo = zGrid.ravel()[st[int(0.02*st.size)]]
+            hi = zGrid.ravel()[st[int(0.98*st.size)]]
     else:
         lo = loHi[0]
         hi = loHi[1]
@@ -541,18 +569,8 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None):
     ax.set_ylabel(r'$\delta\,\mathrm{Dec.}$', fontsize=16)
     ax.tick_params(axis='both', which='major', labelsize=14)
 
-    zGrid = np.zeros_like(deltaMapper['x'])
-    for k in range(deltaMapper.size):
-        field = Cheb2dField(deltaMapper['x_size'][k],
-                            deltaMapper['y_size'][k],
-                            parArray[k, :])
-        zGrid[k, :] = -2.5*np.log10(np.clip(field.evaluate(deltaMapper['x'][k, :],
-                                                           deltaMapper['y'][k, :]),
-                                                           0.1,
-                                                           None))*1000.0
-
     ax.scatter(deltaMapper['delta_ra'].ravel(), deltaMapper['delta_dec'].ravel(),
-               s=0.1,
+               s=markerSize,
                c=zGrid.ravel(),
                vmin=lo, vmax=hi,
                cmap=cm)
