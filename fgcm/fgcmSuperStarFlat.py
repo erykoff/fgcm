@@ -53,6 +53,7 @@ class FgcmSuperStarFlat(object):
         self.superStarSubCCDChebyshevOrder = fgcmConfig.superStarSubCCDChebyshevOrder
         self.superStarSubCCDTriangular = fgcmConfig.superStarSubCCDTriangular
         self.superStarSigmaClip = fgcmConfig.superStarSigmaClip
+        self.superStarPlotCCDResiduals = fgcmConfig.superStarPlotCCDResiduals
 
     def setDeltaMapperDefault(self, deltaMapperDefault):
         """
@@ -290,6 +291,31 @@ class FgcmSuperStarFlat(object):
                 # and record the fit
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = 0
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0: fit.size] = fit
+
+                if doPlots and self.plotPath is not None and self.superStarPlotCCDResiduals:
+                    # Compute the residuals and plot them.
+                    superStar = -2.5 * np.log10(np.clip(field.evaluate(obsXGO[i1a], obsYGO[i1a]), 0.1, None))
+                    resid = EGrayGO[i1a] - superStar
+
+                    fig = plt.figure(figsize=(8, 6))
+                    fig.clf()
+                    ax = fig.add_subplot(111)
+
+                    hb = ax.hexbin(obsXGO[i1a], obsYGO[i1a], C=resid*1000, vmin=-10.0, vmax=10.0)
+                    ax.set_xlabel("X")
+                    ax.set_ylabel("Y")
+                    ax.set_title("%s %s %s" % (self.fgcmPars.lutFilterNames[fiInd],
+                                               self.epochNames[epInd],
+                                               str(cInd)))
+                    ax.set_aspect("equal")
+                    fig.colorbar(hb, label="SuperStar Residual (mmag)")
+                    fig.tight_layout()
+                    fig.savefig("%s/%s_superstar_resid_%s_%s_%s.png" % (self.plotPath,
+                                                                        self.outfileBaseWithCycle,
+                                                                        self.fgcmPars.lutFilterNames[fiInd],
+                                                                        self.epochNames[epInd],
+                                                                        str(cInd)))
+                    plt.close(fig)
 
             # And we need to flag those that have bad observations
             bad = np.where(superStarNGoodStars == 0)
