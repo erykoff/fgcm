@@ -297,11 +297,14 @@ class FgcmSuperStarFlat(object):
                     superStar = -2.5 * np.log10(np.clip(field.evaluate(obsXGO[i1a], obsYGO[i1a]), 0.1, None))
                     resid = EGrayGO[i1a] - superStar
 
+                    # Choose a gridsize appropriate for the number of stars.
+                    gridsize = int(np.clip(np.sqrt(i1a.size/10), 1, 100))
+
                     fig = plt.figure(figsize=(8, 6))
                     fig.clf()
                     ax = fig.add_subplot(111)
 
-                    hb = ax.hexbin(obsXGO[i1a], obsYGO[i1a], C=resid*1000, vmin=-10.0, vmax=10.0)
+                    hb = ax.hexbin(obsXGO[i1a], obsYGO[i1a], C=resid*1000, gridsize=gridsize, vmin=-10.0, vmax=10.0)
                     ax.set_xlabel("X")
                     ax.set_ylabel("Y")
                     ax.set_title("%s %s %s" % (self.fgcmPars.lutFilterNames[fiInd],
