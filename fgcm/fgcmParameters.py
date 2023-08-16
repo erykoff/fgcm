@@ -337,6 +337,9 @@ class FgcmParameters(object):
         # Add in the mirror coating...
         self.compMirrorChromaticity = np.zeros((self.nLUTFilter, self.nCoatingIntervals + 1))
 
+        # And the (possible) detector chromaticity corrections.
+        self.compCCDChromaticity = np.zeros((self.nCCD, self.nLUTFilter))
+
         # And median SED slopes
         self.compMedianSedSlope = np.zeros(self.nBands, dtype=np.float64)
 
@@ -471,6 +474,10 @@ class FgcmParameters(object):
         self.compRefSigma = np.atleast_1d(inParams['COMPREFSIGMA'][0])
         self.compMirrorChromaticity = inParams['COMPMIRRORCHROMATICITY'][0].reshape((self.nLUTFilter, self.nCoatingIntervals + 1))
         self.mirrorChromaticityPivot = np.atleast_1d(inParams['MIRRORCHROMATICITYPIVOT'][0])
+        try:
+            self.compCCDChromaticity = inParams['COMPCCDCHROMATICITY'][0].reshape((self.nCCD, self.nLUTFilter))
+        except ValueError:
+            self.compCCDChromaticity = np.zeros((self.nCCD, self.nLUTFilter))
         self.compMedianSedSlope = np.atleast_1d(inParams['COMPMEDIANSEDSLOPE'][0])
 
         self.externalPwvFlag = np.zeros(self.nExp,dtype=bool)
@@ -1013,6 +1020,7 @@ class FgcmParameters(object):
                ('COMPREFSIGMA', 'f8', (self.compRefSigma.size, )),
                ('COMPMIRRORCHROMATICITY', 'f8', (self.compMirrorChromaticity.size, )),
                ('MIRRORCHROMATICITYPIVOT', 'f8', (self.mirrorChromaticityPivot.size, )),
+               ('COMPCCDCHROMATICITY', 'f8', (self.compCCDChromaticity.size, )),
                ('COMPMEDIANSEDSLOPE', 'f8', (self.compMedianSedSlope.size, )),
                ('COMPAPERCORRPIVOT', 'f8', (self.compAperCorrPivot.size, )),
                ('COMPAPERCORRSLOPE', 'f8', (self.compAperCorrSlope.size, )),
@@ -1071,6 +1079,7 @@ class FgcmParameters(object):
         pars['COMPREFSIGMA'][:] = self.compRefSigma
         pars['COMPMIRRORCHROMATICITY'][:] = self.compMirrorChromaticity.ravel()
         pars['MIRRORCHROMATICITYPIVOT'][:] = self.mirrorChromaticityPivot
+        pars['COMPCCDCHROMATICITY'][:] = self.compCCDChromaticity.ravel()
         pars['COMPMEDIANSEDSLOPE'][:] = self.compMedianSedSlope
 
         if (self.hasExternalPwv):

@@ -206,6 +206,7 @@ class FgcmConfig(object):
     useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
     fitMirrorChromaticity = ConfigField(bool, default=False)
+    fitCCDChromaticityDict = ConfigField(dict, default={})
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCDDict = ConfigField(dict, default={})
@@ -447,6 +448,8 @@ class FgcmConfig(object):
                                                          bool, False, required=False)
         self.ccdGrayFocalPlane = self._convertDictToBandList(self.ccdGrayFocalPlaneDict,
                                                              bool, False, required=False)
+        self.fitCCDChromaticity = self._convertDictToBandList(self.fitCCDChromaticityDict,
+                                                              bool, False, required=False)
         self.superStarSubCCD = self._convertDictToBandList(self.superStarSubCCDDict,
                                                            bool, False, required=False)
         self.aperCorrInputSlopes = self._convertDictToBandList(self.aperCorrInputSlopeDict,

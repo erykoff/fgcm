@@ -1949,6 +1949,40 @@ class FgcmStars(object):
 
         obsMagADU += deltaMag
 
+    def applyCCDChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False):
+        """
+        Apply CCD chromaticity model.
+
+        Parameters
+        ----------
+        fgcmPars : `fgcm.fgcmParameters`
+        returnCorrections : `bool`, optional
+            Just return the corrections, don't apply them.
+        """
+        if not self.starsLoaded or not self.starsPrepped:
+            raise RuntimeError("Cannot call applyCCDChromaticityCorrection until stars have been loaded and prepped.")
+
+        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
+        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+
+        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+
+        c = fgcmPars.compCCDChromaticity[obsCCDIndex, obsLUTFilterIndex]
+
+        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsBandIndex]) * fgcmLUT.I10Std[obsBandIndex]
+        obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
+        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsBandIndex]) * (fgcmLUT.I1Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I2Std[obsBandIndex])) /
+                         (fgcmLUT.I0Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I1Std[obsBandIndex]))
+        deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
+
+        if returnCorrections:
+            return deltaMag
+
+        obsMagADU += deltaMag
+
     def saveFlagStarIndices(self,flagStarFile):
         """
         Save flagged stars to fits.

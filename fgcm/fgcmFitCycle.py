@@ -27,7 +27,7 @@ from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
 from .fgcmComputeStepUnits import FgcmComputeStepUnits
-from .fgcmMirrorChromaticity import FgcmMirrorChromaticity
+from .fgcmChromaticity import FgcmMirrorChromaticity, FgcmCCDChromaticity
 from .fgcmDeltaAper import FgcmDeltaAper
 
 from .fgcmUtilities import zpFlagDict
@@ -312,6 +312,11 @@ class FgcmFitCycle(object):
                     self.fgcmLog.info("Applying mirror chromaticity corrections...")
                 self.fgcmStars.applyMirrorChromaticityCorrection(self.fgcmPars, self.fgcmLUT)
 
+            # Apply the CCD chromaticity if desired (we require SEDs)
+            if np.any(self.fgcmConfig.fitCCDChromaticity):
+                if not self.quietMode:
+                    self.fgcmLog.info("Applying CCD chromaticity corrections...")
+                self.fgcmStars.applyCCDChromaticityCorrection(self.fgcmPars, self.fgcmLUT)
         else:
             # need to go through the bright observations
 
@@ -556,6 +561,12 @@ class FgcmFitCycle(object):
                 self.fgcmLog.debug("FitCycle computing mirror chromaticity")
                 mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
                 mirChrom.computeMirrorChromaticity()
+
+            # Compute CCD chromaticity, but only after the first cycle.
+            if np.any(self.fgcmConfig.fitCCDChromaticity) and not self.initialCycle:
+                self.fgcmLog.debug("FitCycle computing CCD chromaticity")
+                ccdChrom = FgcmCCDChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                ccdChrom.computeCCDChromaticity()
 
             # Compute QE sys slope
             self.fgcmLog.debug('FitCycle computing qe sys slope')

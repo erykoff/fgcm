@@ -274,3 +274,170 @@ class FgcmMirrorChromaticity(object):
             return chisq, deriv, expGrayColorSplit, expGrayColorSplitWt
         else:
             return chisq, deriv
+
+
+class FgcmCCDChromaticity:
+    """
+    Class which computes CCD chromaticity corrections.
+
+    Only run when any of fgcmConfig.fitCCDChromaticity is True.
+
+    Parameters
+    ----------
+    fgcmConfig : `fgcm.FgcmConfig`
+        Config object
+    fgcmPars : `fgcm.FgcmParameters`
+        Parameter object
+    fgcmStars : `fgcm.FgcmStars`
+        Stars object
+    fgcmLUT : `fgcm.FgcmLUT`
+        Look-up table object
+    """
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
+        self.fgcmLog = fgcmConfig.fgcmLog
+        self.fgcmLog.info('Initializing FgcmCCDChromaticity')
+
+        self.fgcmPars = fgcmPars
+        self.fgcmStars = fgcmStars
+        self.fgcmLUT = fgcmLUT
+
+        self.colorSplitIndices = fgcmConfig.colorSplitIndices
+        self.illegalValue = fgcmConfig.illegalValue
+        self.plotPath = fgcmConfig.plotPath
+        self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+
+        self.fitCCDChromaticity = fgcmConfig.fitCCDChromaticity
+        self.ccdStartIndex = fgcmConfig.ccdStartIndex
+
+        self.I0StdBand = fgcmConfig.I0StdBand
+        self.I1StdBand = fgcmConfig.I1StdBand
+        self.I2StdBand = fgcmConfig.I2StdBand
+        self.I10StdBand = fgcmConfig.I10StdBand
+
+        self.magConst = 2.5 / np.log(10.0)
+
+    def computeCCDChromaticity(self):
+        """
+        Compute the CCD Chromaticity terms.
+        """
+        startTime = time.time()
+        self.fgcmLog.info("Fitting CCD chromaticity terms...")
+
+        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+
+        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
+
+        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+
+        # First, we need to compute g-i and take the 25% red and blue ends
+        goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
+
+        # Unapply corrections locally
+        corrections = self.fgcmStars.applyCCDChromaticityCorrection(self.fgcmPars, self.fgcmLUT, returnCorrections=True)
+
+        self.obsMagStdGO = obsMagStd[goodObs] - corrections[goodObs]
+        obsCCDIndexGO = obsCCDIndex[goodObs]
+        obsBandIndexGO = obsBandIndex[goodObs]
+        obsLUTFilterIndexGO = obsLUTFilterIndex[goodObs]
+
+        self.objMagStdMeanGO = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
+        self.objSEDSlopeGO = objSEDSlope[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
+        self.EGrayErr2GO = obsMagErr[goodObs]**2. - objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.
+
+        ccdFilterHash = (obsLUTFilterIndexGO*(self.fgcmPars.nLUTFilter + 1) +
+                         obsCCDIndexGO)
+
+        h, rev = esutil.stat.histogram(ccdFilterHash, rev=True)
+
+        # Make a simple cut here.
+        use, = np.where(h >= 10)
+
+        cWasFit = np.zeros_like(self.fgcmPars.compCCDChromaticity, dtype=bool)
+
+        for i in use:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            self.cInd = obsCCDIndexGO[i1a[0]]
+            self.fInd = obsLUTFilterIndexGO[i1a[0]]
+            self.bInd = obsBandIndexGO[i1a[0]]
+
+            if not self.fitCCDChromaticity[self.bInd]:
+                # We don't want to fit this one.
+                continue
+
+            use, = np.where(self.EGrayErr2GO[i1a] > 0.0)
+
+            self.sel = i1a[use]
+
+            res = optimize.least_squares(self, np.zeros(1), bounds=([-1.0], [1.0]))
+
+            if res.x <= -0.99 or res.x >= 0.99:
+                self.fgcmLog.warning("Found out-of-bounds value for chromaticity for filter %s, detector %d." % (self.fgcmPars.lutFilterNames[self.fInd], self.cInd + self.ccdStartIndex))
+                continue
+
+            self.fgcmPars.compCCDChromaticity[self.cInd, self.fInd] = res.x
+            cWasFit[self.cInd, self.fInd] = True
+
+        # And make plots if necessary.
+        if self.plotPath is not None:
+            from .fgcmUtilities import plotCCDMap
+
+            for filterIndex, filterName in enumerate(self.fgcmPars.lutFilterNames):
+                bandName = self.fgcmPars.filterToBand[filterName]
+                bandIndex = self.fgcmPars.bands.index(bandName)
+
+                if not self.fitCCDChromaticity[bandIndex]:
+                    continue
+
+                chromaticityIndex = self.fgcmPars.compCCDChromaticity[:, filterIndex]
+                use, = np.where(cWasFit[:, filterIndex])
+
+                if use.size == 0:
+                    continue
+
+                fig=plt.figure(figsize=(8, 6))
+                fig.clf()
+
+                ax=fig.add_subplot(111)
+
+                plotCCDMap(
+                    ax,
+                    self.fgcmPars.deltaMapperDefault[use],
+                    self.fgcmPars.compCCDChromaticity[use, filterIndex],
+                    "Chromaticity Index",
+                )
+
+                text = r'$(%s)$' % (filterName)
+
+                ax.annotate(text,
+                            (0.1,0.93),xycoords='axes fraction',
+                            ha='left',va='top',fontsize=18)
+
+                fig.tight_layout()
+
+                fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
+                                                 self.outfileBaseWithCycle,
+                                                 'ccdchromaticity',
+                                                 filterName))
+                plt.close()
+
+    def __call__(self, pars):
+        c = pars[0]
+
+        termOne = 1.0 + (c / self.fgcmLUT.lambdaStd[self.fInd]) * self.fgcmLUT.I10Std[self.fInd]
+        termTwo = 1.0 + (((c / self.fgcmLUT.lambdaStd[self.fInd]) * (self.fgcmLUT.I1Std[self.fInd] + self.objSEDSlopeGO[self.sel] * self.fgcmLUT.I2Std[self.fInd])) /
+                         (self.fgcmLUT.I0Std[self.fInd] + self.objSEDSlopeGO[self.sel] * self.fgcmLUT.I1Std[self.fInd]))
+        chromDelta = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
+
+        delta = self.objMagStdMeanGO[self.sel] - (self.obsMagStdGO[self.sel] + chromDelta)
+
+        resids = (delta - np.median(delta)) / np.sqrt(self.EGrayErr2GO[self.sel])
+
+        return resids
