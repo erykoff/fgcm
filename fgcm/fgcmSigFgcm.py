@@ -128,10 +128,13 @@ class FgcmSigFgcm(object):
         sigTypes = []
         if reserved:
             sigTypes.append('reserved')
+            extraName = 'reserved-stars'
         else:
             sigTypes.append('fit')
+            extraName = 'all-stars'
         if crunch:
             sigTypes.append('crunched')
+            extraName += '_crunched'
 
         sigType = '/'.join(sigTypes)
 
@@ -222,14 +225,6 @@ class FgcmSigFgcm(object):
 
                 ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=14)
                 ax.set_xlabel(r'$E^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=14)
-
-                if (reserved):
-                    extraName = 'reserved-stars'
-                else:
-                    extraName = 'all-stars'
-
-                if crunch:
-                    extraName += '_crunched'
 
                 ax.set_title(extraName)
 

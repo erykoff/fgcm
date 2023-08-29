@@ -698,22 +698,42 @@ class FgcmGray(object):
                   goodCCD[0],
                   ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.)
 
-        # need at least 3 or else computation can blow up
-        gd, = np.where(expNGoodCCDs >= 3)
-        expGray[gd] /= expGrayWt[gd]
-        expDeltaStd[gd] /= expGrayWt[gd]
-        expGrayRMS[gd] = np.sqrt(np.clip((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.),
-                                         0.0, None))
-        expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
-        expNGoodTilings[gd] /= expNGoodCCDs[gd]
+        if self.fgcmPars.nCCD >= 3:
+            # Regular mode, when we have a multi-detector camera.
 
-        # set illegal value for non-measurements
-        bad, = np.where(expNGoodCCDs <= 2)
-        expGray[bad] = self.illegalValue
-        expDeltaStd[bad] = self.illegalValue
-        expGrayRMS[bad] = self.illegalValue
-        expGrayErr[bad] = self.illegalValue
-        expNGoodTilings[bad] = self.illegalValue
+            # need at least 3 or else computation can blow up
+            gd, = np.where(expNGoodCCDs >= 3)
+            expGray[gd] /= expGrayWt[gd]
+            expDeltaStd[gd] /= expGrayWt[gd]
+            expGrayRMS[gd] = np.sqrt(np.clip((expGrayRMS[gd]/expGrayWt[gd]) - (expGray[gd]**2.),
+                                             0.0, None))
+            expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
+            expNGoodTilings[gd] /= expNGoodCCDs[gd]
+
+            # set illegal value for non-measurements
+            bad, = np.where(expNGoodCCDs <= 2)
+            expGray[bad] = self.illegalValue
+            expDeltaStd[bad] = self.illegalValue
+            expGrayRMS[bad] = self.illegalValue
+            expGrayErr[bad] = self.illegalValue
+            expNGoodTilings[bad] = self.illegalValue
+
+        else:
+            # Special mode for 1/2 detector cameras.
+            gd, = np.where(expNGoodCCDs >= 1)
+            expGray[gd] /= expGrayWt[gd]
+            expDeltaStd[gd] /= expGrayWt[gd]
+            expGrayRMS[gd] = 0.0
+            expGrayErr[gd] = np.sqrt(1./expGrayWt[gd])
+            expNGoodTilings[gd] /= expNGoodCCDs[gd]
+
+            # set illegal value for non-measurements
+            bad, = np.where(expNGoodCCDs < 1)
+            expGray[bad] = self.illegalValue
+            expDeltaStd[bad] = self.illegalValue
+            expGrayRMS[bad] = self.illegalValue
+            expGrayErr[bad] = self.illegalValue
+            expNGoodTilings[bad] = self.illegalValue
 
         self.fgcmPars.compExpGray[:] = expGray
         self.fgcmPars.compVarGray[gd] = expGrayRMS[gd]**2.
