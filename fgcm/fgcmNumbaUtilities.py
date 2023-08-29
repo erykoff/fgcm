@@ -31,7 +31,7 @@ if has_numba:
         for i in range(indices[0].size):
             array[indices[0][i], indices[1][i], indices[2][i]] += value
 
-    @jit
+    @jit(nopython=True)
     def numba_test(value):
         pass
 

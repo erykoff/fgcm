@@ -3,9 +3,15 @@ import scipy.interpolate as interpolate
 import scipy.integrate as integrate
 import os
 import sys
-from pkg_resources import resource_exists
-from pkg_resources import resource_filename
-from pkg_resources import resource_listdir
+
+hasLsstResources = True
+try:
+    from lsst.resources.packageresource import PackageResourcePath
+except ImportError:
+    hasLsstResources = False
+    from pkg_resources import resource_exists
+    from pkg_resources import resource_filename
+    from pkg_resources import resource_listdir
 
 try:
     import fitsio
@@ -202,23 +208,39 @@ class FgcmAtmosphereTable(object):
         -----
         Raises IOError if atmosphereTableName couldn't be found
         """
-
         # first, check if we have something in the path...
         if os.path.isfile(atmosphereTableName):
             atmosphereTableFile = os.path.abspath(atmosphereTableName)
             print("Found atmosphereTableName: %s" % (atmosphereTableName))
         else:
-            # allow for a name with or without .fits extension
-            if resource_exists(__name__,'data/tables/%s' % (atmosphereTableName)):
-                testFile = 'data/tables/%s' % (atmosphereTableName)
-            elif resource_exists(__name__,'data/tables/%s.fits' % (atmosphereTableName)):
-                testFile = 'data/tables/%s.fits' % (atmosphereTableName)
+            if hasLsstResources:
+                rootResource = PackageResourcePath("resource://fgcm/data/tables", forceDirectory=True)
+
+                if rootResource.join(atmosphereTableName).exists():
+                    resource = rootResource.join(atmosphereTableName)
+                elif rootResource.join(atmosphereTableName + ".fits").exists():
+                    resource = rootResource.join(atmosphereTableName + ".fits")
+                else:
+                    raise IOError(
+                        "Could not find atmosphereTableName (%s) in the path or in data/tables/" %
+                        (atmosphereTableName)
+                    )
+
+                with resource.as_local() as loc:
+                    atmosphereTableFile = loc.ospath
+
             else:
-                raise IOError("Could not find atmosphereTableName (%s) in the path or in data/tables/" % (atmosphereTableName))
-            try:
-                atmosphereTableFile = resource_filename(__name__,testFile)
-            except:
-                raise IOError("Error finding atmosphereTableName (%s)" % (atmosphereTableName))
+                # allow for a name with or without .fits extension
+                if resource_exists(__name__, 'data/tables/%s' % (atmosphereTableName)):
+                    testFile = 'data/tables/%s' % (atmosphereTableName)
+                elif resource_exists(__name__, 'data/tables/%s.fits' % (atmosphereTableName)):
+                    testFile = 'data/tables/%s.fits' % (atmosphereTableName)
+                else:
+                    raise IOError("Could not find atmosphereTableName (%s) in the path or in data/tables/" % (atmosphereTableName))
+                try:
+                    atmosphereTableFile = resource_filename(__name__, testFile)
+                except:
+                    raise IOError("Error finding atmosphereTableName (%s)" % (atmosphereTableName))
 
         # will set self.atmConfig
         print("Found atmosphere file: %s" % (atmosphereTableFile))
@@ -316,7 +338,12 @@ class FgcmAtmosphereTable(object):
                                  np.log(self.atmConfig['pwvRange'][1]),
                                  num=self.atmConfig['pwvSteps'])
         self.lnPwvDelta = self.lnPwv[1] - self.lnPwv[0]
-        lnPwvPlus = np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta)
+        # We never want this to go above 20 mm.
+        lnPwvPlus = np.clip(
+            np.append(self.lnPwv, self.lnPwv[-1] + self.lnPwvDelta),
+            0.0,
+            np.log(20.0)
+        )
         pwvPlus = np.exp(lnPwvPlus)
 
         self.o3 = np.linspace(self.atmConfig['o3Range'][0],

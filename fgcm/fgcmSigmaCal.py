@@ -206,7 +206,6 @@ class FgcmSigmaCal(object):
                                    (objChi2[goodStars[plotIndices[band]], bandIndex] < 1000.0))
 
                     if ok.size < 100:
-                        self.fgcmLog.warning('Not enough stars with decent chi2 to compute sigmaCal for band %s' % (band))
                         continue
 
                     # These have already been limited to the plot percentile range

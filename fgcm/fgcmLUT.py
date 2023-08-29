@@ -164,7 +164,7 @@ class FgcmLUTMaker(object):
 
             tput = np.zeros(lam.size, dtype=[('LAMBDA', 'f8'),
                                              ('THROUGHPUT_AVG', 'f8'),
-                                             ('THROUGHPUT_CCD', 'f8', self.nCCD)])
+                                             ('THROUGHPUT_CCD', 'f8', (self.nCCD, ))])
             tput['LAMBDA'][:] = lam
             for ccdIndex in range(self.nCCD):
                 try:
@@ -330,7 +330,7 @@ class FgcmLUTMaker(object):
 
             tput = np.zeros(self.atmLambda.size, dtype=[('LAMBDA', 'f8'),
                                                         ('THROUGHPUT_AVG', 'f8'),
-                                                        ('THROUGHPUT_CCD', 'f8', self.nCCD)])
+                                                        ('THROUGHPUT_CCD', 'f8', (self.nCCD, ))])
             tput['LAMBDA'][:] = self.atmLambda
 
             for ccdIndex in range(self.nCCD):

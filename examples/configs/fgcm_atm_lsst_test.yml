@@ -1,0 +1,30 @@
+# default LSST Atmosphere File (beta test)
+
+atmosphereTableFile: fgcm_atm_lsst2_test.fits
+
+elevation: 2663.0
+
+pmbRange: [770.0,790.0]
+pmbSteps: 2
+
+pwvRange: [0.1,12.0]
+pwvSteps: 2
+
+o3Range: [220.0,310.0]
+o3Steps: 2
+
+tauRange: [0.002,0.35]
+tauSteps: 2
+
+alphaRange: [0.0,2.0]
+alphaSteps: 2
+
+zenithRange: [0.0,70.0]
+zenithSteps: 2
+
+pmbStd: 778.0
+pwvStd: 3.0
+o3Std: 263.0
+tauStd: 0.030
+alphaStd: 1.0
+airmassStd: 1.2
