@@ -69,7 +69,7 @@ class FgcmMirrorChromaticity(object):
         # First, we need to compute g-i and take the 25% red and blue ends
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag, requireSED=True)
 
         gmiGO = (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[0]] -
                  objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]])
@@ -337,7 +337,7 @@ class FgcmCCDChromaticity:
 
         # First, we need to compute g-i and take the 25% red and blue ends
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag)
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, checkBadMag=True, expFlag=self.fgcmPars.expFlag, requireSED=True)
 
         # Unapply corrections locally
         corrections = self.fgcmStars.applyCCDChromaticityCorrection(self.fgcmPars, self.fgcmLUT, returnCorrections=True)
@@ -351,8 +351,8 @@ class FgcmCCDChromaticity:
         self.objSEDSlopeGO = objSEDSlope[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
         self.EGrayErr2GO = obsMagErr[goodObs]**2. - objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.
 
-        ccdFilterHash = (obsLUTFilterIndexGO*(self.fgcmPars.nLUTFilter + 1) +
-                         obsCCDIndexGO)
+        ccdFilterHash = (obsLUTFilterIndexGO.astype(np.int64)*(self.fgcmPars.nCCD + 1) +
+                         obsCCDIndexGO.astype(np.int64))
 
         h, rev = esutil.stat.histogram(ccdFilterHash, rev=True)
 
@@ -402,10 +402,10 @@ class FgcmCCDChromaticity:
                 if use.size == 0:
                     continue
 
-                fig=plt.figure(figsize=(8, 6))
+                fig = plt.figure(figsize=(8, 6))
                 fig.clf()
 
-                ax=fig.add_subplot(111)
+                ax = fig.add_subplot(111)
 
                 plotCCDMap(
                     ax,
