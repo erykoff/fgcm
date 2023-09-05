@@ -186,6 +186,7 @@ class FgcmConfig(object):
 
     refStarSnMin = ConfigField(float, default=20.0)
     refStarOutlierNSig = ConfigField(float, default=4.0)
+    refStarMaxFracUse = ConfigField(float, default=0.5)
     applyRefStarColorCuts = ConfigField(bool, default=True)
     useRefStarsWithInstrument = ConfigField(bool, default=True)
     useExposureReferenceOffset = ConfigField(bool, default=False)
@@ -205,12 +206,14 @@ class FgcmConfig(object):
     useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
     fitMirrorChromaticity = ConfigField(bool, default=False)
+    fitCCDChromaticityDict = ConfigField(dict, default={})
     useRetrievedTauInit = ConfigField(bool, default=False)
     tauRetrievalMinCCDPerNight = ConfigField(int, default=100)
     superStarSubCCDDict = ConfigField(dict, default={})
     superStarSubCCDChebyshevOrder = ConfigField(int, default=1)
     superStarSubCCDTriangular = ConfigField(bool, default=False)
     superStarSigmaClip = ConfigField(float, default=5.0)
+    superStarPlotCCDResiduals = ConfigField(bool, default=False)
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)
@@ -445,6 +448,8 @@ class FgcmConfig(object):
                                                          bool, False, required=False)
         self.ccdGrayFocalPlane = self._convertDictToBandList(self.ccdGrayFocalPlaneDict,
                                                              bool, False, required=False)
+        self.fitCCDChromaticity = self._convertDictToBandList(self.fitCCDChromaticityDict,
+                                                              bool, False, required=False)
         self.superStarSubCCD = self._convertDictToBandList(self.superStarSubCCDDict,
                                                            bool, False, required=False)
         self.aperCorrInputSlopes = self._convertDictToBandList(self.aperCorrInputSlopeDict,

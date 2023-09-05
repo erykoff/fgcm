@@ -456,8 +456,8 @@ class FgcmDeltaAper(object):
                 plt.close(fig)
 
                 # And replot with matched scale
-                loHi = [scaleMedian[j] - matchedDelta,
-                        scaleMedian[j] + matchedDelta]
+                loHi = [scaleMedian[j] - matchedDelta - 1e-7,
+                        scaleMedian[j] + matchedDelta + 1e-7]
 
                 fig = plt.figure(figsize=(8, 6))
                 fig.clf()

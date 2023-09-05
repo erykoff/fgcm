@@ -159,11 +159,11 @@ class FgcmZeropoints(object):
         if not self.quietMode:
             self.fgcmLog.info('Building zeropoint structure...')
 
-        dtype = [(self.expField,'i4'),
-                 (self.ccdField,'i2'),
-                 ('FGCM_FLAG','i2'),
-                 ('FGCM_ZPT','f8'),
-                 ('FGCM_ZPTERR','f8')]
+        dtype = [(self.expField, 'i8'),
+                 (self.ccdField, 'i2'),
+                 ('FGCM_FLAG', 'i2'),
+                 ('FGCM_ZPT', 'f8'),
+                 ('FGCM_ZPTERR', 'f8')]
 
         if self.outputFgcmcalZpts:
             self.nChebParGray = 1
@@ -210,15 +210,15 @@ class FgcmZeropoints(object):
                             dtype=dtype)
 
         atmStruct = np.zeros(self.fgcmPars.nExp,
-                             dtype=[(self.expField,'i4'),
-                                    ('PMB','f8'),
-                                    ('PWV','f8'),
-                                    ('TAU','f8'),
-                                    ('ALPHA','f8'),
-                                    ('O3','f8'),
+                             dtype=[(self.expField, 'i8'),
+                                    ('PMB', 'f8'),
+                                    ('PWV', 'f8'),
+                                    ('TAU', 'f8'),
+                                    ('ALPHA', 'f8'),
+                                    ('O3', 'f8'),
                                     ('CTRANS', 'f8'),
                                     ('LAMSTD', 'f8'),
-                                    ('SECZENITH','f8')])
+                                    ('SECZENITH', 'f8')])
 
         ## start with zpStruct
 
