@@ -485,6 +485,10 @@ class FgcmStars(object):
 
         # First, we have the filterNames
         for filterIndex,filterName in enumerate(self.lutFilterNames):
+            if self.filterToBand[filterName] not in self.bands:
+                # This LUT filter is not in the list of bands; we can skip it.
+                continue
+
             try:
                 bandIndex = self.bands.index(self.filterToBand[filterName])
             except KeyError:
