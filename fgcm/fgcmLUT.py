@@ -111,6 +111,11 @@ class FgcmLUTMaker(object):
         self.nCCD = self.lutConfig['nCCD']
         self.nCCDStep = self.nCCD+1
 
+        if 'sensorCTerms' in self.lutConfig:
+            self.sensorCTerms = self.lutConfig['sensorCTerms']
+        else:
+            self.sensorCTerms = {}
+
         # and record the standard values out of the config
         #  (these will also come out of the save file)
 
@@ -156,11 +161,18 @@ class FgcmLUTMaker(object):
         """
 
         self.inThroughputs=[]
+
         for filterName in self.filterNames:
             try:
                 lam = throughputDict[filterName]['LAMBDA']
             except:
                 raise ValueError("Wavelength LAMBDA not found for filter %s in throughputDict!" % (filterName))
+
+            if filterName in self.sensorCTerms:
+                refLambda = self.sensorCTerms[filterName][0]
+                cTermDict = self.sensorCTerms[filterName][1]
+            else:
+                cTermDict = {}
 
             tput = np.zeros(lam.size, dtype=[('LAMBDA', 'f8'),
                                              ('THROUGHPUT_AVG', 'f8'),
@@ -172,8 +184,14 @@ class FgcmLUTMaker(object):
                 except:
                     raise ValueError("CCD Index %d not found for filter %s in throughputDict!" % (ccdIndex,filterName))
 
+                mustComputeAverage = False
+                if ccdIndex in cTermDict:
+                    adjustment = 1.0 + cTermDict[ccdIndex] * (lam - refLambda) / refLambda
+                    tput['THROUGHPUT_CCD'][:, ccdIndex] *= adjustment
+                    mustComputeAverage = True
+
             # check if the average is there, if not compute it
-            if ('AVG' in throughputDict[filterName]):
+            if ('AVG' in throughputDict[filterName]) and not mustComputeAverage:
                 tput['THROUGHPUT_AVG'][:] = throughputDict[filterName]['AVG']
             else:
                 self.fgcmLog.info("Average throughput not found in throughputDict for filter %s.  Computing now..." % (filterName))
@@ -282,7 +300,7 @@ class FgcmLUTMaker(object):
         self.atmStdTrans = self.atmosphereTable.atmStdTrans
 
         self.pmbElevation = self.atmosphereTable.pmbElevation
-        
+
         self.pmb = self.atmosphereTable.pmb
         self.pmbDelta = self.atmosphereTable.pmbDelta
         pmbPlus = np.append(self.pmb, self.pmb[-1] + self.pmbDelta)
@@ -366,8 +384,6 @@ class FgcmLUTMaker(object):
 
         for i, filterName in enumerate(self.filterNames):
             ind = self.filterNames.index(self.stdFilterNames[i])
-            #ind, = np.where(self.filterNames == self.stdFilterNames[i])
-            #self.lambdaStd[i] = self.lambdaStdFilter[ind[0]]
             self.lambdaStd[i] = self.lambdaStdFilter[ind]
             self.fgcmLog.info("Filter: %s (from %s) lambdaStd = %.3f" %
                               (filterName, self.stdFilterNames[i], self.lambdaStd[i]))

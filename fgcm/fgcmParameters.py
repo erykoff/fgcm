@@ -1276,9 +1276,9 @@ class FgcmParameters(object):
 
         # Clean up any missing bands if necessary
         if self.instrumentParsPerBand and (self.bandFitIndex.size < self.nBands):
-            temp = np.sum(self.parQESysIntercept[:, self.bandFitIndex], axis=1)
+            temp = np.sum(self.parQESysIntercept[self.bandFitIndex, :], axis=0)
             for notFitIndex in self.bandNotFitIndex:
-                self.parQESysIntercept[:, notFitIndex] = temp / self.bandFitIndex.size
+                self.parQESysIntercept[notFitIndex, :] = temp / self.bandFitIndex.size
 
         self.parFilterOffset[:] = (parArray[self.parFilterOffsetLoc:
                                                self.parFilterOffsetLoc + self.nLUTFilter] /
