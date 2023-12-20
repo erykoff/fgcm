@@ -1,6 +1,6 @@
 try:
     from numba import jit
-    has_numba = True
+    has_numba = False
 except ImportError:
     has_numba = False
 
