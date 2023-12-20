@@ -382,7 +382,7 @@ class FgcmCCDChromaticity:
                 self.fgcmLog.warning("Found out-of-bounds value for chromaticity for filter %s, detector %d." % (self.fgcmPars.lutFilterNames[self.fInd], self.cInd + self.ccdStartIndex))
                 continue
 
-            self.fgcmPars.compCCDChromaticity[self.cInd, self.fInd] = res.x
+            self.fgcmPars.compCCDChromaticity[self.cInd, self.fInd] = res.x[0]
             cWasFit[self.cInd, self.fInd] = True
 
         # And make plots if necessary.
