@@ -1427,8 +1427,16 @@ class FgcmStars(object):
         wt = 1. / (objMagStdMeanErr[goodRefStars, :]**2. +
                    refMagErr[objRefIDIndex[goodRefStars], :]**2.)
 
-        np.add.at(deltaOffsetRef, gdBandInd, delta[gdStarInd, gdBandInd] * wt[gdStarInd, gdBandInd])
-        np.add.at(deltaOffsetWtRef, gdBandInd, wt[gdStarInd, gdBandInd])
+        np.add.at(
+            deltaOffsetRef,
+            gdBandInd,
+            (delta[gdStarInd, gdBandInd] * wt[gdStarInd, gdBandInd]).astype(deltaOffsetRef.dtype),
+        )
+        np.add.at(
+            deltaOffsetWtRef,
+            gdBandInd,
+            (wt[gdStarInd, gdBandInd]).astype(deltaOffsetWtRef.dtype),
+        )
 
         # Make sure we have a measurement in the band
         ok, = np.where(deltaOffsetWtRef > 0.0)

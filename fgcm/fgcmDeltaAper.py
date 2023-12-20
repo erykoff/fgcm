@@ -522,10 +522,10 @@ class FgcmDeltaAper(object):
 
         np.add.at(objDeltaAperMeanTemp,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  (obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO)
+                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(objDeltaAperMeanTemp.dtype))
         np.add.at(wtSum,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  1./obsMagErr2GO)
+                  (1./obsMagErr2GO).astype(wtSum.dtype))
 
         gd = np.where(wtSum > 0.0)
 

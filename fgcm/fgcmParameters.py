@@ -1928,19 +1928,19 @@ class FgcmParameters(object):
                   1)
         np.add.at(mjdNight,
                   self.expNightIndex[expUse],
-                  self.expMJD[expUse])
+                  (self.expMJD[expUse]).astype(mjdNight.dtype))
         np.add.at(alphaNight,
                   self.expNightIndex[expUse],
-                  self.expAlpha[expUse])
+                  (self.expAlpha[expUse]).astype(alphaNight.dtype))
         np.add.at(tauNight,
                   self.expNightIndex[expUse],
-                  np.exp(self.expLnTau[expUse]))
+                  np.exp((self.expLnTau[expUse]).astype(tauNight.dtype)))
         np.add.at(pwvNight,
                   self.expNightIndex[expUse],
-                  np.exp(self.expLnPwv[expUse]))
+                  np.exp((self.expLnPwv[expUse]).astype(pwvNight.dtype)))
         np.add.at(O3Night,
                   self.expNightIndex[expUse],
-                  self.expO3[expUse])
+                  (self.expO3[expUse]).astype(O3Night.dtype))
 
         # hard code this for now
         gd,=np.where(nExpPerNight > self.minExpPerNight)

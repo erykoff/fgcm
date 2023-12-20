@@ -607,7 +607,7 @@ class FgcmZeropoints(object):
 
             np.add.at(expZpMean,
                       zpExpIndex[okCCD],
-                      zpStruct['FGCM_ZPT'][okCCD])
+                      (zpStruct['FGCM_ZPT'][okCCD]).astype(expZpMean.dtype))
             np.add.at(expZpNCCD,
                       zpExpIndex[okCCD],
                       1)
@@ -978,8 +978,8 @@ class FgcmZeropointPlotter(object):
             meanR1 = np.zeros(nCCD)
             nPerCCD = np.zeros(nCCD,dtype=np.int32)
 
-            np.add.at(meanI1, ccdIndex, i1)
-            np.add.at(meanR1, ccdIndex, r1)
+            np.add.at(meanI1, ccdIndex, i1.astype(meanI1.dtype))
+            np.add.at(meanR1, ccdIndex, r1.astype(meanR1.dtype))
             np.add.at(nPerCCD, ccdIndex, 1)
 
             use,=np.where(nPerCCD > 0)

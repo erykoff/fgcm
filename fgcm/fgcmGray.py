@@ -211,10 +211,10 @@ class FgcmGray(object):
 
         np.add.at(expGrayForInitialSelection,
                   obsExpIndex[goodObs],
-                  EGray[goodObs])
+                  (EGray[goodObs]).astype(expGrayForInitialSelection.dtype))
         np.add.at(expGrayRMSForInitialSelection,
                   obsExpIndex[goodObs],
-                  EGray[goodObs]**2.)
+                  (EGray[goodObs]).astype(expGrayRMSForInitialSelection.dtype)**2.)
         np.add.at(expNGoodStarForInitialSelection,
                   obsExpIndex[goodObs],
                   1)
@@ -376,7 +376,7 @@ class FgcmGray(object):
 
         np.add.at(ccdGrayWt,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                  1./EGrayErr2GO)
+                  (1./EGrayErr2GO).astype(ccdGrayWt.dtype))
         np.add.at(ccdNGoodStars,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                   1)
@@ -386,7 +386,7 @@ class FgcmGray(object):
                               obsBandIndex[goodObs]])
         np.add.at(ccdDeltaStd,
                   (obsExpIndex[goodObs], obsCCDIndex[goodObs]),
-                  obsDeltaStdGO/EGrayErr2GO)
+                  (obsDeltaStdGO/EGrayErr2GO).astype(ccdDeltaStd.dtype))
 
         gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
         ccdDeltaStd[gd] /= ccdGrayWt[gd]
@@ -463,10 +463,10 @@ class FgcmGray(object):
 
                     np.add.at(ccdGrayTemp,
                               obsCCDIndex[goodObs[i1a]],
-                              EGrayGO[i1a]/EGrayErr2GO[i1a])
+                              (EGrayGO[i1a]/EGrayErr2GO[i1a]).astype(ccdGrayTemp.dtype))
                     np.add.at(ccdGrayRMSTemp,
                               obsCCDIndex[goodObs[i1a]],
-                              EGrayGO[i1a]**2./EGrayErr2GO[i1a])
+                              (EGrayGO[i1a]**2./EGrayErr2GO[i1a]).astype(ccdGrayRMSTemp.dtype))
 
                     gdTemp, = np.where((ccdNGoodStars[eInd, :] >= 3) &
                                        (ccdGrayWt[eInd, :] > 0.0) &
@@ -495,7 +495,7 @@ class FgcmGray(object):
                     ccdGrayEvalNStars = np.zeros(self.fgcmPars.nCCD, dtype=np.int32)
                     np.add.at(ccdGrayEval,
                               obsCCDIndex[goodObs[i1a]],
-                              ccdGrayEvalStars)
+                              ccdGrayEvalStars.astype(ccdGrayEval.dtype))
                     np.add.at(ccdGrayEvalNStars,
                               obsCCDIndex[goodObs[i1a]],
                               1)
@@ -536,10 +536,10 @@ class FgcmGray(object):
             # we can do all of this at once.
             np.add.at(ccdGray,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                      EGrayGO/EGrayErr2GO)
+                      (EGrayGO/EGrayErr2GO).astype(ccdGray.dtype))
             np.add.at(ccdGrayRMS,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                      EGrayGO**2./EGrayErr2GO)
+                      (EGrayGO**2./EGrayErr2GO).astype(ccdGrayRMS.dtype))
 
             # need at least 3 or else computation can blow up
             gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0) & (ccdGrayRMS > 0.0))
@@ -679,25 +679,25 @@ class FgcmGray(object):
 
         np.add.at(expGrayWt,
                   goodCCD[0],
-                  1./ccdGrayErr[goodCCD]**2.)
+                  (1./ccdGrayErr[goodCCD]**2.).astype(ccdGrayWt.dtype))
         np.add.at(expGray,
                   goodCCD[0],
-                  ccdGray[goodCCD]/ccdGrayErr[goodCCD]**2.)
+                  (ccdGray[goodCCD]/ccdGrayErr[goodCCD]**2.).astype(expGray.dtype))
         np.add.at(expGrayRMS,
                   goodCCD[0],
-                  ccdGray[goodCCD]**2./ccdGrayErr[goodCCD]**2.)
+                  (ccdGray[goodCCD]**2./ccdGrayErr[goodCCD]**2.).astype(expGrayRMS.dtype))
         np.add.at(expNGoodCCDs,
                   goodCCD[0],
                   1)
         np.add.at(expNGoodTilings,
                   goodCCD[0],
-                  ccdNGoodTilings[goodCCD])
+                  (ccdNGoodTilings[goodCCD]).astype(expNGoodTilings.dtype))
         np.add.at(expNGoodStars,
                   goodCCD[0],
-                  ccdNGoodStars[goodCCD])
+                  (ccdNGoodStars[goodCCD]).astype(expNGoodStars.dtype))
         np.add.at(expDeltaStd,
                   goodCCD[0],
-                  ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.)
+                  (ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.).astype(expDeltaStd.dtype))
 
         if self.fgcmPars.nCCD >= 3:
             # Regular mode, when we have a multi-detector camera.
@@ -812,13 +812,13 @@ class FgcmGray(object):
 
             np.add.at(expGrayColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use] / EGrayErr2GO[use])
+                      (EGrayGO[use] / EGrayErr2GO[use]).astype(expGrayColorSplit.dtype))
             np.add.at(expGrayWtColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      1. / EGrayErr2GO[use])
+                      (1. / EGrayErr2GO[use]).astype(expGrayWtColorSplit.dtype))
             np.add.at(expGrayRMSColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use]**2. / EGrayErr2GO[use])
+                      (EGrayGO[use]**2. / EGrayErr2GO[use]).astype(expGrayRMSColorSplit.dtype))
             np.add.at(expGrayNGoodStarsColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
                       1)

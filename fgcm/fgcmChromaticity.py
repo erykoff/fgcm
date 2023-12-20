@@ -227,10 +227,10 @@ class FgcmMirrorChromaticity(object):
 
             np.add.at(expGrayColorSplit[:, k],
                       self.obsExpIndexGO[sel],
-                      EGrayGOS / self.EGrayErr2GO[sel])
+                      (EGrayGOS / self.EGrayErr2GO[sel]).astype(expGrayColorSplit.dtype))
             np.add.at(expGrayColorSplitWt[:, k],
                       self.obsExpIndexGO[sel],
-                      1. / self.EGrayErr2GO[sel])
+                      (1. / self.EGrayErr2GO[sel]).astype(expGrayColorSplitWt.dtype))
 
             ok, = np.where(expGrayColorSplitWt[:, k] > 0.0)
             expGrayColorSplit[ok, k] /= expGrayColorSplitWt[ok, k]
@@ -241,14 +241,14 @@ class FgcmMirrorChromaticity(object):
 
             np.add.at(dExpGraydC0ColorSplit[:, :, k],
                       (self.obsExpIndexGO[sel], self.fgcmPars.expCoatingIndex[self.obsExpIndexGO[sel]]),
-                      dDeltadC0GOS / self.EGrayErr2GO[sel])
+                      (dDeltadC0GOS / self.EGrayErr2GO[sel]).astype(dExpGraydC0ColorSplit.dtype))
 
             for i in range(c0s.size):
                 dExpGraydC0ColorSplit[ok, i, k] /= expGrayColorSplitWt[ok, k]
 
             np.add.at(dExpGraydC1ColorSplit[:, k],
                       self.obsExpIndexGO[sel],
-                      dDeltadC0GOS * self.deltaTGO[sel] / self.EGrayErr2GO[sel])
+                      (dDeltadC0GOS * self.deltaTGO[sel] / self.EGrayErr2GO[sel]).astype(dExpGraydC1ColorSplit.dtype))
 
             dExpGraydC1ColorSplit[ok, k] /= expGrayColorSplitWt[ok, k]
 
@@ -267,7 +267,7 @@ class FgcmMirrorChromaticity(object):
                   (2.0 * (expGrayColorSplitWt[ok, 0] + expGrayColorSplitWt[ok, 1]) *
                    (expGrayColorSplit[ok, 0] - expGrayColorSplit[ok, 1]) *
                    (dExpGraydC0ColorSplit[ok, self.fgcmPars.expCoatingIndex[ok], 0] -
-                    dExpGraydC0ColorSplit[ok, self.fgcmPars.expCoatingIndex[ok], 1])))
+                    dExpGraydC0ColorSplit[ok, self.fgcmPars.expCoatingIndex[ok], 1])).astype(deriv.dtype))
 
         deriv /= (ok.size - len(fitPars))
 

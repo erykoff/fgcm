@@ -368,8 +368,8 @@ class FgcmSigmaCal(object):
 
         np.add.at(objChi2,
                   (obsObjIDIndexGO, obsBandIndexGO),
-                  ((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
-                   obsMagErr2GO))
+                  (((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
+                   obsMagErr2GO)).astype(objChi2.dtype))
         # There are duplicate indices here, but that's fine because we only want to divide once
         objChi2[obsObjIDIndexGO, obsBandIndexGO] /= (objNGoodObs[obsObjIDIndexGO, obsBandIndexGO] - 1.0)
 
