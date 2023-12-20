@@ -13,6 +13,8 @@ import matplotlib.cm as cmx
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import histogram_rev_sorted
+
 
 class FgcmSuperStarFlat(object):
     """
@@ -155,12 +157,12 @@ class FgcmSuperStarFlat(object):
                       (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
                        self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
                        obsCCDIndex[goodObs2]),
-                      1./EGrayErr2GO[mark])
+                      (1./EGrayErr2GO[mark]).astype(superStarWt.dtype))
             np.add.at(superStarOffset,
                       (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
                        self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
                        obsCCDIndex[goodObs2]),
-                      EGrayGO[mark]/EGrayErr2GO[mark])
+                      (EGrayGO[mark]/EGrayErr2GO[mark]).astype(superStarOffset.dtype))
             np.add.at(superStarNGoodStars,
                       (self.fgcmPars.expEpochIndex[obsExpIndex[goodObs2]],
                        self.fgcmPars.expLUTFilterIndex[obsExpIndex[goodObs2]],
@@ -200,7 +202,7 @@ class FgcmSuperStarFlat(object):
                                (self.fgcmPars.nCCD+1) +
                                obsCCDIndex[goodObs])
 
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+            h, rev = histogram_rev_sorted(epochFilterHash)
 
             for i in range(h.size):
                 if h[i] == 0: continue

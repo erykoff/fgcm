@@ -12,6 +12,7 @@ from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
 from .fgcmUtilities import expFlagDict
+from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -210,10 +211,10 @@ class FgcmGray(object):
 
         np.add.at(expGrayForInitialSelection,
                   obsExpIndex[goodObs],
-                  EGray[goodObs])
+                  (EGray[goodObs]).astype(expGrayForInitialSelection.dtype))
         np.add.at(expGrayRMSForInitialSelection,
                   obsExpIndex[goodObs],
-                  EGray[goodObs]**2.)
+                  (EGray[goodObs]).astype(expGrayRMSForInitialSelection.dtype)**2.)
         np.add.at(expNGoodStarForInitialSelection,
                   obsExpIndex[goodObs],
                   1)
@@ -375,7 +376,7 @@ class FgcmGray(object):
 
         np.add.at(ccdGrayWt,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                  1./EGrayErr2GO)
+                  (1./EGrayErr2GO).astype(ccdGrayWt.dtype))
         np.add.at(ccdNGoodStars,
                   (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
                   1)
@@ -385,7 +386,7 @@ class FgcmGray(object):
                               obsBandIndex[goodObs]])
         np.add.at(ccdDeltaStd,
                   (obsExpIndex[goodObs], obsCCDIndex[goodObs]),
-                  obsDeltaStdGO/EGrayErr2GO)
+                  (obsDeltaStdGO/EGrayErr2GO).astype(ccdDeltaStd.dtype))
 
         gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0))
         ccdDeltaStd[gd] /= ccdGrayWt[gd]
@@ -403,7 +404,7 @@ class FgcmGray(object):
             FGrayGO = 10.**(EGrayGO/(-2.5))
             FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
-            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+            h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
 
             use, = np.where(h >= 3)
             for i in use:
@@ -462,10 +463,10 @@ class FgcmGray(object):
 
                     np.add.at(ccdGrayTemp,
                               obsCCDIndex[goodObs[i1a]],
-                              EGrayGO[i1a]/EGrayErr2GO[i1a])
+                              (EGrayGO[i1a]/EGrayErr2GO[i1a]).astype(ccdGrayTemp.dtype))
                     np.add.at(ccdGrayRMSTemp,
                               obsCCDIndex[goodObs[i1a]],
-                              EGrayGO[i1a]**2./EGrayErr2GO[i1a])
+                              (EGrayGO[i1a]**2./EGrayErr2GO[i1a]).astype(ccdGrayRMSTemp.dtype))
 
                     gdTemp, = np.where((ccdNGoodStars[eInd, :] >= 3) &
                                        (ccdGrayWt[eInd, :] > 0.0) &
@@ -494,7 +495,7 @@ class FgcmGray(object):
                     ccdGrayEvalNStars = np.zeros(self.fgcmPars.nCCD, dtype=np.int32)
                     np.add.at(ccdGrayEval,
                               obsCCDIndex[goodObs[i1a]],
-                              ccdGrayEvalStars)
+                              ccdGrayEvalStars.astype(ccdGrayEval.dtype))
                     np.add.at(ccdGrayEvalNStars,
                               obsCCDIndex[goodObs[i1a]],
                               1)
@@ -535,10 +536,10 @@ class FgcmGray(object):
             # we can do all of this at once.
             np.add.at(ccdGray,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                      EGrayGO/EGrayErr2GO)
+                      (EGrayGO/EGrayErr2GO).astype(ccdGray.dtype))
             np.add.at(ccdGrayRMS,
                       (obsExpIndex[goodObs],obsCCDIndex[goodObs]),
-                      EGrayGO**2./EGrayErr2GO)
+                      (EGrayGO**2./EGrayErr2GO).astype(ccdGrayRMS.dtype))
 
             # need at least 3 or else computation can blow up
             gd = np.where((ccdNGoodStars >= 3) & (ccdGrayWt > 0.0) & (ccdGrayRMS > 0.0))
@@ -574,7 +575,7 @@ class FgcmGray(object):
             expCcdHash = (obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) +
                           obsCCDIndex[goodObs])
 
-            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+            h, rev = histogram_rev_sorted(expCcdHash)
 
             # Anything with 2 or fewer stars will be marked bad
             use, = np.where(h >= 3)
@@ -678,25 +679,25 @@ class FgcmGray(object):
 
         np.add.at(expGrayWt,
                   goodCCD[0],
-                  1./ccdGrayErr[goodCCD]**2.)
+                  (1./ccdGrayErr[goodCCD]**2.).astype(ccdGrayWt.dtype))
         np.add.at(expGray,
                   goodCCD[0],
-                  ccdGray[goodCCD]/ccdGrayErr[goodCCD]**2.)
+                  (ccdGray[goodCCD]/ccdGrayErr[goodCCD]**2.).astype(expGray.dtype))
         np.add.at(expGrayRMS,
                   goodCCD[0],
-                  ccdGray[goodCCD]**2./ccdGrayErr[goodCCD]**2.)
+                  (ccdGray[goodCCD]**2./ccdGrayErr[goodCCD]**2.).astype(expGrayRMS.dtype))
         np.add.at(expNGoodCCDs,
                   goodCCD[0],
                   1)
         np.add.at(expNGoodTilings,
                   goodCCD[0],
-                  ccdNGoodTilings[goodCCD])
+                  (ccdNGoodTilings[goodCCD]).astype(expNGoodTilings.dtype))
         np.add.at(expNGoodStars,
                   goodCCD[0],
-                  ccdNGoodStars[goodCCD])
+                  (ccdNGoodStars[goodCCD]).astype(expNGoodStars.dtype))
         np.add.at(expDeltaStd,
                   goodCCD[0],
-                  ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.)
+                  (ccdDeltaStd[goodCCD]/ccdGrayErr[goodCCD]**2.).astype(expDeltaStd.dtype))
 
         if self.fgcmPars.nCCD >= 3:
             # Regular mode, when we have a multi-detector camera.
@@ -811,13 +812,13 @@ class FgcmGray(object):
 
             np.add.at(expGrayColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use] / EGrayErr2GO[use])
+                      (EGrayGO[use] / EGrayErr2GO[use]).astype(expGrayColorSplit.dtype))
             np.add.at(expGrayWtColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      1. / EGrayErr2GO[use])
+                      (1. / EGrayErr2GO[use]).astype(expGrayWtColorSplit.dtype))
             np.add.at(expGrayRMSColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
-                      EGrayGO[use]**2. / EGrayErr2GO[use])
+                      (EGrayGO[use]**2. / EGrayErr2GO[use]).astype(expGrayRMSColorSplit.dtype))
             np.add.at(expGrayNGoodStarsColorSplit[:, c],
                       obsExpIndex[goodObs[use]],
                       1)
@@ -1206,7 +1207,7 @@ class FgcmGray(object):
         goodObs, = np.where(obsFlag == 0)
 
         # Do the exposures first
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
 
         expDeltaMagBkg[:] = self.illegalValue
 
@@ -1228,7 +1229,7 @@ class FgcmGray(object):
         # Do the exp/ccd second
         expCcdHash = obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) + obsCCDIndex[goodObs]
 
-        h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+        h, rev = histogram_rev_sorted(expCcdHash)
 
         # We need at least 3 for a median, and of those from the percentile...
         use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
@@ -1289,7 +1290,7 @@ class FgcmGray(object):
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
             expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
                           obsCCDIndexGO[ok])
-            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+            h, rev = histogram_rev_sorted(expCcdHash)
             use, = np.where(h > 0)
             for i in use:
                 i1a = rev[rev[i]: rev[i + 1]]
@@ -1318,7 +1319,7 @@ class FgcmGray(object):
 
         # And then this can be split per exposure.
 
-        h, rev = esutil.stat.histogram(obsExpIndexGO[goodRefObsGO], rev=True)
+        h, rev = histogram_rev_sorted(obsExpIndexGO[goodRefObsGO])
 
         use, = np.where(h >= self.minStarPerExp)
 
