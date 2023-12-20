@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import histogram_rev_sorted
+
 
 class FgcmRetrieveAtmosphere(object):
     """
@@ -121,7 +123,7 @@ class FgcmRetrieveAtmosphere(object):
 
         # next, we median together each exposure...
         minExpIndex = np.min(expIndexArray[zUse])
-        h, rev = esutil.stat.histogram(expIndexArray[zUse], min=minExpIndex, rev=True)
+        h, rev = histogram_rev_sorted(expIndexArray[zUse], min=minExpIndex)
 
         gd, = np.where(h >= self.minCCDPerExp)
 
@@ -142,8 +144,7 @@ class FgcmRetrieveAtmosphere(object):
         # next, we do the median smoothing using pwvRetrievalSmoothBlock
         # self.pwvRetrievalSmoothBlock = fgcmConfig.pwvRetrievalSmoothBlock
 
-        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']],
-                                       rev=True)
+        h, rev = histogram_rev_sorted(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']])
 
         # we do this on any night that we have at least 1
         gd, = np.where(h > 0)
@@ -177,7 +178,7 @@ class FgcmRetrieveAtmosphere(object):
         nightIndexWithLnPwv = np.unique(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']])
 
         a, b = esutil.numpy_util.match(nightIndexWithLnPwv, self.fgcmPars.expNightIndex)
-        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[b], rev=True)
+        h, rev = histogram_rev_sorted(self.fgcmPars.expNightIndex[b])
 
         gd, = np.where(h > 0)
 
@@ -385,8 +386,7 @@ class FgcmRetrieveAtmosphere(object):
             extDelta = (-2.5*np.log10(r0[expIndexArray[use], ccdIndexArray[use]]) +
                          2.5*np.log10(I0Ref))
 
-            h,rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[expIndexArray[use]],
-                                          rev=True, min=0)
+            h, rev = histogram_rev_sorted(self.fgcmPars.expNightIndex[expIndexArray[use]], min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
             if not self.quietMode:
@@ -534,8 +534,7 @@ class FgcmRetrieveAtmosphere(object):
             extDelta = (-2.5*np.log10(r0Gray[use]) +
                          2.5*np.log10(I0Ref))
 
-            h,rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[expIndexArray[use]],
-                                          rev=True, min=0)
+            h, rev = histogram_rev_sorted(self.fgcmPars.expNightIndex[expIndexArray[use]], min=0)
 
             gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
             if not self.quietMode:

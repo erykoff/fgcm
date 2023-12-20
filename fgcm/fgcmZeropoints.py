@@ -9,6 +9,7 @@ from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import dataBinner
+from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -301,7 +302,7 @@ class FgcmZeropoints(object):
         # need secZenith for each exp/ccd pair
         deltaRA = np.zeros(zpStruct.size)
         deltaDec = np.zeros(zpStruct.size)
-        h, rev = esutil.stat.histogram(zpExpIndex, rev=True)
+        h, rev = histogram_rev_sorted(zpExpIndex)
         ok, = np.where(h > 0)
         for i in ok:
             i1a = rev[rev[i]: rev[i + 1]]
@@ -606,7 +607,7 @@ class FgcmZeropoints(object):
 
             np.add.at(expZpMean,
                       zpExpIndex[okCCD],
-                      zpStruct['FGCM_ZPT'][okCCD])
+                      (zpStruct['FGCM_ZPT'][okCCD]).astype(expZpMean.dtype))
             np.add.at(expZpNCCD,
                       zpExpIndex[okCCD],
                       1)
@@ -722,7 +723,7 @@ class FgcmZeropoints(object):
                            (self.fgcmPars.nCCD + 1) +
                            zpCCDIndex)
 
-        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+        h, rev = histogram_rev_sorted(epochFilterHash)
 
         for i in range(h.size):
             if h[i] == 0: continue
@@ -977,8 +978,8 @@ class FgcmZeropointPlotter(object):
             meanR1 = np.zeros(nCCD)
             nPerCCD = np.zeros(nCCD,dtype=np.int32)
 
-            np.add.at(meanI1, ccdIndex, i1)
-            np.add.at(meanR1, ccdIndex, r1)
+            np.add.at(meanI1, ccdIndex, i1.astype(meanI1.dtype))
+            np.add.at(meanR1, ccdIndex, r1.astype(meanR1.dtype))
             np.add.at(nPerCCD, ccdIndex, 1)
 
             use,=np.where(nPerCCD > 0)

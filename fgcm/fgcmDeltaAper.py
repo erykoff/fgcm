@@ -8,6 +8,7 @@ import time
 import matplotlib.pyplot as plt
 
 from .fgcmUtilities import dataBinner
+from .fgcmUtilities import histogram_rev_sorted
 
 import multiprocessing
 
@@ -89,7 +90,7 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compMedDeltaAper[:] = self.illegalValue
         self.fgcmPars.compEpsilon[:] = self.illegalValue
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True, min=0)
+        h, rev = histogram_rev_sorted(obsExpIndex[goodObs], min=0)
         expIndices, = np.where(h >= self.minStarPerExp)
 
         for expIndex in expIndices:
@@ -248,7 +249,11 @@ class FgcmDeltaAper(object):
         # Do the mapping
         self.fgcmLog.info("Computing delta-aper epsilon spatial map at nside %d" % self.deltaAperFitSpatialNside)
         ipring = hpg.angle_to_pixel(self.deltaAperFitSpatialNside, objRA, objDec, nest=False)
-        h, rev = esutil.stat.histogram(ipring, min=0, max=hpg.nside_to_npixel(self.deltaAperFitSpatialNside) - 1, rev=True)
+        h, rev = histogram_rev_sorted(
+            ipring,
+            min=0,
+            max=hpg.nside_to_npixel(self.deltaAperFitSpatialNside) - 1,
+        )
 
         offsetMap = np.zeros(h.size, dtype=[('nstar_fit', 'i4', (self.fgcmStars.nBands, )),
                                             ('epsilon', 'f4', (self.fgcmStars.nBands, ))])
@@ -365,7 +370,7 @@ class FgcmDeltaAper(object):
 
         filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
-        h, rev = esutil.stat.histogram(filterCcdHash, rev=True)
+        h, rev = histogram_rev_sorted(filterCcdHash)
 
         # Arbitrary minimum number here
         gdHash, = np.where(h > 10)
@@ -392,7 +397,7 @@ class FgcmDeltaAper(object):
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
-            h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
+            h2, rev2 = histogram_rev_sorted(xyBinHash)
 
             gdHash2, = np.where(h2 > 10)
             for j in gdHash2:
@@ -517,10 +522,10 @@ class FgcmDeltaAper(object):
 
         np.add.at(objDeltaAperMeanTemp,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  (obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO)
+                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(objDeltaAperMeanTemp.dtype))
         np.add.at(wtSum,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  1./obsMagErr2GO)
+                  (1./obsMagErr2GO).astype(wtSum.dtype))
 
         gd = np.where(wtSum > 0.0)
 

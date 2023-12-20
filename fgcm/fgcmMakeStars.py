@@ -6,6 +6,7 @@ import glob
 import hpgeom as hpg
 
 from .fgcmLogger import FgcmLogger
+from .fgcmUtilities import histogram_rev_sorted
 
 
 class FgcmMakeStars(object):
@@ -336,14 +337,14 @@ class FgcmMakeStars(object):
 
         # Split into pixels
         ipring = hpg.angle_to_pixel(self.starConfig['coarseNSide'], raArray, decArray, nest=False)
-        hpix, revpix = esutil.stat.histogram(ipring, rev=True)
+        hpix, revpix = histogram_rev_sorted(ipring)
 
         gdpix, = np.where(hpix > 0)
         self.fgcmLog.info("Matching primary stars in %d pixels" % (gdpix.size))
 
         for ii, gpix in enumerate(gdpix):
             # This is the array of all the observations in the coarse pixel
-            p1a=revpix[revpix[gpix]: revpix[gpix + 1]]
+            p1a = revpix[revpix[gpix]: revpix[gpix + 1]]
 
             if p1a.size == 0:
                 continue
@@ -445,7 +446,7 @@ class FgcmMakeStars(object):
 
                 # This is the official working version, but slower
                 fakeId = np.arange(p1a.size)
-                hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
+                hist, rev = histogram_rev_sorted(fakeId[i1])
 
                 if (hist.max() == 1):
                     self.fgcmLog.warning("  No matches found for pixel %d, %s band" %
@@ -681,7 +682,7 @@ class FgcmMakeStars(object):
             i1 = matches[1]
 
         self.fgcmLog.info("Collating observations")
-        nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
+        nObsPerObj, obsInd = histogram_rev_sorted(i1)
 
         if (nObsPerObj.size != self.objCat.size):
             raise ValueError("Number of primary stars (%d) does not match observations (%d)." %
@@ -729,13 +730,13 @@ class FgcmMakeStars(object):
             self.objCat['dec'][gd],
             nest=False
         )
-        hist, rev = esutil.stat.histogram(ipring, rev=True)
+        hist, rev = histogram_rev_sorted(ipring)
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
         self.fgcmLog.info("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
         for i in range(high.size):
-            i1a=rev[rev[high[i]]:rev[high[i]+1]]
+            i1a = rev[rev[high[i]]: rev[high[i] + 1]]
             cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
             objClass[gd[cut]] = 0
 
@@ -810,7 +811,7 @@ class FgcmMakeStars(object):
             self.objIndexCat['dec'],
             nest=False
         )
-        hpix, revpix = esutil.stat.histogram(ipring, rev=True)
+        hpix, revpix = histogram_rev_sorted(ipring)
 
         pixelCats = []
         nBands = len(self.starConfig['referenceFilterNames'])

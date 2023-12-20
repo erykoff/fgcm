@@ -217,7 +217,7 @@ class FgcmBrightObs(object):
         # find the brightest (minmag) object at each index
         np.fmin.at(objMagStdMeanTemp,
                    (obsObjIDIndexGO, obsBandIndexGO),
-                   obsMagStdGO)
+                   obsMagStdGO.astype(objMagStdMeanTemp.dtype))
 
         # now which observations are bright *enough* to consider?
         brightEnoughGO, = np.where((obsMagStdGO -
@@ -236,11 +236,11 @@ class FgcmBrightObs(object):
         np.add.at(wtSum,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  1./obsMagErr2GOBE)
+                  1./obsMagErr2GOBE.astype(wtSum.dtype))
         np.add.at(objMagStdMeanTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE)
+                  (obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE).astype(objMagStdMeanTemp.dtype))
         np.add.at(objNGoodObsTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
