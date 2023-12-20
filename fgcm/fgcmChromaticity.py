@@ -5,6 +5,7 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 import scipy.optimize as optimize
+from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -354,7 +355,7 @@ class FgcmCCDChromaticity:
         ccdFilterHash = (obsLUTFilterIndexGO.astype(np.int64)*(self.fgcmPars.nCCD + 1) +
                          obsCCDIndexGO.astype(np.int64))
 
-        h, rev = esutil.stat.histogram(ccdFilterHash, rev=True)
+        h, rev = histogram_rev_sorted(ccdFilterHash)
 
         # Make a simple cut here.
         use, = np.where(h >= 10)

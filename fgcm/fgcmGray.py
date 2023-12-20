@@ -12,6 +12,7 @@ from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
 from .fgcmUtilities import expFlagDict
+from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -403,7 +404,7 @@ class FgcmGray(object):
             FGrayGO = 10.**(EGrayGO/(-2.5))
             FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
-            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+            h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
 
             use, = np.where(h >= 3)
             for i in use:
@@ -574,7 +575,7 @@ class FgcmGray(object):
             expCcdHash = (obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) +
                           obsCCDIndex[goodObs])
 
-            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+            h, rev = histogram_rev_sorted(expCcdHash)
 
             # Anything with 2 or fewer stars will be marked bad
             use, = np.where(h >= 3)
@@ -1206,7 +1207,7 @@ class FgcmGray(object):
         goodObs, = np.where(obsFlag == 0)
 
         # Do the exposures first
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
 
         expDeltaMagBkg[:] = self.illegalValue
 
@@ -1228,7 +1229,7 @@ class FgcmGray(object):
         # Do the exp/ccd second
         expCcdHash = obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) + obsCCDIndex[goodObs]
 
-        h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+        h, rev = histogram_rev_sorted(expCcdHash)
 
         # We need at least 3 for a median, and of those from the percentile...
         use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
@@ -1289,7 +1290,7 @@ class FgcmGray(object):
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
             expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
                           obsCCDIndexGO[ok])
-            h, rev = esutil.stat.histogram(expCcdHash, rev=True)
+            h, rev = histogram_rev_sorted(expCcdHash)
             use, = np.where(h > 0)
             for i in use:
                 i1a = rev[rev[i]: rev[i + 1]]
@@ -1318,7 +1319,7 @@ class FgcmGray(object):
 
         # And then this can be split per exposure.
 
-        h, rev = esutil.stat.histogram(obsExpIndexGO[goodRefObsGO], rev=True)
+        h, rev = histogram_rev_sorted(obsExpIndexGO[goodRefObsGO])
 
         use, = np.where(h >= self.minStarPerExp)
 

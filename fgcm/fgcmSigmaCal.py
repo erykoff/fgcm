@@ -5,6 +5,7 @@ import esutil
 import time
 
 from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import histogram_rev_sorted
 
 import multiprocessing
 
@@ -209,8 +210,11 @@ class FgcmSigmaCal(object):
                         continue
 
                     # These have already been limited to the plot percentile range
-                    h, rev = esutil.stat.histogram(objMagStdMean[goodStars[plotIndices[band][ok]], bandIndex],
-                                                   nbin=nPlotBin, rev=True)
+                    h, rev = histogram_rev_sorted(
+                        objMagStdMean[goodStars[plotIndices[band][ok]], bandIndex],
+                        nbin=nPlotBin,
+                    )
+
                     for j, nInBin in enumerate(h):
                         if nInBin < 100:
                             continue

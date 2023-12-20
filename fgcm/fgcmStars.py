@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import obsFlagDict
 from .fgcmUtilities import getMemoryString
+from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -1639,7 +1640,7 @@ class FgcmStars(object):
                            (fgcmPars.nCCD+1) +
                            obsCCDIndex[goodObs])
 
-        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+        h, rev = histogram_rev_sorted(epochFilterHash)
 
         nbad = 0
 
@@ -1711,7 +1712,7 @@ class FgcmStars(object):
         # compute EGray, GO for Good Obs
         EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
 
         nbad = 0
 
@@ -1770,7 +1771,7 @@ class FgcmStars(object):
                                (fgcmPars.nCCD+1) +
                                obsCCDIndex)
 
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+            h, rev = histogram_rev_sorted(epochFilterHash)
 
             for i in range(h.size):
                 if h[i] == 0: continue
