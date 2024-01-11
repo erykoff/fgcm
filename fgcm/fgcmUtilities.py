@@ -86,6 +86,37 @@ def getMemoryString(location):
 
     return memoryString
 
+
+def histogram_rev_sorted(data, binsize=1.0, nbin=None, min=None, max=None):
+    """Vendored edit of esutil.stat.histogram with proper sorting.
+
+    Parameters
+    ----------
+    arr : `np.ndarray`
+    binsize : `float`, optional
+    nbin : `int`, optional
+    min : `float`, optional
+    max : `float`, optional
+
+    Returns
+    -------
+    h : `np.ndarray`
+        Histogram values
+    rev : `np.ndarray`
+        Reverse indices (sorted)
+    """
+    import esutil
+
+    if nbin is not None:
+        binsize = None
+
+    b = esutil.stat.Binner(data)
+    b.sort_index = data.argsort(kind="stable")
+    b.dohist(binsize=binsize, nbin=nbin, min=min, max=max, rev=True, calc_stats=False)
+
+    return b["hist"], b["rev"]
+
+
 def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
     """
     Bin data and compute errors via bootstrap resampling.  All median statistics.
@@ -123,7 +154,12 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
 
     import esutil
 
-    hist,rev=esutil.stat.histogram(x,binsize=binSize,min=xRange[0],max=xRange[1]-0.0001,rev=True)
+    hist, rev = histogram_rev_sorted(
+        x,
+        binsize=binSize,
+        min=xRange[0],
+        max=xRange[1] - 0.0001,
+    )
     binStruct=np.zeros(hist.size,dtype=[('X_BIN','f4'),
                                         ('X','f4'),
                                         ('X_ERR_MEAN','f4'),
@@ -882,7 +918,7 @@ class FocalPlaneProjectorFromOffsets(object):
         else:
             sub = np.arange(obsX.size)
 
-        h, rev = esutil.stat.histogram(obsCCDIndex[sub], rev=True)
+        h, rev = histogram_rev_sorted(obsCCDIndex[sub])
 
         for i in range(h.size):
             if h[i] == 0: continue
@@ -893,7 +929,7 @@ class FocalPlaneProjectorFromOffsets(object):
 
             if self.ccdOffsets['RASIGN'][cInd] == 0:
                 # choose a good exposure to work with
-                hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
+                hTest, revTest = histogram_rev_sorted(obsExpIndex[i1a])
                 # Exclude the first index which will be invalid exposures.
                 maxInd = np.argmax(hTest[1: ]) + 1
                 testStars = revTest[revTest[maxInd]: revTest[maxInd + 1]]

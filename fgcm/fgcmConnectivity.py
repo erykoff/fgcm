@@ -4,6 +4,7 @@ import esutil
 import matplotlib.pyplot as plt
 
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import histogram_rev_sorted
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmConnectivity(object):
@@ -76,8 +77,11 @@ class FgcmConnectivity(object):
                                 ((objFlag[obsObjIDIndex] & mask) == 0))
 
             # Split into nights with a histogram
-            h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[obsExpIndex[goodObs]],
-                                           min=0, max=self.fgcmPars.nCampaignNights, rev=True)
+            h, rev = histogram_rev_sorted(
+                self.fgcmPars.expNightIndex[obsExpIndex[goodObs]],
+                min=0,
+                max=self.fgcmPars.nCampaignNights,
+            )
 
             done = False
             while not done:

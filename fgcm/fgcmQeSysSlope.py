@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import scipy.optimize
 from astropy.time import Time
 
+from .fgcmUtilities import histogram_rev_sorted
+
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmQeSysSlope(object):
@@ -80,7 +82,7 @@ class FgcmQeSysSlope(object):
         obsMagStdGO -= deltaQESlopeGO
 
         # split per wash interval
-        washH, washRev = esutil.stat.histogram(self.fgcmPars.expWashIndex[obsExpIndexGO], rev=True, min=0)
+        washH, washRev = histogram_rev_sorted(self.fgcmPars.expWashIndex[obsExpIndexGO], min=0)
         washIndices, = np.where(washH > 0)
 
         for washIndex in washIndices:
@@ -88,7 +90,7 @@ class FgcmQeSysSlope(object):
 
             # Split per band, and compute the delta-T and delta-Mag
 
-            bandH, bandRev = esutil.stat.histogram(obsBandIndex[goodObs[i1a]], rev=True, min=0)
+            bandH, bandRev = histogram_rev_sorted(obsBandIndex[goodObs[i1a]], min=0)
             bandIndices, = np.where(bandH > 0)
 
             deltaTAll = None

@@ -5,6 +5,7 @@ import esutil
 import time
 
 from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import histogram_rev_sorted
 
 import multiprocessing
 
@@ -209,8 +210,11 @@ class FgcmSigmaCal(object):
                         continue
 
                     # These have already been limited to the plot percentile range
-                    h, rev = esutil.stat.histogram(objMagStdMean[goodStars[plotIndices[band][ok]], bandIndex],
-                                                   nbin=nPlotBin, rev=True)
+                    h, rev = histogram_rev_sorted(
+                        objMagStdMean[goodStars[plotIndices[band][ok]], bandIndex],
+                        nbin=nPlotBin,
+                    )
+
                     for j, nInBin in enumerate(h):
                         if nInBin < 100:
                             continue
@@ -364,8 +368,8 @@ class FgcmSigmaCal(object):
 
         np.add.at(objChi2,
                   (obsObjIDIndexGO, obsBandIndexGO),
-                  ((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
-                   obsMagErr2GO))
+                  (((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
+                   obsMagErr2GO)).astype(objChi2.dtype))
         # There are duplicate indices here, but that's fine because we only want to divide once
         objChi2[obsObjIDIndexGO, obsBandIndexGO] /= (objNGoodObs[obsObjIDIndexGO, obsBandIndexGO] - 1.0)
 
