@@ -1270,7 +1270,7 @@ class FgcmGray(object):
         objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
         refMag = snmm.getArray(self.fgcmStars.refMagHandle)
 
-        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True)
+        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True, removeRefstarReserved=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # Add in the gray values
