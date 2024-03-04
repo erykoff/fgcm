@@ -1317,6 +1317,10 @@ class FgcmGray(object):
                            obsBandIndex[goodObs[goodRefObsGO]]] -
                     obsMagStdGO[goodRefObsGO])
 
+        if len(goodRefObsGO) == 0:
+            self.fgcmLog.warning("No reference objects found to compare to exposures.")
+            return
+
         # And then this can be split per exposure.
 
         h, rev = histogram_rev_sorted(obsExpIndexGO[goodRefObsGO])
