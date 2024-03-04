@@ -698,8 +698,8 @@ class FgcmStars(object):
             refMatches, = np.where(objRefIDIndex >= 0)
             if (refMatches.size/objRefIDIndex.size > self.refStarMaxFracUse):
                 self.fgcmLog.info("Fraction of reference star matches is greater than "
-                                  "refStarMaxFracUse (%.2f); down-sampling." % (self.refStarMaxFracUse))
-                nTarget = int(0.5*objRefIDIndex.size)
+                                  "refStarMaxFracUse (%.3f); down-sampling." % (self.refStarMaxFracUse))
+                nTarget = int(self.config.refStarMaxFracUse*objRefIDIndex.size)
                 nMatch = refMatches.size
                 nToRemove = nMatch - nTarget
 
