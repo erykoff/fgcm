@@ -186,8 +186,9 @@ class FgcmSigmaRef(object):
 
                     # Compute outliers, if desired.
                     if (c == 0) and (self.refStarOutlierNSig > 0.0):
-                        bad, = np.where(np.abs(delta - offsetRef[bandIndex]) >
-                                        self.refStarOutlierNSig * sigmaRef[bandIndex])
+                        bad, = np.where((np.abs(delta - offsetRef[bandIndex]) >
+                                         self.refStarOutlierNSig * sigmaRef[bandIndex]) &
+                                        ((objFlag[goodRefStars[refUse]] & objFlagDict["REFSTAR_RESERVED"]) == 0))
                         if bad.size > 0:
                             message = "Marked %d reference stars as REFSTAR_OUTLIER from observations in the %s band." % (bad.size, band)
                             objFlag[goodRefStars[refUse[bad]]] |= objFlagDict['REFSTAR_OUTLIER']
