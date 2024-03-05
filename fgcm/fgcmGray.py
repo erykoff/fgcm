@@ -1270,7 +1270,7 @@ class FgcmGray(object):
         objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
         refMag = snmm.getArray(self.fgcmStars.refMagHandle)
 
-        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True)
+        goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True, removeRefstarReserved=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
 
         # Add in the gray values
@@ -1316,6 +1316,10 @@ class FgcmGray(object):
         EGrayGRO = (refMag[objRefIDIndex[obsObjIDIndex[goodObs[goodRefObsGO]]],
                            obsBandIndex[goodObs[goodRefObsGO]]] -
                     obsMagStdGO[goodRefObsGO])
+
+        if len(goodRefObsGO) == 0:
+            self.fgcmLog.warning("No reference objects found to compare to exposures.")
+            return
 
         # And then this can be split per exposure.
 

@@ -868,7 +868,7 @@ class FgcmChisq(object):
                 # Get good observations of reference stars
                 # This must be two steps because we first need the indices to
                 # avoid out-of-bounds
-                mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
+                mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR'] | objFlagDict['REFSTAR_RESERVED']
                 goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndexGO] >= 0) &
                                          ((objFlag[obsObjIDIndexGO] & mask) == 0))
 
