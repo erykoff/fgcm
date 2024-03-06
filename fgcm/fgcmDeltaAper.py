@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import objFlagDict
 
 import multiprocessing
 
@@ -176,11 +177,17 @@ class FgcmDeltaAper(object):
         globalEpsilon = np.zeros(self.fgcmStars.nBands) + self.illegalValue
         globalOffset = np.zeros(self.fgcmPars.nBands) + self.illegalValue
 
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'] |
+                objFlagDict['RESERVED'])
+
         # Compute global offsets here.
         for i, band in enumerate(self.fgcmStars.bands):
             use, = np.where((objNGoodObs[:, i] >= self.deltaAperFitMinNgoodObs) &
                             (np.abs(objDeltaAperMean[:, i]) < 0.5) &
-                            (objFlag == 0))
+                            ((objFlag & mask) == 0))
             if use.size == 0:
                 continue
 
@@ -255,6 +262,12 @@ class FgcmDeltaAper(object):
             max=hpg.nside_to_npixel(self.deltaAperFitSpatialNside) - 1,
         )
 
+        mask = (objFlagDict['TOO_FEW_OBS'] |
+                objFlagDict['BAD_COLOR'] |
+                objFlagDict['VARIABLE'] |
+                objFlagDict['TEMPORARY_BAD_STAR'] |
+                objFlagDict['RESERVED'])
+
         offsetMap = np.zeros(h.size, dtype=[('nstar_fit', 'i4', (self.fgcmStars.nBands, )),
                                             ('epsilon', 'f4', (self.fgcmStars.nBands, ))])
         upix, = np.where(h >= self.deltaAperFitSpatialMinStar)
@@ -264,7 +277,7 @@ class FgcmDeltaAper(object):
             for j, band in enumerate(self.fgcmStars.bands):
                 use, = np.where((objNGoodObs[i1a, j] >= self.deltaAperFitMinNgoodObs) &
                                 (np.abs(objDeltaAperMean[i1a, j]) < 0.5) &
-                                (objFlag[i1a] == 0))
+                                ((objFlag[i1a] & mask) == 0))
                 if use.size < self.deltaAperFitSpatialMinStar:
                     continue
 

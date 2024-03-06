@@ -4,6 +4,7 @@ import sys
 import esutil
 import time
 import scipy.optimize
+from scipy.stats import median_abs_deviation
 
 import matplotlib.pyplot as plt
 
@@ -66,7 +67,8 @@ class FgcmSigmaRef(object):
 
         # Select only stars that have reference magnitudes
         # and that are not flagged as outliers
-        # We allow all the reference colors in to get color range statistics.
+        # We allow all the reference colors including reserved in
+        # to get color range statistics.
         mask = objFlagDict['REFSTAR_OUTLIER']
         use, = np.where((objRefIDIndex[goodStars] >= 0) &
                         ((objFlag[goodStars] & mask) == 0))
@@ -161,10 +163,15 @@ class FgcmSigmaRef(object):
                     delta = (objMagStdMean[goodRefStars[refUse], bandIndex] -
                              refMag[objRefIDIndex[goodRefStars[refUse]], bandIndex])
 
+                    # Precut for fit to ensure crazy outliers don't mess things up.
+                    med = np.median(delta)
+                    sigmaMad = median_abs_deviation(delta, scale="normal")
+                    ok = (np.abs(delta - med) < 10*sigmaMad)
+
                     ax = fig.add_subplot(2, 2, c + 1)
 
                     try:
-                        coeff = histoGauss(ax, delta*1000.0)
+                        coeff = histoGauss(ax, delta[ok]*1000.0)
                         coeff[1] /= 1000.0
                         coeff[2] /= 1000.0
                         if coeff[3] > 0:
@@ -185,8 +192,8 @@ class FgcmSigmaRef(object):
 
                     # Compute outliers, if desired.
                     if (c == 0) and (self.refStarOutlierNSig > 0.0):
-                        bad, = np.where(np.abs(delta - offsetRef[bandIndex]) >
-                                        self.refStarOutlierNSig * sigmaRef[bandIndex])
+                        bad, = np.where((np.abs(delta - offsetRef[bandIndex]) >
+                                         self.refStarOutlierNSig * sigmaRef[bandIndex]))
                         if bad.size > 0:
                             message = "Marked %d reference stars as REFSTAR_OUTLIER from observations in the %s band." % (bad.size, band)
                             objFlag[goodRefStars[refUse[bad]]] |= objFlagDict['REFSTAR_OUTLIER']

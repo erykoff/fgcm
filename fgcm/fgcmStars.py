@@ -576,6 +576,10 @@ class FgcmStars(object):
             if test.size > 0:
                 self.fgcmLog.info('Flagging %d stars as reference star outliers from previous cycles.' %
                                   (test.size))
+            test, = np.where((flagFlag[a] & objFlagDict['REFSTAR_RESERVED']) > 0)
+            if test.size > 0:
+                self.fgcmLog.info('Flagging %d stars as reference star reserved from previous cycles.' %
+                                  (test.size))
 
             objFlag[b] = flagFlag[a]
         else:
@@ -698,16 +702,18 @@ class FgcmStars(object):
             refMatches, = np.where(objRefIDIndex >= 0)
             if (refMatches.size/objRefIDIndex.size > self.refStarMaxFracUse):
                 self.fgcmLog.info("Fraction of reference star matches is greater than "
-                                  "refStarMaxFracUse (%.2f); down-sampling." % (self.refStarMaxFracUse))
-                nTarget = int(0.5*objRefIDIndex.size)
+                                  "refStarMaxFracUse (%.3f); down-sampling." % (self.refStarMaxFracUse))
+                objFlag = snmm.getArray(self.objFlagHandle)
+
+                nTarget = int(self.refStarMaxFracUse*objRefIDIndex.size)
                 nMatch = refMatches.size
                 nToRemove = nMatch - nTarget
 
                 remove = np.random.choice(refMatches.size,
                                           size=nToRemove,
                                           replace=False)
-                refMag[objRefIDIndex[refMatches[remove]], :] = 99.0
-                objRefIDIndex[refMatches[remove]] = -1
+                # Flag these as REFSTAR_RESERVED
+                objFlag[refMatches[remove]] |= objFlagDict['REFSTAR_RESERVED']
 
             # Compute the fraction of stars that are reference stars
             for i, band in enumerate(self.bands):
@@ -1041,7 +1047,8 @@ class FgcmStars(object):
                       1)
 
     def getGoodStarIndices(self, includeReserve=False, onlyReserve=False, checkMinObs=False,
-                           checkHasColor=False, removeRefstarOutliers=False, removeRefstarBadcols=False):
+                           checkHasColor=False, removeRefstarOutliers=False, removeRefstarBadcols=False,
+                           removeRefstarReserved=False):
         """
         Get the good star indices.
 
@@ -1059,6 +1066,8 @@ class FgcmStars(object):
             Remove reference star outliers.
         removeRefstarBadcols : `bool`, optional
             Remove reference stars with "bad colors".
+        removeRefstarReserved : `bool`, optional
+            Remove reference stars that are "reserved"?
 
         returns
         -------
@@ -1077,6 +1086,8 @@ class FgcmStars(object):
             mask |= objFlagDict['REFSTAR_OUTLIER']
         if removeRefstarBadcols:
             mask |= objFlagDict['REFSTAR_BAD_COLOR']
+        if removeRefstarReserved:
+            mask |= objFlagDict['REFSTAR_RESERVED']
 
         if includeReserve or onlyReserve:
             mask &= ~objFlagDict['RESERVED']
@@ -1413,7 +1424,7 @@ class FgcmStars(object):
 
         goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
-        mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
+        mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR'] | objFlagDict['REFSTAR_RESERVED']
         use, = np.where((objRefIDIndex[goodStars] >= 0) &
                         ((objFlag[goodStars] & mask) == 0))
         goodRefStars = goodStars[use]
@@ -1528,7 +1539,7 @@ class FgcmStars(object):
             refMagErr = snmm.getArray(self.refMagErrHandle)
 
             # Only use _good_ (non-outlier) reference stars in here.
-            mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR']
+            mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR'] | objFlagDict['REFSTAR_RESERVED']
             goodRefObsGO, = np.where((objRefIDIndex[obsObjIDIndex[goodObs]] >= 0) &
                                      ((objFlag[obsObjIDIndex[goodObs]] & mask) == 0))
 
@@ -2028,7 +2039,8 @@ class FgcmStars(object):
         # everything else should be recomputed based on the good exposures, calibrations, etc
         flagMask = (objFlagDict['VARIABLE'] |
                     objFlagDict['RESERVED'] |
-                    objFlagDict['REFSTAR_OUTLIER'])
+                    objFlagDict['REFSTAR_OUTLIER'] |
+                    objFlagDict['REFSTAR_RESERVED'])
 
         flagged,=np.where((objFlag & flagMask) > 0)
 
@@ -2147,6 +2159,7 @@ class FgcmStars(object):
         refMag = snmm.getArray(self.refMagHandle)
 
         for mode in ['all', 'cut']:
+            # We leave in the "RESERVED" stars for these plots.
             if (mode == 'all'):
                 goodStars = self.getGoodStarIndices(includeReserve=True,
                                                     checkMinObs=True,
