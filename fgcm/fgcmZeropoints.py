@@ -928,9 +928,9 @@ class FgcmZeropointPlotter(object):
             ax.set_xlabel(r'$I_1$ from FGCM Fit (red-blue mmag)',fontsize=16)
             ax.set_ylabel(r'$R_1$ from Retrieval (red-blue mmag)',fontsize=16)
 
-            text = r'(%s)\n' % (filterName)
-            text += r"Blue: %s\n" % (self.blueString)
-            text += r"Red: %s\n" % (self.redString)
+            text = "(%s)\n" % (filterName)
+            text += "Blue: %s\n" % (self.blueString)
+            text += "Red: %s\n" % (self.redString)
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
@@ -1017,10 +1017,10 @@ class FgcmZeropointPlotter(object):
                 except ValueError:
                     continue
 
-                text = r'(%s)\n' % (filterName)
-                text += r'%s\n' % (plotType)
-                text += r"Blue: %s\n" % (self.blueString)
-                text += r"Red: %s\n" % (self.redString)
+                text = "(%s)\n" % (filterName)
+                text += "%s\n" % (plotType)
+                text += "Blue: %s\n" % (self.blueString)
+                text += "Red: %s\n" % (self.redString)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
@@ -1099,9 +1099,9 @@ class FgcmZeropointPlotter(object):
             plt.errorbar(binStruct['X_BIN'], binStruct['Y'],
                          yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
 
-            text = r'(%s)\n' % (filterName)
-            text += r"Blue: %s\n" % (self.blueString)
-            text += r"Red: %s\n" % (self.redString)
+            text = "(%s)\n" % (filterName)
+            text += "Blue: %s\n" % (self.blueString)
+            text += "Red: %s\n" % (self.redString)
             ax.annotate(text,
                         (0.1, 0.93), xycoords='axes fraction',
                         ha='left', va='top', fontsize=18, color='r')
