@@ -74,6 +74,7 @@ class FgcmZeropoints(object):
         self.superStarSubCCD = fgcmConfig.superStarSubCCD
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
         self.ccdGraySubCCD = fgcmConfig.ccdGraySubCCD
+        self.colorSplitBands = fgcmConfig.colorSplitBands
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.I10StdBand = fgcmConfig.I10StdBand
         self.I0StdBand = fgcmConfig.I0StdBand
@@ -587,7 +588,7 @@ class FgcmZeropoints(object):
 
             plotter = FgcmZeropointPlotter(zpStruct, self.fgcmStars, self.fgcmPars,
                                            self.I0StdBand, self.I1StdBand, self.I10StdBand,
-                                           self.colorSplitIndices,
+                                           self.colorSplitIndices, self.colorSplitBands,
                                            self.plotPath, self.outfileBaseWithCycle)
 
             plotter.makeR1I1Plots()
@@ -826,7 +827,7 @@ class FgcmZeropointPlotter(object):
 
     def __init__(self, zpStruct, fgcmStars, fgcmPars,
                  I0StdBand, I1StdBand, I10StdBand,
-                 colorSplitIndices, plotPath, outfileBase):
+                 colorSplitIndices, colorSplitBands, plotPath, outfileBase):
         self.zpStruct = zpStruct
         self.bands = fgcmPars.bands
         self.filterNames = fgcmPars.lutFilterNames
@@ -834,11 +835,12 @@ class FgcmZeropointPlotter(object):
         self.outfileBase = outfileBase
         self.filterToBand = fgcmPars.filterToBand
         self.colorSplitIndices = colorSplitIndices
+        self.colorSplitBands = colorSplitBands
         self.I0StdBand = I0StdBand
         self.I1StdBand = I1StdBand
         self.I10StdBand = I10StdBand
 
-        self.i1Conversions = self.computeI1Conversions(fgcmStars)
+        self.i1Conversions, self.blueString, self.redString = self.computeI1Conversions(fgcmStars)
 
     def computeI1Conversions(self, fgcmStars):
         """
@@ -856,13 +858,15 @@ class FgcmZeropointPlotter(object):
         gmi = (objMagStdMean[goodStars, self.colorSplitIndices[0]] -
                objMagStdMean[goodStars, self.colorSplitIndices[1]])
 
-        # This maybe could be made more clever...
+        cuts = np.percentile(gmi, [5.0, 95.0])
+        blueStars, = np.where(gmi < cuts[0])
+        redStars, = np.where(gmi > cuts[1])
 
-        blueStars, = np.where((gmi > 0.5) & (gmi < 0.55))
-        redStars, = np.where((gmi > 3.0) & (gmi < 3.05))
-        # Make sure we have some blue and red stars
-        if blueStars.size == 0 or redStars.size == 0:
-            return i1Conversions
+        blueColor = np.median(gmi[blueStars])
+        redColor = np.median(gmi[redStars])
+
+        blueString = "%s-%s ~ %.2f" % (self.colorSplitBands[0], self.colorSplitBands[1], np.median(blueColor))
+        redString = "%s-%s ~ %.2f" % (self.colorSplitBands[0], self.colorSplitBands[1], np.median(redColor))
 
         deltaI1 = 1.0
 
@@ -875,7 +879,7 @@ class FgcmZeropointPlotter(object):
 
             i1Conversions[i] = 1000.0 * (deltaMagRed - deltaMagBlue) / deltaI1
 
-        return i1Conversions
+        return i1Conversions, blueString, redString
 
     def makeR1I1Plots(self):
         """
@@ -924,7 +928,9 @@ class FgcmZeropointPlotter(object):
             ax.set_xlabel(r'$I_1$ from FGCM Fit (red-blue mmag)',fontsize=16)
             ax.set_ylabel(r'$R_1$ from Retrieval (red-blue mmag)',fontsize=16)
 
-            text=r'$(%s)$' % (filterName)
+            text = r'(%s)\n' % (filterName)
+            text += r"Blue: %s\n" % (self.blueString)
+            text += r"Red: %s\n" % (self.redString)
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
@@ -1011,8 +1017,10 @@ class FgcmZeropointPlotter(object):
                 except ValueError:
                     continue
 
-                text = r'$(%s)$' % (filterName) + '\n' + \
-                    r'%s' % (plotType)
+                text = r'(%s)\n' % (filterName)
+                text += r'%s\n' % (plotType)
+                text += r"Blue: %s\n" % (self.blueString)
+                text += r"Red: %s\n" % (self.redString)
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
@@ -1091,7 +1099,9 @@ class FgcmZeropointPlotter(object):
             plt.errorbar(binStruct['X_BIN'], binStruct['Y'],
                          yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
 
-            text = r'$(%s)$' % (filterName)
+            text = r'(%s)\n' % (filterName)
+            text += r"Blue: %s\n" % (self.blueString)
+            text += r"Red: %s\n" % (self.redString)
             ax.annotate(text,
                         (0.1, 0.93), xycoords='axes fraction',
                         ha='left', va='top', fontsize=18, color='r')
