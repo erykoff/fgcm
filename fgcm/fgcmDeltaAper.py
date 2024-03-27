@@ -450,7 +450,7 @@ class FgcmDeltaAper(object):
         # ignore bands that have a range > 10
         deltaRange = scaleRange[:, 1] - scaleRange[:, 0]
         filtersToMatchRange, = np.where(deltaRange < 20.0)
-        if filtersToMatchRange.size == 0:
+        if filtersToMatchRange.size > 0:
             matchedDelta = np.max(deltaRange[filtersToMatchRange])
         else:
             # If they all have big variance, just use that.
