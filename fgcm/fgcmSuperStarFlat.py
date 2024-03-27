@@ -453,7 +453,7 @@ class FgcmSuperStarFlat(object):
 
                 # and annotate
 
-                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
+                text = '(%s)' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
                     r'%.2f +/- %.2f' % (superStarFlatFPMean[e,f]*1000.0,
                                         superStarFlatFPSigma[e,f]*1000.0)
                 ax.annotate(text,
@@ -467,7 +467,7 @@ class FgcmSuperStarFlat(object):
                            'Central Delta-SuperStar (mmag)')
 
                 # and annotate
-                text = r'$(%s)$' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
+                text = '(%s)' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
                     r'%.2f +/- %.2f' % (deltaSuperStarFlatFPMean[e,f]*1000.0,
                                         deltaSuperStarFlatFPSigma[e,f]*1000.0)
                 ax.annotate(text,
