@@ -1,5 +1,4 @@
-import distutils
-from distutils.core import setup
+from setuptools import setup
 import glob
 import os
 import fnmatch

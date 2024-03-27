@@ -415,7 +415,7 @@ class FgcmCCDChromaticity:
                     "Chromaticity Index",
                 )
 
-                text = r'$(%s)$' % (filterName)
+                text = '(%s)' % (filterName)
 
                 ax.annotate(text,
                             (0.1,0.93),xycoords='axes fraction',
