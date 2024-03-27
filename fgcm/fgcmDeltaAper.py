@@ -450,7 +450,11 @@ class FgcmDeltaAper(object):
         # ignore bands that have a range > 10
         deltaRange = scaleRange[:, 1] - scaleRange[:, 0]
         filtersToMatchRange, = np.where(deltaRange < 20.0)
-        matchedDelta = np.max(deltaRange[filtersToMatchRange])
+        if filtersToMatchRange.size == 0:
+            matchedDelta = np.max(deltaRange[filtersToMatchRange])
+        else:
+            # If they all have big variance, just use that.
+            matchedDelta = np.max(deltaRange)
 
         if self.plotPath is not None:
             for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
@@ -462,7 +466,7 @@ class FgcmDeltaAper(object):
                 ax = fig.add_subplot(111)
                 plotCCDMapBinned2d(ax, self.deltaMapper, binnedArray, 'Epsilon (nJy/arcsec2)')
 
-                text = r'$(%s)$' % (filterName)
+                text = '(%s)' % (filterName)
                 ax.annotate(text,
                             (0.1, 0.93), xycoords='axes fraction',
                             ha='left', va='top', fontsize=18)
@@ -487,7 +491,7 @@ class FgcmDeltaAper(object):
                                    'Epsilon (nJy/arcsec2)',
                                    loHi=loHi)
 
-                text = r'$(%s)$' % (filterName)
+                text = '(%s)' % (filterName)
                 ax.annotate(text,
                             (0.1, 0.93), xycoords='axes fraction',
                             ha='left', va='top', fontsize=18)
