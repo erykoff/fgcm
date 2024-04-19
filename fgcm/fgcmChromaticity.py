@@ -3,9 +3,11 @@ import os
 import sys
 import esutil
 import time
-import matplotlib.pyplot as plt
+
 import scipy.optimize as optimize
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -27,7 +29,7 @@ class FgcmMirrorChromaticity(object):
        Look-up table object
 
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.info('Initializing FgcmMirrorChromaticity')
 
@@ -35,10 +37,14 @@ class FgcmMirrorChromaticity(object):
         self.fgcmStars = fgcmStars
         self.fgcmLUT = fgcmLUT
 
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
 
         self.I0StdBand = fgcmConfig.I0StdBand
         self.I1StdBand = fgcmConfig.I1StdBand
@@ -138,6 +144,7 @@ class FgcmMirrorChromaticity(object):
             self.fgcmPars.compMirrorChromaticity[filterIndex, :] = parFinal
 
             if self.plotPath is not None:
+                from matplotlib import colormaps
 
                 firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
@@ -158,15 +165,14 @@ class FgcmMirrorChromaticity(object):
                               deltaColorRaw[st[int(0.01*deltaColorRaw.size)]],
                               deltaColorRaw[st[int(0.99*deltaColorRaw.size)]]]
 
-                    plt.set_cmap('viridis')
-
-                    fig = plt.figure(1, figsize=(8, 6))
+                    fig = makeFigure(figsize=(8, 6))
                     fig.clf()
 
                     ax = fig.add_subplot(111)
                     ax.hexbin(self.fgcmPars.expMJD[ok] - firstMJD,
                               (expGrayColorSplitRaw[ok, 0] - expGrayColorSplitRaw[ok, 1]) * 1000.0,
-                              bins='log', extent=extent)
+                              bins='log', extent=extent,
+                              cmap=colormaps.get_cmap("viridis"))
 
                     ylim = ax.get_ylim()
                     for i in range(self.fgcmPars.nCoatingIntervals):
@@ -183,11 +189,19 @@ class FgcmMirrorChromaticity(object):
                     text=r'$(%s)$' % (self.fgcmPars.lutFilterNames[filterIndex])
                     ax.annotate(text,(0.95,0.93),xycoords='axes fraction',ha='right',va='top',fontsize=16)
 
-                    plt.savefig('%s/%s_compare-redblue-mirrorchrom_%s.png' % (self.plotPath,
-                                                                              self.outfileBaseWithCycle,
-                                                                              self.fgcmPars.lutFilterNames[filterIndex]))
+                    if self.butlerQC is not None:
+                        putButlerFigure(self.fgcmLog,
+                                        self.butlerQC,
+                                        self.plotHandleDict,
+                                        "fgcmCompareRedblueMirrorchrom",
+                                        self.cycleNumber,
+                                        fig,
+                                        filterName=self.fgcmPars.lutFilterNames[filterIndex])
+                    else:
+                        fig.savefig('%s/%s_compare-redblue-mirrorchrom_%s.png' % (self.plotPath,
+                                                                                  self.outfileBaseWithCycle,
+                                                                                  self.fgcmPars.lutFilterNames[filterIndex]))
 
-                    plt.close(fig)
 
         # Clear things out of memory
         self.blueStarsInFilter = None
@@ -294,7 +308,7 @@ class FgcmCCDChromaticity:
     fgcmLUT : `fgcm.FgcmLUT`
         Look-up table object
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.info('Initializing FgcmCCDChromaticity')
 
@@ -302,10 +316,14 @@ class FgcmCCDChromaticity:
         self.fgcmStars = fgcmStars
         self.fgcmLUT = fgcmLUT
 
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.colorSplitIndices = fgcmConfig.colorSplitIndices
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
 
         self.fitCCDChromaticity = fgcmConfig.fitCCDChromaticity
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
@@ -403,7 +421,7 @@ class FgcmCCDChromaticity:
                 if use.size == 0:
                     continue
 
-                fig = plt.figure(figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
@@ -423,11 +441,19 @@ class FgcmCCDChromaticity:
 
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
-                                                 self.outfileBaseWithCycle,
-                                                 'ccdchromaticity',
-                                                 filterName))
-                plt.close()
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmCcdChromaticity",
+                                    self.cycleNumber,
+                                    fig,
+                                    filterName=filterName)
+                else:
+                    fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle,
+                                                     'ccdchromaticity',
+                                                     filterName))
 
     def __call__(self, pars):
         c = pars[0]

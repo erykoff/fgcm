@@ -575,7 +575,7 @@ class FgcmFitCycle(object):
 
             # Compute Aperture Corrections
             self.fgcmLog.debug('FitCycle computing ApertureCorrections')
-            aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+            aperCorr = FgcmApertureCorrection(self.fgcmConfig, self.fgcmPars, self.fgcmGray, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             aperCorr.computeApertureCorrections()
 
             if not self.quietMode:
@@ -584,13 +584,13 @@ class FgcmFitCycle(object):
             # Compute mirror chromaticity
             if self.fgcmConfig.fitMirrorChromaticity:
                 self.fgcmLog.debug("FitCycle computing mirror chromaticity")
-                mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
                 mirChrom.computeMirrorChromaticity()
 
             # Compute CCD chromaticity, but only after the first cycle.
             if np.any(self.fgcmConfig.fitCCDChromaticity) and not self.initialCycle:
                 self.fgcmLog.debug("FitCycle computing CCD chromaticity")
-                ccdChrom = FgcmCCDChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                ccdChrom = FgcmCCDChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
                 ccdChrom.computeCCDChromaticity()
 
             # Compute QE sys slope
