@@ -387,7 +387,13 @@ class FgcmFitCycle(object):
 
                 # Might need option here for no ref stars!
                 # Something with the > 1.0.  WTF?
-                preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+                preSuperStarFlat = FgcmSuperStarFlat(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 preSuperStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True, forceZeroMean=True)
 
@@ -554,7 +560,13 @@ class FgcmFitCycle(object):
         # Compute SuperStar Flats
         if not self.finalCycle:
             self.fgcmLog.debug('FitCycle computing SuperStarFlats')
-            superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+            superStarFlat = FgcmSuperStarFlat(
+                self.fgcmConfig,
+                self.fgcmPars,
+                self.fgcmStars,
+                butlerQC=self.butlerQC,
+                plotHandleDict=self.plotHandleDict,
+            )
             superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
             superStarFlat.computeSuperStarFlats()
 

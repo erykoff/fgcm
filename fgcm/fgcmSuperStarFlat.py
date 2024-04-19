@@ -6,14 +6,10 @@ import time
 import scipy.optimize
 from scipy.stats import median_abs_deviation
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.colors as colors
-import matplotlib.cm as cmx
-
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 
 class FgcmSuperStarFlat(object):
@@ -34,7 +30,7 @@ class FgcmSuperStarFlat(object):
        Compute superStar flats on sub-ccd scale?
     """
 
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.debug('Initializing FgcmSuperStarFlat')
@@ -43,10 +39,14 @@ class FgcmSuperStarFlat(object):
 
         self.fgcmStars = fgcmStars
 
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.illegalValue = fgcmConfig.illegalValue
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.epochNames = fgcmConfig.epochNames
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
@@ -303,7 +303,7 @@ class FgcmSuperStarFlat(object):
                     # Choose a gridsize appropriate for the number of stars.
                     gridsize = int(np.clip(np.sqrt(i1a.size/10), 1, 100))
 
-                    fig = plt.figure(figsize=(8, 6))
+                    fig = makeFigure(figsize=(8, 6))
                     fig.clf()
                     ax = fig.add_subplot(111)
 
@@ -316,17 +316,28 @@ class FgcmSuperStarFlat(object):
                     ax.set_aspect("equal")
                     fig.colorbar(hb, label="SuperStar Residual (mmag)")
                     fig.tight_layout()
+
+                    # if self.butlerQC is not None:
+                    #     putButlerFigure(self.fgcmLog,
+                    #                     self.butlerQC,
+                    #                     self.plotHandleDict,
+                    #                     "fgcmSuperstarResidual",
+                    #                     self.cycleNumber,
+                    #                     fig,
+                    #                     filterName=self.fgcmPars.lutFilterNames[fiInd],
+                    #                     epochName=self.epochNames[epInd],
+                    #                     ccdName=str(cInd))
+                    # else:
                     fig.savefig("%s/%s_superstar_resid_%s_%s_%s.png" % (self.plotPath,
                                                                         self.outfileBaseWithCycle,
                                                                         self.fgcmPars.lutFilterNames[fiInd],
                                                                         self.epochNames[epInd],
                                                                         str(cInd)))
-                    plt.close(fig)
 
                     def std_func(x):
                         return median_abs_deviation(x, scale="normal")
 
-                    fig = plt.figure(figsize=(8, 6))
+                    fig = makeFigure(figsize=(8, 6))
                     fig.clf()
                     ax = fig.add_subplot(111)
 
@@ -350,7 +361,6 @@ class FgcmSuperStarFlat(object):
                                                                            self.fgcmPars.lutFilterNames[fiInd],
                                                                            self.epochNames[epInd],
                                                                            str(cInd)))
-                    plt.close(fig)
 
             # And we need to flag those that have bad observations
             bad = np.where(superStarNGoodStars == 0)
@@ -437,7 +447,7 @@ class FgcmSuperStarFlat(object):
                     continue
 
                 # double-wide.  Don't give number because that was dumb
-                fig=plt.figure(figsize=(16,6))
+                fig = makeFigure(figsize=(16, 6))
                 fig.clf()
 
                 # left side plot the map with x/y
@@ -476,9 +486,18 @@ class FgcmSuperStarFlat(object):
 
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
-                                                    self.outfileBaseWithCycle,
-                                                    'superstar',
-                                                    self.fgcmPars.lutFilterNames[f],
-                                                    self.epochNames[e]))
-                plt.close()
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmSuperstar",
+                                    self.cycleNumber,
+                                    fig,
+                                    filterName=self.fgcmPars.lutFilterNames[f],
+                                    epoch=self.epochNames[e])
+                else:
+                    fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
+                                                        self.outfileBaseWithCycle,
+                                                        'superstar',
+                                                        self.fgcmPars.lutFilterNames[f],
+                                                        self.epochNames[e]))
