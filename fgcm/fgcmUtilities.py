@@ -974,3 +974,46 @@ class FocalPlaneProjectorFromOffsets(object):
                         self.ccdOffsets['DECSIGN'][cInd] = 1
 
         self._computedSigns = True
+
+
+def makeFigure(**kwargs):
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+
+    fig = Figure(**kwargs)
+    canvas = FigureCanvasAgg(fig)
+
+    return fig
+
+
+def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None):
+    """Put a figure into the Butler.
+
+    Parameters
+    ----------
+    logger : `fgcm.FgcmLogger`
+    butlerQC : `lsst.pipe.base.QuantumContext`
+    plotHandleDict : `dict` [`lsst.daf.butler.DatasetRef`]
+    name : `str`
+    cycle : `int`
+    figure : `matplotlib.Figure.Figure`
+    band : `str`, optional
+    filterName : `str`, optional
+    """
+    if filterName and band:
+        raise RuntimeError("Cannot specify both filterName and band.")
+
+    plotName = name
+    if filterName:
+        plotFilter = filterName.replace("-", "_").replace(" ", "_")
+        plotName += f"_{plotFilter}"
+    if band:
+        plotName += f"_{band}"
+
+    plotName += f"_Plot{cycle}"
+    if plotName not in plotHandleDict:
+        logger.warning(f"Could not find plot {plotName} in plotHandleDict.")
+        return
+
+    butlerQC.put(figure, plotHandleDict[plotName])
