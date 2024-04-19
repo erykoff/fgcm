@@ -5,11 +5,10 @@ import sys
 import esutil
 import time
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 import multiprocessing
 
@@ -29,7 +28,7 @@ class FgcmDeltaAper(object):
     fgcmStars: FgcmStars
        Star object
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
 
         if not fgcmStars.hasDeltaAper:
@@ -39,8 +38,12 @@ class FgcmDeltaAper(object):
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
 
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
 
         self.deltaMapper = fgcmConfig.focalPlaneProjector(int(fgcmConfig.defaultCameraOrientation))
         self.minStarPerExp = fgcmConfig.minStarPerExp
@@ -222,7 +225,7 @@ class FgcmDeltaAper(object):
                 delta_min = delta[r[st[int(0.02*st.size)]]]
                 delta_max = delta[r[st[int(0.98*st.size)]]]
 
-                fig = plt.figure(1, figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
                 ax.hexbin(mag_std, delta, extent=[mag_min, mag_max,
@@ -236,10 +239,19 @@ class FgcmDeltaAper(object):
                 ax.set_xlabel('mag_std_%s' % (band))
                 ax.set_ylabel('delta_aper_%s' % (band))
                 ax.set_title('%s: %.4f nJy/arcsec2' % (band, globalEpsilon[i]))
-                fig.savefig('%s/%s_epsilon_global_%s.png' % (self.plotPath,
-                                                             self.outfileBaseWithCycle,
-                                                             band))
-                plt.close(fig)
+
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmEpsilonGlobal",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=band)
+                else:
+                    fig.savefig('%s/%s_epsilon_global_%s.png' % (self.plotPath,
+                                                                 self.outfileBaseWithCycle,
+                                                                 band))
 
     def computeEpsilonMap(self):
         """
@@ -311,13 +323,15 @@ class FgcmDeltaAper(object):
                 hi, = np.where(ra > 180.0)
                 ra[hi] -= 360.0
 
-                Z = [[0, 0], [0, 0]]
-                levels = np.linspace(vmin, vmax, num=150)
-                CS3 = plt.contourf(Z, levels)
-
-                fig = plt.figure(1, figsize=(10, 6))
+                fig = makeFigure(figsize=(10, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
+
+                Z = [[0, 0], [0, 0]]
+                levels = np.linspace(vmin, vmax, num=150)
+                CS3 = ax.contourf(Z, levels)
+                ax.clear()
+
                 ax.hexbin(ra, dec, offsetMap['epsilon'][hpix, j], vmin=vmin, vmax=vmax)
                 ax.set_xlabel('RA')
                 ax.set_ylabel('Dec')
@@ -325,12 +339,21 @@ class FgcmDeltaAper(object):
                 ax.set_aspect('equal')
                 xlim = ax.get_xlim()
                 ax.set_xlim(xlim[1], xlim[0])
-                cb = plt.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5), ax=ax)
+                cb = fig.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5), ax=ax)
                 cb.set_label('epsilon (nJy/arcsec2)')
-                fig.savefig('%s/%s_epsilon_map_%s.png' % (self.plotPath,
-                                                          self.outfileBaseWithCycle,
-                                                          band))
-                plt.close(fig)
+
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmEpsilonMap",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=band)
+                else:
+                    fig.savefig('%s/%s_epsilon_map_%s.png' % (self.plotPath,
+                                                              self.outfileBaseWithCycle,
+                                                              band))
 
     def computeEpsilonPerCcd(self):
         """
@@ -460,7 +483,7 @@ class FgcmDeltaAper(object):
             for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 binnedArray = epsilonCcdMap[j, :, :, :]
 
-                fig = plt.figure(figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
@@ -472,16 +495,24 @@ class FgcmDeltaAper(object):
                             ha='left', va='top', fontsize=18)
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
-                                                             self.outfileBaseWithCycle,
-                                                             filterName))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmEpsilonDetector",
+                                    self.cycleNumber,
+                                    fig,
+                                    filterName=filterName)
+                else:
+                    fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
+                                                                 self.outfileBaseWithCycle,
+                                                                 filterName))
 
                 # And replot with matched scale
                 loHi = [scaleMedian[j] - matchedDelta - 1e-7,
                         scaleMedian[j] + matchedDelta + 1e-7]
 
-                fig = plt.figure(figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
@@ -497,10 +528,18 @@ class FgcmDeltaAper(object):
                             ha='left', va='top', fontsize=18)
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_epsilon_perccd_%s_matchscale.png' % (self.plotPath,
-                                                                        self.outfileBaseWithCycle,
-                                                                        filterName))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmEpsilonDetectorMatchscale",
+                                    self.cycleNumber,
+                                    fig,
+                                    filterName=filterName)
+                else:
+                    fig.savefig('%s/%s_epsilon_perccd_%s_matchscale.png' % (self.plotPath,
+                                                                            self.outfileBaseWithCycle,
+                                                                            filterName))
 
     def _starWorker(self, goodStarsAndObs):
         """

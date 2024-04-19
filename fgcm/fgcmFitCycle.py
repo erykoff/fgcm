@@ -504,7 +504,8 @@ class FgcmFitCycle(object):
         if self.fgcmStars.hasDeltaAper:
             self.fgcmLog.debug('FitCycle computing deltaAper')
             self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
-                                               self.fgcmStars)
+                                               self.fgcmStars,
+                                               butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             if self.fgcmConfig.doComputeDeltaAperExposures:
                 self.fgcmDeltaAper.computeDeltaAperExposures()
             if self.fgcmConfig.doComputeDeltaAperStars:
