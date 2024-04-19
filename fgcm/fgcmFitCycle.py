@@ -51,11 +51,16 @@ class FgcmFitCycle(object):
     noFitsDict: dict, optional
        Dict with lutIndex/lutStd/expInfo/[ccdOffsets or focalPlaneProjector]
        if useFits == False
+    butlerQC : `lsst.pipe.base.QuantumContext`, optional
+        Quantum context used for serializing plots.
+    plotHandleDict : `dict` [`lsst.daf.butler.DatasetRef`], optional
+        Dictionary of plot datasets, keyed by plot name and (perhaps)
+        physical filter.
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
 
-    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False):
+    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False, butlerQC=None, plotHandleDict=None):
         # are we in fits mode?
         self.useFits = useFits
 
@@ -96,6 +101,14 @@ class FgcmFitCycle(object):
         self.finalCycle = False
         if (not self.fgcmConfig.resetParameters and self.fgcmConfig.maxIter == 0):
             self.finalCycle = True
+
+        if butlerQC is None and plotHandleDict is not None:
+            raise RuntimeError("If one of butlerQC or plotHandleDict is provided, they both must be.")
+        if butlerQC is not None and plotHandleDict is None:
+            raise RuntimeError("If one of butlerQC or plotHandleDict is provided, they both must be.")
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -602,7 +615,8 @@ class FgcmFitCycle(object):
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval, self.fgcmStars)
+                                       self.fgcmRetrieval, self.fgcmStars,
+                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
