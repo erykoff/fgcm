@@ -229,7 +229,7 @@ class FgcmFitCycle(object):
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
-        self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+        self.fgcmGray = FgcmGray(self.fgcmConfig, self.fgcmPars, self.fgcmStars, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
 
         # And the qeSysSlope code
         self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)

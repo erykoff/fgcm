@@ -5,14 +5,14 @@ import esutil
 import time
 import scipy.optimize
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -46,7 +46,7 @@ class FgcmGray(object):
        Time difference between exposures to check for correlated residuals (plots only)
     """
 
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -58,6 +58,9 @@ class FgcmGray(object):
 
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         # and record configuration variables...
         self.minStarPerCCD = fgcmConfig.minStarPerCCD
@@ -245,7 +248,7 @@ class FgcmGray(object):
             if (inBand.size == 0) :
                 continue
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
@@ -266,10 +269,18 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{initial})\,(\mathrm{mmag})$',fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
-            fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
-                                                          self.outfileBaseWithCycle,
-                                                          self.fgcmPars.bands[i]))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "fgcmExpgrayInitial",
+                                self.cycleNumber,
+                                fig,
+                                band=self.fgcmPars.bands[i])
+            else:
+                fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
+                                                              self.outfileBaseWithCycle,
+                                                              self.fgcmPars.bands[i]))
 
     def computeCCDAndExpGray(self, onlyObsErr=False):
         """
@@ -840,8 +851,6 @@ class FgcmGray(object):
             # main plots:
             #  per band, plot expGray for red vs blue stars!
 
-            plt.set_cmap('viridis')
-
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                     continue
@@ -853,11 +862,11 @@ class FgcmGray(object):
                     self.fgcmLog.info('Could not find photometric color-split exposures in band %d' % (bandIndex))
                     continue
 
-                fig = plt.figure(1, figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
-                ax.hexbin(expGrayColorSplit[use, 0]*1000.0, expGrayColorSplit[use, 2]*1000.0, bins='log')
+                ax.hexbin(expGrayColorSplit[use, 0]*1000.0, expGrayColorSplit[use, 2]*1000.0, bins='log', cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
                 ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
@@ -866,10 +875,18 @@ class FgcmGray(object):
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
 
-                fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
-                                                                      self.outfileBaseWithCycle,
-                                                                      self.fgcmPars.bands[bandIndex]))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmCompareRedblueExpgray",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex])
+                else:
+                    fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
+                                                                          self.outfileBaseWithCycle,
+                                                                          self.fgcmPars.bands[bandIndex]))
 
                 # And a plot as function of time
 
@@ -882,13 +899,13 @@ class FgcmGray(object):
                           deltaColor[st[int(0.01*deltaColor.size)]],
                           deltaColor[st[int(0.99*deltaColor.size)]]]
 
-                fig = plt.figure(1, figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
                 ax.hexbin(self.fgcmPars.expMJD[use] - firstMJD,
                           (expGrayColorSplit[use, 2] - expGrayColorSplit[use, 0]) * 1000.,
-                          bins='log', extent=extent)
+                          bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel('MJD - %.0f' % (firstMJD))
                 ax.set_ylabel('EXP_GRAY (%s) (%s) - EXP_GRAY (%s) (%s) (mmag)' %
                               (self.fgcmPars.bands[bandIndex], gmiCutNames[2],
@@ -900,10 +917,18 @@ class FgcmGray(object):
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
 
-                plt.savefig('%s/%s_compare-mjd-redblue-expgray_%s.png' % (self.plotPath,
-                                                                          self.outfileBaseWithCycle,
-                                                                          self.fgcmPars.bands[bandIndex]))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgrayCompareMjdRedblue",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex])
+                else:
+                    fig.savefig('%s/%s_compare-mjd-redblue-expgray_%s.png' % (self.plotPath,
+                                                                              self.outfileBaseWithCycle,
+                                                                              self.fgcmPars.bands[bandIndex]))
 
         # and we're done...
 
@@ -931,7 +956,7 @@ class FgcmGray(object):
 
             # plot histograms of EXP^gray
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
@@ -953,10 +978,18 @@ class FgcmGray(object):
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
             if self.plotPath is not None:
-                fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
-                                                      self.outfileBaseWithCycle,
-                                                      self.fgcmPars.bands[i]))
-            plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgray",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[i])
+                else:
+                    fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
+                                                          self.outfileBaseWithCycle,
+                                                          self.fgcmPars.bands[i]))
 
             self.fgcmLog.info("sigExpGray (%s) = %.2f mmag" % (
                     self.fgcmPars.bands[i],
@@ -972,12 +1005,12 @@ class FgcmGray(object):
             # zoom in on 1<secZenith<1.5 for plotting
             ok,=np.where(secZenith < 1.5)
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
 
-            ax.hexbin(secZenith[ok],expGray[expUse[inBand[ok]]]*1000.0,rasterized=True)
+            ax.hexbin(secZenith[ok], expGray[expUse[inBand[ok]]]*1000.0, rasterized=True, cmap=colormaps.get_cmap("viridis"))
 
             text = r'$(%s)$' % (self.fgcmPars.bands[i])
             ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
@@ -987,21 +1020,29 @@ class FgcmGray(object):
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
             if self.plotPath is not None:
-                fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
-                                                              self.outfileBaseWithCycle,
-                                                              self.fgcmPars.bands[i]))
-            plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgrayAirmass",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[i])
+                else:
+                    fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
+                                                                  self.outfileBaseWithCycle,
+                                                                  self.fgcmPars.bands[i]))
 
             # plot EXP^gray as a function of UT
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
 
             ax.hexbin(self.fgcmPars.expDeltaUT[expUse[inBand]],
                       expGray[expUse[inBand]]*1000.0,
-                      rasterized=True)
+                      rasterized=True, cmap=colormaps.get_cmap("viridis"))
             ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                         va='top', fontsize=16, color='r')
 
@@ -1009,13 +1050,21 @@ class FgcmGray(object):
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
             if self.plotPath is not None:
-                fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
-                                                         self.outfileBaseWithCycle,
-                                                         self.fgcmPars.bands[i]))
-            plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgrayUT",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[i])
+                else:
+                    fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
+                                                             self.outfileBaseWithCycle,
+                                                             self.fgcmPars.bands[i]))
 
         # and plot EXP^gray vs MJD for all bands for deep fields
-        fig = plt.figure(1,figsize=(8,6))
+        fig = makeFigure(figsize=(8, 6))
         fig.clf()
 
         ax=fig.add_subplot(111)
@@ -1026,16 +1075,23 @@ class FgcmGray(object):
 
         if deepUse.size > 0:
             ax.hexbin(self.fgcmPars.expMJD[expUse[deepUse]] - firstMJD,
-                      expGray[expUse[deepUse]]*1000.0, bins='log')
+                      expGray[expUse[deepUse]]*1000.0, bins='log', cmap=colormaps.get_cmap("viridis"))
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
             ax.set_title(r'$\mathrm{Deep Fields}$')
 
             if self.plotPath is not None:
-                fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
-                                                            self.outfileBaseWithCycle))
-            plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgrayDeepMjd",
+                                    self.cycleNumber,
+                                    fig)
+                else:
+                    fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
+                                                                self.outfileBaseWithCycle))
 
         # And plot correlations of EXP^gray between pairs of bands
         for ind, bandIndex0 in enumerate(self.bandFitIndex[:-2]):
@@ -1072,23 +1128,31 @@ class FgcmGray(object):
                                   self.expGrayCheckDeltaT * 24 * 60))
                 continue
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
 
             ax.hexbin(expGray[use0[matchInd[ok]]]*1000.0,
-                      expGray[use1[ok]]*1000.0, bins='log')
+                      expGray[use1[ok]]*1000.0, bins='log', cmap=colormaps.get_cmap("viridis"))
             ax.set_xlabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex0]))
             ax.set_ylabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex1]))
             ax.plot([-0.01 * 1000, 0.01 * 1000],[-0.01 * 1000, 0.01 * 1000],'r--')
 
             if self.plotPath is not None:
-                fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,
-                                                                 self.outfileBaseWithCycle,
-                                                                 self.fgcmPars.bands[bandIndex0],
-                                                                 self.fgcmPars.bands[bandIndex1]))
-            plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "fgcmExpgrayCompareBands",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex0])
+                else:
+                    fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,
+                                                                     self.outfileBaseWithCycle,
+                                                                     self.fgcmPars.bands[bandIndex0],
+                                                                     self.fgcmPars.bands[bandIndex1]))
 
     def computeExpGrayCuts(self):
         """
@@ -1353,7 +1417,7 @@ class FgcmGray(object):
             if inBand.size == 0:
                 continue
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -1373,10 +1437,18 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{ref}}\,(\mathrm{mmag})$', fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
-            fig.savefig('%s/%s_expref_%s.png' % (self.plotPath,
-                                                 self.outfileBaseWithCycle,
-                                                 self.fgcmPars.bands[i]))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "fgcmExpgrayReference",
+                                self.cycleNumber,
+                                fig,
+                                band=self.fgcmPars.bands[i])
+            else:
+                fig.savefig('%s/%s_expref_%s.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle,
+                                                     self.fgcmPars.bands[i]))
 
     def __getstate__(self):
         # Don't try to pickle the logger.
