@@ -187,9 +187,13 @@ class FgcmFitCycle(object):
         # Generate or Read Parameters
         if (self.initialCycle):
             self.fgcmPars = FgcmParameters.newParsWithFits(self.fgcmConfig,
-                                                           self.fgcmLUT)
+                                                           self.fgcmLUT,
+                                                           butlerQC=self.butlerQC,
+                                                           plotHandleDict=self.plotHandleDict)
         else:
-            self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig)
+            self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig,
+                                                            butlerQC=self.butlerQC,
+                                                            plotHandleDict=self.plotHandleDict)
 
         # Read in the stars
         self.fgcmStars = FgcmStars(self.fgcmConfig)
