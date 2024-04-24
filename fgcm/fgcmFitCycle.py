@@ -236,7 +236,7 @@ class FgcmFitCycle(object):
         self.fgcmGray = FgcmGray(self.fgcmConfig, self.fgcmPars, self.fgcmStars, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
 
         # And the qeSysSlope code
-        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
 
         self.setupComplete = True
         if not self.quietMode:
