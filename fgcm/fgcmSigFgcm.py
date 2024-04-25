@@ -6,7 +6,6 @@ import time
 import scipy.optimize
 
 from .fgcmUtilities import makeFigure, putButlerFigure
-from matplotlib import colormaps
 
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss

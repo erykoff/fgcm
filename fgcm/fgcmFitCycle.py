@@ -618,7 +618,8 @@ class FgcmFitCycle(object):
         #   if we don't the zeropoints before convergence will be wrong.
 
         self.fgcmLog.debug('FitCycle computing SigmaCal')
-        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
+        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray,
+                                   butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.sigCal.run()
 
         if self.fgcmStars.hasRefstars:
