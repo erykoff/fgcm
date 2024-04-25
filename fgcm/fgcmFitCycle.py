@@ -306,7 +306,9 @@ class FgcmFitCycle(object):
         # Set up the magnitude error modeler
         self.fgcmModelMagErrs = FgcmModelMagErrors(self.fgcmConfig,
                                                    self.fgcmPars,
-                                                   self.fgcmStars)
+                                                   self.fgcmStars,
+                                                   butlerQC=self.butlerQC,
+                                                   plotHandleDict=self.plotHandleDict)
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
