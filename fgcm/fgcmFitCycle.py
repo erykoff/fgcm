@@ -524,8 +524,9 @@ class FgcmFitCycle(object):
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
-        self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
-                                       self.fgcmStars)
+        self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig, self.fgcmPars,
+                                       self.fgcmStars, butlerQC=self.butlerQC,
+                                       plotHandleDict=self.plotHandleDict)
         # first compute with all...(better stats)
         self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
