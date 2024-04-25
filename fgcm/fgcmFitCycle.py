@@ -624,7 +624,8 @@ class FgcmFitCycle(object):
 
         if self.fgcmStars.hasRefstars:
             self.fgcmLog.debug('FitCycle computing SigmaRef')
-            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars,
+                                  butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             sigRef.computeSigmaRef()
 
             self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
