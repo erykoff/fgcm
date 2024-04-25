@@ -558,7 +558,8 @@ class FgcmFitCycle(object):
         # Compute Retrieved PWV -- always because why not?
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
-                                                             self.fgcmPars)
+                                                             self.fgcmPars, butlerQC=self.butlerQC,
+                                                             plotHandleDict=self.plotHandleDict)
         self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
