@@ -4,8 +4,6 @@ import sys
 import esutil
 import scipy.optimize as optimize
 
-import matplotlib.pyplot as plt
-
 from .fgcmConfig import FgcmConfig
 from .fgcmParameters import FgcmParameters
 from .fgcmChisq import FgcmChisq
@@ -34,6 +32,7 @@ from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import FocalPlaneProjectorFromOffsets
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -754,7 +753,7 @@ class FgcmFitCycle(object):
         self.fgcmChisq.maxIterations = -1
 
         if (doPlots):
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax=fig.add_subplot(111)
 
@@ -768,9 +767,16 @@ class FgcmFitCycle(object):
             ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
             ax.set_ylim(chisqValues[-1]-0.5,chisqValues[0]+0.5)
 
-            fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
-                                                 self.fgcmConfig.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "fgcmChisqFit",
+                                self.fgcmConfig.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
+                                                     self.fgcmConfig.outfileBaseWithCycle))
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
