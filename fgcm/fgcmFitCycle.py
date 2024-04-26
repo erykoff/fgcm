@@ -20,7 +20,6 @@ from .fgcmSigFgcm import FgcmSigFgcm
 from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
-from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
@@ -435,11 +434,6 @@ class FgcmFitCycle(object):
         # And compute the step units
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         self.fgcmComputeStepUnits.run(parArray)
-
-        # Make connectivity maps with what we know about photometric selection
-        # This code doesn't work properly, skip it for now.
-        # fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
-        # fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
