@@ -273,7 +273,7 @@ class FgcmGray(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmExpgrayInitial",
+                                "ExpgrayInitial",
                                 self.cycleNumber,
                                 fig,
                                 band=self.fgcmPars.bands[i])
@@ -879,7 +879,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmCompareRedblueExpgray",
+                                    "CompareRedblueExpgray",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
@@ -921,7 +921,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgrayCompareMjdRedblue",
+                                    "ExpgrayCompareMjdRedblue",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
@@ -982,7 +982,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgray",
+                                    "Expgray",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
@@ -1024,7 +1024,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgrayAirmass",
+                                    "ExpgrayAirmass",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
@@ -1054,7 +1054,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgrayUT",
+                                    "ExpgrayUT",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
@@ -1086,7 +1086,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgrayDeepMjd",
+                                    "ExpgrayDeepMjd",
                                     self.cycleNumber,
                                     fig)
                 else:
@@ -1144,7 +1144,7 @@ class FgcmGray(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmExpgrayCompareBands",
+                                    "ExpgrayCompareBands",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex0])
@@ -1441,7 +1441,7 @@ class FgcmGray(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmExpgrayReference",
+                                "ExpgrayReference",
                                 self.cycleNumber,
                                 fig,
                                 band=self.fgcmPars.bands[i])

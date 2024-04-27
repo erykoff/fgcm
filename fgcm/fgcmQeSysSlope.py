@@ -239,7 +239,7 @@ class FgcmQeSysSlope(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                f"fgcmQESysWashes{name.title()}",
+                                f"QESysWashes{name.title()}",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -363,7 +363,7 @@ class FgcmQeSysSlope(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                f"fgcmQESysRefstarsStd{name.title()}",
+                                f"QESysRefstarsStd{name.title()}",
                                 self.cycleNumber,
                                 fig,
                                 band=band)
@@ -394,7 +394,7 @@ class FgcmQeSysSlope(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                f"fgcmQESysRefstarsObs{name.title()}",
+                                f"QESysRefstarsObs{name.title()}",
                                 self.cycleNumber,
                                 fig,
                                 band=band)

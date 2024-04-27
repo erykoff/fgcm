@@ -651,7 +651,7 @@ class FgcmZeropoints(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmZeropoints",
+                                "Zeropoints",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -958,7 +958,7 @@ class FgcmZeropointPlotter(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmI1R1",
+                                "I1R1",
                                 self.cycleNumber,
                                 fig,
                                 filterName=filterName)
@@ -1061,7 +1061,7 @@ class FgcmZeropointPlotter(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    f"fgcm{name}",
+                                    name,
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
@@ -1149,7 +1149,7 @@ class FgcmZeropointPlotter(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmR1mI1_vs_mjd",
+                                "R1mI1_vs_mjd",
                                 self.cycleNumber,
                                 fig,
                                 filterName=filterName)

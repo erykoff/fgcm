@@ -228,7 +228,7 @@ class FgcmSigmaRef(object):
                         putButlerFigure(self.fgcmLog,
                                         self.butlerQC,
                                         self.plotHandleDict,
-                                        "fgcmSigmaRef",
+                                        "SigmaRef",
                                         self.cycleNumber,
                                         fig,
                                         band=band)

@@ -2199,7 +2199,7 @@ class FgcmStars(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    f"fgcmRefResidVsColor{mode.title()}",
+                                    f"RefResidVsColor{mode.title()}",
                                     self.cycleNumber,
                                     fig,
                                     band=band)

@@ -210,7 +210,7 @@ class FgcmParameters(object):
         return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
 
     @classmethod
-    def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo):
+    def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo, butlerQC=None, plotHandleDict=None):
         """
         Make a new FgcmParameters object, with input arrays
 
@@ -220,9 +220,13 @@ class FgcmParameters(object):
         fgcmLUT: FgcmLUT
         expInfo: numpy recarray
            Exposure info
+        butlerQC : `lsst.pipe.base.QuantumContext`, optional
+            Quantum context used for serializing plots.
+        plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+            Dictionary of plot datasets, keyed by plot name.
         """
 
-        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
+        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT, butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
     @classmethod
     def loadParsWithFits(cls, fgcmConfig):
@@ -255,7 +259,7 @@ class FgcmParameters(object):
                    inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
 
     @classmethod
-    def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar):
+    def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar, butlerQC=None, plotHandleDict=None):
         """
         Make an FgcmParameters object, loading from old parameters in arrays.
 
@@ -270,10 +274,15 @@ class FgcmParameters(object):
            Input parameters
         inSuperStar: numpy array
            Input superstar
+        butlerQC : `lsst.pipe.base.QuantumContext`, optional
+            Quantum context used for serializing plots.
+        plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+            Dictionary of plot datasets, keyed by plot name.
         """
 
         return cls(fgcmConfig, expInfo=expInfo,
-                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
+                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar,
+                   butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
     def _initializeNewParameters(self, expInfo, fgcmLUT):
         """
@@ -1972,7 +1981,7 @@ class FgcmParameters(object):
             putButlerFigure(self.fgcmLog,
                             self.butlerQC,
                             self.plotHandleDict,
-                            "fgcmNightlyAlpha",
+                            "NightlyAlpha",
                             self.cycleNumber,
                             fig)
         else:
@@ -2018,7 +2027,7 @@ class FgcmParameters(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmNightlyTau",
+                                "NightlyTau",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -2047,7 +2056,7 @@ class FgcmParameters(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmNightlyPwv",
+                                "NightlyPwv",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -2076,7 +2085,7 @@ class FgcmParameters(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmNightlyO3",
+                                "NightlyO3",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -2104,10 +2113,14 @@ class FgcmParameters(object):
             putButlerFigure(self.fgcmLog,
                             self.butlerQC,
                             self.plotHandleDict,
-                            "fgcmFilterOffsets",
+                            "FilterOffsets",
                             self.cycleNumber,
                             fig)
         else:
+            print("FILTER OFFSETS")
+            import IPython
+            IPython.embed()
+
             fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
 
@@ -2130,10 +2143,13 @@ class FgcmParameters(object):
             putButlerFigure(self.fgcmLog,
                             self.butlerQC,
                             self.plotHandleDict,
-                            "fgcmAbsThroughputs",
+                            "AbsThroughputs",
                             self.cycleNumber,
                             fig)
         else:
+            print("ABS THROUGHPUT")
+            import IPython
+            IPython.embed()
             fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 

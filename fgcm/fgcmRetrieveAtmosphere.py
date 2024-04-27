@@ -243,7 +243,7 @@ class FgcmRetrieveAtmosphere(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmRpwvVsRpwvInput",
+                                "RpwvVsRpwvInput",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -274,7 +274,7 @@ class FgcmRetrieveAtmosphere(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmRpwvVsRpwvSmooth",
+                                "RpwvVsRpwvSmooth",
                                 self.cycleNumber,
                                 fig)
             else:
@@ -304,7 +304,7 @@ class FgcmRetrieveAtmosphere(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmModelPwvVsRpwv",
+                                "ModelPwvVsRpwv",
                                 self.cycleNumber,
                                 fig)
             else:

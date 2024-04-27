@@ -193,7 +193,7 @@ class FgcmMirrorChromaticity(object):
                         putButlerFigure(self.fgcmLog,
                                         self.butlerQC,
                                         self.plotHandleDict,
-                                        "fgcmCompareRedblueMirrorchrom",
+                                        "CompareRedblueMirrorchrom",
                                         self.cycleNumber,
                                         fig,
                                         filterName=self.fgcmPars.lutFilterNames[filterIndex])
@@ -445,7 +445,7 @@ class FgcmCCDChromaticity:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmCcdChromaticity",
+                                    "CcdChromaticity",
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)

@@ -262,7 +262,7 @@ class FgcmModelMagErrors(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    f"fgcmModelMagerr{fitName.title()}",
+                                    f"ModelMagerr{fitName.title()}",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])

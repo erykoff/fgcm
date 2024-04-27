@@ -244,7 +244,7 @@ class FgcmDeltaAper(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmEpsilonGlobal",
+                                    "EpsilonGlobal",
                                     self.cycleNumber,
                                     fig,
                                     band=band)
@@ -346,7 +346,7 @@ class FgcmDeltaAper(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmEpsilonMap",
+                                    "EpsilonMap",
                                     self.cycleNumber,
                                     fig,
                                     band=band)
@@ -499,7 +499,7 @@ class FgcmDeltaAper(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmEpsilonDetector",
+                                    "EpsilonDetector",
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
@@ -532,7 +532,7 @@ class FgcmDeltaAper(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmEpsilonDetectorMatchscale",
+                                    "EpsilonDetectorMatchscale",
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)

@@ -226,7 +226,7 @@ class FgcmApertureCorrection(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmApercorr",
+                                    "Apercorr",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])

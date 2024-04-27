@@ -765,7 +765,7 @@ class FgcmFitCycle(object):
                 putButlerFigure(self.fgcmLog,
                                 self.butlerQC,
                                 self.plotHandleDict,
-                                "fgcmChisqFit",
+                                "ChisqFit",
                                 self.fgcmConfig.cycleNumber,
                                 fig)
             else:

@@ -247,7 +247,7 @@ class FgcmSigFgcm(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    f"fgcmSigmaFgcm{extraNameButler}",
+                                    f"SigmaFgcm{extraNameButler}",
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])

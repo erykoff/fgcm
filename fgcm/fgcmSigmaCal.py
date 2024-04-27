@@ -284,7 +284,7 @@ class FgcmSigmaCal(object):
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
-                                    "fgcmSigmaCal",
+                                    "SigmaCal",
                                     self.cycleNumber,
                                     fig,
                                     band=band)
