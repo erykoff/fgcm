@@ -254,7 +254,9 @@ class FgcmConfig(object):
     zpsToApplyFile = ConfigField(str, required=False)
     maxFlagZpsToApply = ConfigField(int, default=2)
 
-    def __init__(self, configDict, lutIndex, lutStd, expInfo, checkFiles=False, noOutput=False, ccdOffsets=None, focalPlaneProjector=None):
+    def __init__(self, configDict, lutIndex, lutStd, expInfo, checkFiles=False, noOutput=False, ccdOffsets=None, focalPlaneProjector=None, hasButler=False):
+
+        self.hasButler = hasButler
 
         self._setVarsFromDict(configDict)
 
@@ -272,7 +274,7 @@ class FgcmConfig(object):
             self.outputPath = os.path.abspath(self.outputPath)
 
         # create output path if necessary
-        if not noOutput:
+        if not noOutput and not self.hasButler:
             if (not os.path.isdir(self.outputPath)):
                 try:
                     os.makedirs(self.outputPath)
@@ -336,7 +338,7 @@ class FgcmConfig(object):
         if (self.noChromaticCorrections) :
             self.fgcmLog.warning('No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
-        if (self.plotPath is not None and not os.path.isdir(self.plotPath)):
+        if (self.plotPath is not None and not os.path.isdir(self.plotPath)) and not self.hasButler:
             try:
                 os.makedirs(self.plotPath)
             except:

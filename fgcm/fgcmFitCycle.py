@@ -85,7 +85,8 @@ class FgcmFitCycle(object):
                                          noFitsDict['expInfo'],
                                          noOutput=noOutput,
                                          ccdOffsets=noFitsDict.get('ccdOffsets'),
-                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'))
+                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'),
+                                         hasButler=(butlerQC is not None))
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
         self.quietMode = self.fgcmConfig.quietMode
