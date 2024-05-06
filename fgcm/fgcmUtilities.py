@@ -1004,7 +1004,7 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
 
     plotName = f"fgcm_Cycle{cycle}_{name}"
     if filterName:
-        plotFilter = filterName.replace("-", "_").replace(" ", "_")
+        plotFilter = filterName.replace("-", "_").replace(" ", "_").replace("~", "_")
         plotName += f"_{plotFilter}"
     if band:
         plotName += f"_{band}"
