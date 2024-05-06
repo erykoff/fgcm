@@ -338,7 +338,8 @@ class FgcmConfig(object):
         if (self.noChromaticCorrections) :
             self.fgcmLog.warning('No chromatic corrections will be applied.  I hope this is what you wanted for a test!')
 
-        if (self.plotPath is not None and not os.path.isdir(self.plotPath)) and not self.hasButler:
+        if (self.plotPath is not None and not os.path.isdir(self.plotPath)) and (not self.hasButler or self.superStarPlotCCDResiduals):
+            # We will put ccd residuals locally always.
             try:
                 os.makedirs(self.plotPath)
             except:
