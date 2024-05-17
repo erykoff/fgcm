@@ -977,8 +977,8 @@ def makeFigure(**kwargs):
     """Make a matplotlib Figure with an Agg-backend canvas.
 
     This routine creates a matplotlib figure without using
-    ``matplotlib.pyplot``, and a fixed non-interactive backend.
-    The advantage is that these figures are not cached and
+    ``matplotlib.pyplot``, and instead uses a fixed non-interactive
+    backend. The advantage is that these figures are not cached and
     therefore do not need to be explicitly closed -- they
     are completely self-contained and ephemeral unlike figures
     created with `matplotlib.pyplot.figure()`.
