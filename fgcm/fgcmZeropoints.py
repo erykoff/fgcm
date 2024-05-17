@@ -1136,7 +1136,7 @@ class FgcmZeropointPlotter(object):
             ax.plot(xRange, [0.0, 0.0], 'r:')
 
             ax.errorbar(binStruct['X_BIN'], binStruct['Y'],
-                         yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
+                        yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
 
             text = "(%s)\n" % (filterName)
             text += "Blue: %s\n" % (self.blueString)

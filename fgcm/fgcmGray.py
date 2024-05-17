@@ -866,7 +866,12 @@ class FgcmGray(object):
                 fig.clf()
 
                 ax = fig.add_subplot(111)
-                ax.hexbin(expGrayColorSplit[use, 0]*1000.0, expGrayColorSplit[use, 2]*1000.0, bins='log', cmap=colormaps.get_cmap("viridis"))
+                ax.hexbin(
+                    expGrayColorSplit[use, 0]*1000.0,
+                    expGrayColorSplit[use, 2]*1000.0,
+                    bins='log',
+                    cmap=colormaps.get_cmap("viridis"),
+                )
                 ax.set_xlabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[0]))
                 ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
@@ -955,6 +960,10 @@ class FgcmGray(object):
                 continue
 
             # plot histograms of EXP^gray
+            # Note that we use the histogram fit/plot code to get the
+            # fit coefficients even if we are not persisting the plots.
+            # Fortunately, the makeFigure code now ensures that this
+            # does not have any side effects.
 
             fig = makeFigure(figsize=(8, 6))
             fig.clf()
@@ -1010,7 +1019,12 @@ class FgcmGray(object):
 
             ax=fig.add_subplot(111)
 
-            ax.hexbin(secZenith[ok], expGray[expUse[inBand[ok]]]*1000.0, rasterized=True, cmap=colormaps.get_cmap("viridis"))
+            ax.hexbin(
+                secZenith[ok],
+                expGray[expUse[inBand[ok]]]*1000.0,
+                rasterized=True,
+                cmap=colormaps.get_cmap("viridis"),
+            )
 
             text = r'$(%s)$' % (self.fgcmPars.bands[i])
             ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',

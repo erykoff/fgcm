@@ -50,10 +50,11 @@ class FgcmFitCycle(object):
        Dict with lutIndex/lutStd/expInfo/[ccdOffsets or focalPlaneProjector]
        if useFits == False
     butlerQC : `lsst.pipe.base.QuantumContext`, optional
-        Quantum context used for serializing plots.
-    plotHandleDict : `dict` [`lsst.daf.butler.DatasetRef`], optional
-        Dictionary of plot datasets, keyed by plot name and (perhaps)
-        physical filter.
+        Quantum context used for serializing plots. If this is set then
+        plotHandleDict must also be set.
+    plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+        Dictionary of plot datasets refs, keyed by plot name and (perhaps)
+        physical filter. If this is set then butlerQC must also be set.
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
@@ -102,9 +103,10 @@ class FgcmFitCycle(object):
             self.finalCycle = True
 
         if butlerQC is None and plotHandleDict is not None:
-            raise RuntimeError("If one of butlerQC or plotHandleDict is provided, they both must be.")
+
+            raise RuntimeError("If plotHandleDict is set then butlerQC must also be set.")
         if butlerQC is not None and plotHandleDict is None:
-            raise RuntimeError("If one of butlerQC or plotHandleDict is provided, they both must be.")
+            raise RuntimeError("If butlerQC is set then plotHandleDict must also be set.")
 
         self.butlerQC = butlerQC
         self.plotHandleDict = plotHandleDict
@@ -232,10 +234,22 @@ class FgcmFitCycle(object):
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
-        self.fgcmGray = FgcmGray(self.fgcmConfig, self.fgcmPars, self.fgcmStars, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+        self.fgcmGray = FgcmGray(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            butlerQC=self.butlerQC,
+            plotHandleDict=self.plotHandleDict,
+        )
 
         # And the qeSysSlope code
-        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+        self.fgcmQeSysSlope = FgcmQeSysSlope(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            butlerQC=self.butlerQC,
+            plotHandleDict=self.plotHandleDict,
+        )
 
         self.setupComplete = True
         if not self.quietMode:
@@ -578,7 +592,13 @@ class FgcmFitCycle(object):
 
             # Compute Aperture Corrections
             self.fgcmLog.debug('FitCycle computing ApertureCorrections')
-            aperCorr = FgcmApertureCorrection(self.fgcmConfig, self.fgcmPars, self.fgcmGray, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+            aperCorr = FgcmApertureCorrection(
+                self.fgcmConfig,
+                self.fgcmPars,
+                self.fgcmGray,
+                butlerQC=self.butlerQC,
+                plotHandleDict=self.plotHandleDict,
+            )
             aperCorr.computeApertureCorrections()
 
             if not self.quietMode:
@@ -587,13 +607,27 @@ class FgcmFitCycle(object):
             # Compute mirror chromaticity
             if self.fgcmConfig.fitMirrorChromaticity:
                 self.fgcmLog.debug("FitCycle computing mirror chromaticity")
-                mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+                mirChrom = FgcmMirrorChromaticity(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    self.fgcmLUT,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 mirChrom.computeMirrorChromaticity()
 
             # Compute CCD chromaticity, but only after the first cycle.
             if np.any(self.fgcmConfig.fitCCDChromaticity) and not self.initialCycle:
                 self.fgcmLog.debug("FitCycle computing CCD chromaticity")
-                ccdChrom = FgcmCCDChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+                ccdChrom = FgcmCCDChromaticity(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    self.fgcmLUT,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 ccdChrom.computeCCDChromaticity()
 
             # Compute QE sys slope

@@ -327,6 +327,7 @@ class FgcmDeltaAper(object):
                 fig.clf()
                 ax = fig.add_subplot(111)
 
+                # Make a dummy image for the colorbar (below).
                 Z = [[0, 0], [0, 0]]
                 levels = np.linspace(vmin, vmax, num=150)
                 CS3 = ax.contourf(Z, levels)

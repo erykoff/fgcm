@@ -974,6 +974,30 @@ class FocalPlaneProjectorFromOffsets(object):
 
 
 def makeFigure(**kwargs):
+    """Make a matplotlib Figure with an Agg-backend canvas.
+
+    This routine creates a matplotlib figure without using
+    ``matplotlib.pyplot``, and a fixed non-interactive backend.
+    The advantage is that these figures are not cached and
+    therefore do not need to be explicitly closed -- they
+    are completely self-contained and ephemeral unlike figures
+    created with `matplotlib.pyplot.figure()`.
+
+    Parameters
+    ----------
+    **kwargs : `dict`
+        Keyward arguments to be passed to `matplotlib.figure.Figure()`
+
+    Returns
+    -------
+    figure : `matplotlib.figure.Figure`
+        Figure with a fixed Agg backend, and no caching.
+
+    Notes
+    -----
+    The code here is based on
+    https://matplotlib.org/stable/gallery/user_interfaces/canvasagg.html#sphx-glr-gallery-user-interfaces-canvasagg-py
+    """
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
@@ -991,7 +1015,7 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
     ----------
     logger : `fgcm.FgcmLogger`
     butlerQC : `lsst.pipe.base.QuantumContext`
-    plotHandleDict : `dict` [`lsst.daf.butler.DatasetRef`]
+    plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`]
     name : `str`
     cycle : `int`
     figure : `matplotlib.Figure.Figure`
@@ -1011,7 +1035,7 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
     if epoch:
         plotName += f"_{epoch}"
 
-    plotName += f"_Plot"
+    plotName += "_Plot"
     if plotName not in plotHandleDict:
         logger.warning(f"Could not find plot {plotName} in plotHandleDict.")
         return

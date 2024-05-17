@@ -68,10 +68,10 @@ class FgcmParameters(object):
         self.hasExternalTau = False
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.plotPath = fgcmConfig.plotPath
         self.butlerQC = butlerQC
         self.plotHandleDict = plotHandleDict
-        self.cycleNumber = fgcmConfig.cycleNumber
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -2117,10 +2117,6 @@ class FgcmParameters(object):
                             self.cycleNumber,
                             fig)
         else:
-            print("FILTER OFFSETS")
-            import IPython
-            IPython.embed()
-
             fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
 
@@ -2147,9 +2143,6 @@ class FgcmParameters(object):
                             self.cycleNumber,
                             fig)
         else:
-            print("ABS THROUGHPUT")
-            import IPython
-            IPython.embed()
             fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 

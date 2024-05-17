@@ -140,6 +140,10 @@ class FgcmSigmaRef(object):
 
                 # start the figure which will have 4 panels
                 # (the figure may not be drawn and written if not configured)
+                # Note that we use the histogram fit/plot code to get the
+                # fit coefficients even if we are not persisting the plots.
+                # Fortunately, the makeFigure code now ensures that this
+                # does not have any side effects.
                 fig = makeFigure(figsize=(9, 6))
                 fig.clf()
 

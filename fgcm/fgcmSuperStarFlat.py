@@ -317,6 +317,10 @@ class FgcmSuperStarFlat(object):
                     fig.colorbar(hb, label="SuperStar Residual (mmag)")
                     fig.tight_layout()
 
+                    # These plots will only be used for local debugging because
+                    # of the large number of plots that may be produced
+                    # (one per filter per epoch per detector).
+
                     # if self.butlerQC is not None:
                     #     putButlerFigure(self.fgcmLog,
                     #                     self.butlerQC,
@@ -496,8 +500,8 @@ class FgcmSuperStarFlat(object):
                                     filterName=self.fgcmPars.lutFilterNames[f],
                                     epoch=self.epochNames[e])
                 else:
-                    fig.savefig('%s/%s_%s_%s_%s.png' % (self.plotPath,
+                    fig.savefig("%s/%s_%s_%s_%s.png" % (self.plotPath,
                                                         self.outfileBaseWithCycle,
-                                                        'superstar',
+                                                        "superstar",
                                                         self.fgcmPars.lutFilterNames[f],
                                                         self.epochNames[e]))

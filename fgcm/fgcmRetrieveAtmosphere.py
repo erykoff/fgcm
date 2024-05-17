@@ -311,41 +311,6 @@ class FgcmRetrieveAtmosphere(object):
                 fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 
-            #  PWV vs RPWV_SCALED: this plot is commented out.
-            """
-            fig = makeFigure(figsize=(8, 6))
-            fig.clf()
-
-            ax = fig.add_subplot(111)
-
-            if self.useNightlyRetrievedPwv:
-                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvNightlyOffset[self.fgcmPars.expNightIndex] +
-                                        self.fgcmPars.parRetrievedLnPwvScale *
-                                        self.fgcmPars.compRetrievedLnPwv)
-            else:
-                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvOffset +
-                                        self.fgcmPars.parRetrievedLnPwvScale *
-                                        self.fgcmPars.compRetrievedLnPwv)
-
-            if hasPwv.size >= 3000:
-                # we can use hexbin; this is arbitrary.
-                ax.hexbin(np.exp(scaledRetrievedLnPwv[hasPwv]),
-                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log',
-                          cmap=colormaps.get_cmap("viridis"))
-            else:
-                ax.plot(np.exp(scaledRetrievedLnPwv[hasPwv]),
-                        np.exp(self.fgcmPars.expLnPwv[hasPwv]), 'b.')
-            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
-                                  np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
-            ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV_SCALED (mm)')
-            ax.set_ylabel('PWV_MODEL (mm)')
-
-
-            fig.savefig('%s/%s_pwv_vs_rpwv_scaled.png' % (self.plotPath,
-                                                         self.outfileBaseWithCycle))
-            """
-
         # and we're done!  Everything is filled in!
         self.fgcmLog.debug('Done computing retrieved PWV values')
 
@@ -437,6 +402,10 @@ class FgcmRetrieveAtmosphere(object):
                                                          self.fgcmLUT.tau[-1]-0.0001)
 
         # And the plots
+        # The nightlyTau code is not currently used because it is
+        # not fully developed.  I have commented out the plots because
+        # this code is not used/tested currently.  I am leaving
+        # in the code in case it gets resurrected in the future.
         """
         if self.plotPath is not None:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
