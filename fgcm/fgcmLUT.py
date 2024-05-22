@@ -3,8 +3,13 @@ import scipy.interpolate as interpolate
 import scipy.integrate as integrate
 import os
 import sys
-from pkg_resources import resource_filename
 
+hasLsstResources = True
+try:
+    from lsst.resources.packageresource import PackageResourcePath
+except ImportError:
+    hasLsstResources = False
+    from pkg_resources import resource_filename
 
 from .modtranGenerator import ModtranGenerator
 from .fgcmAtmosphereTable import FgcmAtmosphereTable
@@ -33,10 +38,21 @@ class FgcmLUTMaker(object):
         self._setThroughput = False
         self.makeSeds = makeSeds
 
-        try:
-            self.stellarTemplateFile = resource_filename(__name__,'data/templates/stellar_templates_master.fits')
-        except:
-            raise IOError("Could not find stellar template file")
+        if hasLsstResources:
+            rootResource = PackageResourcePath("resource://fgcm/data/templates", forceDirectory=True)
+
+            if rootResource.join("stellar_templates_master.fits").exists():
+                resource = rootResource.join("stellar_templates_master.fits")
+            else:
+                raise IOError("Could not find stellar template file")
+
+            with resource.as_local() as loc:
+                self.stellarTemplateFile = loc.ospath
+        else:
+            try:
+                self.stellarTemplateFile = resource_filename(__name__,'data/templates/stellar_templates_master.fits')
+            except:
+                raise IOError("Could not find stellar template file")
 
         if (not os.path.isfile(self.stellarTemplateFile)):
             raise IOError("Could not find stellar template file")

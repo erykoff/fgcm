@@ -986,7 +986,7 @@ def makeFigure(**kwargs):
     Parameters
     ----------
     **kwargs : `dict`
-        Keyward arguments to be passed to `matplotlib.figure.Figure()`
+        Keyword arguments to be passed to `matplotlib.figure.Figure()`
 
     Returns
     -------
