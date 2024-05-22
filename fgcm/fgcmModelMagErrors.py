@@ -2,11 +2,13 @@ import numpy as np
 import os
 import sys
 import esutil
-import matplotlib.pyplot as plt
 import scipy.optimize
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import dataBinner
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
+
 
 class MagErrorModelFitter(object):
     """
@@ -33,12 +35,15 @@ class FgcmModelMagErrors(object):
     Class which models the magnitude errors.
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.debug('Initializing FgcmModelMagErrors')
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.sigma0Phot = fgcmConfig.sigma0Phot
         self.minObsPerBand = fgcmConfig.minObsPerBand
@@ -47,6 +52,7 @@ class FgcmModelMagErrors(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.quietMode = fgcmConfig.quietMode
 
     def computeMagErrorModel(self, fitName):
@@ -179,8 +185,6 @@ class FgcmModelMagErrors(object):
 
             # And also plots (if necessary)
             if self.plotPath is not None:
-                plt.set_cmap('viridis')
-
                 ymod = (pars[0] + pars[1] * obsMagADUMeanGOu + pars[2] * obsMagADUMeanGOu**2. +
                         pars[3] * np.log10(obsFwhmGOu / medFwhm) +
                         pars[4] * np.log10(obsSkyBrightnessGOu / medSkyBrightness) +
@@ -188,7 +192,7 @@ class FgcmModelMagErrors(object):
                         pars[6] * obsMagADUMeanGOu * np.log10(obsSkyBrightnessGOu / medSkyBrightness))
 
                 # This is going to be a 3x2 figure
-                fig = plt.figure(10, figsize=(10,10))
+                fig = makeFigure(figsize=(10, 10))
                 fig.clf()
 
                 # First row: observed error vs magADU and model error vs mean mag
@@ -196,12 +200,12 @@ class FgcmModelMagErrors(object):
                           np.min(ymod), np.max(ymod))
 
                 ax = fig.add_subplot(321)
-                ax.hexbin(obsMagADUGOu, np.log10(obsMagADUErrGOu), bins='log', extent=extent)
+                ax.hexbin(obsMagADUGOu, np.log10(obsMagADUErrGOu), bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel(r'Obs mag')
                 ax.set_ylabel(r'log(ObsErr)')
 
                 ax = fig.add_subplot(322)
-                ax.hexbin(obsMagADUMeanGOu, ymod, bins='log', extent=extent)
+                ax.hexbin(obsMagADUMeanGOu, ymod, bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel(r'Mean Mag (Decorr.)')
                 ax.set_ylabel(r'log1(ModErr)')
 
@@ -221,13 +225,13 @@ class FgcmModelMagErrors(object):
 
                 ax = fig.add_subplot(323)
                 ax.hexbin(np.log10(obsFwhmGOu[slit]), np.log10(obsMagADUErrGOu[slit]),
-                          bins='log', extent=extent)
+                          bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel(r'log(FWHM)')
                 ax.set_ylabel(r'log(ObsErr)')
                 ax.set_title(r'Mag ~ %.1f' % (mid), fontsize=10)
 
                 ax = fig.add_subplot(324)
-                ax.hexbin(np.log10(obsFwhmGOu[slit]), ymod[slit], bins='log', extent=extent)
+                ax.hexbin(np.log10(obsFwhmGOu[slit]), ymod[slit], bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel(r'log(FWHM)')
                 ax.set_ylabel(r'log(ModErr)')
                 ax.set_title(r'Mag ~ %.1f' % (mid), fontsize=10)
@@ -239,7 +243,7 @@ class FgcmModelMagErrors(object):
 
                 ax = fig.add_subplot(325)
                 ax.hexbin(np.log10(obsSkyBrightnessGOu[slit]), np.log10(obsMagADUErrGOu[slit]),
-                          bins='log', extent=extent)
+                          bins='log', extent=extent, cmap=colormaps.get_cmap("viridis"))
                 ax.set_xlabel(r'log(Sky)')
                 ax.set_ylabel(r'log(ObsErr)')
                 ax.set_title(r'Mag ~ %.1f' % (mid), fontsize=10)
@@ -254,9 +258,16 @@ class FgcmModelMagErrors(object):
                 fig.suptitle('%s: %s band' % (fitName, self.fgcmPars.bands[bandIndex]))
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_%s_modelmagerr_%s.png' % (self.plotPath,
-                                                             self.outfileBaseWithCycle,
-                                                             fitName,
-                                                             self.fgcmPars.bands[bandIndex]))
-                plt.close(fig)
-
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    f"ModelMagerr{fitName.title()}",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex])
+                else:
+                    fig.savefig('%s/%s_%s_modelmagerr_%s.png' % (self.plotPath,
+                                                                 self.outfileBaseWithCycle,
+                                                                 fitName,
+                                                                 self.fgcmPars.bands[bandIndex]))

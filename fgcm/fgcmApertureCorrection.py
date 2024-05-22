@@ -3,12 +3,11 @@ import os
 import sys
 import esutil
 import time
-import matplotlib.pyplot as plt
 import scipy.optimize
 import warnings
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from .fgcmUtilities import dataBinner
+from .fgcmUtilities import dataBinner, makeFigure, putButlerFigure
 
 class FgcmApertureCorrection(object):
     """
@@ -31,13 +30,15 @@ class FgcmApertureCorrection(object):
        Number of expSeeingVariable bins to use for computing correction slope
 
     """
-    def __init__(self,fgcmConfig,fgcmPars,fgcmGray):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmGray, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.debug('Initializing FgcmApertureCorrection')
 
         self.fgcmPars = fgcmPars
-
         self.fgcmGray = fgcmGray
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         # and record configuration variables
         ## include plot path...
@@ -45,6 +46,7 @@ class FgcmApertureCorrection(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.quietMode = fgcmConfig.quietMode
 
     def computeApertureCorrections(self):
@@ -186,16 +188,17 @@ class FgcmApertureCorrection(object):
                                   self.fgcmPars.compAperCorrSlopeErr[i]*1000.0))
 
             if self.plotPath is not None:
-                plt.set_cmap('viridis')
+                from matplotlib import colormaps
 
-                fig=plt.figure(1,figsize=(8,6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax=fig.add_subplot(111)
 
                 ax.hexbin(self.fgcmPars.expSeeingVariable[expIndexUse[use]],
                           expGrayTemp[expIndexUse[use]]*1000.0,
-                          rasterized=True)
+                          rasterized=True,
+                          cmap=colormaps.get_cmap("viridis"))
 
                 ax.errorbar(binStruct['X_BIN'],binStruct['Y']*1000.0,
                             yerr=binStruct['Y_ERR']*1000.0,fmt='r.',markersize=10)
@@ -219,10 +222,18 @@ class FgcmApertureCorrection(object):
 
                 fig.tight_layout()
 
-                fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
-                                                       self.outfileBaseWithCycle,
-                                                       self.fgcmPars.bands[i]))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "Apercorr",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[i])
+                else:
+                    fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle,
+                                                           self.fgcmPars.bands[i]))
 
 
         ## MAYBE: modify ccd gray and exp gray?
