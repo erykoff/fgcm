@@ -103,7 +103,6 @@ class FgcmFitCycle(object):
             self.finalCycle = True
 
         if butlerQC is None and plotHandleDict is not None:
-
             raise RuntimeError("If plotHandleDict is set then butlerQC must also be set.")
         if butlerQC is not None and plotHandleDict is None:
             raise RuntimeError("If butlerQC is set then plotHandleDict must also be set.")
