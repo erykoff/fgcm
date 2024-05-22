@@ -3,12 +3,12 @@ import esutil
 import time
 import warnings
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import obsFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -45,9 +45,12 @@ class FgcmStars(object):
        Star index file
     """
 
-    def __init__(self,fgcmConfig):
+    def __init__(self, fgcmConfig, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.fgcmLog.debug('Initializing stars.')
 
@@ -70,6 +73,7 @@ class FgcmStars(object):
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.expField = fgcmConfig.expField
         self.ccdField = fgcmConfig.ccdField
         self.reserveFraction = fgcmConfig.reserveFraction
@@ -1204,42 +1208,6 @@ class FgcmStars(object):
         # FIXME: add skyproj plotting.
         return
 
-    """
-        mask = (objFlagDict['TOO_FEW_OBS'] |
-                objFlagDict['BAD_COLOR'] |
-                objFlagDict['VARIABLE'] |
-                objFlagDict['TEMPORARY_BAD_STAR'])
-
-        goodStars, = np.where((snmm.getArray(self.objFlagHandle) & mask) == 0)
-
-        theta = (90.0-snmm.getArray(self.objDecHandle)[goodStars])*np.pi/180.
-        phi = snmm.getArray(self.objRAHandle)[goodStars]*np.pi/180.
-
-        ipring = hp.ang2pix(self.mapNSide,theta,phi)
-
-        densMap = esutil.stat.histogram(ipring,min=0,max=12*self.mapNSide*self.mapNSide-1)
-        densMap = densMap.astype(np.float32)
-
-        bad,=np.where(densMap == 0)
-        densMap[bad] = hp.UNSEEN
-
-        raStarRot = snmm.getArray(self.objRAHandle)[goodStars]
-        hi,=np.where(raStarRot > 180.0)
-        raStarRot[hi] -= 360.0
-
-        decStar = snmm.getArray(self.objDecHandle)[goodStars]
-
-        fig,ax = plot_hpxmap(densMap,
-                             raRange=[np.min(raStarRot),np.max(raStarRot)],
-                             decRange=[np.min(decStar),np.max(decStar)],
-                             lonRef = self.mapLongitudeRef)
-
-        fig.savefig('%s/%s_%sGoodStars.png' % (self.plotPath, self.outfileBaseWithCycle,
-                                               mapType))
-        plt.close(fig)
-    """
-
-
     def computeObjectSEDSlopes(self,objIndicesIn):
         """
         Compute fnuprime (object SED slopes) for a list of objects.
@@ -2181,12 +2149,11 @@ class FgcmStars(object):
             okColor, = np.where((objMagStdMean[goodRefStars, self.colorSplitIndices[0]] < 90.0) &
                                 (objMagStdMean[goodRefStars, self.colorSplitIndices[1]] < 90.0))
 
-            plt.set_cmap('viridis')
             for bandIndex, band in enumerate(self.bands):
                 if not fgcmPars.hasExposuresInBand[bandIndex]:
                     continue
 
-                fig = plt.figure(figsize=(8, 6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
 
@@ -2207,7 +2174,7 @@ class FgcmStars(object):
                 xhigh = gmiGRS[refUse[st[int(0.98*refUse.size)]]]
 
                 if refUse.size >= 1000:
-                    ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh])
+                    ax.hexbin(gmiGRS[refUse], delta, bins='log', extent=[xlow, xhigh, ylow, yhigh], cmap=colormaps.get_cmap("viridis"))
                 else:
                     ax.plot(gmiGRS[refUse], delta, 'k.')
                     ax.set_xlim(xlow, xhigh)
@@ -2228,11 +2195,19 @@ class FgcmStars(object):
                 ax.set_ylabel('%s_std - %s_ref' % (band, band))
 
                 fig.tight_layout()
-                fig.savefig('%s/%s_refresidvscol_%s_%s.png' % (self.plotPath,
-                                                               self.outfileBaseWithCycle,
-                                                               band,
-                                                               mode))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    f"RefResidVsColor{mode.title()}",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=band)
+                else:
+                    fig.savefig('%s/%s_refresidvscol_%s_%s.png' % (self.plotPath,
+                                                                   self.outfileBaseWithCycle,
+                                                                   band,
+                                                                   mode))
 
     def __getstate__(self):
         # Don't try to pickle the logger.

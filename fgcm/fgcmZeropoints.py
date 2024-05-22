@@ -3,15 +3,17 @@ import os
 import sys
 import esutil
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+
+from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
+
 
 class FgcmZeropoints(object):
     """
@@ -41,13 +43,16 @@ class FgcmZeropoints(object):
        Exposure gray variance to consider recovering via focal-plane average
     """
 
-    def __init__(self,fgcmConfig,fgcmPars,fgcmLUT,fgcmGray,fgcmRetrieval,fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmLUT, fgcmGray, fgcmRetrieval, fgcmStars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmPars = fgcmPars
         self.fgcmLUT = fgcmLUT
         self.fgcmGray = fgcmGray
         self.fgcmRetrieval = fgcmRetrieval
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -589,7 +594,9 @@ class FgcmZeropoints(object):
             plotter = FgcmZeropointPlotter(zpStruct, self.fgcmStars, self.fgcmPars,
                                            self.I0StdBand, self.I1StdBand, self.I10StdBand,
                                            self.colorSplitIndices, self.colorSplitBands,
-                                           self.plotPath, self.outfileBaseWithCycle)
+                                           self.plotPath, self.outfileBaseWithCycle,
+                                           self.cycleNumber, self.fgcmLog,
+                                           butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
 
             plotter.makeR1I1Plots()
             plotter.makeR1I1Maps(deltaMapperDefault, ccdField=self.ccdField)
@@ -616,7 +623,7 @@ class FgcmZeropoints(object):
             gd,=np.where(expZpNCCD > 0)
             expZpMean[gd] /= expZpNCCD[gd]
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
@@ -634,16 +641,22 @@ class FgcmZeropoints(object):
                 if (use.size == 0) :
                     continue
 
-                plt.plot(self.fgcmPars.expMJD[use] - firstMJD,
-                         expZpMean[use], cols[i % 5] + syms[i % 5],
-                         label=r'$(%s)$' % (self.fgcmPars.bands[i]))
+                ax.plot(self.fgcmPars.expMJD[use] - firstMJD,
+                        expZpMean[use], cols[i % 5] + syms[i % 5],
+                        label=r'$(%s)$' % (self.fgcmPars.bands[i]))
 
             ax.legend(loc=3)
 
-            fig.savefig('%s/%s_zeropoints.png' % (self.plotPath,
-                                                  self.outfileBaseWithCycle))
-            plt.close(fig)
-
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "Zeropoints",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_zeropoints.png' % (self.plotPath,
+                                                      self.outfileBaseWithCycle))
 
     def _computeZpt(self, zpStruct, indices, includeFlat=True, includeGray=True):
         """
@@ -807,6 +820,7 @@ class FgcmZeropoints(object):
         self.fgcmLog.info('Saving atmosphere parameters to %s' % (outFile))
         fitsio.write(outFile,self.atmStruct,clobber=True,extname='ATMPARS')
 
+
 class FgcmZeropointPlotter(object):
     """
     Class to make zeropoint plots
@@ -827,18 +841,24 @@ class FgcmZeropointPlotter(object):
 
     def __init__(self, zpStruct, fgcmStars, fgcmPars,
                  I0StdBand, I1StdBand, I10StdBand,
-                 colorSplitIndices, colorSplitBands, plotPath, outfileBase):
+                 colorSplitIndices, colorSplitBands, plotPath, outfileBase,
+                 cycleNumber, fgcmLog, butlerQC=None, plotHandleDict=None):
         self.zpStruct = zpStruct
         self.bands = fgcmPars.bands
         self.filterNames = fgcmPars.lutFilterNames
         self.plotPath = plotPath
         self.outfileBase = outfileBase
+        self.cycleNumber = cycleNumber
+        self.fgcmLog = fgcmLog
         self.filterToBand = fgcmPars.filterToBand
         self.colorSplitIndices = colorSplitIndices
         self.colorSplitBands = colorSplitBands
         self.I0StdBand = I0StdBand
         self.I1StdBand = I1StdBand
         self.I10StdBand = I10StdBand
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.i1Conversions, self.blueString, self.redString = self.computeI1Conversions(fgcmStars)
 
@@ -913,12 +933,12 @@ class FgcmZeropointPlotter(object):
             i1=i1[ok]
             r1=r1[ok]
 
-            fig = plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax=fig.add_subplot(111)
 
-            ax.hexbin(i1,r1,cmap=plt.get_cmap('gray_r'),rasterized=True)
+            ax.hexbin(i1, r1, cmap=colormaps.get_cmap('gray_r'), rasterized=True)
             # and overplot a 1-1 line that best covers the range of the data
             xlim = ax.get_xlim()
             range0 = xlim[0]+0.001
@@ -934,10 +954,18 @@ class FgcmZeropointPlotter(object):
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
-            fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
-                                               self.outfileBase,
-                                               filterName))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "I1R1",
+                                self.cycleNumber,
+                                fig,
+                                filterName=filterName)
+            else:
+                fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
+                                                   self.outfileBase,
+                                                   filterName))
 
     def makeR1I1Maps(self, deltaMapper, ccdField='CCDNUM'):
         """
@@ -1000,7 +1028,7 @@ class FgcmZeropointPlotter(object):
             hi = meanR1[use[st[int(0.98*st.size)]]]
 
             for plotType in plotTypes:
-                fig=plt.figure(1,figsize=(8,6))
+                fig = makeFigure(figsize=(8, 6))
                 fig.clf()
 
                 ax=fig.add_subplot(111)
@@ -1025,11 +1053,23 @@ class FgcmZeropointPlotter(object):
                             (0.1,0.93),xycoords='axes fraction',
                             ha='left',va='top',fontsize=18)
 
-                fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
-                                                 self.outfileBase,
-                                                 plotType.replace(" ",""),
-                                                 filterName))
-                plt.close(fig)
+                if self.butlerQC is not None:
+                    if plotType == "R1 - I1":
+                        name = "R1mI1"
+                    else:
+                        name = plotType
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    name,
+                                    self.cycleNumber,
+                                    fig,
+                                    filterName=filterName)
+                else:
+                    fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
+                                                     self.outfileBase,
+                                                     plotType.replace(" ",""),
+                                                     filterName))
 
         return None
 
@@ -1040,8 +1080,6 @@ class FgcmZeropointPlotter(object):
 
         if self.plotPath is None:
             return
-
-        plt.set_cmap('viridis')
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
@@ -1085,19 +1123,20 @@ class FgcmZeropointPlotter(object):
 
             binStruct = binStruct[gd]
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax = fig.add_subplot(111)
 
             ax.hexbin(xValues, yValues, bins='log', extent=[xRange[0], xRange[1],
-                                                            yRange[0], yRange[1]])
+                                                            yRange[0], yRange[1]],
+                      cmap=colormaps.get_cmap('viridis'))
             ax.set_xlabel('MJD - %.1f' % (mjd0), fontsize=16)
             ax.set_ylabel('R1 - I1 (red-blue mmag)', fontsize=16)
             ax.plot(xRange, [0.0, 0.0], 'r:')
 
-            plt.errorbar(binStruct['X_BIN'], binStruct['Y'],
-                         yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
+            ax.errorbar(binStruct['X_BIN'], binStruct['Y'],
+                        yerr=binStruct['Y_ERR'], fmt='r.', markersize=10)
 
             text = "(%s)\n" % (filterName)
             text += "Blue: %s\n" % (self.blueString)
@@ -1106,7 +1145,15 @@ class FgcmZeropointPlotter(object):
                         (0.1, 0.93), xycoords='axes fraction',
                         ha='left', va='top', fontsize=18, color='r')
 
-            fig.savefig('%s/%s_r1-i1_vs_mjd_%s.png' % (self.plotPath,
-                                                       self.outfileBase,
-                                                       filterName))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "R1mI1_vs_mjd",
+                                self.cycleNumber,
+                                fig,
+                                filterName=filterName)
+            else:
+                fig.savefig('%s/%s_r1-i1_vs_mjd_%s.png' % (self.plotPath,
+                                                           self.outfileBase,
+                                                           filterName))

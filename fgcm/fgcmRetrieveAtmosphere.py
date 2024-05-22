@@ -5,12 +5,12 @@ import esutil
 import scipy.interpolate
 import scipy.optimize
 
-import matplotlib.pyplot as plt
-
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 
 class FgcmRetrieveAtmosphere(object):
@@ -24,7 +24,7 @@ class FgcmRetrieveAtmosphere(object):
     fgcmPars: FgcmPars
     """
 
-    def __init__(self, fgcmConfig, fgcmLUT, fgcmPars):
+    def __init__(self, fgcmConfig, fgcmLUT, fgcmPars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -33,9 +33,13 @@ class FgcmRetrieveAtmosphere(object):
         self.fgcmLUT = fgcmLUT
         self.fgcmPars = fgcmPars
 
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.pwvRetrievalSmoothBlock = fgcmConfig.pwvRetrievalSmoothBlock
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.minCCDPerExp = fgcmConfig.minCCDPerExp
         self.illegalValue = fgcmConfig.illegalValue
         self.useNightlyRetrievedPwv = fgcmConfig.useNightlyRetrievedPwv
@@ -212,13 +216,11 @@ class FgcmRetrieveAtmosphere(object):
 
         if self.plotPath is not None:
             # if there are fewer than ... 3000 do points, more than do hexbin
-            plt.set_cmap('viridis')
-
             hasPwv, = np.where((self.fgcmPars.compRetrievedLnPwvFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
             #  RPWV_SMOOTH vs RPWV_SMOOTH_INPUT  (fgcmPars.compRetrievedPWVInput)
             #   (this checks for convergence on the actual measured values)
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -227,7 +229,7 @@ class FgcmRetrieveAtmosphere(object):
             if (hadPwv.size >= 3000):
                 ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwvInput[hasPwv[hadPwv]]),
                           np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv[hadPwv]]),
-                          bins='log')
+                          bins='log', cmap=colormaps.get_cmap("viridis"))
             else:
                 ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwvInput[hasPwv[hadPwv]]),
                         np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv[hadPwv]]), 'b.')
@@ -237,12 +239,19 @@ class FgcmRetrieveAtmosphere(object):
             ax.set_xlabel('RPWV_INPUT (mm)')
             ax.set_ylabel('RPWV (mm)')
 
-            fig.savefig('%s/%s_rpwv_vs_rpwv_in.png' % (self.plotPath,
-                                                       self.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "RpwvVsRpwvInput",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_rpwv_vs_rpwv_in.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle))
 
             #  RPWV_RAW vs RPWV_SMOOTH (current calculation, just to make sure)
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax = fig.add_subplot(111)
@@ -250,7 +259,8 @@ class FgcmRetrieveAtmosphere(object):
             if hasPwv.size >= 3000:
                 # we can use hexbin; this is arbitrary.
                 ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
-                          np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv]), bins='log')
+                          np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv]), bins='log',
+                          cmap=colormaps.get_cmap("viridis"))
             else:
                 ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
                         np.exp(self.fgcmPars.compRetrievedLnPwvRaw[hasPwv]), 'b.')
@@ -260,12 +270,18 @@ class FgcmRetrieveAtmosphere(object):
             ax.set_xlabel('RPWV_SMOOTH (mm)')
             ax.set_ylabel('RPWV_RAW (mm)')
 
-            fig.savefig('%s/%s_rpwv_vs_rpwv_smooth.png' % (self.plotPath,
-                                                           self.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "RpwvVsRpwvSmooth",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_rpwv_vs_rpwv_smooth.png' % (self.plotPath,
+                                                               self.outfileBaseWithCycle))
 
-            #  PWV vs RPWV_SMOOTH
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
 
             ax = fig.add_subplot(111)
@@ -273,7 +289,8 @@ class FgcmRetrieveAtmosphere(object):
             if hasPwv.size >= 3000:
                 # we can use hexbin; this is arbitrary.
                 ax.hexbin(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
-                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log')
+                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log',
+                          cmap=colormaps.get_cmap("viridis"))
             else:
                 ax.plot(np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv]),
                         np.exp(self.fgcmPars.expLnPwv[hasPwv]), 'b.')
@@ -283,43 +300,16 @@ class FgcmRetrieveAtmosphere(object):
             ax.set_xlabel('RPWV (mm)')
             ax.set_ylabel('PWV_MODEL (mm)')
 
-            fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
-                                                   self.outfileBaseWithCycle))
-            plt.close(fig)
-
-            #  PWV vs RPWV_SCALED
-            fig = plt.figure(1, figsize=(8, 6))
-            fig.clf()
-
-            ax = fig.add_subplot(111)
-
-            if self.useNightlyRetrievedPwv:
-                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvNightlyOffset[self.fgcmPars.expNightIndex] +
-                                        self.fgcmPars.parRetrievedLnPwvScale *
-                                        self.fgcmPars.compRetrievedLnPwv)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "ModelPwvVsRpwv",
+                                self.cycleNumber,
+                                fig)
             else:
-                scaledRetrievedLnPwv = (self.fgcmPars.parRetrievedLnPwvOffset +
-                                        self.fgcmPars.parRetrievedLnPwvScale *
-                                        self.fgcmPars.compRetrievedLnPwv)
-
-            if hasPwv.size >= 3000:
-                # we can use hexbin; this is arbitrary.
-                ax.hexbin(np.exp(scaledRetrievedLnPwv[hasPwv]),
-                          np.exp(self.fgcmPars.expLnPwv[hasPwv]), bins='log')
-            else:
-                ax.plot(np.exp(scaledRetrievedLnPwv[hasPwv]),
-                        np.exp(self.fgcmPars.expLnPwv[hasPwv]), 'b.')
-            plotRange = np.array([np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].min())+0.001,
-                                  np.exp(self.fgcmPars.compRetrievedLnPwv[hasPwv].max())-0.001])
-            ax.plot(plotRange, plotRange, 'r--')
-            ax.set_xlabel('RPWV_SCALED (mm)')
-            ax.set_ylabel('PWV_MODEL (mm)')
-
-
-            fig.savefig('%s/%s_pwv_vs_rpwv_scaled.png' % (self.plotPath,
-                                                         self.outfileBaseWithCycle))
-            plt.close(fig)
-
+                fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle))
 
         # and we're done!  Everything is filled in!
         self.fgcmLog.debug('Done computing retrieved PWV values')
@@ -412,10 +402,15 @@ class FgcmRetrieveAtmosphere(object):
                                                          self.fgcmLUT.tau[-1]-0.0001)
 
         # And the plots
+        # The nightlyTau code is not currently used because it is
+        # not fully developed.  I have commented out the plots because
+        # this code is not used/tested currently.  I am leaving
+        # in the code in case it gets resurrected in the future.
+        """
         if self.plotPath is not None:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -429,11 +424,10 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_rtaunight_in.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle))
-            plt.close(fig)
 
             hasTau, = np.where(self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd)
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -445,7 +439,7 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_tauint.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
-            plt.close(fig)
+        """
 
     def expGrayToNightlyTau(self, fgcmGray):
         """
@@ -564,10 +558,11 @@ class FgcmRetrieveAtmosphere(object):
                                                          self.fgcmLUT.tau[-1]-0.0001)
 
         # And the plots
+        """
         if self.plotPath is not None:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -581,11 +576,11 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_rtaunight_in.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle))
-            plt.close(fig)
+
 
             hasTau, = np.where(self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd)
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -597,5 +592,5 @@ class FgcmRetrieveAtmosphere(object):
 
             fig.savefig('%s/%s_rtaunight_vs_tauint.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
-            plt.close(fig)
+        """
 

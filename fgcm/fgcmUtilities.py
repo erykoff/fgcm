@@ -468,13 +468,12 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
     cmap : `matplotlib.colors.Colormap`, optional
         Color map to use.
     """
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.colors as colors
-    import matplotlib.cm as cmx
+    from matplotlib import colormaps
 
     if cmap is None:
-        cm = plt.get_cmap('rainbow')
+        cm = colormaps.get_cmap("rainbow")
     else:
         cm = cmap
 
@@ -497,7 +496,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
 
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
-    CS3 = plt.contourf(Z, levels, cmap=cm)
+    CS3 = ax.contourf(Z, levels, cmap=cm)
 
     useCentersForScaling = True
     markerSize = 0.1
@@ -524,8 +523,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
                cmap=cm)
     ax.set_aspect('equal')
 
-    cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
+    cb = ax.get_figure().colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -552,10 +550,10 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
-    import matplotlib.cm as cmx
+    from matplotlib import colormaps
 
     if cmap is None:
-        cm = plt.get_cmap('rainbow')
+        cm = colormaps.get_cmap("rainbow")
     else:
         cm = cmap
 
@@ -606,7 +604,7 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
 
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
-    CS3 = plt.contourf(Z, levels, cmap=cm)
+    CS3 = ax.contourf(Z, levels, cmap=cm)
 
     ax.clear()
 
@@ -624,7 +622,7 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
     ax.set_aspect('equal')
 
     cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
+    cb = ax.get_figure().colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -651,9 +649,9 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
-    import matplotlib.cm as cmx
+    from matplotlib import colormaps
 
-    cm = plt.get_cmap('rainbow')
+    cm = colormaps.get_cmap("rainbow")
 
     plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
                    np.max(deltaMapper['delta_ra']) + 0.02]
@@ -680,7 +678,7 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
 
     Z = [[0, 0], [0, 0]]
     levels = np.linspace(lo, hi, num=150)
-    CS3 = plt.contourf(Z, levels, cmap=cm)
+    CS3 = ax.contourf(Z, levels, cmap=cm)
 
     ax.clear()
 
@@ -710,8 +708,7 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
                cmap=cm)
     ax.set_aspect('equal')
 
-    cb = None
-    cb = plt.colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
+    cb = ax.get_figure().colorbar(CS3, ticks=np.linspace(lo, hi, 5), ax=ax, cmap=cm)
     cb.set_label('%s' % (cbLabel), fontsize=14)
 
     return None
@@ -974,3 +971,73 @@ class FocalPlaneProjectorFromOffsets(object):
                         self.ccdOffsets['DECSIGN'][cInd] = 1
 
         self._computedSigns = True
+
+
+def makeFigure(**kwargs):
+    """Make a matplotlib Figure with an Agg-backend canvas.
+
+    This routine creates a matplotlib figure without using
+    ``matplotlib.pyplot``, and instead uses a fixed non-interactive
+    backend. The advantage is that these figures are not cached and
+    therefore do not need to be explicitly closed -- they
+    are completely self-contained and ephemeral unlike figures
+    created with `matplotlib.pyplot.figure()`.
+
+    Parameters
+    ----------
+    **kwargs : `dict`
+        Keyward arguments to be passed to `matplotlib.figure.Figure()`
+
+    Returns
+    -------
+    figure : `matplotlib.figure.Figure`
+        Figure with a fixed Agg backend, and no caching.
+
+    Notes
+    -----
+    The code here is based on
+    https://matplotlib.org/stable/gallery/user_interfaces/canvasagg.html#sphx-glr-gallery-user-interfaces-canvasagg-py
+    """
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+
+    fig = Figure(**kwargs)
+    canvas = FigureCanvasAgg(fig)
+
+    return fig
+
+
+def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None, epoch=None):
+    """Put a figure into the Butler.
+
+    Parameters
+    ----------
+    logger : `fgcm.FgcmLogger`
+    butlerQC : `lsst.pipe.base.QuantumContext`
+    plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`]
+    name : `str`
+    cycle : `int`
+    figure : `matplotlib.Figure.Figure`
+    band : `str`, optional
+    filterName : `str`, optional
+    epoch : `str`, optional
+    """
+    if filterName and band:
+        raise RuntimeError("Cannot specify both filterName and band.")
+
+    plotName = f"fgcm_Cycle{cycle}_{name}"
+    if filterName:
+        plotFilter = filterName.replace("-", "_").replace(" ", "_").replace("~", "_")
+        plotName += f"_{plotFilter}"
+    if band:
+        plotName += f"_{band}"
+    if epoch:
+        plotName += f"_{epoch}"
+
+    plotName += "_Plot"
+    if plotName not in plotHandleDict:
+        logger.warning(f"Could not find plot {plotName} in plotHandleDict.")
+        return
+
+    butlerQC.put(figure, plotHandleDict[plotName])

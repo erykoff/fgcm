@@ -4,10 +4,10 @@ import sys
 import esutil
 import hpgeom as hpg
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -49,7 +49,8 @@ class FgcmParameters(object):
     """
 
     def __init__(self, fgcmConfig, expInfo=None, fgcmLUT=None,
-                 inParInfo=None, inParams=None, inSuperStar=None):
+                 inParInfo=None, inParams=None, inSuperStar=None,
+                 butlerQC=None, plotHandleDict=None):
 
         initNew = False
         loadOld = False
@@ -67,7 +68,10 @@ class FgcmParameters(object):
         self.hasExternalTau = False
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber = fgcmConfig.cycleNumber
         self.plotPath = fgcmConfig.plotPath
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -206,7 +210,7 @@ class FgcmParameters(object):
         return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
 
     @classmethod
-    def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo):
+    def newParsWithArrays(cls, fgcmConfig, fgcmLUT, expInfo, butlerQC=None, plotHandleDict=None):
         """
         Make a new FgcmParameters object, with input arrays
 
@@ -216,9 +220,13 @@ class FgcmParameters(object):
         fgcmLUT: FgcmLUT
         expInfo: numpy recarray
            Exposure info
+        butlerQC : `lsst.pipe.base.QuantumContext`, optional
+            Quantum context used for serializing plots.
+        plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+            Dictionary of plot datasets, keyed by plot name.
         """
 
-        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT)
+        return cls(fgcmConfig, expInfo=expInfo, fgcmLUT=fgcmLUT, butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
     @classmethod
     def loadParsWithFits(cls, fgcmConfig):
@@ -251,7 +259,7 @@ class FgcmParameters(object):
                    inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
 
     @classmethod
-    def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar):
+    def loadParsWithArrays(cls, fgcmConfig, expInfo, inParInfo, inParams, inSuperStar, butlerQC=None, plotHandleDict=None):
         """
         Make an FgcmParameters object, loading from old parameters in arrays.
 
@@ -266,10 +274,15 @@ class FgcmParameters(object):
            Input parameters
         inSuperStar: numpy array
            Input superstar
+        butlerQC : `lsst.pipe.base.QuantumContext`, optional
+            Quantum context used for serializing plots.
+        plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+            Dictionary of plot datasets, keyed by plot name.
         """
 
         return cls(fgcmConfig, expInfo=expInfo,
-                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar)
+                   inParInfo=inParInfo, inParams=inParams, inSuperStar=inSuperStar,
+                   butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
     def _initializeNewParameters(self, expInfo, fgcmLUT):
         """
@@ -1953,7 +1966,7 @@ class FgcmParameters(object):
         firstMJD = np.floor(np.min(self.expMJD))
 
         # now alpha
-        fig=plt.figure(1,figsize=(8,6))
+        fig = makeFigure(figsize=(8, 6))
         fig.clf()
         ax=fig.add_subplot(111)
 
@@ -1964,9 +1977,16 @@ class FgcmParameters(object):
         ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
         ax.set_ylabel(r'$\alpha$',fontsize=16)
 
-        fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
-                                                 self.outfileBaseWithCycle))
-        plt.close(fig)
+        if self.butlerQC is not None:
+            putButlerFigure(self.fgcmLog,
+                            self.butlerQC,
+                            self.plotHandleDict,
+                            "NightlyAlpha",
+                            self.cycleNumber,
+                            fig)
+        else:
+            fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
+                                                     self.outfileBaseWithCycle))
 
         # Tau
         try:
@@ -1980,7 +2000,7 @@ class FgcmParameters(object):
 
         if gBandIndex >=0 or rBandIndex >= 0:
 
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax=fig.add_subplot(111)
 
@@ -2003,9 +2023,16 @@ class FgcmParameters(object):
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
             ax.set_ylabel(r'$\tau_{7750}$',fontsize=16)
 
-            fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
-                                                   self.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "NightlyTau",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle))
 
         try:
             zBandIndex = self.bands.index('z')
@@ -2014,7 +2041,7 @@ class FgcmParameters(object):
 
         if zBandIndex >= 0:
             # pwv
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax=fig.add_subplot(111)
 
@@ -2025,9 +2052,16 @@ class FgcmParameters(object):
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
             ax.set_ylabel(r'$\mathrm{PWV}$ (mm)',fontsize=16)
 
-            fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
-                                                   self.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "NightlyPwv",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle))
 
         # O3
         try:
@@ -2036,7 +2070,7 @@ class FgcmParameters(object):
             rBandIndex = -1
 
         if rBandIndex >= 0:
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax=fig.add_subplot(111)
 
@@ -2047,12 +2081,19 @@ class FgcmParameters(object):
             ax.set_xlabel(r'$\mathrm{MJD}\ -\ %.0f$' % (firstMJD),fontsize=16)
             ax.set_ylabel(r'$O_3$ (Dob)',fontsize=16)
 
-            fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
-                                                  self.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "NightlyO3",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
+                                                      self.outfileBaseWithCycle))
 
         # Filter Offset
-        fig = plt.figure(1, figsize=(8, 6))
+        fig = makeFigure(figsize=(8, 6))
         fig.clf()
         ax = fig.add_subplot(111)
 
@@ -2068,11 +2109,19 @@ class FgcmParameters(object):
         ax.set_ylabel('Filter Offset (mmag)')
         ax.set_ylim(np.min(parFilterOffsetMmag - 20.0), np.max(parFilterOffsetMmag + 20.0))
 
-        fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
-                                                  self.outfileBaseWithCycle))
+        if self.butlerQC is not None:
+            putButlerFigure(self.fgcmLog,
+                            self.butlerQC,
+                            self.plotHandleDict,
+                            "FilterOffsets",
+                            self.cycleNumber,
+                            fig)
+        else:
+            fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
+                                                      self.outfileBaseWithCycle))
 
         # Abs Offset
-        fig = plt.figure(1, figsize=(8, 6))
+        fig = makeFigure(figsize=(8, 6))
         fig.clf()
         ax = fig.add_subplot(111)
 
@@ -2086,8 +2135,16 @@ class FgcmParameters(object):
         ax.set_ylabel('Absolute throughput (fraction)')
         ax.set_ylim(np.min(self.compAbsThroughput - 0.15), np.max(self.compAbsThroughput + 0.05))
 
-        fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
-                                               self.outfileBaseWithCycle))
+        if self.butlerQC is not None:
+            putButlerFigure(self.fgcmLog,
+                            self.butlerQC,
+                            self.plotHandleDict,
+                            "AbsThroughputs",
+                            self.cycleNumber,
+                            fig)
+        else:
+            fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
+                                                       self.outfileBaseWithCycle))
 
         for i, band in enumerate(self.bands):
             if not self.hasExposuresInBand[i]:

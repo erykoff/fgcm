@@ -3,11 +3,12 @@ import os
 import sys
 import esutil
 import time
-import matplotlib.pyplot as plt
 import scipy.optimize
 from astropy.time import Time
 
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -26,15 +27,19 @@ class FgcmQeSysSlope(object):
     initialCycle: `bool`
        Is this the initial cycle? (Force gray computation)
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
         self.fgcmLog.debug('Initializing FgcmQeSysSlope')
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.plotPath = fgcmConfig.plotPath
+        self.cycleNumber = fgcmConfig.cycleNumber
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.instrumentParsPerBand = fgcmConfig.instrumentParsPerBand
@@ -187,7 +192,7 @@ class FgcmQeSysSlope(object):
             # Make the plots
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax = fig.add_subplot(111)
 
@@ -230,11 +235,17 @@ class FgcmQeSysSlope(object):
                 ax.plot([self.fgcmPars.washMJDs[i] - firstMJD, self.fgcmPars.washMJDs[i]-firstMJD],
                         ylim, 'k--')
 
-            fig.savefig('%s/%s_qesys_washes_%s.png' % (self.plotPath,
-                                                       self.outfileBaseWithCycle,
-                                                       name))
-
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                f"QESysWashes{name.title()}",
+                                self.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_qesys_washes_%s.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle,
+                                                           name))
 
     def plotQeSysRefStars(self, name):
         """
@@ -252,8 +263,6 @@ class FgcmQeSysSlope(object):
 
         if self.plotPath is None:
             return
-
-        plt.set_cmap('viridis')
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
@@ -332,10 +341,16 @@ class FgcmQeSysSlope(object):
                 self.fgcmLog.info("Not enough good reference star information in %s band to make QE sys plots." % (band))
                 continue
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayGRO[use]*1000.0, bins='log', extent=[xMin, xMax, yMin, yMax])
+            ax.hexbin(
+                mjdGRO[use],
+                EGrayGRO[use]*1000.0,
+                bins='log',
+                extent=[xMin, xMax, yMin, yMax],
+                cmap=colormaps.get_cmap("viridis"),
+            )
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMin, yMax], 'r--', linewidth=2)
@@ -344,15 +359,29 @@ class FgcmQeSysSlope(object):
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
             ax.set_ylabel('m_ref - m_std (mmag)', fontsize=14)
 
-            fig.savefig('%s/%s_qesys_refstars-std_%s_%s.png' % (self.plotPath,
-                                                                self.outfileBaseWithCycle,
-                                                                name, band))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                f"QESysRefstarsStd{name.title()}",
+                                self.cycleNumber,
+                                fig,
+                                band=band)
+            else:
+                fig.savefig('%s/%s_qesys_refstars-std_%s_%s.png' % (self.plotPath,
+                                                                    self.outfileBaseWithCycle,
+                                                                    name, band))
 
-            fig = plt.figure(1, figsize=(8, 6))
+            fig = makeFigure(figsize=(8, 6))
             ax = fig.add_subplot(111)
 
-            ax.hexbin(mjdGRO[use], EGrayObsGRO[use]*1000.0, bins='log', extent=[xMin, xMax, yMinObs, yMaxObs])
+            ax.hexbin(
+                mjdGRO[use],
+                EGrayObsGRO[use]*1000.0,
+                bins='log',
+                extent=[xMin, xMax, yMinObs, yMaxObs],
+                cmap=colormaps.get_cmap("viridis")
+            )
 
             for washIndex in washInRange:
                 ax.plot([self.fgcmPars.washMJDs[washIndex] - minMjd, self.fgcmPars.washMJDs[washIndex] - minMjd], [yMinObs, yMaxObs], 'r--', linewidth=2)
@@ -361,9 +390,15 @@ class FgcmQeSysSlope(object):
             ax.set_xlabel('Days since %s (%.0f)' % (startString, minMjd), fontsize=14)
             ax.set_ylabel('m_ref - m_obs (mmag)', fontsize=14)
 
-            fig.savefig('%s/%s_qesys_refstars-obs_%s_%s.png' % (self.plotPath,
-                                                                self.outfileBaseWithCycle,
-                                                                name, band))
-            plt.close(fig)
-
-
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                f"QESysRefstarsObs{name.title()}",
+                                self.cycleNumber,
+                                fig,
+                                band=band)
+            else:
+                fig.savefig('%s/%s_qesys_refstars-obs_%s_%s.png' % (self.plotPath,
+                                                                    self.outfileBaseWithCycle,
+                                                                    name, band))

@@ -5,7 +5,7 @@ import esutil
 import time
 import scipy.optimize
 
-import matplotlib.pyplot as plt
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
@@ -30,7 +30,7 @@ class FgcmSigFgcm(object):
        Maxmimum error on m_std - <m_std> to consider to compute sigFgcm
     """
 
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -41,6 +41,9 @@ class FgcmSigFgcm(object):
 
         # need fgcmStars because it has the stars (duh)
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         # and config numbers
         self.sigFgcmMaxEGray = fgcmConfig.sigFgcmMaxEGray
@@ -129,12 +132,15 @@ class FgcmSigFgcm(object):
         if reserved:
             sigTypes.append('reserved')
             extraName = 'reserved-stars'
+            extraNameButler = "ReservedStars"
         else:
             sigTypes.append('fit')
             extraName = 'all-stars'
+            extraNameButler = "AllStars"
         if crunch:
             sigTypes.append('crunched')
             extraName += '_crunched'
+            extraNameButler += "Crunched"
 
         sigType = '/'.join(sigTypes)
 
@@ -143,7 +149,7 @@ class FgcmSigFgcm(object):
                 continue
 
             # start the figure which will have 4 panels
-            fig = plt.figure(figsize=(9, 6))
+            fig = makeFigure(figsize=(9, 6))
             fig.clf()
 
             started=False
@@ -236,11 +242,20 @@ class FgcmSigFgcm(object):
 
             if self.plotPath is not None:
                 fig.tight_layout()
-                fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
-                                                         self.outfileBaseWithCycle,
-                                                         extraName,
-                                                         self.fgcmPars.bands[bandIndex]))
-            plt.close(fig)
+
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    f"SigmaFgcm{extraNameButler}",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex])
+                else:
+                    fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
+                                                             self.outfileBaseWithCycle,
+                                                             extraName,
+                                                             self.fgcmPars.bands[bandIndex]))
 
         if not self.quietMode:
             self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %

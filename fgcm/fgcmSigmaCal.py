@@ -6,6 +6,8 @@ import time
 
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import histogram_rev_sorted
+from .fgcmUtilities import makeFigure, putButlerFigure
+from matplotlib import colormaps
 
 import multiprocessing
 
@@ -26,7 +28,7 @@ class FgcmSigmaCal(object):
        Stars object
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmGray):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmGray, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -35,6 +37,9 @@ class FgcmSigmaCal(object):
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
         self.fgcmGray = fgcmGray
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
@@ -45,6 +50,7 @@ class FgcmSigmaCal(object):
         self.sigmaCalPlotPercentile = fgcmConfig.sigmaCalPlotPercentile
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
+        self.cycleNumber= fgcmConfig.cycleNumber
         self.quietMode = fgcmConfig.quietMode
 
         # these are the standard *band* I10s
@@ -133,9 +139,10 @@ class FgcmSigmaCal(object):
         sigmaCals = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], nStep)
 
         if self.plotPath is not None:
-            import matplotlib.pyplot as plt
-            import matplotlib.colors as colors
-            import matplotlib.cm as cmx
+            from matplotlib.colors import Normalize
+            from matplotlib.cm import ScalarMappable
+
+
             use_inset = False
             try:
                 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -143,8 +150,7 @@ class FgcmSigmaCal(object):
             except ImportError:
                 pass
 
-            cm = plt.get_cmap('rainbow')
-            plt.set_cmap('rainbow')
+            cm = colormaps.get_cmap('rainbow')
 
             Z = [[0, 0], [0, 0]]
             if self.sigmaCalRange[0] == self.sigmaCalRange[1]:
@@ -152,10 +158,9 @@ class FgcmSigmaCal(object):
             else:
                 useRange = self.sigmaCalRange
             levels = np.linspace(useRange[0], useRange[1], 256)
-            CS3 = plt.contourf(Z, levels, cmap=cm)
 
-            cNorm = colors.Normalize(vmin=self.sigmaCalRange[0], vmax=self.sigmaCalRange[1])
-            scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cm)
+            cNorm = Normalize(vmin=self.sigmaCalRange[0], vmax=self.sigmaCalRange[1])
+            scalarMap = ScalarMappable(norm=cNorm, cmap=cm)
 
         medChi2s = np.ones((nStep, self.fgcmPars.nBands))
 
@@ -238,10 +243,12 @@ class FgcmSigmaCal(object):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                     continue
 
-                fig = plt.figure(figsize=(9, 6))
+                fig = makeFigure(figsize=(9, 6))
                 fig.clf()
 
                 ax = fig.add_subplot(111)
+                CS3 = ax.contourf(Z, levels, cmap=cm)
+                ax.clear()
 
                 # Only plot those that are > 0!
 
@@ -267,17 +274,24 @@ class FgcmSigmaCal(object):
 
                 if use_inset:
                     axins=inset_axes(ax, width='45%',height='5%',loc=4)
-                    plt.colorbar(CS3,cax=axins,orientation='horizontal',format='%.3f',
-                                 ticks=[self.sigmaCalRange[0], (self.sigmaCalRange[0] + self.sigmaCalRange[1]) / 2.,
-                                        self.sigmaCalRange[1]])
+                    ax.get_figure().colorbar(CS3, cax=axins, orientation='horizontal', format='%.3f',
+                                             ticks=[self.sigmaCalRange[0], (self.sigmaCalRange[0] + self.sigmaCalRange[1]) / 2.,
+                                                    self.sigmaCalRange[1]])
                     axins.xaxis.set_ticks_position('top')
                     axins.tick_params(axis='both',which='major',labelsize=12)
 
-                fig.savefig('%s/%s_sigmacal_%s.png' % (self.plotPath,
-                                                       self.outfileBaseWithCycle,
-                                                       band))
-
-                plt.close()
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    "SigmaCal",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=band)
+                else:
+                    fig.savefig('%s/%s_sigmacal_%s.png' % (self.plotPath,
+                                                           self.outfileBaseWithCycle,
+                                                           band))
 
     def _worker(self, goodStarsAndObs):
         """
