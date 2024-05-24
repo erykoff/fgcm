@@ -718,8 +718,6 @@ class FgcmConfig(object):
         with open(configFile) as f:
             configDict = yaml.load(f, Loader=yaml.SafeLoader)
 
-        print("Configuration read from %s" % (configFile))
-
         return configDict
 
     @classmethod
