@@ -57,6 +57,7 @@ class FgcmAtmosphereTable(object):
             # We have an atmosphereTableFile, so read that
             self.atmosphereTableFile = atmosphereTableFile
             self.atmConfig = atmConfig
+            self.fgcmLog.info("Using atmosphere table %s" % (atmosphereTableFile))
         else:
             # get modTran stuff ready since we're going to be generating
             # also check the config
@@ -211,7 +212,6 @@ class FgcmAtmosphereTable(object):
         # first, check if we have something in the path...
         if os.path.isfile(atmosphereTableName):
             atmosphereTableFile = os.path.abspath(atmosphereTableName)
-            print("Found atmosphereTableName: %s" % (atmosphereTableName))
         else:
             if hasLsstResources:
                 rootResource = PackageResourcePath("resource://fgcm/data/tables", forceDirectory=True)
@@ -243,7 +243,6 @@ class FgcmAtmosphereTable(object):
                     raise IOError("Error finding atmosphereTableName (%s)" % (atmosphereTableName))
 
         # will set self.atmConfig
-        print("Found atmosphere file: %s" % (atmosphereTableFile))
         atmConfig = FgcmAtmosphereTable.getInfoDict(atmosphereTableFile)
 
         return cls(atmConfig, atmosphereTableFile=atmosphereTableFile)

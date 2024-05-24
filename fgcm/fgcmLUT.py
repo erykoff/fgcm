@@ -32,6 +32,11 @@ class FgcmLUTMaker(object):
     """
 
     def __init__(self,lutConfig,makeSeds=False):
+        if 'logger' in lutConfig:
+            self.fgcmLog = lutConfig['logger']
+        else:
+            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
+
         self._checkLUTConfig(lutConfig)
 
         self.magConstant = 2.5/np.log(10)
@@ -56,11 +61,6 @@ class FgcmLUTMaker(object):
 
         if (not os.path.isfile(self.stellarTemplateFile)):
             raise IOError("Could not find stellar template file")
-
-        if 'logger' in lutConfig:
-            self.fgcmLog = lutConfig['logger']
-        else:
-            self.fgcmLog = FgcmLogger('dummy.log', 'INFO', printLogger=True)
 
     def _checkLUTConfig(self,lutConfig):
         """
@@ -91,14 +91,14 @@ class FgcmLUTMaker(object):
                     if 'Range' in key:
                         if (not np.isclose(lutConfig[key][0], self.atmosphereTable.atmConfig[key][0]) or
                             not np.isclose(lutConfig[key][1], self.atmosphereTable.atmConfig[key][1])):
-                            print("Warning: input config %s is %.5f-%.5f but precomputed table is %.5f-%.5f" %
-                                  (key, lutConfig[key][0], lutConfig[key][1],
-                                   self.atmosphereTable.atmConfig[key][0],
-                                   self.atmosphereTable.atmConfig[key][1]))
+                            self.fgcmLog.warning("Input config %s is %.5f-%.5f but precomputed table is %.5f-%.5f" %
+                                                 (key, lutConfig[key][0], lutConfig[key][1],
+                                                  self.atmosphereTable.atmConfig[key][0],
+                                                  self.atmosphereTable.atmConfig[key][1]))
                     else:
                         if not np.isclose(lutConfig[key], self.atmosphereTable.atmConfig[key]):
-                            print("Warning: input config %s is %.5f but precomputed table is %.5f" %
-                                  (key, lutConfig[key], self.atmosphereTable.atmConfig[key]))
+                            self.fgcmLog.warning("Warning: input config %s is %.5f but precomputed table is %.5f" %
+                                                 (key, lutConfig[key], self.atmosphereTable.atmConfig[key]))
 
         else:
             # regular config with parameters
