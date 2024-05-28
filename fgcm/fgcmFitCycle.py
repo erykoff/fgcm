@@ -4,8 +4,6 @@ import sys
 import esutil
 import scipy.optimize as optimize
 
-import matplotlib.pyplot as plt
-
 from .fgcmConfig import FgcmConfig
 from .fgcmParameters import FgcmParameters
 from .fgcmChisq import FgcmChisq
@@ -22,7 +20,6 @@ from .fgcmSigFgcm import FgcmSigFgcm
 from .fgcmFlagVariables import FgcmFlagVariables
 from .fgcmRetrieveAtmosphere import FgcmRetrieveAtmosphere
 from .fgcmModelMagErrors import FgcmModelMagErrors
-from .fgcmConnectivity import FgcmConnectivity
 from .fgcmSigmaCal import FgcmSigmaCal
 from .fgcmSigmaRef import FgcmSigmaRef
 from .fgcmQeSysSlope import FgcmQeSysSlope
@@ -34,6 +31,7 @@ from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import FocalPlaneProjectorFromOffsets
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -51,11 +49,17 @@ class FgcmFitCycle(object):
     noFitsDict: dict, optional
        Dict with lutIndex/lutStd/expInfo/[ccdOffsets or focalPlaneProjector]
        if useFits == False
+    butlerQC : `lsst.pipe.base.QuantumContext`, optional
+        Quantum context used for serializing plots. If this is set then
+        plotHandleDict must also be set.
+    plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+        Dictionary of plot datasets refs, keyed by plot name and (perhaps)
+        physical filter. If this is set then butlerQC must also be set.
 
     Note that at least one of useFits or noFitsDict must be supplied.
     """
 
-    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False):
+    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False, butlerQC=None, plotHandleDict=None):
         # are we in fits mode?
         self.useFits = useFits
 
@@ -82,7 +86,8 @@ class FgcmFitCycle(object):
                                          noFitsDict['expInfo'],
                                          noOutput=noOutput,
                                          ccdOffsets=noFitsDict.get('ccdOffsets'),
-                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'))
+                                         focalPlaneProjector=noFitsDict.get('focalPlaneProjector'),
+                                         hasButler=(butlerQC is not None))
         # and set up the log
         self.fgcmLog = self.fgcmConfig.fgcmLog
         self.quietMode = self.fgcmConfig.quietMode
@@ -96,6 +101,14 @@ class FgcmFitCycle(object):
         self.finalCycle = False
         if (not self.fgcmConfig.resetParameters and self.fgcmConfig.maxIter == 0):
             self.finalCycle = True
+
+        if butlerQC is None and plotHandleDict is not None:
+            raise RuntimeError("If plotHandleDict is set then butlerQC must also be set.")
+        if butlerQC is not None and plotHandleDict is None:
+            raise RuntimeError("If butlerQC is set then plotHandleDict must also be set.")
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -174,9 +187,13 @@ class FgcmFitCycle(object):
         # Generate or Read Parameters
         if (self.initialCycle):
             self.fgcmPars = FgcmParameters.newParsWithFits(self.fgcmConfig,
-                                                           self.fgcmLUT)
+                                                           self.fgcmLUT,
+                                                           butlerQC=self.butlerQC,
+                                                           plotHandleDict=self.plotHandleDict)
         else:
-            self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig)
+            self.fgcmPars = FgcmParameters.loadParsWithFits(self.fgcmConfig,
+                                                            butlerQC=self.butlerQC,
+                                                            plotHandleDict=self.plotHandleDict)
 
         # Read in the stars
         self.fgcmStars = FgcmStars(self.fgcmConfig)
@@ -216,10 +233,22 @@ class FgcmFitCycle(object):
         self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
 
         # And the Gray code
-        self.fgcmGray = FgcmGray(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+        self.fgcmGray = FgcmGray(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            butlerQC=self.butlerQC,
+            plotHandleDict=self.plotHandleDict,
+        )
 
         # And the qeSysSlope code
-        self.fgcmQeSysSlope = FgcmQeSysSlope(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+        self.fgcmQeSysSlope = FgcmQeSysSlope(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            butlerQC=self.butlerQC,
+            plotHandleDict=self.plotHandleDict,
+        )
 
         self.setupComplete = True
         if not self.quietMode:
@@ -289,7 +318,9 @@ class FgcmFitCycle(object):
         # Set up the magnitude error modeler
         self.fgcmModelMagErrs = FgcmModelMagErrors(self.fgcmConfig,
                                                    self.fgcmPars,
-                                                   self.fgcmStars)
+                                                   self.fgcmStars,
+                                                   butlerQC=self.butlerQC,
+                                                   plotHandleDict=self.plotHandleDict)
 
         # Get m^std, <m^std>, SED for all the stars.
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
@@ -374,7 +405,13 @@ class FgcmFitCycle(object):
 
                 # Might need option here for no ref stars!
                 # Something with the > 1.0.  WTF?
-                preSuperStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+                preSuperStarFlat = FgcmSuperStarFlat(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 preSuperStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
                 preSuperStarFlat.computeSuperStarFlats(doPlots=False, doNotUseSubCCD=True, onlyObsErr=True, forceZeroMean=True)
 
@@ -411,11 +448,6 @@ class FgcmFitCycle(object):
         # And compute the step units
         parArray = self.fgcmPars.getParArray(fitterUnits=False)
         self.fgcmComputeStepUnits.run(parArray)
-
-        # Make connectivity maps with what we know about photometric selection
-        # This code doesn't work properly, skip it for now.
-        # fgcmCon = FgcmConnectivity(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
-        # fgcmCon.plotConnectivity()
 
         # Finally, reset the atmosphere parameters if desired (prior to fitting)
         if self.fgcmConfig.resetParameters:
@@ -485,7 +517,8 @@ class FgcmFitCycle(object):
         if self.fgcmStars.hasDeltaAper:
             self.fgcmLog.debug('FitCycle computing deltaAper')
             self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
-                                               self.fgcmStars)
+                                               self.fgcmStars,
+                                               butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             if self.fgcmConfig.doComputeDeltaAperExposures:
                 self.fgcmDeltaAper.computeDeltaAperExposures()
             if self.fgcmConfig.doComputeDeltaAperStars:
@@ -498,8 +531,9 @@ class FgcmFitCycle(object):
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
-        self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig,self.fgcmPars,
-                                       self.fgcmStars)
+        self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig, self.fgcmPars,
+                                       self.fgcmStars, butlerQC=self.butlerQC,
+                                       plotHandleDict=self.plotHandleDict)
         # first compute with all...(better stats)
         self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
@@ -532,7 +566,8 @@ class FgcmFitCycle(object):
         # Compute Retrieved PWV -- always because why not?
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
-                                                             self.fgcmPars)
+                                                             self.fgcmPars, butlerQC=self.butlerQC,
+                                                             plotHandleDict=self.plotHandleDict)
         self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
         #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
@@ -541,7 +576,13 @@ class FgcmFitCycle(object):
         # Compute SuperStar Flats
         if not self.finalCycle:
             self.fgcmLog.debug('FitCycle computing SuperStarFlats')
-            superStarFlat = FgcmSuperStarFlat(self.fgcmConfig,self.fgcmPars,self.fgcmStars)
+            superStarFlat = FgcmSuperStarFlat(
+                self.fgcmConfig,
+                self.fgcmPars,
+                self.fgcmStars,
+                butlerQC=self.butlerQC,
+                plotHandleDict=self.plotHandleDict,
+            )
             superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
             superStarFlat.computeSuperStarFlats()
 
@@ -550,7 +591,13 @@ class FgcmFitCycle(object):
 
             # Compute Aperture Corrections
             self.fgcmLog.debug('FitCycle computing ApertureCorrections')
-            aperCorr = FgcmApertureCorrection(self.fgcmConfig,self.fgcmPars,self.fgcmGray)
+            aperCorr = FgcmApertureCorrection(
+                self.fgcmConfig,
+                self.fgcmPars,
+                self.fgcmGray,
+                butlerQC=self.butlerQC,
+                plotHandleDict=self.plotHandleDict,
+            )
             aperCorr.computeApertureCorrections()
 
             if not self.quietMode:
@@ -559,13 +606,27 @@ class FgcmFitCycle(object):
             # Compute mirror chromaticity
             if self.fgcmConfig.fitMirrorChromaticity:
                 self.fgcmLog.debug("FitCycle computing mirror chromaticity")
-                mirChrom = FgcmMirrorChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                mirChrom = FgcmMirrorChromaticity(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    self.fgcmLUT,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 mirChrom.computeMirrorChromaticity()
 
             # Compute CCD chromaticity, but only after the first cycle.
             if np.any(self.fgcmConfig.fitCCDChromaticity) and not self.initialCycle:
                 self.fgcmLog.debug("FitCycle computing CCD chromaticity")
-                ccdChrom = FgcmCCDChromaticity(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+                ccdChrom = FgcmCCDChromaticity(
+                    self.fgcmConfig,
+                    self.fgcmPars,
+                    self.fgcmStars,
+                    self.fgcmLUT,
+                    butlerQC=self.butlerQC,
+                    plotHandleDict=self.plotHandleDict,
+                )
                 ccdChrom.computeCCDChromaticity()
 
             # Compute QE sys slope
@@ -584,12 +645,14 @@ class FgcmFitCycle(object):
         #   if we don't the zeropoints before convergence will be wrong.
 
         self.fgcmLog.debug('FitCycle computing SigmaCal')
-        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray)
+        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray,
+                                   butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.sigCal.run()
 
         if self.fgcmStars.hasRefstars:
             self.fgcmLog.debug('FitCycle computing SigmaRef')
-            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars)
+            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars,
+                                  butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             sigRef.computeSigmaRef()
 
             self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
@@ -602,7 +665,8 @@ class FgcmFitCycle(object):
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval, self.fgcmStars)
+                                       self.fgcmRetrieval, self.fgcmStars,
+                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()
 
@@ -717,7 +781,7 @@ class FgcmFitCycle(object):
         self.fgcmChisq.maxIterations = -1
 
         if (doPlots):
-            fig=plt.figure(1,figsize=(8,6))
+            fig = makeFigure(figsize=(8, 6))
             fig.clf()
             ax=fig.add_subplot(111)
 
@@ -731,9 +795,16 @@ class FgcmFitCycle(object):
             ax.set_xlim(-0.5,self.fgcmConfig.maxIter+0.5)
             ax.set_ylim(chisqValues[-1]-0.5,chisqValues[0]+0.5)
 
-            fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
-                                                 self.fgcmConfig.outfileBaseWithCycle))
-            plt.close(fig)
+            if self.butlerQC is not None:
+                putButlerFigure(self.fgcmLog,
+                                self.butlerQC,
+                                self.plotHandleDict,
+                                "ChisqFit",
+                                self.fgcmConfig.cycleNumber,
+                                fig)
+            else:
+                fig.savefig('%s/%s_chisq_fit.png' % (self.fgcmConfig.plotPath,
+                                                     self.fgcmConfig.outfileBaseWithCycle))
 
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)

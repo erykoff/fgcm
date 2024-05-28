@@ -6,11 +6,10 @@ import time
 import scipy.optimize
 from scipy.stats import median_abs_deviation
 
-import matplotlib.pyplot as plt
-
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import makeFigure, putButlerFigure
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -25,7 +24,7 @@ class FgcmSigmaRef(object):
     fgcmStars: FgcmStars
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -33,6 +32,9 @@ class FgcmSigmaRef(object):
 
         self.fgcmPars = fgcmPars
         self.fgcmStars = fgcmStars
+
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
 
         self.plotPath = fgcmConfig.plotPath
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
@@ -138,7 +140,11 @@ class FgcmSigmaRef(object):
 
                 # start the figure which will have 4 panels
                 # (the figure may not be drawn and written if not configured)
-                fig = plt.figure(figsize=(9, 6))
+                # Note that we use the histogram fit/plot code to get the
+                # fit coefficients even if we are not persisting the plots.
+                # Fortunately, the makeFigure code now ensures that this
+                # does not have any side effects.
+                fig = makeFigure(figsize=(9, 6))
                 fig.clf()
 
                 started = False
@@ -221,10 +227,19 @@ class FgcmSigmaRef(object):
 
                 if self.plotPath is not None:
                     fig.tight_layout()
-                    fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
-                                                           self.outfileBaseWithCycle,
-                                                           band))
-                plt.close(fig)
+
+                    if self.butlerQC is not None:
+                        putButlerFigure(self.fgcmLog,
+                                        self.butlerQC,
+                                        self.plotHandleDict,
+                                        "SigmaRef",
+                                        self.cycleNumber,
+                                        fig,
+                                        band=band)
+                    else:
+                        fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
+                                                               self.outfileBaseWithCycle,
+                                                               band))
 
                 if message is not None:
                     self.fgcmLog.info(message)
