@@ -1470,6 +1470,8 @@ class FgcmGray(object):
         state = self.__dict__.copy()
         del state['fgcmLog']
         del state['focalPlaneProjector']
+        del state['butlerQC']
+        del state['plotHandleDict']
         return state
 
     def freeSharedMemory(self):
