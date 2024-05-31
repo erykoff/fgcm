@@ -2214,6 +2214,8 @@ class FgcmStars(object):
 
         state = self.__dict__.copy()
         del state['fgcmLog']
+        del state['butlerQC']
+        del state['plotHandleDict']
         return state
 
     def freeSharedMemory(self):
