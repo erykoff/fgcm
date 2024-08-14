@@ -381,16 +381,16 @@ class FgcmLUTMaker(object):
         self.fgcmLog.info("Computing lambdaB")
         self.lambdaB = np.zeros(len(self.filterNames))
         for i in range(len(self.filterNames)):
-            num = integrate.simpson(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
-            denom = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, self.atmLambda)
+            num = integrate.simpson(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, x=self.atmLambda)
+            denom = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] / self.atmLambda, x=self.atmLambda)
             self.lambdaB[i] = num / denom
             self.fgcmLog.info("Filter: %s, lambdaB = %.3f" % (self.filterNames[i], self.lambdaB[i]))
 
         self.fgcmLog.info("Computing lambdaStdFilter")
         self.lambdaStdFilter = np.zeros(len(self.filterNames))
         for i in range(len(self.filterNames)):
-            num = integrate.simpson(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            denom = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+            num = integrate.simpson(self.atmLambda * self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, x=self.atmLambda)
+            denom = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, x=self.atmLambda)
             self.lambdaStdFilter[i] = num / denom
             self.fgcmLog.info("Filter: %s, lambdaStdFilter = %.3f" % (self.filterNames[i],self.lambdaStdFilter[i]))
 
@@ -410,9 +410,9 @@ class FgcmLUTMaker(object):
         self.I2Std = np.zeros(len(self.filterNames))
 
         for i in range(len(self.filterNames)):
-            self.I0Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-            self.I1Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
-            self.I2Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i])**2. / self.atmLambda, self.atmLambda)
+            self.I0Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans / self.atmLambda, x=self.atmLambda)
+            self.I1Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, x=self.atmLambda)
+            self.I2Std[i] = integrate.simpson(self.throughputs[i]['THROUGHPUT_AVG'] * self.atmStdTrans * (self.atmLambda - self.lambdaStd[i])**2. / self.atmLambda, x=self.atmLambda)
 
         self.I10Std = self.I1Std / self.I0Std
 
@@ -454,8 +454,8 @@ class FgcmLUTMaker(object):
                                     else:
                                         Sb = self.throughputs[i]['THROUGHPUT_CCD'][:,p] * o2AtmTable[o,:] * rayleighAtmTable[o,:] * pwvAtmTable[j,o,:] * o3AtmTable[k,o,:] * aerosolTauLambda
 
-                                    lutPlus['I0'][i,j,k,m,n,o,p] = integrate.simpson(Sb / self.atmLambda, self.atmLambda)
-                                    lutPlus['I1'][i,j,k,m,n,o,p] = integrate.simpson(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, self.atmLambda)
+                                    lutPlus['I0'][i,j,k,m,n,o,p] = integrate.simpson(Sb / self.atmLambda, x=self.atmLambda)
+                                    lutPlus['I1'][i,j,k,m,n,o,p] = integrate.simpson(Sb * (self.atmLambda - self.lambdaStd[i]) / self.atmLambda, x=self.atmLambda)
 
         # and create the LUT (not plus)
         self.lut = np.zeros((len(self.filterNames),
@@ -627,8 +627,8 @@ class FgcmLUTMaker(object):
 
                 # compute synthetic mags
                 for j in range(len(self.filterNames)):
-                    num = integrate.simpson(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
-                    denom = integrate.simpson(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, self.atmLambda)
+                    num = integrate.simpson(fnu * self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, x=self.atmLambda)
+                    denom = integrate.simpson(self.throughputs[j]['THROUGHPUT_AVG'][:] * self.atmStdTrans / self.atmLambda, x=self.atmLambda)
 
                     self.sedLUT['SYNTHMAG'][i,j] = -2.5*np.log10(num/denom)
 
