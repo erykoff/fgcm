@@ -1247,7 +1247,7 @@ class FgcmStars(object):
                 index1 = self.bands.index(boundaryTerm['secondary'])
             except ValueError:
                 # Not in the list; set to nan
-                S[boundaryTermName] = np.full(len(objMagStdMeanOI[:, index0]), np.nan)
+                S[boundaryTermName] = np.full(len(objMagStdMeanOI[:, 0]), np.nan)
                 continue
 
             with warnings.catch_warnings():
