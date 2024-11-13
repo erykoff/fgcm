@@ -103,7 +103,7 @@ class FgcmModelMagErrors(object):
             else:
                 use = use0
 
-            if use.size < 10000:
+            if use.size < 5000:
                 # This is arbitrary, but necessary.
                 self.fgcmLog.info('Not enough star observations to model errors in %s band' % (self.fgcmPars.bands[bandIndex]))
                 continue
