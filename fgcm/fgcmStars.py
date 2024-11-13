@@ -1242,8 +1242,13 @@ class FgcmStars(object):
         # First compute the terms
         S = {}
         for boundaryTermName, boundaryTerm in self.sedBoundaryTermDict.items():
-            index0 = self.bands.index(boundaryTerm['primary'])
-            index1 = self.bands.index(boundaryTerm['secondary'])
+            try:
+                index0 = self.bands.index(boundaryTerm['primary'])
+                index1 = self.bands.index(boundaryTerm['secondary'])
+            except ValueError:
+                # Not in the list; set to nan
+                S[boundaryTermName] = np.full(len(objMagStdMeanOI[:, index0]), np.nan)
+                continue
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
