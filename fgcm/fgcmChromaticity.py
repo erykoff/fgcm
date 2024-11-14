@@ -410,6 +410,10 @@ class FgcmCCDChromaticity:
 
             for filterIndex, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 bandName = self.fgcmPars.filterToBand[filterName]
+
+                if bandName not in self.fgcmPars.bands:
+                    continue
+
                 bandIndex = self.fgcmPars.bands.index(bandName)
 
                 if not self.fitCCDChromaticity[bandIndex]:
