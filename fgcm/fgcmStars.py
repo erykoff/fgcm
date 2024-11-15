@@ -1969,10 +1969,10 @@ class FgcmStars(object):
 
         c = fgcmPars.compCCDChromaticity[obsCCDIndex, obsLUTFilterIndex]
 
-        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsBandIndex]) * fgcmLUT.I10Std[obsBandIndex]
+        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * fgcmLUT.I10Std[obsLUTFilterIndex]
         obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
-        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsBandIndex]) * (fgcmLUT.I1Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I2Std[obsBandIndex])) /
-                         (fgcmLUT.I0Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I1Std[obsBandIndex]))
+        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * (fgcmLUT.I1Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I2Std[obsLUTFilterIndex])) /
+                         (fgcmLUT.I0Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I1Std[obsLUTFilterIndex]))
         deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
 
         if returnCorrections:
