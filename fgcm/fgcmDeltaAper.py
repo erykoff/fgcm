@@ -310,6 +310,7 @@ class FgcmDeltaAper(object):
             for j, band in enumerate(self.fgcmStars.bands):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
                 if hpix.size < 2:
+                    self.fgcmLog.info("Not enough sky coverage for epsilon map in %s band" % (band))
                     continue
                 ra, dec = hpg.pixel_to_angle(self.deltaAperFitSpatialNside, hpix, nest=False)
                 st = np.argsort(offsetMap['epsilon'][hpix, j])
@@ -440,6 +441,9 @@ class FgcmDeltaAper(object):
             for j in gdHash2:
                 i2a = rev2[rev2[j]: rev2[j + 1]]
 
+                if len(i2a) == 0:
+                    continue
+
                 xInd = xBin[i1a[i2a[0]]]
                 yInd = yBin[i1a[i2a[0]]]
 
@@ -482,6 +486,9 @@ class FgcmDeltaAper(object):
 
         if self.plotPath is not None:
             for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
+                if self.fgcmPars.filterToBand[filterName] not in self.fgcmPars.bands:
+                    continue
+
                 binnedArray = epsilonCcdMap[j, :, :, :]
 
                 fig = makeFigure(figsize=(8, 6))

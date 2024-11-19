@@ -109,6 +109,9 @@ class FgcmMirrorChromaticity(object):
                 bounds.append((-0.5, 0.5))
 
         for filterIndex in range(self.fgcmPars.nLUTFilter):
+            if self.fgcmPars.lutFilterNames[filterIndex] not in self.fgcmPars.bands:
+                continue
+
             use, = np.where((obsLUTFilterIndex[goodObs] == filterIndex) &
                             (self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
                             (self.EGrayErr2GO > 0.0))
