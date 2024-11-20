@@ -1242,8 +1242,13 @@ class FgcmStars(object):
         # First compute the terms
         S = {}
         for boundaryTermName, boundaryTerm in self.sedBoundaryTermDict.items():
-            index0 = self.bands.index(boundaryTerm['primary'])
-            index1 = self.bands.index(boundaryTerm['secondary'])
+            try:
+                index0 = self.bands.index(boundaryTerm['primary'])
+                index1 = self.bands.index(boundaryTerm['secondary'])
+            except ValueError:
+                # Not in the list; set to nan
+                S[boundaryTermName] = np.full(len(objMagStdMeanOI[:, 0]), np.nan)
+                continue
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -1964,10 +1969,10 @@ class FgcmStars(object):
 
         c = fgcmPars.compCCDChromaticity[obsCCDIndex, obsLUTFilterIndex]
 
-        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsBandIndex]) * fgcmLUT.I10Std[obsBandIndex]
+        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * fgcmLUT.I10Std[obsLUTFilterIndex]
         obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
-        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsBandIndex]) * (fgcmLUT.I1Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I2Std[obsBandIndex])) /
-                         (fgcmLUT.I0Std[obsBandIndex] + obsSEDSlope * fgcmLUT.I1Std[obsBandIndex]))
+        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * (fgcmLUT.I1Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I2Std[obsLUTFilterIndex])) /
+                         (fgcmLUT.I0Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I1Std[obsLUTFilterIndex]))
         deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
 
         if returnCorrections:

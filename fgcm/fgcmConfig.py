@@ -618,11 +618,11 @@ class FgcmConfig(object):
             if 'primary' not in boundaryTerm or 'secondary' not in boundaryTerm:
                 raise RuntimeError("sedBoundaryTerm %s must have primary and secondary keys." % (boundaryTerm))
             if boundaryTerm['primary'] not in self.bands:
-                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
-                                   (boundaryTermName, boundaryTerm['primary']))
+                self.fgcmLog.warning("sedBoundaryTerm %s band %s not in list of bands." %
+                                     (boundaryTermName, boundaryTerm['primary']))
             if boundaryTerm['secondary'] not in self.bands:
-                raise RuntimeError("sedBoundaryTerm %s band %s not in list of bands." %
-                                   (boundaryTermName, boundaryTerm['secondary']))
+                self.fgcmLog.warning("sedBoundaryTerm %s band %s not in list of bands." %
+                                     (boundaryTermName, boundaryTerm['secondary']))
 
         # Third, extract all the terms and bands from sedTermDict, make sure all
         # are defined.
@@ -659,7 +659,7 @@ class FgcmConfig(object):
                 raise RuntimeError("Term %s is used in sedTermDict but not in sedBoundaryTermDict" % (mapTerm))
         for mapBand in mapBands:
             if mapBand not in self.bands:
-                raise RuntimeError("Band %s is used in sedTermDict but not in bands" % (mapBand))
+                self.fgcmLog.warning("Band %s is used in sedTermDict but not in bands" % (mapBand))
 
         # and AB zeropoint
         self.hPlanck = 6.6
