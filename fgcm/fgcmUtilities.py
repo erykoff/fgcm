@@ -1027,15 +1027,17 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
         raise RuntimeError("Cannot specify both filterName and band.")
 
     plotName = f"fgcm_Cycle{cycle}_{name}"
-    if filterName:
-        plotFilter = filterName.replace("-", "_").replace(" ", "_").replace("~", "_")
-        plotName += f"_{plotFilter}"
-    if band:
-        plotName += f"_{band}"
     if epoch:
         plotName += f"_{epoch}"
 
     plotName += "_Plot"
+
+    if filterName:
+        plotName += f"_{filterName}"
+
+    if band:
+        plotName += f"_{band}"
+
     if plotName not in plotHandleDict:
         logger.warning(f"Could not find plot {plotName} in plotHandleDict.")
         return
