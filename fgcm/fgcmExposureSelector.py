@@ -21,6 +21,7 @@ class FgcmExposureSelector(object):
         # and config variables...
         self.minStarPerExp = fgcmConfig.minStarPerExp
         self.minExpPerNight = fgcmConfig.minExpPerNight
+        self.expFwhmCut = fgcmConfig.expFwhmCut
         self.expGrayPhotometricCut = fgcmConfig.expGrayPhotometricCut
         self.expVarGrayPhotometricCut = fgcmConfig.expVarGrayPhotometricCut
         self.expGrayHighCut = fgcmConfig.expGrayHighCut
@@ -35,6 +36,12 @@ class FgcmExposureSelector(object):
         # based on those in the parameter file if they're available
 
         self.fgcmPars.expFlag[:] = 0
+
+        bad, = np.where(self.fgcmPars.expFwhm > self.expFwhmCut[self.fgcmPars.expBandIndex])
+        self.fgcmPars.expFlag[bad] |= expFlagDict['BAD_FWHM']
+        self.fgcmLog.info('Flagged %d bad exposures with bad fwhm.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars, 'BAD_FWHM')
 
         bad,=np.where(self.fgcmPars.compNGoodStarPerExp == 0)
         self.fgcmPars.expFlag[bad] |= expFlagDict['NO_STARS']
@@ -99,6 +106,12 @@ class FgcmExposureSelector(object):
 
         # reset all exposure flags
         self.fgcmPars.expFlag[:] = 0
+
+        bad, = np.where(self.fgcmPars.expFwhm > self.expFwhmCut[self.fgcmPars.expBandIndex])
+        self.fgcmPars.expFlag[bad] |= expFlagDict['BAD_FWHM']
+        self.fgcmLog.info('Flagged %d bad exposures with bad fwhm.' % (bad.size))
+        if not self.quietMode:
+            logFlaggedExposuresPerBand(self.fgcmLog, self.fgcmPars, 'BAD_FWHM')
 
         bad,=np.where(expNGoodStarForInitialSelection < self.minStarPerExp)
         self.fgcmPars.expFlag[bad] |= expFlagDict['TOO_FEW_STARS']
