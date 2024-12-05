@@ -31,7 +31,8 @@ expFlagDict = {'TOO_FEW_STARS':2**0,
                'BAND_NOT_IN_LUT':2**5,
                'TEMPORARY_BAD_EXPOSURE':2**6,
                'EXP_GRAY_TOO_POSITIVE':2**7,
-               'BAD_ZPFLAG':2**8}
+               'BAD_ZPFLAG':2**8,
+               'BAD_FWHM':2**9}
 
 # Dictionary of zeropoint flags
 zpFlagDict = {'PHOTOMETRIC_FIT_EXPOSURE':2**0,

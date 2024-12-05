@@ -447,7 +447,8 @@ class FgcmZeropoints(object):
         acceptMask = (expFlagDict['EXP_GRAY_TOO_NEGATIVE'] |
                       expFlagDict['EXP_GRAY_TOO_POSITIVE'] |
                       expFlagDict['VAR_GRAY_TOO_LARGE'] |
-                      expFlagDict['TOO_FEW_STARS'])
+                      expFlagDict['TOO_FEW_STARS'] |
+                      expFlagDict['BAD_FWHM'])
 
         nonPhotZpIndex, = np.where(((self.fgcmPars.expFlag[zpExpIndex] & acceptMask) > 0) &
                            ((self.fgcmPars.expFlag[zpExpIndex] & rejectMask) == 0))
