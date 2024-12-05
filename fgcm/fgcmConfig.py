@@ -163,6 +163,7 @@ class FgcmConfig(object):
     expGrayInitialCut = ConfigField(float, default=-0.25)
     expVarGrayPhotometricCutDict = ConfigField(dict, default={})
     expGrayPhotometricCutDict = ConfigField(dict, required=True)
+    expFwhmCutDict = ConfigField(dict, required=True)
     expGrayRecoverCut = ConfigField(float, default=-1.0)
     expGrayHighCutDict = ConfigField(dict, required=True)
     expGrayErrRecoverCut = ConfigField(float, default=0.05)
@@ -469,6 +470,10 @@ class FgcmConfig(object):
                                                                  float, -0.05,
                                                                  ndarray=True, required=True,
                                                                  dictName='expGrayPhotometricCutDict')
+        self.expFwhmCut = self._convertDictToBandList(self.expFwhmCutDict,
+                                                      float, 100.0,
+                                                      ndarray=True, required=False,
+                                                      dictName='expFwhmCutDict')
         self.expGrayHighCut = self._convertDictToBandList(self.expGrayHighCutDict,
                                                           float, 0.10,
                                                           ndarray=True, required=True,
