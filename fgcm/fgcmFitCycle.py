@@ -519,8 +519,9 @@ class FgcmFitCycle(object):
             self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
                                                self.fgcmStars,
                                                butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
-            if self.fgcmConfig.doComputeDeltaAperExposures:
-                self.fgcmDeltaAper.computeDeltaAperExposures()
+            self.fgcmDeltaAper.computeDeltaAperExposures(
+                doFullFit=self.fgcmConfig.doComputeDeltaAperExposures,
+            )
             if self.fgcmConfig.doComputeDeltaAperStars:
                 self.fgcmDeltaAper.computeDeltaAperStars()
                 # Only run if we have the values per star.

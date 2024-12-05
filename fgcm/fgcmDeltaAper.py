@@ -68,12 +68,15 @@ class FgcmDeltaAper(object):
         self.njyZp = 8.9 + 9*2.5
         self.k = 2.5/np.log(10.)
 
-    def computeDeltaAperExposures(self):
+    def computeDeltaAperExposures(self, doFullFit=False):
         """
         Compute deltaAper per-exposure quantities
         """
         if not self.quietMode:
-            self.fgcmLog.info('Computing deltaAper per exposure')
+            if doFullFit:
+                self.fgcmLog.info('Computing deltaAper per exposure')
+            else:
+                self.fgcmLog.info('Computing deltaAper offset per exposure')
 
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -115,6 +118,9 @@ class FgcmDeltaAper(object):
             cutMag = mag[ok[st[int(0.25*st.size)]]]
             bright, = np.where(mag[ok] < cutMag)
             self.fgcmPars.compMedDeltaAper[expIndex] = np.median(deltaAper[ok[bright]])
+
+            if not doFullFit:
+                continue
 
             fit, _ = self._fitEpsilonWithDataBinner(mag[ok], deltaAper[ok])
 
