@@ -632,19 +632,38 @@ class FgcmZeropoints(object):
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
             # FIXME: make configurable
-            cols = ['g', 'r', 'b', 'm', 'y']
-            syms = ['.', '+', 'o', '*', 'X']
+            stdColDict = {
+                # These are the LSST color-blind friendly colors.
+                "u": "#0c71ff",
+                "g": "#49be61",
+                "r": "#c61c00",
+                "i": "#ffc200",
+                "z": "#f341a2",
+                "y": "#5d0000",
+            }
 
-            for i in range(self.fgcmPars.nBands):
+            extraCols = ['g', 'r', 'b', 'm', 'y']
+            markers = ['.', '+', 'o', '*', 'X']
+
+            for i, band in enumerate(self.fgcmPars.bands):
                 use,=np.where((self.fgcmPars.expBandIndex == i) &
                               (expZpMean > 0.0))
 
                 if (use.size == 0) :
                     continue
 
-                ax.plot(self.fgcmPars.expMJD[use] - firstMJD,
-                        expZpMean[use], cols[i % 5] + syms[i % 5],
-                        label=r'$(%s)$' % (self.fgcmPars.bands[i]))
+                if band in stdColDict:
+                    col = stdColDict[band]
+                else:
+                    col = extraCols[i % 5]
+
+                ax.plot(
+                    self.fgcmPars.expMJD[use] - firstMJD,
+                    expZpMean[use],
+                    color=col,
+                    marker=markers[i % 5],
+                    label=r'$(%s)$' % (self.fgcmPars.bands[i]),
+                )
 
             ax.legend(loc=3)
 
