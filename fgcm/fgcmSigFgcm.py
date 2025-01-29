@@ -103,6 +103,8 @@ class FgcmSigFgcm(object):
         # see fgcmSigmaRef for reference stars
         EGrayGO, EGrayErr2GO = self.fgcmStars.computeEGray(goodObs, ignoreRef=True)
 
+        EGrayPullGO = EGrayGO / np.sqrt(EGrayErr2GO)
+
         # now we can compute sigFgcm
 
         sigFgcm = np.zeros(self.fgcmStars.nBands)
@@ -256,6 +258,102 @@ class FgcmSigFgcm(object):
                                                              self.outfileBaseWithCycle,
                                                              extraName,
                                                              self.fgcmPars.bands[bandIndex]))
+
+        # Make pulls plots as above.
+        for bandIndex, band in enumerate(self.fgcmStars.bands):
+            if not self.fgcmPars.hasExposuresInBand[bandIndex]:
+                continue
+
+            # start the figure which will have 4 panels
+            fig = makeFigure(figsize=(9, 6))
+            fig.clf()
+
+            started = False
+            for c, name in enumerate(gmiCutNames):
+                if c == 0:
+                    # This is the "All"
+                    # There shouldn't be any need any additional checks on if these
+                    # stars were actually observed in this band, because the goodObs
+                    # selection takes care of that.
+                    sigUse, = np.where((np.abs(EGrayGO) < self.sigFgcmMaxEGray[bandIndex]) &
+                                       (EGrayErr2GO > 0.0) &
+                                       (EGrayErr2GO < self.sigFgcmMaxErr**2.) &
+                                       (EGrayGO != 0.0) &
+                                       (obsBandIndex[goodObs] == bandIndex))
+                else:
+                    sigUse, = np.where((np.abs(EGrayGO[okColor]) < self.sigFgcmMaxEGray[bandIndex]) &
+                                       (EGrayErr2GO[okColor] > 0.0) &
+                                       (EGrayErr2GO[okColor] < self.sigFgcmMaxErr**2.) &
+                                       (EGrayGO[okColor] != 0.0) &
+                                       (obsBandIndex[goodObs[okColor]] == bandIndex) &
+                                       (gmiGO[okColor] > gmiCutLow[c]) &
+                                       (gmiGO[okColor] < gmiCutHigh[c]))
+                    sigUse = okColor[sigUse]
+
+                if (sigUse.size == 0):
+                    self.fgcmLog.info('sigFGCMPulls: No good observations in %s band (color cut %d).' %
+                                     (self.fgcmPars.bands[bandIndex],c))
+                    continue
+
+                ax = fig.add_subplot(2, 2, c + 1)
+
+                try:
+                    coeff = histoGauss(ax, EGrayPullGO[sigUse])
+                except Exception as inst:
+                    coeff = np.array([np.inf, np.inf, np.inf])
+
+                if not np.isfinite(coeff[2]):
+                    self.fgcmLog.info("Failed to compute sigFgcmPulls (%s) (%s)." %
+                                      (self.fgcmPars.bands[bandIndex], name))
+                    coeff[2] = -10.0
+
+                self.fgcmLog.info("%s sigFgcmPull (%s) (%s) = %.2f" % (
+                        sigType,
+                        self.fgcmPars.bands[bandIndex],
+                        name,
+                        coeff[2]))
+
+                if self.plotPath is None:
+                    continue
+
+                ax.tick_params(axis='both',which='major',labelsize=14)
+
+                text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n' + \
+                    r'$\mathrm{Cycle\ %d}$' % (self.cycleNumber) + '\n' + \
+                    r'$\mu = %.2f$' % (coeff[1]) + '\n' + \
+                    r'$\sigma_\mathrm{pull} = %.2f$' % (coeff[2]) + '\n' + \
+                    name
+
+                ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right', va='top', fontsize=14)
+                ax.set_xlabel(r'$E^{\mathrm{gray}}/\sigma_{E^{\mathrm{gray}}}$', fontsize=14)
+
+                ax.set_title(extraName)
+
+                if (not started):
+                    started = True
+                    plotXRange = ax.get_xlim()
+                else:
+                    ax.set_xlim(plotXRange)
+
+            if self.plotPath is not None:
+                fig.tight_layout()
+
+                if self.butlerQC is not None:
+                    putButlerFigure(self.fgcmLog,
+                                    self.butlerQC,
+                                    self.plotHandleDict,
+                                    f"SigmaFgcmPulls{extraNameButler}",
+                                    self.cycleNumber,
+                                    fig,
+                                    band=self.fgcmPars.bands[bandIndex])
+                else:
+                    fig.savefig('%s/%s_sigfgcmpulls_%s_%s.png' % (self.plotPath,
+                                                                  self.outfileBaseWithCycle,
+                                                                  extraName,
+                                                                  self.fgcmPars.bands[bandIndex]))
+
+
+
 
         if not self.quietMode:
             self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %

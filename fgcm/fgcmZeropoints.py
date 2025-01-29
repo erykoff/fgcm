@@ -1011,6 +1011,7 @@ class FgcmZeropointPlotter(object):
             return
 
         from .fgcmUtilities import plotCCDMap
+        from matplotlib import colormaps
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
@@ -1071,7 +1072,14 @@ class FgcmZeropointPlotter(object):
                     else:
                         # for the residuals, center at zero, but use lo/hi
                         amp = np.abs((hi - lo)/2.)
-                        plotCCDMap(ax, deltaMapper[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
+                        plotCCDMap(
+                            ax,
+                            deltaMapper[use],
+                            meanR1[use] - meanI1[use],
+                            "R1 - I1 (red-blue mmag)",
+                            loHi=[-amp, amp],
+                            cmap=colormaps.get_cmap("bwr"),
+                        )
                 except ValueError:
                     continue
 
