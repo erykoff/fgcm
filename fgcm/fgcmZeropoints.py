@@ -649,13 +649,15 @@ class FgcmZeropoints(object):
                 if mode == "unscaled":
                     ax = fig.add_subplot(211)
                     ylabel = "Zero Point"
+                    valueToPlot = expZpMean
                 else:
                     ax = fig.add_subplot(212)
                     ylabel = "Zero Point - 2.5*log10(exptime)"
+                    valueToPlot = expZpScaledMean
 
                 for i, band in enumerate(self.fgcmPars.bands):
                     use, = np.where((self.fgcmPars.expBandIndex == i) &
-                                    (expZpMean > 0.0))
+                                    (valueToPlot > 0.0))
 
                     if (use.size == 0) :
                         continue
@@ -667,7 +669,7 @@ class FgcmZeropoints(object):
 
                     ax.plot(
                         self.fgcmPars.expMJD[use] - firstMJD,
-                        expZpMean[use],
+                        valueToPlot[use],
                         color=col,
                         marker=markers[i % 5],
                         label=r'$(%s)$' % (self.fgcmPars.bands[i]),
