@@ -624,10 +624,7 @@ class FgcmZeropoints(object):
             gd,=np.where(expZpNCCD > 0)
             expZpMean[gd] /= expZpNCCD[gd]
 
-            fig = makeFigure(figsize=(8, 6))
-            fig.clf()
-
-            ax=fig.add_subplot(111)
+            expZpScaledMean = expZpMean - 2.5*np.log10(self.fgcmPars.expExptime)
 
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
@@ -645,27 +642,40 @@ class FgcmZeropoints(object):
             extraCols = ['g', 'r', 'b', 'm', 'y']
             markers = ['.', '+', 'o', '*', 'X']
 
-            for i, band in enumerate(self.fgcmPars.bands):
-                use,=np.where((self.fgcmPars.expBandIndex == i) &
-                              (expZpMean > 0.0))
+            fig = makeFigure(figsize=(8, 12))
+            fig.clf()
 
-                if (use.size == 0) :
-                    continue
-
-                if band in stdColDict:
-                    col = stdColDict[band]
+            for mode in ["unscaled", "scaled"]:
+                if mode == "unscaled":
+                    ax = fig.add_subplot(211)
+                    ylabel = "Zero Point"
                 else:
-                    col = extraCols[i % 5]
+                    ax = fig.add_subplot(212)
+                    ylabel = "Zero Point - 2.5*log10(exptime)"
 
-                ax.plot(
-                    self.fgcmPars.expMJD[use] - firstMJD,
-                    expZpMean[use],
-                    color=col,
-                    marker=markers[i % 5],
-                    label=r'$(%s)$' % (self.fgcmPars.bands[i]),
-                )
+                for i, band in enumerate(self.fgcmPars.bands):
+                    use, = np.where((self.fgcmPars.expBandIndex == i) &
+                                    (expZpMean > 0.0))
 
-            ax.legend(loc=3)
+                    if (use.size == 0) :
+                        continue
+
+                    if band in stdColDict:
+                        col = stdColDict[band]
+                    else:
+                        col = extraCols[i % 5]
+
+                    ax.plot(
+                        self.fgcmPars.expMJD[use] - firstMJD,
+                        expZpMean[use],
+                        color=col,
+                        marker=markers[i % 5],
+                        label=r'$(%s)$' % (self.fgcmPars.bands[i]),
+                    )
+
+                    ax.legend(loc=3)
+                    ax.set_xlabel(f"Days after {firstMJD}")
+                    ax.set_ylabel(ylabel)
 
             if self.butlerQC is not None:
                 putButlerFigure(self.fgcmLog,
