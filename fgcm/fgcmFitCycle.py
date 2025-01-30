@@ -585,7 +585,7 @@ class FgcmFitCycle(object):
                 plotHandleDict=self.plotHandleDict,
             )
             superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
-            superStarFlat.computeSuperStarFlats()
+            superStarFlat.computeSuperStarFlats(forceZeroMean=self.fgcmConfig.superStarForceZeroMean)
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing superstar flats'))
