@@ -876,7 +876,7 @@ class FgcmGray(object):
                 ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
 
-                text = r'$(%s)$\n' % (self.fgcmPars.bands[bandIndex])
+                text = r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n'
                 text += "(1-1 reference line)"
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
@@ -919,7 +919,7 @@ class FgcmGray(object):
                 ax.plot([extent[0], extent[1]],
                         [0.0, 0.0], 'r--')
 
-                text = r"$(%s)$\n" % (self.fgcmPars.bands[bandIndex])
+                text = r"$(%s)$" % (self.fgcmPars.bands[bandIndex]) + "\n"
                 text += "(0 reference line)"
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
