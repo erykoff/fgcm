@@ -2096,6 +2096,17 @@ class FgcmParameters(object):
             else:
                 fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
+        # FIXME: make configurable
+        stdColDict = {
+            # These are the LSST color-blind friendly colors.
+            "u": "#0c71ff",
+            "g": "#49be61",
+            "r": "#c61c00",
+            "i": "#ffc200",
+            "z": "#f341a2",
+            "y": "#5d0000",
+        }
+        extraCols = ['g', 'r', 'b', 'm', 'y']
 
         # Filter Offset
         fig = makeFigure(figsize=(8, 6))

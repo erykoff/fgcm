@@ -983,6 +983,7 @@ class FgcmZeropointPlotter(object):
             text = "(%s)\n" % (filterName)
             text += "Blue: %s\n" % (self.blueString)
             text += "Red: %s\n" % (self.redString)
+            text += "(1-1 reference line)"
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
