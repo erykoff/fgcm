@@ -242,9 +242,9 @@ class FgcmDeltaAper(object):
                 xplotfluxvals = 10.**((xplotvals - self.njyZp)/(-2.5))
                 yplotvals = fit[0]*((2.5/np.log(10.0))/xplotfluxvals) + fit[1]
                 ax.plot(xplotvals, yplotvals, 'r-')
-                ax.set_xlabel('mag_std_%s' % (band))
-                ax.set_ylabel('Normalized delta_aper_%s' % (band))
-                ax.set_title('%s: %.4f nJy/arcsec2' % (band, globalEpsilon[i]))
+                ax.set_xlabel('mag_std_%s (mag)' % (band))
+                ax.set_ylabel('Normalized delta_aper_%s (mag)' % (band))
+                ax.set_title('Global offset %s: %.4f nJy/arcsec2' % (band, globalEpsilon[i]))
 
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,

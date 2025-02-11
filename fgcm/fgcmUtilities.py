@@ -450,7 +450,7 @@ class Cheb2dField(object):
         return self.evaluate(xy[0, :], xy[1, :], flatpars)
 
 
-def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
+def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None, symmetric=False):
     """
     Plot CCD map with single values for each CCD.
 
@@ -468,6 +468,8 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
         (lo, hi) if set.  Otherwise, scaling is computed from data.
     cmap : `matplotlib.colors.Colormap`, optional
         Color map to use.
+    symmetric : `bool`, optional
+        Make loHi symmetric around 0?  (Only used if loHi is None).
     """
     import matplotlib.patches as patches
     import matplotlib.colors as colors
@@ -488,6 +490,11 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
 
         lo = values[st[int(0.02*st.size)]]
         hi = values[st[int(0.98*st.size)]]
+
+        if symmetric:
+            maxlohi = np.max([np.abs(lo), np.abs(hi)])
+            lo = -maxlohi
+            hi = maxlohi
     else:
         lo = loHi[0]
         hi = loHi[1]
@@ -530,7 +537,7 @@ def plotCCDMap(ax, deltaMapper, values, cbLabel, loHi=None, cmap=None):
     return None
 
 
-def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
+def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None, symmetric=False):
     """
     Plot CCD map with Chebyshev fits for each CCD.
 
@@ -548,6 +555,8 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
         (lo, hi) if set.  Otherwise, scaling is computed from data.
     cmap : `maplotlib.colors.Colormap`, optional
         Colormap to use.
+    symmetric : `bool`, optional
+        Make loHi symmetric around 0?  (Only used if loHi is None).
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colors
@@ -596,6 +605,11 @@ def plotCCDMap2d(ax, deltaMapper, parArray, cbLabel, loHi=None, cmap=None):
             st = np.argsort(zGrid.ravel())
             lo = zGrid.ravel()[st[int(0.02*st.size)]]
             hi = zGrid.ravel()[st[int(0.98*st.size)]]
+
+        if symmetric:
+            maxlohi = np.max([np.abs(lo), np.abs(hi)])
+            lo = -maxlohi
+            hi = maxlohi
     else:
         lo = loHi[0]
         hi = loHi[1]
