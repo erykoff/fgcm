@@ -2196,8 +2196,8 @@ class FgcmStars(object):
                 else:
                     title = '%s band: Ref stars, cut color range (used in calibration)' % (band)
                 ax.set_title(title)
-                ax.set_xlabel('%s - %s' % (self.colorSplitBands[0], self.colorSplitBands[1]))
-                ax.set_ylabel('%s_std - %s_ref' % (band, band))
+                ax.set_xlabel('%s - %s (mag)' % (self.colorSplitBands[0], self.colorSplitBands[1]))
+                ax.set_ylabel('%s_std - %s_ref (mag)' % (band, band))
 
                 fig.tight_layout()
                 if self.butlerQC is not None:

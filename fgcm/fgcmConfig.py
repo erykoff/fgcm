@@ -215,6 +215,7 @@ class FgcmConfig(object):
     superStarSubCCDTriangular = ConfigField(bool, default=False)
     superStarSigmaClip = ConfigField(float, default=5.0)
     superStarPlotCCDResiduals = ConfigField(bool, default=False)
+    superStarForceZeroMean = ConfigField(bool, default=False)
     clobber = ConfigField(bool, default=False)
     printOnly = ConfigField(bool, default=False)
     outputStars = ConfigField(bool, default=False)

@@ -410,6 +410,10 @@ class FgcmCCDChromaticity:
         # And make plots if necessary.
         if self.plotPath is not None:
             from .fgcmUtilities import plotCCDMap
+            from matplotlib import colormaps
+
+            # We want to use a red/blue diverging colormap, centered at 0.
+            cmap = colormaps.get_cmap("bwr")
 
             for filterIndex, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 bandName = self.fgcmPars.filterToBand[filterName]
@@ -438,6 +442,8 @@ class FgcmCCDChromaticity:
                     self.fgcmPars.deltaMapperDefault[use],
                     self.fgcmPars.compCCDChromaticity[use, filterIndex],
                     "Chromaticity Index",
+                    cmap=cmap,
+                    symmetric=True,
                 )
 
                 text = '(%s)' % (filterName)

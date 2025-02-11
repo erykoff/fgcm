@@ -876,7 +876,8 @@ class FgcmGray(object):
                 ax.set_ylabel('EXP_GRAY (%s) (%s) (mmag)' % (self.fgcmPars.bands[bandIndex], gmiCutNames[2]))
                 ax.plot([-10.0, 10.0], [-10.0, 10.0], 'r--')
 
-                text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
+                text = r'$(%s)$' % (self.fgcmPars.bands[bandIndex]) + '\n'
+                text += "(1-1 reference line)"
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
 
@@ -918,7 +919,8 @@ class FgcmGray(object):
                 ax.plot([extent[0], extent[1]],
                         [0.0, 0.0], 'r--')
 
-                text=r'$(%s)$' % (self.fgcmPars.bands[bandIndex])
+                text = r"$(%s)$" % (self.fgcmPars.bands[bandIndex]) + "\n"
+                text += "(0 reference line)"
                 ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                             va='top', fontsize=16, color='r')
 
@@ -1152,6 +1154,9 @@ class FgcmGray(object):
             ax.set_xlabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex0]))
             ax.set_ylabel('EXP_GRAY (%s) (mmag)' % (self.fgcmPars.bands[bandIndex1]))
             ax.plot([-0.01 * 1000, 0.01 * 1000],[-0.01 * 1000, 0.01 * 1000],'r--')
+            text = "(1-1 reference line)"
+            ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
+                        va='top', fontsize=16, color='r')
 
             if self.plotPath is not None:
                 if self.butlerQC is not None:

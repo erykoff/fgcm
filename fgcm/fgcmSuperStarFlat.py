@@ -442,6 +442,10 @@ class FgcmSuperStarFlat(object):
 
         from .fgcmUtilities import plotCCDMap
         from .fgcmUtilities import plotCCDMap2d
+        from matplotlib import colormaps
+
+        # We want to use a red/blue diverging colormap, centered at 0.
+        cmap = colormaps.get_cmap("bwr")
 
         for e in range(self.fgcmPars.nEpochs):
             for f in range(self.fgcmPars.nLUTFilter):
@@ -460,10 +464,10 @@ class FgcmSuperStarFlat(object):
                 if not self.superStarSubCCD:
                     # New flux parameters
                     plotCCDMap(ax, self.deltaMapperDefault[use], -2.5 * np.log10(superStarPars[e, f, use, 0]) * 1000.0,
-                               'SuperStar (mmag)')
+                               'SuperStar (mmag)', cmap=cmap, symmetric=True)
                 else:
                     plotCCDMap2d(ax, self.deltaMapperDefault[use], superStarPars[e, f, use, :],
-                                 'SuperStar (mmag)')
+                                 'SuperStar (mmag)', cmap=cmap, symmetric=True)
 
                 # and annotate
 
@@ -478,7 +482,7 @@ class FgcmSuperStarFlat(object):
                 ax=fig.add_subplot(122)
 
                 plotCCDMap(ax, self.deltaMapperDefault[use], deltaSuperStar[e, f, use]*1000.0,
-                           'Central Delta-SuperStar (mmag)')
+                           'Central Delta-SuperStar (mmag)', cmap=cmap, symmetric=True)
 
                 # and annotate
                 text = '(%s)' % (self.fgcmPars.lutFilterNames[f]) + '\n' + \
