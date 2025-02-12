@@ -585,7 +585,7 @@ class FgcmFitCycle(object):
                 plotHandleDict=self.plotHandleDict,
             )
             superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
-            superStarFlat.computeSuperStarFlats()
+            superStarFlat.computeSuperStarFlats(forceZeroMean=self.fgcmConfig.superStarForceZeroMean)
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing superstar flats'))
@@ -789,6 +789,7 @@ class FgcmFitCycle(object):
             chisqValues = np.array(self.fgcmChisq.fitChisqs)
 
             ax.plot(np.arange(chisqValues.size),chisqValues,'k.')
+            ax.set_yscale("log")
 
             ax.set_xlabel(r'$\mathrm{Iteration}$',fontsize=16)
             ax.set_ylabel(r'$\chi^2/\mathrm{DOF}$',fontsize=16)

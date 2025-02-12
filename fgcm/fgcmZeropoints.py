@@ -624,29 +624,60 @@ class FgcmZeropoints(object):
             gd,=np.where(expZpNCCD > 0)
             expZpMean[gd] /= expZpNCCD[gd]
 
-            fig = makeFigure(figsize=(8, 6))
-            fig.clf()
-
-            ax=fig.add_subplot(111)
+            expZpScaledMean = expZpMean - 2.5*np.log10(self.fgcmPars.expExptime)
 
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
             # FIXME: make configurable
-            cols = ['g', 'r', 'b', 'm', 'y']
-            syms = ['.', '+', 'o', '*', 'X']
+            stdColDict = {
+                # These are the LSST color-blind friendly colors.
+                "u": "#0c71ff",
+                "g": "#49be61",
+                "r": "#c61c00",
+                "i": "#ffc200",
+                "z": "#f341a2",
+                "y": "#5d0000",
+            }
 
-            for i in range(self.fgcmPars.nBands):
-                use,=np.where((self.fgcmPars.expBandIndex == i) &
-                              (expZpMean > 0.0))
+            extraCols = ['g', 'r', 'b', 'm', 'y']
+            markers = ['.', '+', 'o', '*', 'X']
 
-                if (use.size == 0) :
-                    continue
+            fig = makeFigure(figsize=(8, 12))
+            fig.clf()
 
-                ax.plot(self.fgcmPars.expMJD[use] - firstMJD,
-                        expZpMean[use], cols[i % 5] + syms[i % 5],
-                        label=r'$(%s)$' % (self.fgcmPars.bands[i]))
+            for mode in ["unscaled", "scaled"]:
+                if mode == "unscaled":
+                    ax = fig.add_subplot(211)
+                    ylabel = "Zero Point"
+                    valueToPlot = expZpMean
+                else:
+                    ax = fig.add_subplot(212)
+                    ylabel = "Zero Point - 2.5*log10(exptime)"
+                    valueToPlot = expZpScaledMean
 
-            ax.legend(loc=3)
+                for i, band in enumerate(self.fgcmPars.bands):
+                    use, = np.where((self.fgcmPars.expBandIndex == i) &
+                                    (valueToPlot > 0.0))
+
+                    if (use.size == 0) :
+                        continue
+
+                    if band in stdColDict:
+                        col = stdColDict[band]
+                    else:
+                        col = extraCols[i % 5]
+
+                    ax.plot(
+                        self.fgcmPars.expMJD[use] - firstMJD,
+                        valueToPlot[use],
+                        color=col,
+                        marker=markers[i % 5],
+                        label=r'$(%s)$' % (self.fgcmPars.bands[i]),
+                    )
+
+                    ax.legend(loc=3)
+                    ax.set_xlabel(f"Days after {firstMJD}")
+                    ax.set_ylabel(ylabel)
 
             if self.butlerQC is not None:
                 putButlerFigure(self.fgcmLog,
@@ -952,6 +983,7 @@ class FgcmZeropointPlotter(object):
             text = "(%s)\n" % (filterName)
             text += "Blue: %s\n" % (self.blueString)
             text += "Red: %s\n" % (self.redString)
+            text += "(1-1 reference line)"
             ax.annotate(text,(0.1,0.93),xycoords='axes fraction',
                         ha='left',va='top',fontsize=16)
 
@@ -982,6 +1014,7 @@ class FgcmZeropointPlotter(object):
             return
 
         from .fgcmUtilities import plotCCDMap
+        from matplotlib import colormaps
 
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
@@ -1042,7 +1075,14 @@ class FgcmZeropointPlotter(object):
                     else:
                         # for the residuals, center at zero, but use lo/hi
                         amp = np.abs((hi - lo)/2.)
-                        plotCCDMap(ax, deltaMapper[use], meanR1[use] - meanI1[use], 'R1 - I1 (red-blue mmag)', loHi=[-amp, amp])
+                        plotCCDMap(
+                            ax,
+                            deltaMapper[use],
+                            meanR1[use] - meanI1[use],
+                            "R1 - I1 (red-blue mmag)",
+                            loHi=[-amp, amp],
+                            cmap=colormaps.get_cmap("bwr"),
+                        )
                 except ValueError:
                     continue
 
