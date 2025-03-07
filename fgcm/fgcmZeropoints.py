@@ -209,8 +209,8 @@ class FgcmZeropoints(object):
                       ('FGCM_DELTACHROM', 'f8'),
                       ('FGCM_CTRANS', 'f4'),
                       ('EXPTIME','f4'),
-                      ('FILTERNAME', 'a%d' % (maxFilterLen)),
-                      ('BAND', 'a%d' % (maxBandLen)),
+                      ('FILTERNAME', 'S%d' % (maxFilterLen)),
+                      ('BAND', 'S%d' % (maxBandLen)),
                       ('MJD', 'f8')])
 
         zpStruct = np.zeros(self.fgcmPars.nExp*self.fgcmPars.nCCD,
@@ -944,7 +944,7 @@ class FgcmZeropointPlotter(object):
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
         for filterName in self.filterNames:
-            use,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
+            use,=np.where((np.char.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                           ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                           (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                           (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
@@ -1026,7 +1026,7 @@ class FgcmZeropointPlotter(object):
         nCCD = (ccdMax - ccdMin) + 1
 
         for filterName in self.filterNames:
-            use0,=np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
+            use0,=np.where((np.char.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                            ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                            (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                            (np.abs(self.zpStruct['FGCM_R0']) < 1000.0))
@@ -1126,7 +1126,7 @@ class FgcmZeropointPlotter(object):
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
         for filterName in self.filterNames:
-            use, = np.where((np.core.defchararray.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
+            use, = np.where((np.char.rstrip(self.zpStruct['FILTERNAME']) == filterName.encode('utf-8')) &
                             ((self.zpStruct['FGCM_FLAG'] & acceptMask) > 0) &
                             (np.abs(self.zpStruct['FGCM_R10']) < 1000.0) &
                             (np.abs(self.zpStruct['FGCM_R0']) < 1000.0) &
