@@ -293,7 +293,7 @@ class FgcmStars(object):
                   objID, objRA, objDec, objObsIndex, objNobs, obsX=None, obsY=None,
                   psfCandidate=None, refID=None, refMag=None, refMagErr=None,
                   obsDeltaMagBkg=None, obsDeltaAper=None,
-                  flagID=None, flagFlag=None, computeNobs=True):
+                  flagID=None, flagFlag=None, computeNobs=True, objIDAlternate=None):
         """
         Load stars from arrays
 
@@ -348,6 +348,8 @@ class FgcmStars(object):
            Flag value from previous cycle
         computeNobs: bool, default=True
            Compute number of good observations of each object?
+        objIDAlternate : int array, optional
+            Alternate (non-consecutive) star id.
         """
 
         # FIXME: check that these are all the same length!
@@ -526,6 +528,8 @@ class FgcmStars(object):
 
         #  objID: unique object ID
         self.objIDHandle = snmm.createArray(self.nStars,dtype='i8')
+        #  objIDAlternate: alternate, non-consecutive, object ID
+        self.objIDAlternateHandle = snmm.createArray(self.nStars, dtype='i8')
         #  objRA: mean RA for object
         self.objRAHandle = snmm.createArray(self.nStars,dtype='f8')
         #  objDec: mean Declination for object
@@ -543,6 +547,10 @@ class FgcmStars(object):
             self.objNPsfCandidateHandle = snmm.createArray((self.nStars, self.nBands), dtype='i4')
 
         snmm.getArray(self.objIDHandle)[:] = objID
+        if objIDAlternate is not None:
+            snmm.getArray(self.objIDAlternateHandle)[:] = objIDAlternate
+        else:
+            snmm.getArray(self.objIDHandle)[:] = objID
         snmm.getArray(self.objRAHandle)[:] = objRA
         snmm.getArray(self.objDecHandle)[:] = objDec
 
@@ -551,6 +559,7 @@ class FgcmStars(object):
 
         obsObjIDIndex = None
         objID = None
+        objIDAlternate = None
         obsIndex = None
         objObsIndex = None
         objNobs = None
@@ -2057,6 +2066,7 @@ class FgcmStars(object):
         """
 
         objID = snmm.getArray(self.objIDHandle)
+        objIDAlternate = snmm.getArray(self.objIDAlternateHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
         objRA = snmm.getArray(self.objRAHandle)
         objDec = snmm.getArray(self.objDecHandle)
@@ -2076,6 +2086,7 @@ class FgcmStars(object):
         goodBandNames = [fgcmPars.bands[i] for i in goodBands]
 
         dtype=[('FGCM_ID', 'i8'),
+               ('ALTERNATE_ID', 'i8'),
                ('RA', 'f8'),
                ('DEC', 'f8'),
                ('FLAG', 'i4'),
@@ -2092,6 +2103,7 @@ class FgcmStars(object):
         outCat = np.zeros(goodStars.size, dtype=dtype)
 
         outCat['FGCM_ID'] = objID[goodStars]
+        outCat['ALTERNATE_ID'] = objIDAlternate[goodStars]
         outCat['RA'] = objRA[goodStars]
         outCat['DEC'] = objDec[goodStars]
         outCat['FLAG'] = objFlag[goodStars]

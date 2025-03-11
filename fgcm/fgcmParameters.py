@@ -746,7 +746,7 @@ class FgcmParameters(object):
         self.expLUTFilterIndex = np.zeros(self.nExp,dtype='i2') - 1
         self.hasExposuresInFilter = np.ones(self.nLUTFilter, dtype=bool)
         self.hasExposuresInBand = np.zeros(self.nBands, dtype=bool)
-        expFilterName = np.core.defchararray.strip(expInfo['FILTERNAME'])
+        expFilterName = np.char.strip(expInfo['FILTERNAME'])
 
         expFilterNameIsEncoded = False
         try:
@@ -981,9 +981,9 @@ class FgcmParameters(object):
         maxBandLen = len(max(self.bands, key=len))
 
         dtype=[('NCCD','i4'),
-               ('LUTFILTERNAMES', 'a%d' % (maxFilterLen), (len(self.lutFilterNames), )),
-               ('BANDS', 'a%d' % (maxBandLen), (len(self.bands), )),
-               ('FITBANDS', 'a%d' % (maxBandLen), (len(self.fitBands), )),
+               ('LUTFILTERNAMES', 'S%d' % (maxFilterLen), (len(self.lutFilterNames), )),
+               ('BANDS', 'S%d' % (maxBandLen), (len(self.bands), )),
+               ('FITBANDS', 'S%d' % (maxBandLen), (len(self.fitBands), )),
                ('LNTAUUNIT', 'f8'),
                ('LNTAUSLOPEUNIT', 'f8'),
                ('ALPHAUNIT', 'f8'),
@@ -999,9 +999,9 @@ class FgcmParameters(object):
 
         ## FIXME: change from these files...
         if (self.hasExternalPwv):
-            dtype.extend([('PWVFILE', 'a%d' % (len(self.pwvFile)+1))])
+            dtype.extend([('PWVFILE', 'S%d' % (len(self.pwvFile)+1))])
         if (self.hasExternalTau):
-            dtype.extend([('TAUFILE', 'a%d' % (len(self.tauFile)+1))])
+            dtype.extend([('TAUFILE', 'S%d' % (len(self.tauFile)+1))])
 
         parInfo=np.zeros(1, dtype=dtype)
         parInfo['NCCD'] = self.nCCD
