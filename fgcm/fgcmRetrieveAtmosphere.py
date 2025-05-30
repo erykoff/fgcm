@@ -5,15 +5,13 @@ import esutil
 import scipy.interpolate
 import scipy.optimize
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
 
-class FgcmRetrieveAtmosphere(object):
+class FgcmRetrieveAtmosphere:
     """
     Class to convert retrieved integrals into atmosphere parameters.  Experimental.
 
@@ -24,9 +22,11 @@ class FgcmRetrieveAtmosphere(object):
     fgcmPars: FgcmPars
     """
 
-    def __init__(self, fgcmConfig, fgcmLUT, fgcmPars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmLUT, fgcmPars, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing fgcmRetrieveAtmosphere')
 
@@ -65,8 +65,8 @@ class FgcmRetrieveAtmosphere(object):
         expIndexArray = np.repeat(np.arange(self.fgcmPars.nExp), self.fgcmPars.nCCD)
         ccdIndexArray = np.tile(np.arange(self.fgcmPars.nCCD),self.fgcmPars.nExp)
 
-        r0 = snmm.getArray(fgcmRetrieval.r0Handle)
-        r10 = snmm.getArray(fgcmRetrieval.r10Handle)
+        r0 = self.holder.getArray(fgcmRetrieval.r0Handle)
+        r10 = self.holder.getArray(fgcmRetrieval.r10Handle)
 
         # Reset values
         self.fgcmPars.compRetrievedLnPwvRaw[:] = self.illegalValue
@@ -328,7 +328,7 @@ class FgcmRetrieveAtmosphere(object):
 
         #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
 
-        r0 = snmm.getArray(fgcmRetrieval.r0Handle)
+        r0 = self.holder.getArray(fgcmRetrieval.r0Handle)
 
         expIndexArray = np.repeat(np.arange(self.fgcmPars.nExp), self.fgcmPars.nCCD)
         ccdIndexArray = np.tile(np.arange(self.fgcmPars.nCCD), self.fgcmPars.nExp)
@@ -453,7 +453,7 @@ class FgcmRetrieveAtmosphere(object):
         if not self.quietMode:
             self.fgcmLog.info('Retrieving nightly Tau values...')
 
-        expGray = snmm.getArray(fgcmGray.expGrayHandle)
+        expGray = self.holder.getArray(fgcmGray.expGrayHandle)
 
         expIndexArray = np.repeat(np.arange(self.fgcmPars.nExp), self.fgcmPars.nCCD)
         ccdIndexArray = np.tile(np.arange(self.fgcmPars.nCCD), self.fgcmPars.nExp)

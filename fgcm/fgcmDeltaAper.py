@@ -12,10 +12,8 @@ from .fgcmUtilities import makeFigure, putButlerFigure
 
 import multiprocessing
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmDeltaAper(object):
+class FgcmDeltaAper:
     """
     Class which computes delta aperture background offsets.
 
@@ -28,8 +26,10 @@ class FgcmDeltaAper(object):
     fgcmStars: FgcmStars
        Star object
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         if not fgcmStars.hasDeltaAper:
             self.fgcmLog.info("Cannot compute delta aperture parameters without measurements.")
@@ -78,17 +78,17 @@ class FgcmDeltaAper(object):
             else:
                 self.fgcmLog.info('Computing deltaAper offset per exposure')
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
+        obsDeltaAper = self.holder.getArray(self.fgcmStars.obsDeltaAperHandle)
 
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagADUModelErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
 
         # Use only good observations of good stars
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
@@ -127,51 +127,55 @@ class FgcmDeltaAper(object):
             if fit is not None:
                 self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
 
-    def computeDeltaAperStars(self, debug=False):
+    def computeDeltaAperStars(self):
         """
         Compute deltaAper per-star quantities
         """
-        self.debug = debug
-
         startTime=time.time()
         if not self.quietMode:
             self.fgcmLog.info('Compute per-star deltaAper')
 
         # Reset numbers
-        snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)[:] = 99.0
+        self.holder.getArray(self.fgcmStars.objDeltaAperMeanHandle)[:] = 99.0
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
-        if self.debug:
-            self._starWorker((goodStars, goodObs))
-        else:
-            if not self.quietMode:
-                self.fgcmLog.info('Running DeltaAper on %d cores' % (self.nCore))
+        if not self.quietMode:
+            self.fgcmLog.info('Running DeltaAper on %d cores' % (self.nCore))
 
-            nSections = goodStars.size // self.nStarPerRun + 1
-            goodStarsList = np.array_split(goodStars, nSections)
+        nSections = goodStars.size // self.nStarPerRun + 1
+        goodStarsList = np.array_split(goodStars, nSections)
 
-            splitValues = np.zeros(nSections - 1,dtype='i4')
-            for i in range(1, nSections):
-                splitValues[i - 1] = goodStarsList[i][0]
+        splitValues = np.zeros(nSections - 1,dtype='i4')
+        for i in range(1, nSections):
+            splitValues[i - 1] = goodStarsList[i][0]
 
-            splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-            goodObsList = np.split(goodObs, splitIndices)
+        splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
+        goodObsList = np.split(goodObs, splitIndices)
 
-            workerList = list(zip(goodStarsList,goodObsList))
+        workerList = list(zip(goodStarsList,goodObsList))
 
-            # reverse sort so the longest running go first
-            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
+        # reverse sort so the longest running go first
+        workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            mp_ctx = multiprocessing.get_context('fork')
+        mp_ctx = multiprocessing.get_context('fork')
+
+        with multiprocessing.Manager() as manager:
+            sharedDict = manager.dict()
+            sharedDict["holder"] = self.holder
+            sharedDict["fgcmStars"] = self.fgcmStars
+            sharedDict["fgcmPars"] = self.fgcmPars
+
+            inputs = [(input_, sharedDict) for input_ in workerList]
+
             pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._starWorker, workerList, chunksize=1)
+            pool.starmap(_starWorker, inputs, chunksize=1)
             pool.close()
             pool.join()
 
@@ -179,10 +183,10 @@ class FgcmDeltaAper(object):
             self.fgcmLog.info('Finished DeltaAper in %.2f seconds.' %
                               (time.time() - startTime))
 
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objDeltaAperMean = self.holder.getArray(self.fgcmStars.objDeltaAperMeanHandle)
+        objFlag = self.holder.getArray(self.fgcmStars.objFlagHandle)
         globalEpsilon = np.zeros(self.fgcmStars.nBands) + self.illegalValue
         globalOffset = np.zeros(self.fgcmPars.nBands) + self.illegalValue
 
@@ -263,13 +267,13 @@ class FgcmDeltaAper(object):
         """
         Compute global epsilon and local maps.
         """
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
-        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
-        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
+        objFlag = self.holder.getArray(self.fgcmStars.objFlagHandle)
+        objRA = self.holder.getArray(self.fgcmStars.objRAHandle)
+        objDec = self.holder.getArray(self.fgcmStars.objDecHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objDeltaAperMean = self.holder.getArray(self.fgcmStars.objDeltaAperMeanHandle)
 
         # Do the mapping
         self.fgcmLog.info("Computing delta-aper epsilon spatial map at nside %d" % self.deltaAperFitSpatialNside)
@@ -373,21 +377,21 @@ class FgcmDeltaAper(object):
 
         from .fgcmUtilities import plotCCDMapBinned2d
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
+        obsDeltaAper = self.holder.getArray(self.fgcmStars.obsDeltaAperHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsX = snmm.getArray(self.fgcmStars.obsXHandle)
-        obsY = snmm.getArray(self.fgcmStars.obsYHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = self.holder.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsMagADUModelErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsX = self.holder.getArray(self.fgcmStars.obsXHandle)
+        obsY = self.holder.getArray(self.fgcmStars.obsYHandle)
 
         # Use only good observations of good stars
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
@@ -569,15 +573,15 @@ class FgcmDeltaAper(object):
         goodStars = goodStarsAndObs[0]
         goodObs = goodStarsAndObs[1]
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objDeltaAperMean = self.holder.getArray(self.fgcmStars.objDeltaAperMeanHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsDeltaAper = snmm.getArray(self.fgcmStars.obsDeltaAperHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsMagADUModelErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsDeltaAper = self.holder.getArray(self.fgcmStars.obsDeltaAperHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         # Cut to good exposures
         gd, = np.where((self.fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
@@ -712,4 +716,59 @@ class FgcmDeltaAper(object):
         del state['fgcmLog']
         del state['butlerQC']
         del state['plotHandleDict']
+        del state['snmm']
         return state
+
+
+def _starWorker(goodStarsAndObs, sharedDict):
+    """
+    Multiprocessing worker for FgcmDeltaAper.  Not to be called on its own.
+
+    Parameters
+    ----------
+    goodStarsAndObs: tuple[2]
+       (goodStars, goodObs)
+    """
+    goodStars = goodStarsAndObs[0]
+    goodObs = goodStarsAndObs[1]
+
+    holder = sharedDict["holder"]
+    fgcmStars = sharedDict["fgcmStars"]
+    fgcmPars = sharedDict["fgcmPars"]
+
+    objMagStdMean = holder.getArray(fgcmStars.objMagStdMeanHandle)
+    objDeltaAperMean = holder.getArray(fgcmStars.objDeltaAperMeanHandle)
+
+    obsObjIDIndex = holder.getArray(fgcmStars.obsObjIDIndexHandle)
+    obsMagADUModelErr = holder.getArray(fgcmStars.obsMagADUModelErrHandle)
+    obsDeltaAper = holder.getArray(fgcmStars.obsDeltaAperHandle)
+    obsExpIndex = holder.getArray(fgcmStars.obsExpIndexHandle)
+    obsBandIndex = holder.getArray(fgcmStars.obsBandIndexHandle)
+    obsFlag = holder.getArray(fgcmStars.obsFlagHandle)
+
+    # Cut to good exposures
+    gd, = np.where((fgcmPars.expFlag[obsExpIndex[goodObs]] == 0) &
+                   (obsFlag[goodObs] == 0) &
+                   (np.abs(obsDeltaAper[goodObs]) < 0.5))
+    goodObs = goodObs[gd]
+
+    obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
+
+    wtSum = np.zeros_like(objMagStdMean, dtype='f8')
+    objDeltaAperMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
+
+    np.add.at(objDeltaAperMeanTemp,
+              (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
+              ((obsDeltaAper[goodObs] - fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(objDeltaAperMeanTemp.dtype))
+    np.add.at(wtSum,
+              (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
+              (1./obsMagErr2GO).astype(wtSum.dtype))
+
+    gd = np.where(wtSum > 0.0)
+
+    objDeltaAperMeanLock = snmm.getArrayLock(fgcmStars.objDeltaAperMeanHandle)
+    objDeltaAperMeanLock.acquire()
+
+    objDeltaAperMean[gd] = objDeltaAperMeanTemp[gd] / wtSum[gd]
+
+    objDeltaAperMeanLock.release()

@@ -14,10 +14,8 @@ from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmGray(object):
+class FgcmGray:
     """
     Class which computes ccd and exposure gray residuals.
 
@@ -46,9 +44,12 @@ class FgcmGray(object):
        Time difference between exposures to check for correlated residuals (plots only)
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing fgcmGray')
 
@@ -105,6 +106,7 @@ class FgcmGray(object):
         """
         Internal method to create shared-memory arrays.
         """
+        snmm = self.snmm
 
         # we have expGray for Selection
         self.expGrayForInitialSelectionHandle = snmm.createArray(self.fgcmPars.nExp,dtype='f8')
@@ -169,22 +171,22 @@ class FgcmGray(object):
         self.fgcmLog.debug('Computing ExpGray for initial selection')
 
         # useful numbers
-        expGrayForInitialSelection = snmm.getArray(self.expGrayForInitialSelectionHandle)
-        expGrayRMSForInitialSelection = snmm.getArray(self.expGrayRMSForInitialSelectionHandle)
-        expNGoodStarForInitialSelection = snmm.getArray(self.expNGoodStarForInitialSelectionHandle)
+        expGrayForInitialSelection = self.holder.getArray(self.expGrayForInitialSelectionHandle)
+        expGrayRMSForInitialSelection = self.holder.getArray(self.expGrayRMSForInitialSelectionHandle)
+        expNGoodStarForInitialSelection = self.holder.getArray(self.expNGoodStarForInitialSelectionHandle)
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsIndex = self.holder.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         # first, we need to compute E_gray == <mstd> - mstd for each observation
 
@@ -302,41 +304,41 @@ class FgcmGray(object):
         # Note: this computes the gray values for all exposures, good and bad
 
         # values to set
-        ccdGray = snmm.getArray(self.ccdGrayHandle)
-        ccdDeltaStd = snmm.getArray(self.ccdDeltaStdHandle)
-        ccdGrayRMS = snmm.getArray(self.ccdGrayRMSHandle)
-        ccdGrayErr = snmm.getArray(self.ccdGrayErrHandle)
-        ccdNGoodObs = snmm.getArray(self.ccdNGoodObsHandle)
-        ccdNGoodStars = snmm.getArray(self.ccdNGoodStarsHandle)
-        ccdNGoodTilings = snmm.getArray(self.ccdNGoodTilingsHandle)
+        ccdGray = self.holder.getArray(self.ccdGrayHandle)
+        ccdDeltaStd = self.holder.getArray(self.ccdDeltaStdHandle)
+        ccdGrayRMS = self.holder.getArray(self.ccdGrayRMSHandle)
+        ccdGrayErr = self.holder.getArray(self.ccdGrayErrHandle)
+        ccdNGoodObs = self.holder.getArray(self.ccdNGoodObsHandle)
+        ccdNGoodStars = self.holder.getArray(self.ccdNGoodStarsHandle)
+        ccdNGoodTilings = self.holder.getArray(self.ccdNGoodTilingsHandle)
 
         if np.any(self.ccdGraySubCCD):
-            ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
+            ccdGraySubCCDPars = self.holder.getArray(self.ccdGraySubCCDParsHandle)
 
-        expGray = snmm.getArray(self.expGrayHandle)
-        expDeltaStd = snmm.getArray(self.expDeltaStdHandle)
-        expGrayRMS = snmm.getArray(self.expGrayRMSHandle)
-        expGrayErr = snmm.getArray(self.expGrayErrHandle)
-        expNGoodCCDs = snmm.getArray(self.expNGoodCCDsHandle)
-        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
-        expNGoodTilings = snmm.getArray(self.expNGoodTilingsHandle)
+        expGray = self.holder.getArray(self.expGrayHandle)
+        expDeltaStd = self.holder.getArray(self.expDeltaStdHandle)
+        expGrayRMS = self.holder.getArray(self.expGrayRMSHandle)
+        expGrayErr = self.holder.getArray(self.expGrayErrHandle)
+        expNGoodCCDs = self.holder.getArray(self.expNGoodCCDsHandle)
+        expNGoodStars = self.holder.getArray(self.expNGoodStarsHandle)
+        expNGoodTilings = self.holder.getArray(self.expNGoodTilingsHandle)
 
         # input numbers
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsDeltaStd = snmm.getArray(self.fgcmStars.obsDeltaStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsDeltaStd = self.holder.getArray(self.fgcmStars.obsDeltaStdHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsIndex = self.holder.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         # Only use good observations of good stars...
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
@@ -357,12 +359,12 @@ class FgcmGray(object):
         obsDeltaStdGO = obsDeltaStd[goodObs]
 
         if np.any(self.ccdGraySubCCD):
-            obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
-            obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+            obsXGO = self.holder.getArray(self.fgcmStars.obsXHandle)[goodObs]
+            obsYGO = self.holder.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
         if np.any(self.ccdGrayFocalPlane):
-            obsRAGO = snmm.getArray(self.fgcmStars.obsRAHandle)[goodObs]
-            obsDecGO = snmm.getArray(self.fgcmStars.obsDecHandle)[goodObs]
+            obsRAGO = self.holder.getArray(self.fgcmStars.obsRAHandle)[goodObs]
+            obsDecGO = self.holder.getArray(self.fgcmStars.obsDecHandle)[goodObs]
 
         self.fgcmLog.debug('FgcmGray using %d observations from %d good stars.' %
                            (goodObs.size,goodStars.size))
@@ -771,23 +773,23 @@ class FgcmGray(object):
         startTime = time.time()
         self.fgcmLog.debug('Computing ExpGrayColorSplit')
 
-        expGrayColorSplit = snmm.getArray(self.expGrayColorSplitHandle)
-        expGrayErrColorSplit = snmm.getArray(self.expGrayErrColorSplitHandle)
-        expGrayRMSColorSplit = snmm.getArray(self.expGrayRMSColorSplitHandle)
-        expGrayNGoodStarsColorSplit = snmm.getArray(self.expGrayNGoodStarsColorSplitHandle)
+        expGrayColorSplit = self.holder.getArray(self.expGrayColorSplitHandle)
+        expGrayErrColorSplit = self.holder.getArray(self.expGrayErrColorSplitHandle)
+        expGrayRMSColorSplit = self.holder.getArray(self.expGrayRMSColorSplitHandle)
+        expGrayNGoodStarsColorSplit = self.holder.getArray(self.expGrayNGoodStarsColorSplitHandle)
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsIndex = self.holder.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         # This should check that every star used has a valid g-i color
         # We also want to filter only photometric observations, because
@@ -948,8 +950,8 @@ class FgcmGray(object):
         # we might not save the image
 
         # arrays we need
-        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
-        expGray = snmm.getArray(self.expGrayHandle)
+        expNGoodStars = self.holder.getArray(self.expNGoodStarsHandle)
+        expGray = self.holder.getArray(self.expGrayHandle)
 
         expUse, = np.where((self.fgcmPars.expFlag == 0) &
                            (expNGoodStars > self.minStarPerExp) &
@@ -1184,8 +1186,8 @@ class FgcmGray(object):
         expGrayHighCut: `np.array`
            Float array (per band) of recommended expGray cuts (high side)
         """
-        expNGoodStars = snmm.getArray(self.expNGoodStarsHandle)
-        expGray = snmm.getArray(self.expGrayHandle)
+        expNGoodStars = self.holder.getArray(self.expNGoodStarsHandle)
+        expGray = self.holder.getArray(self.expGrayHandle)
 
         expUse, = np.where((self.fgcmPars.expFlag == 0) &
                            (expNGoodStars > self.minStarPerExp) &
@@ -1278,14 +1280,14 @@ class FgcmGray(object):
         startTime = time.time()
         self.fgcmLog.debug('Computing ccdDeltaMagBkg and ExpDeltaMagBkg.')
 
-        ccdDeltaMagBkg = snmm.getArray(self.ccdDeltaMagBkgHandle)
-        expDeltaMagBkg = snmm.getArray(self.expDeltaMagBkgHandle)
+        ccdDeltaMagBkg = self.holder.getArray(self.ccdDeltaMagBkgHandle)
+        expDeltaMagBkg = self.holder.getArray(self.expDeltaMagBkgHandle)
 
-        obsDeltaMagBkg = snmm.getArray(self.fgcmStars.obsDeltaMagBkgHandle)
-        obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsDeltaMagBkg = self.holder.getArray(self.fgcmStars.obsDeltaMagBkgHandle)
+        obsMagADU = self.holder.getArray(self.fgcmStars.obsMagADUHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         goodObs, = np.where(obsFlag == 0)
 
@@ -1344,14 +1346,14 @@ class FgcmGray(object):
             # Nothing to do here
             return
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
-        objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.fgcmStars.refMagHandle)
+        objRefIDIndex = self.holder.getArray(self.fgcmStars.objRefIDIndexHandle)
+        refMag = self.holder.getArray(self.fgcmStars.refMagHandle)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True, removeRefstarOutliers=True, removeRefstarBadcols=True, removeRefstarReserved=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
@@ -1362,15 +1364,15 @@ class FgcmGray(object):
         obsBandIndexGO = obsBandIndex[goodObs]
         obsMagStdGO = obsMagStd[goodObs]
 
-        ccdGray = snmm.getArray(self.ccdGrayHandle)
+        ccdGray = self.holder.getArray(self.ccdGrayHandle)
         if np.any(self.ccdGraySubCCD):
-            ccdGraySubCCDPars = snmm.getArray(self.ccdGraySubCCDParsHandle)
+            ccdGraySubCCDPars = self.holder.getArray(self.ccdGraySubCCDParsHandle)
 
         ok, = np.where(ccdGray[obsExpIndexGO, obsCCDIndexGO] > self.illegalValue)
 
         if np.any(self.ccdGraySubCCD):
-            obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
-            obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+            obsXGO = self.holder.getArray(self.fgcmStars.obsXHandle)[goodObs]
+            obsYGO = self.holder.getArray(self.fgcmStars.obsYHandle)[goodObs]
             expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
                           obsCCDIndexGO[ok])
             h, rev = histogram_rev_sorted(expCcdHash)
@@ -1473,16 +1475,26 @@ class FgcmGray(object):
         # Don't try to pickle the logger.
 
         state = self.__dict__.copy()
-        del state['fgcmLog']
-        del state['focalPlaneProjector']
-        del state['butlerQC']
-        del state['plotHandleDict']
+        if "fgcmLog" in state:
+            del state['fgcmLog']
+        if "focalPlaneProjector" in state:
+            del state['focalPlaneProjector']
+        if "butlerQC" in state:
+            del state['butlerQC']
+        if "plotHandleDict" in state:
+            del state['plotHandleDict']
+        if "snmm" in state:
+            del state['snmm']
+        if "holder" in state:
+            del state['holder']
         return state
 
     def freeSharedMemory(self):
         """Free shared memory"""
         if not self.arraysPrepared:
             return
+
+        snmm = self.snmm
 
         snmm.freeArray(self.expGrayForInitialSelectionHandle)
         snmm.freeArray(self.expGrayRMSForInitialSelectionHandle)

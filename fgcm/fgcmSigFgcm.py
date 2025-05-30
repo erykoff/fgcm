@@ -10,9 +10,8 @@ from .fgcmUtilities import makeFigure, putButlerFigure
 from .fgcmUtilities import gaussFunction
 from .fgcmUtilities import histoGauss
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmSigFgcm(object):
+class FgcmSigFgcm:
     """
     Class to compute repeatability statistics for stars.
 
@@ -30,9 +29,11 @@ class FgcmSigFgcm(object):
        Maxmimum error on m_std - <m_std> to consider to compute sigFgcm
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing FgcmSigFgcm')
 
@@ -77,19 +78,19 @@ class FgcmSigFgcm(object):
         self.fgcmLog.debug('Computing sigFgcm.')
 
         # input numbers
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objID = self.holder.getArray(self.fgcmStars.objIDHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
 
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         if reserved:
             goodStars = self.fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True)

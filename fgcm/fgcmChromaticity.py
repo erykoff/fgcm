@@ -9,9 +9,7 @@ from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
-class FgcmMirrorChromaticity(object):
+class FgcmMirrorChromaticity:
     """
     Class which computes mirror chromaticity corrections.
 
@@ -29,8 +27,10 @@ class FgcmMirrorChromaticity(object):
        Look-up table object
 
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
         self.fgcmLog.info('Initializing FgcmMirrorChromaticity')
 
         self.fgcmPars = fgcmPars
@@ -61,17 +61,17 @@ class FgcmMirrorChromaticity(object):
         startTime = time.time()
         self.fgcmLog.info("Fitting mirror chromaticity terms...")
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objSEDSlope = self.holder.getArray(self.fgcmStars.objSEDSlopeHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = self.holder.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
 
         # First, we need to compute g-i and take the 25% red and blue ends
 
@@ -311,8 +311,10 @@ class FgcmCCDChromaticity:
     fgcmLUT : `fgcm.FgcmLUT`
         Look-up table object
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
         self.fgcmLog.info('Initializing FgcmCCDChromaticity')
 
         self.fgcmPars = fgcmPars
@@ -345,17 +347,17 @@ class FgcmCCDChromaticity:
         startTime = time.time()
         self.fgcmLog.info("Fitting CCD chromaticity terms...")
 
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objSEDSlope = self.holder.getArray(self.fgcmStars.objSEDSlopeHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsLUTFilterIndex = self.holder.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
         # First, we need to compute g-i and take the 25% red and blue ends
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True, checkHasColor=True)

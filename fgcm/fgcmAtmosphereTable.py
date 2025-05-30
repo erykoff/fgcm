@@ -29,7 +29,6 @@ except ImportError:
 
 from .modtranGenerator import ModtranGenerator
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmLogger import FgcmLogger
 
 class FgcmAtmosphereTable(object):

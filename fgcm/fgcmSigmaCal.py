@@ -11,10 +11,8 @@ from matplotlib import colormaps
 
 import multiprocessing
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmSigmaCal(object):
+class FgcmSigmaCal:
     """
     Class which calibrates the calibration error floor.
 
@@ -28,9 +26,11 @@ class FgcmSigmaCal(object):
        Stars object
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmGray, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmGray, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing FgcmSigmaCal')
 
@@ -63,6 +63,7 @@ class FgcmSigmaCal(object):
     def _prepareSigmaCalArrays(self):
         """
         """
+        snmm = self.snmm
 
         self.objChi2Handle = snmm.createArray((self.fgcmStars.nStars, self.fgcmPars.nBands), dtype='f8')
 
@@ -83,8 +84,8 @@ class FgcmSigmaCal(object):
         if goodStars.size == 0:
             raise ValueError("No good reserve stars to fit!")
 
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         preStartTime=time.time()
         self.fgcmLog.debug('Pre-matching stars and observations...')
@@ -126,9 +127,9 @@ class FgcmSigmaCal(object):
         # Label this, put a color bar, etc.
         # One plot/fit per band
 
-        objChi2 = snmm.getArray(self.objChi2Handle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objChi2 = self.holder.getArray(self.objChi2Handle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
 
         if self.sigmaCalRange[0] == self.sigmaCalRange[1]:
             nStep = 1
@@ -189,10 +190,26 @@ class FgcmSigmaCal(object):
             self.sigmaCal = s
 
             mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
+
+            with multiprocessing.Manager() as manager:
+                sharedDict = manager.dict()
+                sharedDict["holder"] = self.holder
+                sharedDict["fgcmStars"] = self.fgcmStars
+                sharedDict["fgcmGray"] = self.fgcmGray
+                sharedDict["fgcmPars"] = self.fgcmPars
+                sharedDict["ccdStartIndex"] = self.ccdStartIndex
+                sharedDict["objChi2Handle"] = objChi2Handle
+                sharedDict["illegalValue"] = illegalValue
+                sharedDict["applyGray"] = applyGray
+                sharedDict["sigma0Phot"] = sigma0Phot
+                sharedDict["sigmaCal"] = sigmaCal
+
+                inputs = [(input_, sharedDict) for input_ in workerList]
+
+                pool = mp_ctx.Pool(processes=self.nCore)
+                pool.starmap(_sigmaCalWorker, inputs, chunksize=1)
+                pool.close()
+                pool.join()
 
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
@@ -293,102 +310,6 @@ class FgcmSigmaCal(object):
                                                            self.outfileBaseWithCycle,
                                                            band))
 
-    def _worker(self, goodStarsAndObs):
-        """
-        """
-
-        workerStartTime = time.time()
-
-        goodStars = goodStarsAndObs[0]
-        goodObs = goodStarsAndObs[1]
-
-        # We need to make sure we don't overwrite anything we care about!!!!
-        # This will be a challenge to keep the memory okay...
-
-        # We already have the mean...
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objChi2 = snmm.getArray(self.objChi2Handle)
-
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-        obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
-        obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
-        # We already have obsMagStd
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-
-        # We apply the gray corrections here!
-        # Note that obsMagStd does not have the gray corrections applied
-        ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
-        ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
-        ccdNGoodTilings = snmm.getArray(self.fgcmGray.ccdNGoodTilingsHandle)
-
-        # Cut down goodObs to valid values
-        gd, = np.where((ccdGray[obsExpIndex[goodObs], obsCCDIndex[goodObs]] > self.illegalValue) &
-                       (ccdNGoodTilings[obsExpIndex[goodObs], obsCCDIndex[goodObs]] >= 2.0) &
-                       (objNGoodObs[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] >= 2) &
-                       (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] < 99.0))
-
-        goodObs = goodObs[gd]
-
-        # cut these down now, faster later
-        obsObjIDIndexGO = obsObjIDIndex[goodObs]
-        obsBandIndexGO = obsBandIndex[goodObs]
-        obsLUTFilterIndexGO = obsLUTFilterIndex[goodObs]
-        obsExpIndexGO = obsExpIndex[goodObs]
-        obsSecZenithGO = obsSecZenith[goodObs]
-        obsCCDIndexGO = obsCCDIndex[goodObs]
-
-        # We make a sub-copy here that we can overwrite
-        obsMagStdGO = obsMagStd[goodObs]
-
-        if self.applyGray:
-            # NOTE: This only applies the mean gray per ccd for speed
-            # (since this is approximate anyway)
-            obsMagStdGO += ccdGray[obsExpIndexGO, obsCCDIndexGO]
-
-        # chi2 = 1. / (N - 1) * Sum ((m_i - mbar)**2. / (sigma_i**2.))
-        # N is the number of good observations of the star objNGoodObs[obsObjIDIndexGO, obsBandIndexGO]
-        # m_i is obsMagStdGO (after adjustment by ccdGray)
-        # mbar is objMagStdMean[obsObjIDIndexGO, obsBandIndexGO]
-        # sigma_i**2 = sigma_obs**2. + sig2fgcm / (ntile - 1) + zptvar + sigma_cal**2.
-        # It needs to be computed, it is based one
-        # - obsMagADUModelErr (this is sigma_obs with an additional sigma0Phot)
-        # - self.sigma0Phot
-        # - sig2Fgcm (self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[obsExpIndexGO]])
-        # - Ntile (ccdNGoodTilings[obsExpIndexGO, obsCCDIndexGO])
-        # - zptvar (ccdGrayErr[obsExpIndexGO, obsCCDIndexGO]**2.)
-        # - sigma_cal (self.sigmaCal)
-
-        # And recompute the errors...
-        nTilingsM1 = np.clip(ccdNGoodTilings[obsExpIndexGO, obsCCDIndexGO] - 1.0, 1.0, None)
-
-        obsMagErr2GO = ((obsMagADUModelErr[goodObs]**2. - self.sigma0Phot**2.) +
-                        (self.fgcmPars.compSigFgcm[self.fgcmPars.expBandIndex[obsExpIndexGO]]**2. / nTilingsM1) +
-                        (ccdGrayErr[obsExpIndexGO, obsCCDIndexGO]**2.) +
-                        (self.sigmaCal**2.))
-
-        # Now we need the per-object chi2...
-
-        objChi2[:, :] = 0.0
-
-        np.add.at(objChi2,
-                  (obsObjIDIndexGO, obsBandIndexGO),
-                  (((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
-                   obsMagErr2GO)).astype(objChi2.dtype))
-        # There are duplicate indices here, but that's fine because we only want to divide once
-        objChi2[obsObjIDIndexGO, obsBandIndexGO] /= (objNGoodObs[obsObjIDIndexGO, obsBandIndexGO] - 1.0)
-
-        # And we're done
-
     def __getstate__(self):
         # Don't try to pickle the logger.
 
@@ -396,8 +317,114 @@ class FgcmSigmaCal(object):
         del state['fgcmLog']
         del state['butlerQC']
         del state['plotHandleDict']
+        del state['snmm']
         return state
 
     def freeSharedMemory(self):
         """Free shared memory"""
+        snmm = self.snmm
+
         snmm.freeArray(self.objChi2Handle)
+
+
+def _sigmaCalWorker(goodStarsAndObs, sharedDict):
+    """
+    """
+    goodStars = goodStarsAndObs[0]
+    goodObs = goodStarsAndObs[1]
+
+    holder = sharedDict["holder"]
+    fgcmStars = sharedDict["fgcmStars"]
+    fgcmGray = sharedDict["fgcmGray"]
+    fgcmPars = sharedDict["fgcmPars"]
+    ccdStartIndex = sharedDict["ccdStartIndex"]
+    objChi2Handle = sharedDict["objChi2Handle"]
+    illegalValue = sharedDict["illegalValue"]
+    applyGray = sharedDict["applyGray"]
+    sigma0Phot = sharedDict["sigma0Phot"]
+    sigmaCal = sharedDict["sigmaCal"]
+
+    # We need to make sure we don't overwrite anything we care about!!!!
+    # This will be a challenge to keep the memory okay...
+
+    # We already have the mean...
+    objMagStdMean = holder.getArray(fgcmStars.objMagStdMeanHandle)
+    objSEDSlope = holder.getArray(fgcmStars.objSEDSlopeHandle)
+    objNGoodObs = holder.getArray(fgcmStars.objNGoodObsHandle)
+    objChi2 = holder.getArray(objChi2Handle)
+
+    obsObjIDIndex = holder.getArray(fgcmStars.obsObjIDIndexHandle)
+
+    obsExpIndex = holder.getArray(fgcmStars.obsExpIndexHandle)
+    obsBandIndex = holder.getArray(fgcmStars.obsBandIndexHandle)
+    obsLUTFilterIndex = holder.getArray(fgcmStars.obsLUTFilterIndexHandle)
+    obsCCDIndex = holder.getArray(fgcmStars.obsCCDHandle) - ccdStartIndex
+    obsFlag = holder.getArray(fgcmStars.obsFlagHandle)
+    obsSecZenith = holder.getArray(fgcmStars.obsSecZenithHandle)
+    obsMagADU = holder.getArray(fgcmStars.obsMagADUHandle)
+    obsMagADUModelErr = holder.getArray(fgcmStars.obsMagADUModelErrHandle)
+    obsMagADUErr = holder.getArray(fgcmStars.obsMagADUErrHandle)
+    # We already have obsMagStd
+    obsMagStd = holder.getArray(fgcmStars.obsMagStdHandle)
+
+    # We apply the gray corrections here!
+    # Note that obsMagStd does not have the gray corrections applied
+    ccdGray = holder.getArray(fgcmGray.ccdGrayHandle)
+    ccdGrayErr = holder.getArray(fgcmGray.ccdGrayErrHandle)
+    ccdNGoodTilings = holder.getArray(fgcmGray.ccdNGoodTilingsHandle)
+
+    # Cut down goodObs to valid values
+    gd, = np.where((ccdGray[obsExpIndex[goodObs], obsCCDIndex[goodObs]] > illegalValue) &
+                   (ccdNGoodTilings[obsExpIndex[goodObs], obsCCDIndex[goodObs]] >= 2.0) &
+                   (objNGoodObs[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] >= 2) &
+                   (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] < 99.0))
+
+    goodObs = goodObs[gd]
+
+    # cut these down now, faster later
+    obsObjIDIndexGO = obsObjIDIndex[goodObs]
+    obsBandIndexGO = obsBandIndex[goodObs]
+    obsLUTFilterIndexGO = obsLUTFilterIndex[goodObs]
+    obsExpIndexGO = obsExpIndex[goodObs]
+    obsSecZenithGO = obsSecZenith[goodObs]
+    obsCCDIndexGO = obsCCDIndex[goodObs]
+
+    # We make a sub-copy here that we can overwrite
+    obsMagStdGO = obsMagStd[goodObs]
+
+    if applyGray:
+        # NOTE: This only applies the mean gray per ccd for speed
+        # (since this is approximate anyway)
+        obsMagStdGO += ccdGray[obsExpIndexGO, obsCCDIndexGO]
+
+    # chi2 = 1. / (N - 1) * Sum ((m_i - mbar)**2. / (sigma_i**2.))
+    # N is the number of good observations of the star objNGoodObs[obsObjIDIndexGO, obsBandIndexGO]
+    # m_i is obsMagStdGO (after adjustment by ccdGray)
+    # mbar is objMagStdMean[obsObjIDIndexGO, obsBandIndexGO]
+    # sigma_i**2 = sigma_obs**2. + sig2fgcm / (ntile - 1) + zptvar + sigma_cal**2.
+    # It needs to be computed, it is based one
+    # - obsMagADUModelErr (this is sigma_obs with an additional sigma0Phot)
+    # - self.sigma0Phot
+    # - sig2Fgcm (fgcmPars.compSigFgcm[fgcmPars.expBandIndex[obsExpIndexGO]])
+    # - Ntile (ccdNGoodTilings[obsExpIndexGO, obsCCDIndexGO])
+    # - zptvar (ccdGrayErr[obsExpIndexGO, obsCCDIndexGO]**2.)
+    # - sigma_cal (self.sigmaCal)
+
+    # And recompute the errors...
+    nTilingsM1 = np.clip(ccdNGoodTilings[obsExpIndexGO, obsCCDIndexGO] - 1.0, 1.0, None)
+
+    obsMagErr2GO = ((obsMagADUModelErr[goodObs]**2. - sigma0Phot**2.) +
+                    (fgcmPars.compSigFgcm[fgcmPars.expBandIndex[obsExpIndexGO]]**2. / nTilingsM1) +
+                    (ccdGrayErr[obsExpIndexGO, obsCCDIndexGO]**2.) +
+                    (sigmaCal**2.))
+
+    # Now we need the per-object chi2...
+
+    objChi2[:, :] = 0.0
+
+    np.add.at(objChi2,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              (((obsMagStdGO - objMagStdMean[obsObjIDIndexGO, obsBandIndexGO])**2. /
+               obsMagErr2GO)).astype(objChi2.dtype))
+    # There are duplicate indices here, but that's fine because we only want to divide once
+    objChi2[obsObjIDIndexGO, obsBandIndexGO] /= (objNGoodObs[obsObjIDIndexGO, obsBandIndexGO] - 1.0)

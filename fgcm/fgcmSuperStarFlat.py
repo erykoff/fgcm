@@ -6,13 +6,12 @@ import time
 import scipy.optimize
 from scipy.stats import median_abs_deviation
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 
-class FgcmSuperStarFlat(object):
+class FgcmSuperStarFlat:
     """
     Class to compute the SuperStarFlat.
 
@@ -30,9 +29,12 @@ class FgcmSuperStarFlat(object):
        Compute superStar flats on sub-ccd scale?
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
+
         self.fgcmLog.debug('Initializing FgcmSuperStarFlat')
 
         self.fgcmPars = fgcmPars
@@ -87,22 +89,22 @@ class FgcmSuperStarFlat(object):
         self.fgcmLog.debug('Computing superstarflats')
 
         # New version, use the stars directly
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
+        objID = self.holder.getArray(self.fgcmStars.objIDHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsSuperStarApplied = snmm.getArray(self.fgcmStars.obsSuperStarAppliedHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsSuperStarApplied = self.holder.getArray(self.fgcmStars.obsSuperStarAppliedHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsIndex = self.holder.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         # Flag bad observations here...
         self.fgcmStars.performSuperStarOutlierCuts(self.fgcmPars)
@@ -191,8 +193,8 @@ class FgcmSuperStarFlat(object):
 
             # Note that the ccd offset signs are now computed in fgcmFitCycle.
 
-            obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
-            obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
+            obsXGO = self.holder.getArray(self.fgcmStars.obsXHandle)[goodObs]
+            obsYGO = self.holder.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
             # need to histogram this all up.  Watch for extra bands
 

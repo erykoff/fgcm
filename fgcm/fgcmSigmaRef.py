@@ -11,9 +11,8 @@ from .fgcmUtilities import histoGauss
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmSigmaRef(object):
+class FgcmSigmaRef:
     """
     Class to compute reference catalog statistics for stars.
 
@@ -24,9 +23,11 @@ class FgcmSigmaRef(object):
     fgcmStars: FgcmStars
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing FgcmSigmaRef')
 
@@ -55,14 +56,14 @@ class FgcmSigmaRef(object):
         self.fgcmLog.debug('Computing sigmaRef')
 
         # Input numbers
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objFlag = self.holder.getArray(self.fgcmStars.objFlagHandle)
 
-        objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.fgcmStars.refMagHandle)
-        refMagErr = snmm.getArray(self.fgcmStars.refMagErrHandle)
+        objRefIDIndex = self.holder.getArray(self.fgcmStars.objRefIDIndexHandle)
+        refMag = self.holder.getArray(self.fgcmStars.refMagHandle)
+        refMagErr = self.holder.getArray(self.fgcmStars.refMagErrHandle)
 
         # FIXME: at the moment, use all stars
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)

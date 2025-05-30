@@ -9,9 +9,8 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmParameters(object):
+class FgcmParameters:
     """
     Class to contain FGCM parameters.  Initialization should be done via:
       newParsWithFits()
@@ -2174,7 +2173,10 @@ class FgcmParameters(object):
         # Don't try to pickle the logger.
 
         state = self.__dict__.copy()
-        del state['fgcmLog']
-        del state['butlerQC']
-        del state['plotHandleDict']
+        if "fgcmLog" in state:
+            del state['fgcmLog']
+        if "butlerQC" in state:
+            del state['butlerQC']
+        if "plotHandleDict" in state:
+            del state['plotHandleDict']
         return state

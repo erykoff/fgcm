@@ -9,14 +9,15 @@ import matplotlib.pyplot as plt
 
 from .fgcmUtilities import objFlagDict
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmFlagVariables(object):
+class FgcmFlagVariables:
     """
     """
-    def __init__(self,fgcmConfig,fgcmPars,fgcmStars):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.info('Initializing fgcmFlagVariables')
 
@@ -41,22 +42,22 @@ class FgcmFlagVariables(object):
         self.fgcmLog.info('Flagging variables.')
 
         # input numbers
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objID = self.holder.getArray(self.fgcmStars.objIDHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objFlag = self.holder.getArray(self.fgcmStars.objFlagHandle)
 
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        #obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
-        obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        #obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
 
-        obsIndex = snmm.getArray(self.fgcmStars.obsIndexHandle)
-        objObsIndex = snmm.getArray(self.fgcmStars.objObsIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsIndex = self.holder.getArray(self.fgcmStars.obsIndexHandle)
+        objObsIndex = self.holder.getArray(self.fgcmStars.objObsIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)

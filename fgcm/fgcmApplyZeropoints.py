@@ -15,9 +15,8 @@ from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 
 from .fgcmUtilities import getMemoryString, expFlagDict, obsFlagDict
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmApplyZeropoints(object):
+class FgcmApplyZeropoints:
     """
     Class which reads in FGCM zeropoints and applies them.
 
@@ -67,6 +66,10 @@ class FgcmApplyZeropoints(object):
         self.fgcmLog = self.fgcmConfig.fgcmLog
         self.quietMode = self.fgcmConfig.quietMode
 
+        from .sharedNumpyMemManager2 import SharedNumpyMemManager2
+
+        self.snmm = SharedNumpyMemManager2()
+
         self.fgcmLUT = None
         self.fgcmPars = None
         self.fgcmStars = None
@@ -108,7 +111,7 @@ class FgcmApplyZeropoints(object):
 
         # Read in the LUT
         # (might not be necessary)
-        self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile,
+        self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile, self.snmm,
                                             filterToBand=self.fgcmConfig.filterToBand)
 
         try:
@@ -118,11 +121,11 @@ class FgcmApplyZeropoints(object):
                                                            self.fgcmLUT)
 
         # Read in the stars
-        self.fgcmStars = FgcmStars(self.fgcmConfig)
+        self.fgcmStars = FgcmStars(self.fgcmConfig, self.snmm)
         self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
         self.fgcmStars.prepStars(self.fgcmPars)
 
-        self.fgcmZpsToApply = FgcmZpsToApply(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT)
+        self.fgcmZpsToApply = FgcmZpsToApply(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, self.snmm)
         self.fgcmZpsToApply.loadZeropointsFromFits()
 
         self.finishSetup()
@@ -161,7 +164,7 @@ class FgcmApplyZeropoints(object):
         # Select good exposures based on the flag cuts
         # Can do this only for exposures that are ALL above the threshold.
 
-        zpFlag = snmm.getArray(self.fgcmZpsToApply.zpFlagHandle)
+        zpFlag = self.holder.getArray(self.fgcmZpsToApply.zpFlagHandle)
         flagMin = np.min(zpFlag, axis=1)
 
         bad, = np.where(flagMin > self.fgcmConfig.maxFlagZpsToApply)
@@ -169,9 +172,9 @@ class FgcmApplyZeropoints(object):
 
         # And flag observations that do not have zeropoints...
 
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.fgcmConfig.ccdStartIndex
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.fgcmConfig.ccdStartIndex
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         bad, = np.where(zpFlag[obsExpIndex, obsCCDIndex] > self.fgcmConfig.maxFlagZpsToApply)
         obsFlag[bad] |= obsFlagDict['NO_ZEROPOINT']

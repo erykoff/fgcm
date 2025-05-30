@@ -903,7 +903,7 @@ class FocalPlaneProjectorFromOffsets(object):
 
         return deltaMapper
 
-    def computeCCDOffsetSigns(self, fgcmStars):
+    def computeCCDOffsetSigns(self, fgcmStars, holder):
         """Compute plotting signs for x/y to ra/dec conversions.
 
         This does not support rotations; you need a proper
@@ -915,16 +915,15 @@ class FocalPlaneProjectorFromOffsets(object):
         """
         import scipy.stats
         import esutil
-        from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-        obsObjIDIndex = snmm.getArray(fgcmStars.obsObjIDIndexHandle)
-        obsCCDIndex = snmm.getArray(fgcmStars.obsCCDHandle) - fgcmStars.ccdStartIndex
-        obsExpIndex = snmm.getArray(fgcmStars.obsExpIndexHandle)
+        obsObjIDIndex = holder.getArray(fgcmStars.obsObjIDIndexHandle)
+        obsCCDIndex = holder.getArray(fgcmStars.obsCCDHandle) - fgcmStars.ccdStartIndex
+        obsExpIndex = holder.getArray(fgcmStars.obsExpIndexHandle)
 
-        obsX = snmm.getArray(fgcmStars.obsXHandle)
-        obsY = snmm.getArray(fgcmStars.obsYHandle)
-        obsRA = snmm.getArray(fgcmStars.obsRAHandle)
-        obsDec = snmm.getArray(fgcmStars.obsDecHandle)
+        obsX = holder.getArray(fgcmStars.obsXHandle)
+        obsY = holder.getArray(fgcmStars.obsYHandle)
+        obsRA = holder.getArray(fgcmStars.obsRAHandle)
+        obsDec = holder.getArray(fgcmStars.obsDecHandle)
 
         if obsX.size > 10_000_000:
             sub = np.random.choice(obsX.size, size=10_000_000, replace=False)

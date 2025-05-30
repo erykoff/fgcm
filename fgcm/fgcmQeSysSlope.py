@@ -10,9 +10,8 @@ from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmQeSysSlope(object):
+class FgcmQeSysSlope:
     """
     Class which computes the slope of the system QE degredation.
 
@@ -27,8 +26,11 @@ class FgcmQeSysSlope(object):
     initialCycle: `bool`
        Is this the initial cycle? (Force gray computation)
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
+
         self.fgcmLog.debug('Initializing FgcmQeSysSlope')
 
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
@@ -56,13 +58,13 @@ class FgcmQeSysSlope(object):
            Name to put on filenames
         """
 
-        objID = snmm.getArray(self.fgcmStars.objIDHandle)
+        objID = self.holder.getArray(self.fgcmStars.objIDHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsMagADUModelErr = self.holder.getArray(self.fgcmStars.obsMagADUModelErrHandle)
 
         # Select good stars and good observations of said stars
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
@@ -264,13 +266,13 @@ class FgcmQeSysSlope(object):
         if self.plotPath is None:
             return
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
 
-        objRefIDIndex = snmm.getArray(self.fgcmStars.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.fgcmStars.refMagHandle)
+        objRefIDIndex = self.holder.getArray(self.fgcmStars.objRefIDIndexHandle)
+        refMag = self.holder.getArray(self.fgcmStars.refMagHandle)
 
         goodStars = self.fgcmStars.getGoodStarIndices(checkMinObs=True)
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)

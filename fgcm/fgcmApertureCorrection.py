@@ -6,10 +6,9 @@ import time
 import scipy.optimize
 import warnings
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import dataBinner, makeFigure, putButlerFigure
 
-class FgcmApertureCorrection(object):
+class FgcmApertureCorrection:
     """
     Class which computes aperture corrections.  Note that this will only
       be run if aperCorrFitNBins > 0 and expSeeingVariable is set in the
@@ -30,8 +29,10 @@ class FgcmApertureCorrection(object):
        Number of expSeeingVariable bins to use for computing correction slope
 
     """
-    def __init__(self, fgcmConfig, fgcmPars, fgcmGray, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmGray, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
         self.fgcmLog.debug('Initializing FgcmApertureCorrection')
 
         self.fgcmPars = fgcmPars
@@ -71,7 +72,7 @@ class FgcmApertureCorrection(object):
                               (self.aperCorrFitNBins))
 
         # need to make a local copy since we're modifying
-        expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
+        expGray = self.holder.getArray(self.fgcmGray.expGrayHandle)
         expGrayTemp = expGray.copy()
 
         # save original pivot and range in case it fails

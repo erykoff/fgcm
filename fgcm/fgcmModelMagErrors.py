@@ -4,13 +4,12 @@ import sys
 import esutil
 import scipy.optimize
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
 
-class MagErrorModelFitter(object):
+class MagErrorModelFitter:
     """
     """
     def __init__(self, mag, magErr, fwhm, sky, fwhmPivot, skyPivot):
@@ -30,13 +29,16 @@ class MagErrorModelFitter(object):
         return np.sum(np.abs(yMod - self.logErr))
 
 
-class FgcmModelMagErrors(object):
+class FgcmModelMagErrors:
     """
     Class which models the magnitude errors.
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
+
         self.fgcmLog.debug('Initializing FgcmModelMagErrors')
 
         self.fgcmPars = fgcmPars
@@ -73,16 +75,16 @@ class FgcmModelMagErrors(object):
         if not self.quietMode:
             self.fgcmLog.info('Computing magnitude error model parameters...')
 
-        objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
+        objNGoodObs = self.holder.getArray(self.fgcmStars.objNGoodObsHandle)
+        objMagStdMean = self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)
 
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
-        obsMagADUErr = snmm.getArray(self.fgcmStars.obsMagADUErrHandle)
-        obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
+        obsObjIDIndex = self.holder.getArray(self.fgcmStars.obsObjIDIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsBandIndex = self.holder.getArray(self.fgcmStars.obsBandIndexHandle)
+        obsMagADU = self.holder.getArray(self.fgcmStars.obsMagADUHandle)
+        obsMagADUErr = self.holder.getArray(self.fgcmStars.obsMagADUErrHandle)
+        obsMagStd = self.holder.getArray(self.fgcmStars.obsMagStdHandle)
 
         obsExptime = self.fgcmPars.expExptime[obsExpIndex]
         obsFwhm = self.fgcmPars.expFwhm[obsExpIndex]

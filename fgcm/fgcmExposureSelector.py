@@ -6,14 +6,16 @@ import esutil
 from .fgcmUtilities import expFlagDict, logFlaggedExposuresPerBand, checkFlaggedExposuresPerBand
 from .fgcmUtilities import histogram_rev_sorted
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
 class FgcmExposureSelector(object):
     """
     """
-    def __init__(self,fgcmConfig,fgcmPars):
+    def __init__(self, fgcmConfig, fgcmPars, snmm):
 
         self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing FgcmExposureSelector')
         self.fgcmPars = fgcmPars
@@ -97,8 +99,8 @@ class FgcmExposureSelector(object):
         """
         """
 
-        expGrayForInitialSelection = snmm.getArray(fgcmGray.expGrayForInitialSelectionHandle)
-        expNGoodStarForInitialSelection = snmm.getArray(fgcmGray.expNGoodStarForInitialSelectionHandle)
+        expGrayForInitialSelection = self.holder.getArray(fgcmGray.expGrayForInitialSelectionHandle)
+        expNGoodStarForInitialSelection = self.holder.getArray(fgcmGray.expNGoodStarForInitialSelectionHandle)
 
         if (np.max(expNGoodStarForInitialSelection) == 0):
             self.fgcmLog.info('ERROR: Must run FgcmGray.computeExpGrayForInitialSelection before FgcmExposureSelector')

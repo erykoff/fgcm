@@ -33,10 +33,8 @@ from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import FocalPlaneProjectorFromOffsets
 from .fgcmUtilities import makeFigure, putButlerFigure
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmFitCycle(object):
+class FgcmFitCycle:
     """
     Class which runs the main FGCM fitter.
 
@@ -59,7 +57,7 @@ class FgcmFitCycle(object):
     Note that at least one of useFits or noFitsDict must be supplied.
     """
 
-    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False, butlerQC=None, plotHandleDict=None):
+    def __init__(self, configDict, useFits=False, noFitsDict=None, noOutput=False, butlerQC=None, plotHandleDict=None, snmm=None):
         # are we in fits mode?
         self.useFits = useFits
 
@@ -109,6 +107,13 @@ class FgcmFitCycle(object):
 
         self.butlerQC = butlerQC
         self.plotHandleDict = plotHandleDict
+
+        if snmm is None:
+            from .sharedNumpyMemManager2 import SharedNumpyMemManager2
+
+            self.snmm = SharedNumpyMemManager2()
+        else:
+            self.snmm = snmm
 
         self.fgcmLUT = None
         self.fgcmPars = None
@@ -182,6 +187,7 @@ class FgcmFitCycle(object):
 
         # read in the LUT
         self.fgcmLUT = FgcmLUT.initFromFits(self.fgcmConfig.lutFile,
+                                            self.snmm,
                                             filterToBand=self.fgcmConfig.filterToBand)
 
         # Generate or Read Parameters
@@ -196,7 +202,7 @@ class FgcmFitCycle(object):
                                                             plotHandleDict=self.plotHandleDict)
 
         # Read in the stars
-        self.fgcmStars = FgcmStars(self.fgcmConfig)
+        self.fgcmStars = FgcmStars(self.fgcmConfig, self.snmm)
         self.fgcmStars.loadStarsFromFits(self.fgcmPars, computeNobs=True)
         self.fgcmStars.prepStars(self.fgcmPars)
 
@@ -223,20 +229,22 @@ class FgcmFitCycle(object):
 
         # And prepare the chisq function
         self.fgcmChisq = FgcmChisq(self.fgcmConfig,self.fgcmPars,
-                                   self.fgcmStars,self.fgcmLUT)
+                                   self.fgcmStars,self.fgcmLUT,
+                                   self.snmm)
 
         # The step unit calculator
         self.fgcmComputeStepUnits = FgcmComputeStepUnits(self.fgcmConfig, self.fgcmPars,
-                                                         self.fgcmStars, self.fgcmLUT)
+                                                         self.fgcmStars, self.fgcmLUT, self.snmm)
 
         # And the exposure selector
-        self.expSelector = FgcmExposureSelector(self.fgcmConfig,self.fgcmPars)
+        self.expSelector = FgcmExposureSelector(self.fgcmConfig, self.fgcmPars, self.snmm)
 
         # And the Gray code
         self.fgcmGray = FgcmGray(
             self.fgcmConfig,
             self.fgcmPars,
             self.fgcmStars,
+            self.snmm,
             butlerQC=self.butlerQC,
             plotHandleDict=self.plotHandleDict,
         )
@@ -246,6 +254,7 @@ class FgcmFitCycle(object):
             self.fgcmConfig,
             self.fgcmPars,
             self.fgcmStars,
+            self.snmm,
             butlerQC=self.butlerQC,
             plotHandleDict=self.plotHandleDict,
         )
@@ -286,7 +295,7 @@ class FgcmFitCycle(object):
 
         # Compute signs for CCD offsets if necessary
         if isinstance(self.fgcmConfig.focalPlaneProjector, FocalPlaneProjectorFromOffsets):
-            self.fgcmConfig.focalPlaneProjector.computeCCDOffsetSigns(self.fgcmStars)
+            self.fgcmConfig.focalPlaneProjector.computeCCDOffsetSigns(self.fgcmStars, self.snmm.getHolder())
         self.deltaMapperDefault = self.fgcmConfig.focalPlaneProjector(int(self.fgcmConfig.defaultCameraOrientation))
         self.fgcmPars.setDeltaMapperDefault(self.deltaMapperDefault)
         self.fgcmChisq.setDeltaMapperDefault(self.deltaMapperDefault)
@@ -319,6 +328,7 @@ class FgcmFitCycle(object):
         self.fgcmModelMagErrs = FgcmModelMagErrors(self.fgcmConfig,
                                                    self.fgcmPars,
                                                    self.fgcmStars,
+                                                   self.snmm,
                                                    butlerQC=self.butlerQC,
                                                    plotHandleDict=self.plotHandleDict)
 
@@ -356,7 +366,7 @@ class FgcmFitCycle(object):
             self.fgcmChisq(parArray,allExposures=True,includeReserve=True)
 
             # run the bright observation algorithm, computing SEDs
-            brightObs = FgcmBrightObs(self.fgcmConfig,self.fgcmPars,self.fgcmStars,self.fgcmLUT)
+            brightObs = FgcmBrightObs(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmLUT, self.snmm)
             brightObs.brightestObsMeanMag(computeSEDSlopes=True)
 
             # Compute median SED slopes and apply
@@ -409,6 +419,7 @@ class FgcmFitCycle(object):
                     self.fgcmConfig,
                     self.fgcmPars,
                     self.fgcmStars,
+                    self.snmm,
                     butlerQC=self.butlerQC,
                     plotHandleDict=self.plotHandleDict,
                 )
@@ -517,7 +528,7 @@ class FgcmFitCycle(object):
         if self.fgcmStars.hasDeltaAper:
             self.fgcmLog.debug('FitCycle computing deltaAper')
             self.fgcmDeltaAper = FgcmDeltaAper(self.fgcmConfig, self.fgcmPars,
-                                               self.fgcmStars,
+                                               self.fgcmStars, self.snmm,
                                                butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             self.fgcmDeltaAper.computeDeltaAperExposures(
                 doFullFit=self.fgcmConfig.doComputeDeltaAperExposures,
@@ -533,7 +544,7 @@ class FgcmFitCycle(object):
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
         self.fgcmSigFgcm = FgcmSigFgcm(self.fgcmConfig, self.fgcmPars,
-                                       self.fgcmStars, butlerQC=self.butlerQC,
+                                       self.fgcmStars, snmm, butlerQC=self.butlerQC,
                                        plotHandleDict=self.plotHandleDict)
         # first compute with all...(better stats)
         self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
@@ -557,8 +568,8 @@ class FgcmFitCycle(object):
 
         # Compute Retrieved chromatic integrals
         self.fgcmLog.debug('FitCycle computing retrieved R0/R1')
-        self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig,self.fgcmPars,
-                                           self.fgcmStars,self.fgcmLUT)
+        self.fgcmRetrieval = FgcmRetrieval(self.fgcmConfig, self.fgcmPars,
+                                           self.fgcmStars, self.fgcmLUT, self.snmm)
         self.fgcmRetrieval.computeRetrievalIntegrals()
 
         if not self.quietMode:
@@ -567,7 +578,7 @@ class FgcmFitCycle(object):
         # Compute Retrieved PWV -- always because why not?
         self.fgcmLog.debug('FitCycle computing RPWV')
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
-                                                             self.fgcmPars, butlerQC=self.butlerQC,
+                                                             self.fgcmPars, snmm, butlerQC=self.butlerQC,
                                                              plotHandleDict=self.plotHandleDict)
         self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
@@ -581,6 +592,7 @@ class FgcmFitCycle(object):
                 self.fgcmConfig,
                 self.fgcmPars,
                 self.fgcmStars,
+                snmm,
                 butlerQC=self.butlerQC,
                 plotHandleDict=self.plotHandleDict,
             )
@@ -596,6 +608,7 @@ class FgcmFitCycle(object):
                 self.fgcmConfig,
                 self.fgcmPars,
                 self.fgcmGray,
+                self.snmm,
                 butlerQC=self.butlerQC,
                 plotHandleDict=self.plotHandleDict,
             )
@@ -612,6 +625,7 @@ class FgcmFitCycle(object):
                     self.fgcmPars,
                     self.fgcmStars,
                     self.fgcmLUT,
+                    self.snmm,
                     butlerQC=self.butlerQC,
                     plotHandleDict=self.plotHandleDict,
                 )
@@ -625,6 +639,7 @@ class FgcmFitCycle(object):
                     self.fgcmPars,
                     self.fgcmStars,
                     self.fgcmLUT,
+                    self.snmm,
                     butlerQC=self.butlerQC,
                     plotHandleDict=self.plotHandleDict,
                 )
@@ -646,13 +661,13 @@ class FgcmFitCycle(object):
         #   if we don't the zeropoints before convergence will be wrong.
 
         self.fgcmLog.debug('FitCycle computing SigmaCal')
-        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray,
+        self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray, self.snmm,
                                    butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.sigCal.run()
 
         if self.fgcmStars.hasRefstars:
             self.fgcmLog.debug('FitCycle computing SigmaRef')
-            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars,
+            sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.snmm,
                                   butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             sigRef.computeSigmaRef()
 
@@ -666,7 +681,7 @@ class FgcmFitCycle(object):
 
         self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
                                        self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval, self.fgcmStars,
+                                       self.fgcmRetrieval, self.fgcmStars, self.snmm,
                                        butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
         self.fgcmZpts.computeZeropoints()

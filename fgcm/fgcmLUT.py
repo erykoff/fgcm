@@ -15,7 +15,6 @@ from .modtranGenerator import ModtranGenerator
 from .fgcmAtmosphereTable import FgcmAtmosphereTable
 
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmLogger import FgcmLogger
 
 
@@ -755,13 +754,18 @@ class FgcmLUT(object):
        Flattened I0/I1 derivative arrays
     stdVals: numpy recarray
        Standard atmosphere and associated values
+    snmm : `fgcm.SharedNumpyMemManager2`
+        Memory manager.
     sedLUT: bool, default=False
        Use SED look-up table instead of colors (experimental).
     filterToBand: dict, optional
        Dictionary to map filterNames to bands if not unique
     """
 
-    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, sedLUT=None, filterToBand=None):
+    def __init__(self, indexVals, lutFlat, lutDerivFlat, stdVals, snmm, sedLUT=None, filterToBand=None):
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         try:
             self.filterNames = [n.decode('utf-8') for n in indexVals['FILTERNAMES'][0]]
@@ -970,7 +974,7 @@ class FgcmLUT(object):
                 (np.exp(-(pmb - self.pmbElevation)/self.pmbElevation)) ** 1.6)
 
 
-    def computeI0(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices):
+    def computeI0(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices, holder=None):
         """
         Compute I0 from the look-up table.
 
@@ -984,6 +988,8 @@ class FgcmLUT(object):
         pmb: float array
         indices: tuple, from getIndices()
         """
+        if holder is None:
+            holder = self.holder
 
         # do a simple linear interpolation
         dlnPwv = lnPwv - (self.lnPwv[0] + indices[1] * self.lnPwvDelta)
@@ -1001,21 +1007,21 @@ class FgcmLUT(object):
         # and a second-derivative term for pwv
         #  note that indices[-1] is the PMB vactor
 
-        return indices[-1]*(snmm.getArray(self.lutI0Handle)[indices[:-1]] +
-                            dlnPwv * snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] +
-                            dO3 * snmm.getArray(self.lutDO3Handle)[indices[:-1]] +
-                            dlnTau * snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] +
-                            dAlpha * snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] +
-                            dSecZenith * snmm.getArray(self.lutDSecZenithHandle)[indices[:-1]] +
-                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauHandle)[tuple(indicesSecZenithPlus)] -
-                                                   snmm.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta +
-                            dlnPwv * dSecZenith * (snmm.getArray(self.lutDLnPwvHandle)[tuple(indicesSecZenithPlus)] -
-                                                 snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]])/self.secZenithDelta +
-                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (snmm.getArray(self.lutDLnPwvHandle)[tuple(indicesPwvPlus)] -
-                                                             snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]]))
+        return indices[-1]*(holder.getArray(self.lutI0Handle)[indices[:-1]] +
+                            dlnPwv * holder.getArray(self.lutDLnPwvHandle)[indices[:-1]] +
+                            dO3 * holder.getArray(self.lutDO3Handle)[indices[:-1]] +
+                            dlnTau * holder.getArray(self.lutDLnTauHandle)[indices[:-1]] +
+                            dAlpha * holder.getArray(self.lutDAlphaHandle)[indices[:-1]] +
+                            dSecZenith * holder.getArray(self.lutDSecZenithHandle)[indices[:-1]] +
+                            dlnTau * dSecZenith * (holder.getArray(self.lutDLnTauHandle)[tuple(indicesSecZenithPlus)] -
+                                                   holder.getArray(self.lutDLnTauHandle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * dSecZenith * (holder.getArray(self.lutDLnPwvHandle)[tuple(indicesSecZenithPlus)] -
+                                                 holder.getArray(self.lutDLnPwvHandle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (holder.getArray(self.lutDLnPwvHandle)[tuple(indicesPwvPlus)] -
+                                                             holder.getArray(self.lutDLnPwvHandle)[indices[:-1]]))
 
 
-    def computeI1(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices):
+    def computeI1(self, lnPwv, o3, lnTau, alpha, secZenith, pmb, indices, holder=None):
         """
         Compute I1 from the look-up table.
 
@@ -1029,6 +1035,8 @@ class FgcmLUT(object):
         pmb: float array
         indices: tuple, from getIndices()
         """
+        if holder is None:
+            holder = self.holder
 
         # do a simple linear interpolation
         dlnPwv = lnPwv - (self.lnPwv[0] + indices[1] * self.lnPwvDelta)
@@ -1045,24 +1053,18 @@ class FgcmLUT(object):
         # also include a cross-term for tau
         #  note that indices[-1] is the PMB vactor
 
-        return indices[-1]*(snmm.getArray(self.lutI1Handle)[indices[:-1]] +
-                            dlnPwv * snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]] +
-                            dO3 * snmm.getArray(self.lutDO3I1Handle)[indices[:-1]] +
-                            dlnTau * snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]] +
-                            dAlpha * snmm.getArray(self.lutDAlphaI1Handle)[indices[:-1]] +
-                            dSecZenith * snmm.getArray(self.lutDSecZenithI1Handle)[indices[:-1]] +
-                            dlnTau * dSecZenith * (snmm.getArray(self.lutDLnTauI1Handle)[tuple(indicesSecZenithPlus)] -
-                                                   snmm.getArray(self.lutDLnTauI1Handle)[indices[:-1]])/self.secZenithDelta +
-                            dlnPwv * dSecZenith * (snmm.getArray(self.lutDLnPwvI1Handle)[tuple(indicesSecZenithPlus)] -
-                                                 snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]])/self.secZenithDelta +
-                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (snmm.getArray(self.lutDLnPwvI1Handle)[tuple(indicesPwvPlus)] -
-                                                             snmm.getArray(self.lutDLnPwvI1Handle)[indices[:-1]]))
-
-    def computeI1Old(self, indices):
-        """
-        Unused
-        """
-        return indices[-1] * snmm.getArray(self.lutI1Handle)[indices[:-1]]
+        return indices[-1]*(holder.getArray(self.lutI1Handle)[indices[:-1]] +
+                            dlnPwv * holder.getArray(self.lutDLnPwvI1Handle)[indices[:-1]] +
+                            dO3 * holder.getArray(self.lutDO3I1Handle)[indices[:-1]] +
+                            dlnTau * holder.getArray(self.lutDLnTauI1Handle)[indices[:-1]] +
+                            dAlpha * holder.getArray(self.lutDAlphaI1Handle)[indices[:-1]] +
+                            dSecZenith * holder.getArray(self.lutDSecZenithI1Handle)[indices[:-1]] +
+                            dlnTau * dSecZenith * (holder.getArray(self.lutDLnTauI1Handle)[tuple(indicesSecZenithPlus)] -
+                                                   holder.getArray(self.lutDLnTauI1Handle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * dSecZenith * (holder.getArray(self.lutDLnPwvI1Handle)[tuple(indicesSecZenithPlus)] -
+                                                 holder.getArray(self.lutDLnPwvI1Handle)[indices[:-1]])/self.secZenithDelta +
+                            dlnPwv * (dlnPwv - self.lnPwvDelta) * (holder.getArray(self.lutDLnPwvI1Handle)[tuple(indicesPwvPlus)] -
+                                                             holder.getArray(self.lutDLnPwvI1Handle)[indices[:-1]]))
 
     def computeLogDerivatives(self, indices, I0):
         """
@@ -1076,10 +1078,10 @@ class FgcmLUT(object):
 
         # dL(i,j|p) = d/dp(2.5*log10(LUT(i,j|p)))
         #           = 1.086*(LUT'(i,j|p)/LUT(i,j|p))
-        return (self.magConstant*snmm.getArray(self.lutDLnPwvHandle)[indices[:-1]] / I0,
-                self.magConstant*snmm.getArray(self.lutDO3Handle)[indices[:-1]] / I0,
-                self.magConstant*snmm.getArray(self.lutDLnTauHandle)[indices[:-1]] / I0,
-                self.magConstant*snmm.getArray(self.lutDAlphaHandle)[indices[:-1]] / I0)
+        return (self.magConstant*self.holder.getArray(self.lutDLnPwvHandle)[indices[:-1]] / I0,
+                self.magConstant*self.holder.getArray(self.lutDO3Handle)[indices[:-1]] / I0,
+                self.magConstant*self.holder.getArray(self.lutDLnTauHandle)[indices[:-1]] / I0,
+                self.magConstant*self.holder.getArray(self.lutDAlphaHandle)[indices[:-1]] / I0)
 
 
     def computeLogDerivativesI1(self, indices, I0, I10, sedSlope):
@@ -1098,16 +1100,16 @@ class FgcmLUT(object):
 
         preFactor = self.magConstant * (sedSlope / (1. + sedSlope * I10)) * (1. / I0)
 
-        return (preFactor * (snmm.getArray(self.lutDLnPwvI1Handle)[indices[: -1]] -
-                             I10 * snmm.getArray(self.lutDLnPwvHandle)[indices[: -1]]),
-                preFactor * (snmm.getArray(self.lutDO3I1Handle)[indices[: -1]] -
-                             I10 * snmm.getArray(self.lutDO3Handle)[indices[: -1]]),
-                preFactor * (snmm.getArray(self.lutDLnTauI1Handle)[indices[: -1]] -
-                             I10 * snmm.getArray(self.lutDLnTauHandle)[indices[: -1]]),
-                preFactor * (snmm.getArray(self.lutDAlphaI1Handle)[indices[: -1]] -
-                             I10 * snmm.getArray(self.lutDAlphaHandle)[indices[: -1]]))
+        return (preFactor * (self.holder.getArray(self.lutDLnPwvI1Handle)[indices[: -1]] -
+                             I10 * self.holder.getArray(self.lutDLnPwvHandle)[indices[: -1]]),
+                preFactor * (self.holder.getArray(self.lutDO3I1Handle)[indices[: -1]] -
+                             I10 * self.holder.getArray(self.lutDO3Handle)[indices[: -1]]),
+                preFactor * (self.holder.getArray(self.lutDLnTauI1Handle)[indices[: -1]] -
+                             I10 * self.holder.getArray(self.lutDLnTauHandle)[indices[: -1]]),
+                preFactor * (self.holder.getArray(self.lutDAlphaI1Handle)[indices[: -1]] -
+                             I10 * self.holder.getArray(self.lutDAlphaHandle)[indices[: -1]]))
 
-    def computeSEDSlopes(self, objectSedColor):
+    def computeSEDSlopes(self, objectSedColor, holder=None):
         """
         Compute SED slopes using the SED look-up table.  Experimental.
 
@@ -1116,6 +1118,8 @@ class FgcmLUT(object):
         objectSedColor: float array
            Color used for SED look-up (typically g-i)
         """
+        if holder is None:
+            holder = self.holder
 
         indices = np.clip(np.searchsorted(self.sedColor, objectSedColor),0,self.sedColor.size-2)
         # right now, a straight matching to the nearest sedColor (g-i)
@@ -1127,6 +1131,8 @@ class FgcmLUT(object):
 
     def freeSharedMemory(self):
         """Free shared memory in the LUT"""
+        snmm = self.snmm
+
         snmm.freeArray(self.lutI0Handle)
         snmm.freeArray(self.lutI1Handle)
         snmm.freeArray(self.lutDLnPwvHandle)
@@ -1140,3 +1146,10 @@ class FgcmLUT(object):
         snmm.freeArray(self.lutDAlphaI1Handle)
         snmm.freeArray(self.lutDSecZenithI1Handle)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if 'snmm' in state:
+            del state['snmm']
+        if 'holder' in state:
+            del state['holder']
+        return state

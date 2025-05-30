@@ -10,9 +10,8 @@ from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-class FgcmStars(object):
+class FgcmStars:
     """
     Class to describe the stars and observations of the stars.  Note that
      after initialization you must call loadStarsFromFits() or loadStars()
@@ -45,7 +44,10 @@ class FgcmStars(object):
        Star index file
     """
 
-    def __init__(self, fgcmConfig, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, snmm, butlerQC=None, plotHandleDict=None):
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog = fgcmConfig.fgcmLog
 
@@ -351,6 +353,7 @@ class FgcmStars(object):
         objIDAlternate : int array, optional
             Alternate (non-consecutive) star id.
         """
+        snmm = self.snmm
 
         # FIXME: check that these are all the same length!
 
@@ -620,6 +623,8 @@ class FgcmStars(object):
         ----------
         fgcmPars : `fgcm.FgcmParameters`
         """
+        snmm = self.snmm
+
         self.fgcmLog.debug('Applying sigma0Phot = %.4f to mag errs' %
                            (self.sigma0Phot))
 
@@ -823,7 +828,7 @@ class FgcmStars(object):
 
         self._needToComputeNobs = False
 
-    def reloadStarMagnitudes(self, obsMag, obsMagErr):
+    def reloadStarMagnitudes(self, obsMag, obsMagErr, holder=None):
         """
         Reload star magnitudes, used when automating multiple fit cycles in memory.
 
@@ -834,21 +839,23 @@ class FgcmStars(object):
         obsMagErr: float array
            Raw ADU magnitude error for each observation
         """
-
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call reloadStarMagnitudes until stars have been loaded and prepped.")
+
+        if holder is None:
+            holder = self.holder
 
         if len(obsMag) != self.nStarObs:
             raise RuntimeError("Replacement star magnitude has wrong length.")
         if len(obsMagErr) != self.nStarObs:
             raise RuntimeError("Replacement star magnitude error has wrong length.")
 
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
-        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
-        obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
-        obsDeltaStd = snmm.getArray(self.obsDeltaStdHandle)
-        obsSuperStarApplied = snmm.getArray(self.obsSuperStarAppliedHandle)
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
+        obsMagADUModelErr = holder.getArray(self.obsMagADUModelErrHandle)
+        obsMagADUErr = holder.getArray(self.obsMagADUErrHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
+        obsDeltaStd = holder.getArray(self.obsDeltaStdHandle)
+        obsSuperStarApplied = holder.getArray(self.obsSuperStarAppliedHandle)
 
         obsMagADU[:] = obsMag + self.zptABNoThroughput
         obsMagStd[:] = obsMag + self.zptABNoThroughput
@@ -856,20 +863,20 @@ class FgcmStars(object):
         obsSuperStarApplied[:] = 0.0
 
         if self.hasDeltaMagBkg:
-            obsDeltaMagBkg = snmm.getArray(self.obsDeltaMagBkgHandle)
+            obsDeltaMagBkg = holder.getArray(self.obsDeltaMagBkgHandle)
             obsMagADU[:] += obsDeltaMagBkg[:]
 
         obsMagADUErr[:] = np.sqrt(obsMagErr**2. + self.sigma0Phot**2.)
         obsMagADUModelErr[:] = obsMagADUErr[:]
 
-        snmm.getArray(self.objNGoodObsHandle)[:, :] = 0
-        snmm.getArray(self.objMagStdMeanHandle)[:, :] = 0.0
-        snmm.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
-        snmm.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
-        snmm.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
+        holder.getArray(self.objNGoodObsHandle)[:, :] = 0
+        holder.getArray(self.objMagStdMeanHandle)[:, :] = 0.0
+        holder.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
+        holder.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
+        holder.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
-                                  minObsPerBand=None, reset=True):
+                                  minObsPerBand=None, reset=True, holder=None):
         """
         Select stars that have at least the minimum number of observations per band,
          using a list of good exposures
@@ -888,18 +895,21 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call selectStarsMinObsExpIndex until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         if (minObsPerBand is None):
             minObsPerBand = self.minObsPerBand
 
         # Given a list of good exposures, which stars have at least minObs observations
         #  in each required band?
 
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
+        obsFlag = holder.getArray(self.obsFlagHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
 
         self.fgcmLog.debug('Selecting good stars from %d exposures.' %
                            (goodExpsIndex.size))
@@ -945,7 +955,7 @@ class FgcmStars(object):
             self.fgcmLog.info('Flagging %d of %d stars with TEMPORARY_BAD_STAR' % (bad.size,self.nStars))
 
 
-    def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minObsPerBand=None):
+    def selectStarsMinObsExpAndCCD(self, goodExps, goodCCDs, minObsPerBand=None, holder=None):
         """
         Select stars that have at least the minimum number of observations per band,
          using a list of good exposures and ccds.
@@ -962,20 +972,23 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call selectStarsMinObsExpAndCCD until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         if (minObsPerBand is None):
             minObsPerBand = self.minObsPerBand
 
         if (goodExps.size != goodCCDs.size) :
             raise ValueError("Length of goodExps and goodCCDs must be the same")
 
-        obsExp = snmm.getArray(self.obsExpHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsCCD = snmm.getArray(self.obsCCDHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        obsExp = holder.getArray(self.obsExpHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsCCD = holder.getArray(self.obsCCDHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
+        obsFlag = holder.getArray(self.obsFlagHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
 
         self.fgcmLog.debug('Selecting good stars from %d exposure/ccd pairs.' %
                          (goodExps.size))
@@ -1017,7 +1030,7 @@ class FgcmStars(object):
         objFlag[bad] |= objFlagDict['TOO_FEW_OBS']
         self.fgcmLog.info('Flagging %d of %d stars with TOO_FEW_OBS' % (bad.size,self.nStars))
 
-    def computeNTotalStats(self, fgcmPars):
+    def computeNTotalStats(self, fgcmPars, holder=None):
         """
         Compute ntotal statistics and psf candidate statistics if available.
 
@@ -1028,14 +1041,17 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call computeNTotalStats until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         goodExpsIndex, = np.where(fgcmPars.expFlag >= 0)
 
         minObsPerBand = 0
 
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        objNTotalObs = holder.getArray(self.objNTotalObsHandle)
 
         _, goodObs = esutil.numpy_util.match(goodExpsIndex, obsExpIndex)
 
@@ -1047,8 +1063,8 @@ class FgcmStars(object):
 
         # Do the psf candidate computation if available
         if self.hasPsfCandidate:
-            psfCandidate = snmm.getArray(self.psfCandidateHandle)
-            objNPsfCandidate = snmm.getArray(self.objNPsfCandidateHandle)
+            psfCandidate = holder.getArray(self.psfCandidateHandle)
+            objNPsfCandidate = holder.getArray(self.objNPsfCandidateHandle)
 
             ispsf, = np.where(psfCandidate[goodObs])
             psfObs = goodObs[ispsf]
@@ -1061,7 +1077,7 @@ class FgcmStars(object):
 
     def getGoodStarIndices(self, includeReserve=False, onlyReserve=False, checkMinObs=False,
                            checkHasColor=False, removeRefstarOutliers=False, removeRefstarBadcols=False,
-                           removeRefstarReserved=False):
+                           removeRefstarReserved=False, holder=None):
         """
         Get the good star indices.
 
@@ -1089,6 +1105,9 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call getGoodStarIndices until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         mask = (objFlagDict['TOO_FEW_OBS'] |
                 objFlagDict['BAD_COLOR'] |
                 objFlagDict['VARIABLE'] |
@@ -1107,13 +1126,13 @@ class FgcmStars(object):
 
         if onlyReserve:
             resMask = objFlagDict['RESERVED']
-            goodFlag = (((snmm.getArray(self.objFlagHandle) & resMask) > 0) &
-                        ((snmm.getArray(self.objFlagHandle) & mask) == 0))
+            goodFlag = (((holder.getArray(self.objFlagHandle) & resMask) > 0) &
+                        ((holder.getArray(self.objFlagHandle) & mask) == 0))
         else:
-            goodFlag = ((snmm.getArray(self.objFlagHandle) & mask) == 0)
+            goodFlag = ((holder.getArray(self.objFlagHandle) & mask) == 0)
 
         if checkMinObs:
-            objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+            objNGoodObs = holder.getArray(self.objNGoodObsHandle)
 
             if self.bandRequiredIndex.size == 0:
                 maxObs = objNGoodObs[:, :].max(axis=1)
@@ -1123,14 +1142,14 @@ class FgcmStars(object):
                 goodFlag &= (minObs >= self.minObsPerBand)
 
         if checkHasColor:
-            objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+            objNGoodObs = holder.getArray(self.objNGoodObsHandle)
 
             goodFlag &= (objNGoodObs[:, self.colorSplitIndices[0]] >= self.minObsPerBand)
             goodFlag &= (objNGoodObs[:, self.colorSplitIndices[1]] >= self.minObsPerBand)
 
         return np.where(goodFlag)[0]
 
-    def getGoodObsIndices(self, goodStars, expFlag=None, requireSED=False, checkBadMag=False):
+    def getGoodObsIndices(self, goodStars, expFlag=None, requireSED=False, checkBadMag=False, holder=None):
         """
         Get the good observation indices.
 
@@ -1156,8 +1175,11 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call getGoodObsIndices until stars have been loaded and prepped.")
 
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
+        if holder is None:
+            holder = self.holder
+
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        obsFlag = holder.getArray(self.obsFlagHandle)
 
         goodStarsSub, goodObs = esutil.numpy_util.match(goodStars,
                                                         obsObjIDIndex,
@@ -1170,29 +1192,29 @@ class FgcmStars(object):
         okFlag = (obsFlag[goodObs] == 0)
 
         if expFlag is not None:
-            obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+            obsExpIndex = holder.getArray(self.obsExpIndexHandle)
             okFlag &= (expFlag[obsExpIndex[goodObs]] == 0)
 
         # Make sure we don't have any 99s or related due to stars going bad
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
 
         if checkBadMag:
-            objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-            objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+            objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+            objMagStdMeanErr = holder.getArray(self.objMagStdMeanErrHandle)
             okFlag &= ((objMagStdMean[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0) &
                        (objMagStdMeanErr[goodStars[goodStarsSub], obsBandIndex[goodObs]] < 99.0))
 
         if not self.allFitBandsAreRequired or self.nNotFitBands > 0:
             # We need to do some extra checks since not all fit bands are required
             # Or we have some extra bands.
-            objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+            objNGoodObs = holder.getArray(self.objNGoodObsHandle)
 
             okFlag &= (objNGoodObs[goodStars[goodStarsSub], obsBandIndex[goodObs]] >= self.minObsPerBand)
 
         if requireSED:
             # We need to ensure that we have an SED
-            obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-            objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+            obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+            objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
 
             okFlag &= ((objSEDSlope[goodStars[goodStarsSub], obsBandIndex[goodObs]] != 0.0) &
                        (objSEDSlope[goodStars[goodStarsSub], obsBandIndex[goodObs]] != self.missingSedValues[obsBandIndex[goodObs]]))
@@ -1217,7 +1239,7 @@ class FgcmStars(object):
         # FIXME: add skyproj plotting.
         return
 
-    def computeObjectSEDSlopes(self,objIndicesIn):
+    def computeObjectSEDSlopes(self, objIndicesIn, holder=None):
         """
         Compute fnuprime (object SED slopes) for a list of objects.
         Output is saved in objSEDSlope.
@@ -1227,15 +1249,17 @@ class FgcmStars(object):
         objIndicesIn: int array
            Array of object indices to do computation
         """
+        if holder is None:
+            holder = self.holder
 
         # work on multiple indices
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
 
-        objMagStdMeanLock = snmm.getArrayBase(self.objMagStdMeanHandle).get_lock()
-        objSEDSlopeLock = snmm.getArrayBase(self.objSEDSlopeHandle).get_lock()
+        objMagStdMeanLock = holder.getArrayLock(self.objMagStdMeanHandle)
+        objSEDSlopeLock = holder.getArrayLock(self.objSEDSlopeHandle)
 
         # protect access when copying to local
         objMagStdMeanLock.acquire()
@@ -1305,7 +1329,7 @@ class FgcmStars(object):
         objSEDSlope[objIndicesIn,:] = objSEDSlopeOI
         objSEDSlopeLock.release()
 
-    def computeObjectSEDSlopesLUT(self, objIndicesIn, fgcmLUT):
+    def computeObjectSEDSlopesLUT(self, objIndicesIn, fgcmLUT, holder=None):
         """
         Compute fnuprime (object SED slopes) for a list of objects, from the SED fit
           in the look-up table.  Experimental.
@@ -1317,12 +1341,14 @@ class FgcmStars(object):
            Array of object indices to do computation
         fgcmLUT: FgcmLUT
         """
+        if holder is None:
+            holder = self.holder
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
 
-        objMagStdMeanLock = snmm.getArrayBase(self.objMagStdMeanHandle).get_lock()
-        objSEDSlopeLock = snmm.getArrayBase(self.objSEDSlopeHandle).get_lock()
+        objMagStdMeanLock = holder.getArrayLock(self.objMagStdMeanHandle)
+        objSEDSlopeLock = holder.getArrayLock(self.objSEDSlopeHandle)
 
         # protect access to copy to local
         objMagStdMeanLock.acquire()
@@ -1340,7 +1366,7 @@ class FgcmStars(object):
         objSEDColorOI = objMagStdMeanOI[:,0] - objMagStdMeanOI[:,2]
 
         # do the look-up
-        objSEDSlopeOI = fgcmLUT.computeSEDSlopes(objSEDColorOI)
+        objSEDSlopeOI = fgcmLUT.computeSEDSlopes(objSEDColorOI, holder=holder)
 
         # and save the values, protected
         objSEDSlopeLock.acquire()
@@ -1349,7 +1375,7 @@ class FgcmStars(object):
 
         objSEDSlopeLock.release()
 
-    def fillMissingSedSlopes(self, fgcmPars):
+    def fillMissingSedSlopes(self, fgcmPars, holder=None):
         """
         Fill missing SED slopes with median values
 
@@ -1357,9 +1383,12 @@ class FgcmStars(object):
         ----------
         fgcmPars : `fgcmParameters`
         """
-        objFlag = snmm.getArray(self.objFlagHandle)
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+        if holder is None:
+            holder = self.holder
+
+        objFlag = holder.getArray(self.objFlagHandle)
+        objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
 
         for bandIndex, band in enumerate(self.bands):
             # The exact 0.0 is a special value that it wasn't measured.  This isn't
@@ -1380,7 +1409,7 @@ class FgcmStars(object):
             # And save this locally
             self.missingSedValues[bandIndex] = fgcmPars.compMedianSedSlope[bandIndex]
 
-    def computeAbsOffset(self):
+    def computeAbsOffset(self, holder=None):
         """
         Compute the absolute offset
 
@@ -1389,6 +1418,8 @@ class FgcmStars(object):
         deltaOffsetRef: `np.array`
            Float array (nBands) that is the delta offset in abs mag
         """
+        if holder is None:
+            holder = self.holder
 
         if not self.hasRefstars:
             # should this Raise because it's programmer error, or just pass because
@@ -1397,12 +1428,12 @@ class FgcmStars(object):
             return np.zeros(self.nBands)
 
         # Set things up
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
-        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
-        refMag = snmm.getArray(self.refMagHandle)
-        refMagErr = snmm.getArray(self.refMagErrHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = holder.getArray(self.objMagStdMeanErrHandle)
+        objRefIDIndex = holder.getArray(self.objRefIDIndexHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
+        refMag = holder.getArray(self.refMagHandle)
+        refMagErr = holder.getArray(self.refMagErrHandle)
 
         goodStars = self.getGoodStarIndices(includeReserve=False, checkMinObs=True)
 
@@ -1445,7 +1476,7 @@ class FgcmStars(object):
 
         return deltaOffsetRef
 
-    def applyAbsOffset(self, deltaAbsOffset):
+    def applyAbsOffset(self, deltaAbsOffset, holder=None):
         """
         Apply the absolute offsets.  Used for initial fit cycle.
 
@@ -1454,11 +1485,13 @@ class FgcmStars(object):
         deltaAbsOffset: `np.array`
            Float array with nbands offsets
         """
+        if holder is None:
+            holder = self.holder
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
 
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
 
         goodStars = self.getGoodStarIndices(includeReserve=True)
         _, goodObs = self.getGoodObsIndices(goodStars, expFlag=None)
@@ -1469,7 +1502,7 @@ class FgcmStars(object):
         gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
         objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= deltaAbsOffset[gdMeanBand]
 
-    def computeEGray(self, goodObs, ignoreRef=True, onlyObsErr=False):
+    def computeEGray(self, goodObs, ignoreRef=True, onlyObsErr=False, holder=None):
         """
         Compute the delta-mag between the observed and true value (EGray) for a set of
         observations (goodObs).
@@ -1494,15 +1527,17 @@ class FgcmStars(object):
         EGrayErr2GO: `np.array`
            Array of gray residual error squared
         """
+        if holder is None:
+            holder = self.holder
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = holder.getArray(self.objMagStdMeanErrHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
 
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
-        obsMagErr = snmm.getArray(self.obsMagADUModelErrHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
+        obsMagErr = holder.getArray(self.obsMagADUModelErrHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
 
         # First compute EGray for all the observations
         EGrayGO = (objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]] -
@@ -1516,9 +1551,9 @@ class FgcmStars(object):
 
         # And if we need reference stars, replace these
         if self.hasRefstars and not ignoreRef:
-            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-            refMag = snmm.getArray(self.refMagHandle)
-            refMagErr = snmm.getArray(self.refMagErrHandle)
+            objRefIDIndex = holder.getArray(self.objRefIDIndexHandle)
+            refMag = holder.getArray(self.refMagHandle)
+            refMagErr = holder.getArray(self.refMagErrHandle)
 
             # Only use _good_ (non-outlier) reference stars in here.
             mask = objFlagDict['REFSTAR_OUTLIER'] | objFlagDict['REFSTAR_BAD_COLOR'] | objFlagDict['REFSTAR_RESERVED']
@@ -1543,7 +1578,7 @@ class FgcmStars(object):
 
         return EGrayGO, EGrayErr2GO
 
-    def performColorCuts(self):
+    def performColorCuts(self, holder=None):
         """
         Make the color cuts that are specified in the config.
         """
@@ -1551,8 +1586,11 @@ class FgcmStars(object):
         if (not self.magStdComputed):
             raise ValueError("Must compute magStd before performing color cuts")
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        if holder is None:
+            holder = self.holder
+
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
 
         # Only cut stars where we have a color, and are *not* reference stars
 
@@ -1573,7 +1611,7 @@ class FgcmStars(object):
 
         # This config says "apply starColorCuts to reference stars"
         if self.hasRefstars and not self.applyRefStarColorCuts:
-            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
+            objRefIDIndex = holder.getArray(self.objRefIDIndexHandle)
             cancel, = np.where(((objFlag & objFlagDict['BAD_COLOR']) > 0) &
                                (objRefIDIndex >= 0))
             if cancel.size > 0:
@@ -1581,8 +1619,8 @@ class FgcmStars(object):
                 self.fgcmLog.info('Cancelling BAD_COLOR flag on %d reference stars' % (cancel.size))
 
         if self.hasRefstars:
-            objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-            refMag = snmm.getArray(self.refMagHandle)
+            objRefIDIndex = holder.getArray(self.objRefIDIndexHandle)
+            refMag = holder.getArray(self.refMagHandle)
 
             for cCut in self.refStarColorCuts:
                 self.fgcmLog.info('Applying reference star color cut: %.3f < %s-%s < %.3f' % (cCut[2],
@@ -1607,21 +1645,23 @@ class FgcmStars(object):
                 objFlag[ok[bad]] |= objFlagDict['REFSTAR_BAD_COLOR']
                 self.fgcmLog.info('Flag %d stars with REFSTAR_BAD_COLOR (std colors)' % (bad.size))
 
-    def performSuperStarOutlierCuts(self, fgcmPars, reset=False):
+    def performSuperStarOutlierCuts(self, fgcmPars, reset=False, holder=None):
         """
         Do outlier cuts from common ccd/filter/epochs
         """
+        if holder is None:
+            holder = self.holder
 
         self.fgcmLog.debug('Computing superstar outliers')
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
 
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
-        obsFlag = snmm.getArray(self.obsFlagHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = holder.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsFlag = holder.getArray(self.obsFlagHandle)
 
         if reset:
             # reset the obsFlag...
@@ -1668,7 +1708,7 @@ class FgcmStars(object):
         # I had considered it might be necessary to flag bad exposures
         # at this point, but I don't think that's the case.
 
-    def performFocalPlaneOutlierCuts(self, fgcmPars, reset=False, ignoreRef=False):
+    def performFocalPlaneOutlierCuts(self, fgcmPars, reset=False, ignoreRef=False, holder=None):
         """Do focal plane outlier cuts per exposure.
 
         Parameters
@@ -1679,16 +1719,18 @@ class FgcmStars(object):
         ignoreRef : `bool`, optional
            Ignore reference stars
         """
+        if holder is None:
+            holder = self.holder
 
         self.fgcmLog.debug('Computing focal plane outliers')
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
 
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsFlag = holder.getArray(self.obsFlagHandle)
 
         if ignoreRef:
             # Without reference stars, these are simply FOCALPLANE_OUTLIERs
@@ -1737,7 +1779,7 @@ class FgcmStars(object):
         goodExpsIndex, = np.where(fgcmPars.expFlag == 0)
         self.selectStarsMinObsExpIndex(goodExpsIndex, reset=reset)
 
-    def applySuperStarFlat(self,fgcmPars):
+    def applySuperStarFlat(self, fgcmPars, holder=None):
         """
         Apply superStarFlat to raw magnitudes.
 
@@ -1750,12 +1792,15 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call applySuperStarFlat until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         self.fgcmLog.debug('Applying SuperStarFlat to raw magnitudes')
 
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
-        obsSuperStarApplied = snmm.getArray(self.obsSuperStarAppliedHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
+        obsSuperStarApplied = holder.getArray(self.obsSuperStarAppliedHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = holder.getArray(self.obsCCDHandle) - self.ccdStartIndex
 
         # two different tracks, if x/y available or not.
         if self.hasXY:
@@ -1763,8 +1808,8 @@ class FgcmStars(object):
             from .fgcmUtilities import Cheb2dField
 
             # Scale X and Y
-            obsX = snmm.getArray(self.obsXHandle)
-            obsY = snmm.getArray(self.obsYHandle)
+            obsX = holder.getArray(self.obsXHandle)
+            obsY = holder.getArray(self.obsYHandle)
 
             epochFilterHash = (fgcmPars.expEpochIndex[obsExpIndex]*
                                (fgcmPars.nLUTFilter+1)*(fgcmPars.nCCD+1) +
@@ -1798,7 +1843,7 @@ class FgcmStars(object):
         # And finally apply the superstar correction
         obsMagADU[:] += obsSuperStarApplied[:]
 
-    def applyApertureCorrection(self,fgcmPars):
+    def applyApertureCorrection(self, fgcmPars, holder=None):
         """
         Apply aperture corrections to raw magnitudes.
 
@@ -1811,6 +1856,9 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call applyApertureCorrection until stars have been loaded and prepped.")
 
+        if holder is None:
+            holder = self.holder
+
         self.fgcmLog.debug('Applying ApertureCorrections to raw magnitudes')
 
         if self.seeingSubExposure:
@@ -1818,10 +1866,10 @@ class FgcmStars(object):
         else:
             self.fgcmLog.debug('Aperture correction is per-exposure')
 
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsCCDIndex = holder.getArray(self.obsCCDHandle) - self.ccdStartIndex
 
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
 
         # Note that EXP^gray = < <mstd>_j - mstd_ij >
         #  when we have seeing loss, that makes mstd_ij larger and EXP^gray smaller
@@ -1859,18 +1907,18 @@ class FgcmStars(object):
 
         self.fgcmLog.debug('Computing model magnitude errors for photometric observations')
 
-        objFlag = snmm.getArray(self.objFlagHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
 
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
-        obsFlag = snmm.getArray(self.obsFlagHandle)
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
-        obsMagADUErr = snmm.getArray(self.obsMagADUErrHandle)
-        obsMagADUModelErr = snmm.getArray(self.obsMagADUModelErrHandle)
-        obsMagStd = snmm.getArray(self.obsMagStdHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
+        obsFlag = holder.getArray(self.obsFlagHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
+        obsMagADUErr = holder.getArray(self.obsMagADUErrHandle)
+        obsMagADUModelErr = holder.getArray(self.obsMagADUModelErrHandle)
+        obsMagStd = holder.getArray(self.obsMagStdHandle)
 
         obsExptime = fgcmPars.expExptime[obsExpIndex]
         obsFwhm = fgcmPars.expFwhm[obsExpIndex]
@@ -1921,7 +1969,7 @@ class FgcmStars(object):
 
             obsMagADUModelErr[goodObs[use]] = np.sqrt(modErr**2. + self.sigma0Phot**2.)
 
-    def applyMirrorChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False):
+    def applyMirrorChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False, holder=None):
         """
         Apply mirror chromaticity model
 
@@ -1934,13 +1982,16 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call applyMirrorChromaticityCorrection until stars have been loaded and prepped.")
 
-        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        if holder is None:
+            holder = self.holder
 
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsExpIndex = holder.getArray(self.obsExpIndexHandle)
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsLUTFilterIndex = holder.getArray(self.obsLUTFilterIndexHandle)
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
+
+        objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
 
         cAl = fgcmPars.expCTrans[obsExpIndex]
 
@@ -1955,7 +2006,7 @@ class FgcmStars(object):
 
         obsMagADU += deltaMag
 
-    def applyCCDChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False):
+    def applyCCDChromaticityCorrection(self, fgcmPars, fgcmLUT, returnCorrections=False, holder=None):
         """
         Apply CCD chromaticity model.
 
@@ -1968,13 +2019,16 @@ class FgcmStars(object):
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call applyCCDChromaticityCorrection until stars have been loaded and prepped.")
 
-        obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
-        obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
-        obsMagADU = snmm.getArray(self.obsMagADUHandle)
+        if holder is None:
+            holder = self.holder
 
-        objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
-        obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
+        obsCCDIndex = holder.getArray(self.obsCCDHandle) - self.ccdStartIndex
+        obsBandIndex = holder.getArray(self.obsBandIndexHandle)
+        obsLUTFilterIndex = holder.getArray(self.obsLUTFilterIndexHandle)
+        obsMagADU = holder.getArray(self.obsMagADUHandle)
+
+        objSEDSlope = holder.getArray(self.objSEDSlopeHandle)
+        obsObjIDIndex = holder.getArray(self.obsObjIDIndexHandle)
 
         c = fgcmPars.compCCDChromaticity[obsCCDIndex, obsLUTFilterIndex]
 
@@ -2009,13 +2063,15 @@ class FgcmStars(object):
         # set clobber == True?
         fitsio.write(flagStarFile,flagObjStruct,clobber=True)
 
-    def getFlagStarIndices(self):
+    def getFlagStarIndices(self, holder=None):
         """
         Retrieve flagged star indices.
         """
+        if holder is None:
+            holder = self.holder
 
-        objID = snmm.getArray(self.objIDHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        objID = holder.getArray(self.objIDHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
 
         # we only store VARIABLE and RESERVED stars
         # everything else should be recomputed based on the good exposures, calibrations, etc
@@ -2056,7 +2112,7 @@ class FgcmStars(object):
 
         fitsio.write(starFile, stdStars, clobber=True, header=hdr)
 
-    def retrieveStdStarCatalog(self, fgcmPars):
+    def retrieveStdStarCatalog(self, fgcmPars, holder=None):
         """
         Retrieve standard star catalog.  Note that this does not fill in holes (yet).
 
@@ -2064,18 +2120,20 @@ class FgcmStars(object):
         ----------
         fgcmPars: FgcmParameters
         """
+        if holder is None:
+            holder = self.holder
 
-        objID = snmm.getArray(self.objIDHandle)
-        objIDAlternate = snmm.getArray(self.objIDAlternateHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
-        objRA = snmm.getArray(self.objRAHandle)
-        objDec = snmm.getArray(self.objDecHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(self.objMagStdMeanErrHandle)
+        objID = holder.getArray(self.objIDHandle)
+        objIDAlternate = holder.getArray(self.objIDAlternateHandle)
+        objFlag = holder.getArray(self.objFlagHandle)
+        objRA = holder.getArray(self.objRAHandle)
+        objDec = holder.getArray(self.objDecHandle)
+        objNGoodObs = holder.getArray(self.objNGoodObsHandle)
+        objNTotalObs = holder.getArray(self.objNTotalObsHandle)
+        objMagStdMean = holder.getArray(self.objMagStdMeanHandle)
+        objMagStdMeanErr = holder.getArray(self.objMagStdMeanErrHandle)
         if self.hasPsfCandidate:
-            objNPsfCandidate = snmm.getArray(self.objNPsfCandidateHandle)
+            objNPsfCandidate = holder.getArray(self.objNPsfCandidateHandle)
 
         rejectMask = (objFlagDict['BAD_COLOR'] | objFlagDict['VARIABLE'] |
                       objFlagDict['TOO_FEW_OBS'])
@@ -2097,7 +2155,7 @@ class FgcmStars(object):
         if self.hasPsfCandidate:
             dtype.append(('NPSFCAND', 'i4', goodBands.size))
         if self.hasDeltaAper:
-            objDeltaAperMean = snmm.getArray(self.objDeltaAperMeanHandle)
+            objDeltaAperMean = holder.getArray(self.objDeltaAperMeanHandle)
             dtype.append(('DELTA_APER', 'f4', goodBands.size))
 
         outCat = np.zeros(goodStars.size, dtype=dtype)
@@ -2136,12 +2194,12 @@ class FgcmStars(object):
         if self.plotPath is None:
             return
 
-        objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
-        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
-        objFlag = snmm.getArray(self.objFlagHandle)
+        objMagStdMean = self.holder.getArray(self.objMagStdMeanHandle)
+        objNGoodObs = self.holder.getArray(self.objNGoodObsHandle)
+        objFlag = self.holder.getArray(self.objFlagHandle)
 
-        objRefIDIndex = snmm.getArray(self.objRefIDIndexHandle)
-        refMag = snmm.getArray(self.refMagHandle)
+        objRefIDIndex = self.holder.getArray(self.objRefIDIndexHandle)
+        refMag = self.holder.getArray(self.refMagHandle)
 
         for mode in ['all', 'cut']:
             # We leave in the "RESERVED" stars for these plots.
@@ -2230,13 +2288,22 @@ class FgcmStars(object):
         # Don't try to pickle the logger.
 
         state = self.__dict__.copy()
-        del state['fgcmLog']
-        del state['butlerQC']
-        del state['plotHandleDict']
+        if "fgcmLog" in state:
+            del state['fgcmLog']
+        if "butlerQC" in state:
+            del state['butlerQC']
+        if "plotHandleDict" in state:
+            del state['plotHandleDict']
+        if "snmm" in state:
+            del state['snmm']
+        if "holder" in state:
+            del state['holder']
         return state
 
     def freeSharedMemory(self):
         """Free shared memory"""
+        snmm = self.snmm
+
         snmm.freeArray(self.obsIndexHandle)
         snmm.freeArray(self.obsExpHandle)
         snmm.freeArray(self.obsExpIndexHandle)

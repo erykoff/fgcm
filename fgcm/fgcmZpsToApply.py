@@ -6,10 +6,8 @@ from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
 import multiprocessing
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmZpsToApply(object):
+class FgcmZpsToApply:
     """
     Class to hold zeropoints that will be applied in FgcmApplyZeropoints.
 
@@ -18,8 +16,10 @@ class FgcmZpsToApply(object):
     fgcmConfig: FgcmConfig
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, snmm):
         self.fgcmLog = fgcmConfig.fgcmLog
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing fgcmZpsToApply.')
 
@@ -91,6 +91,7 @@ class FgcmZpsToApply(object):
         zpI10Array: `float` array
            I10 for each zeropoint
         """
+        snmm = self.snmm
 
         # Rearrange into 2d arrays for easy indexing
 
@@ -120,9 +121,9 @@ class FgcmZpsToApply(object):
             self.fgcmLog.info('Apply zeropoints to stars')
 
         # Reset mean magnitudes
-        snmm.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
-        snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)[:] = 99.0
-        snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
+        self.holder.getArray(self.fgcmStars.objMagStdMeanHandle)[:] = 99.0
+        self.holder.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)[:] = 99.0
+        self.holder.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
@@ -132,14 +133,14 @@ class FgcmZpsToApply(object):
         if goodStars.size == 0:
             raise RuntimeError("No good stars to apply zeropoints!")
 
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsCCDIndex = self.holder.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
         mp_ctx = multiprocessing.get_context('fork')
         proc = mp_ctx.Process()
-        workerIndex = proc._identity[0] + 1
+        workerIndex = proc._identity[0] + 2
         proc = None
 
         nSections = goodStars.size // self.nStarPerRun + 1
@@ -157,11 +158,17 @@ class FgcmZpsToApply(object):
 
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-        pool = mp_ctx.Pool(processes=self.nCore)
-        pool.map(self._worker, workerList, chunksize=1)
+        with multiprocessing.Manager() as manager:
+            sharedDict = manager.dict()
+            sharedDict["holder"] = self.holder
 
-        pool.close()
-        pool.join()
+            inputs = [(input_, sharedDict) for input_ in workerList]
+
+            pool = mp_ctx.Pool(processes=self.nCore)
+            pool.starmap(_zpsApplyWorker, inputs, chunksize=1)
+
+            pool.close()
+            pool.join()
 
         self.fgcmStars.magStdComputed = True
 
@@ -287,4 +294,134 @@ class FgcmZpsToApply(object):
 
         state = self.__dict__.copy()
         del state['fgcmLog']
+        del state['snmm']
         return state
+
+
+def _zpsApplyWorker(goodStarsAndObs, sharedDict):
+    """
+    Multiprocessing worker to compute standard/mean magnitudes for FgcmZpsToApply.
+    Not to be called on its own.
+
+    Parameters
+    ----------
+    goodStarsAndObs: tuple[2]
+       (goodStars, goodObs)
+    """
+
+    goodStars = goodStarsAndObs[0]
+    goodObs = goodStarsAndObs[1]
+
+    holder = sharedDict["holder"]
+    fgcmStars = sharedDict["fgcmStars"]
+    fgcmLUT = sharedDict["fgcmLUT"]
+    ccdStartIndex = sharedDict["ccdStartIndex"]
+    zpZptHandle = sharedDict["zpZptHandle"]
+    zpI10Handle = sharedDict["zpI10Handle"]
+    fgcmPars = sharedDict["fgcmPars"]
+    zptABNoThroughput = sharedDict["zptABNoThroughput"]
+    useSedLUT = sharedDict["useSedLUT"]
+    I10StdBand = sharedDict["I10StdBand"]
+
+    objMagStdMean = holder.getArray(fgcmStars.objMagStdMeanHandle)
+    objMagStdMeanNoChrom = holder.getArray(fgcmStars.objMagStdMeanNoChromHandle)
+    objMagStdMeanErr = holder.getArray(fgcmStars.objMagStdMeanErrHandle)
+    objSEDSlope = holder.getArray(fgcmStars.objSEDSlopeHandle)
+    objID = holder.getArray(fgcmStars.objIDHandle)
+
+    obsObjIDIndex = holder.getArray(fgcmStars.obsObjIDIndexHandle)
+
+    obsExpIndex = holder.getArray(fgcmStars.obsExpIndexHandle)
+    obsBandIndex = holder.getArray(fgcmStars.obsBandIndexHandle)
+    obsLUTFilterIndex = holder.getArray(fgcmStars.obsLUTFilterIndexHandle)
+    obsCCDIndex = holder.getArray(fgcmStars.obsCCDHandle) - ccdStartIndex
+    obsMagADU = holder.getArray(fgcmStars.obsMagADUHandle)
+    obsMagADUModelErr = holder.getArray(fgcmStars.obsMagADUModelErrHandle)
+    obsMagStd = holder.getArray(fgcmStars.obsMagStdHandle)
+
+    zpZpt = holder.getArray(zpZptHandle)
+    zpI10 = holder.getArray(zpI10Handle)
+
+    # and the arrays for locking access
+    objMagStdMeanLock = holder.getArrayLock(fgcmStars.objMagStdMeanHandle)
+    obsMagStdLock = holder.getArrayLock(fgcmStars.obsMagStdHandle)
+
+    # cut these down now, faster later
+    obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
+    obsBandIndexGO = esutil.numpy_util.to_native(obsBandIndex[goodObs])
+    obsLUTFilterIndexGO = esutil.numpy_util.to_native(obsLUTFilterIndex[goodObs])
+    obsExpIndexGO = esutil.numpy_util.to_native(obsExpIndex[goodObs])
+    obsCCDIndexGO = esutil.numpy_util.to_native(obsCCDIndex[goodObs])
+    I10GO = esutil.numpy_util.to_native(zpI10[obsExpIndexGO, obsCCDIndexGO])
+
+    obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
+
+    obsMagGO = (obsMagADU[goodObs] + zpZpt[obsExpIndexGO, obsCCDIndexGO] +
+                -2.5 * np.log10(fgcmPars.expExptime[obsExpIndexGO]) -
+                zptABNoThroughput)
+
+    # Compute the mean
+
+    wtSum = np.zeros_like(objMagStdMean, dtype='f8')
+    objMagStdMeanTemp = np.zeros_like(objMagStdMean)
+
+    add_at_2d(wtSum,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              1./obsMagErr2GO)
+    add_at_2d(objMagStdMeanTemp,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              obsMagGO / obsMagErr2GO)
+
+    gd = np.where(wtSum > 0.0)
+
+    objMagStdMeanLock.acquire()
+    objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
+    objMagStdMeanErr[gd] = np.sqrt(1. / wtSum[gd])
+    objMagStdMeanLock.release()
+
+    # Compute the SEDs
+
+    if useSedLUT:
+        fgcmStars.computeObjectSEDSlopesLUT(goodStars, fgcmLUT)
+    else:
+        fgcmStars.computeObjectSEDSlopes(goodStars)
+
+    # Compute the chromatic correction
+
+    deltaStdGO = 2.5 * np.log10((1.0 +
+                                 objSEDSlope[obsObjIDIndexGO,
+                                             obsBandIndexGO] * I10GO) /
+                                (1.0 + objSEDSlope[obsObjIDIndexGO,
+                                                   obsBandIndexGO] *
+                                 I10StdBand[obsBandIndexGO]))
+
+    obsMagStdLock.acquire()
+    obsMagStd[goodObs] = obsMagGO + deltaStdGO
+    obsMagStdGO = obsMagStd[goodObs]
+    obsMagStdLock.release()
+
+    # Compute the mean (again)
+
+    wtSum = np.zeros_like(objMagStdMean, dtype='f8')
+    objMagStdMeanTemp = np.zeros_like(objMagStdMean)
+    objMagStdMeanNoChromTemp = np.zeros_like(objMagStdMean)
+
+    add_at_2d(wtSum,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              1./obsMagErr2GO)
+    add_at_2d(objMagStdMeanTemp,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              obsMagStdGO / obsMagErr2GO)
+    add_at_2d(objMagStdMeanNoChromTemp,
+              (obsObjIDIndexGO, obsBandIndexGO),
+              obsMagGO / obsMagErr2GO)
+
+    gd = np.where(wtSum > 0.0)
+
+    # Record the mean
+
+    objMagStdMeanLock.acquire()
+    objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
+    objMagStdMeanNoChrom[gd] = objMagStdMeanNoChromTemp[gd] / wtSum[gd]
+    objMagStdMeanErr[gd] = np.sqrt(1. / wtSum[gd])
+    objMagStdMeanLock.release()

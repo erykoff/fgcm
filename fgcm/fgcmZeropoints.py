@@ -12,10 +12,8 @@ from .fgcmUtilities import makeFigure, putButlerFigure
 
 from matplotlib import colormaps
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-
-class FgcmZeropoints(object):
+class FgcmZeropoints:
     """
     Class to compute final zeropoints
 
@@ -43,7 +41,10 @@ class FgcmZeropoints(object):
        Exposure gray variance to consider recovering via focal-plane average
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmLUT, fgcmGray, fgcmRetrieval, fgcmStars, butlerQC=None, plotHandleDict=None):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmLUT, fgcmGray, fgcmRetrieval, fgcmStars, snmm, butlerQC=None, plotHandleDict=None):
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmPars = fgcmPars
         self.fgcmLUT = fgcmLUT
@@ -133,25 +134,25 @@ class FgcmZeropoints(object):
         """
 
         # first, we need to get relevant quantities from shared memory.
-        expGray = snmm.getArray(self.fgcmGray.expGrayHandle)
-        expDeltaStd = snmm.getArray(self.fgcmGray.expDeltaStdHandle)
-        expGrayErr = snmm.getArray(self.fgcmGray.expGrayErrHandle)
-        expGrayRMS = snmm.getArray(self.fgcmGray.expGrayRMSHandle)
-        expNGoodCCDs = snmm.getArray(self.fgcmGray.expNGoodCCDsHandle)
-        expNGoodTilings = snmm.getArray(self.fgcmGray.expNGoodTilingsHandle)
-        expGrayColorSplit = snmm.getArray(self.fgcmGray.expGrayColorSplitHandle)
-        expGrayErrColorSplit = snmm.getArray(self.fgcmGray.expGrayErrColorSplitHandle)
-        expGrayRMSColorSplit = snmm.getArray(self.fgcmGray.expGrayRMSColorSplitHandle)
+        expGray = self.holder.getArray(self.fgcmGray.expGrayHandle)
+        expDeltaStd = self.holder.getArray(self.fgcmGray.expDeltaStdHandle)
+        expGrayErr = self.holder.getArray(self.fgcmGray.expGrayErrHandle)
+        expGrayRMS = self.holder.getArray(self.fgcmGray.expGrayRMSHandle)
+        expNGoodCCDs = self.holder.getArray(self.fgcmGray.expNGoodCCDsHandle)
+        expNGoodTilings = self.holder.getArray(self.fgcmGray.expNGoodTilingsHandle)
+        expGrayColorSplit = self.holder.getArray(self.fgcmGray.expGrayColorSplitHandle)
+        expGrayErrColorSplit = self.holder.getArray(self.fgcmGray.expGrayErrColorSplitHandle)
+        expGrayRMSColorSplit = self.holder.getArray(self.fgcmGray.expGrayRMSColorSplitHandle)
 
-        ccdGray = snmm.getArray(self.fgcmGray.ccdGrayHandle)
-        ccdDeltaStd = snmm.getArray(self.fgcmGray.ccdDeltaStdHandle)
-        ccdGrayRMS = snmm.getArray(self.fgcmGray.ccdGrayRMSHandle)
-        ccdGrayErr = snmm.getArray(self.fgcmGray.ccdGrayErrHandle)
-        ccdNGoodStars = snmm.getArray(self.fgcmGray.ccdNGoodStarsHandle)
-        ccdNGoodTilings = snmm.getArray(self.fgcmGray.ccdNGoodTilingsHandle)
+        ccdGray = self.holder.getArray(self.fgcmGray.ccdGrayHandle)
+        ccdDeltaStd = self.holder.getArray(self.fgcmGray.ccdDeltaStdHandle)
+        ccdGrayRMS = self.holder.getArray(self.fgcmGray.ccdGrayRMSHandle)
+        ccdGrayErr = self.holder.getArray(self.fgcmGray.ccdGrayErrHandle)
+        ccdNGoodStars = self.holder.getArray(self.fgcmGray.ccdNGoodStarsHandle)
+        ccdNGoodTilings = self.holder.getArray(self.fgcmGray.ccdNGoodTilingsHandle)
 
-        r0 = snmm.getArray(self.fgcmRetrieval.r0Handle)
-        r10 = snmm.getArray(self.fgcmRetrieval.r10Handle)
+        r0 = self.holder.getArray(self.fgcmRetrieval.r0Handle)
+        r10 = self.holder.getArray(self.fgcmRetrieval.r10Handle)
 
         deltaMapperDefault = self.focalPlaneProjector(int(self.defaultCameraOrientation))
 
@@ -269,12 +270,12 @@ class FgcmZeropoints(object):
             zpStruct['FGCM_APERCORR'][:] = self.fgcmPars.expApertureCorrection[zpExpIndex]
 
         # Fill in the background correction
-        ccdDeltaMagBkg = snmm.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
+        ccdDeltaMagBkg = self.holder.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
         if self.deltaMagBkgPerCcd:
-            ccdDeltaMagBkg = snmm.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
+            ccdDeltaMagBkg = self.holder.getArray(self.fgcmGray.ccdDeltaMagBkgHandle)
             zpStruct['FGCM_DELTAMAGBKG'][:] = ccdDeltaMagBkg[zpExpIndex, zpCCDIndex]
         else:
-            expDeltaMagBkg = snmm.getArray(self.fgcmGray.expDeltaMagBkgHandle)
+            expDeltaMagBkg = self.holder.getArray(self.fgcmGray.expDeltaMagBkgHandle)
             zpStruct['FGCM_DELTAMAGBKG'][:] = expDeltaMagBkg[zpExpIndex]
 
         # Fill in the transmission adjustment constant
@@ -413,7 +414,7 @@ class FgcmZeropoints(object):
         if self.outputFgcmcalZpts and np.any(self.ccdGraySubCCD):
             # We need to alter the gray parameters to record the constant (interpolated)
             # gray offset
-            ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
+            ccdGraySubCCDPars = self.holder.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
             ccdGraySubCCDPars[zpExpIndex[badCCDGoodExp], zpCCDIndex[badCCDGoodExp], :] = 0.0
             ccdGraySubCCDPars[zpExpIndex[badCCDGoodExp], zpCCDIndex[badCCDGoodExp], 0] = 10.**(zpStruct['FGCM_GRY'][badCCDGoodExp] / (-2.5))
@@ -786,7 +787,7 @@ class FgcmZeropoints(object):
                 zptChebSstarPars[i1a, :] = self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0]
 
         if np.any(self.fgcmGray.ccdGraySubCCD):
-            ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
+            ccdGraySubCCDPars = self.holder.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
             zpExpIndex = (np.searchsorted(self.fgcmPars.expArray, zpStruct[self.expField]))[zpIndex]
             zpCCDIndex = (zpStruct[self.ccdField] - self.ccdStartIndex)[zpIndex]
@@ -901,9 +902,9 @@ class FgcmZeropointPlotter(object):
 
         i1Conversions = np.zeros(fgcmStars.nBands) + 1000.0
 
-        objMagStdMean = snmm.getArray(fgcmStars.objMagStdMeanHandle)
-        objMagStdMeanErr = snmm.getArray(fgcmStars.objMagStdMeanErrHandle)
-        objSEDSlope = snmm.getArray(fgcmStars.objSEDSlopeHandle)
+        objMagStdMean = self.holder.getArray(fgcmStars.objMagStdMeanHandle)
+        objMagStdMeanErr = self.holder.getArray(fgcmStars.objMagStdMeanErrHandle)
+        objSEDSlope = self.holder.getArray(fgcmStars.objSEDSlopeHandle)
 
         # Use the reserve stars, it's a reasonable sample
         goodStars = fgcmStars.getGoodStarIndices(onlyReserve=True, checkMinObs=True, checkHasColor=True)

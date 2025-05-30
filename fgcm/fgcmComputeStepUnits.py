@@ -10,8 +10,6 @@ from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
 import multiprocessing
 
-from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-
 
 class FgcmComputeStepUnits(object):
     """
@@ -29,8 +27,11 @@ class FgcmComputeStepUnits(object):
        LUT object
     """
 
-    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT):
+    def __init__(self, fgcmConfig, fgcmPars, fgcmStars, fgcmLUT, snmm):
         self.fgcmLog = fgcmConfig.fgcmLog
+
+        self.snmm = snmm
+        self.holder = snmm.getHolder()
 
         self.fgcmLog.debug('Initializing FgcmComputeStepUnits')
 
@@ -95,8 +96,8 @@ class FgcmComputeStepUnits(object):
         if (goodStars.size == 0):
             raise RuntimeError("No good stars to fit!")
 
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
+        obsExpIndex = self.holder.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsFlag = self.holder.getArray(self.fgcmStars.obsFlagHandle)
 
         expFlag = self.fgcmPars.expFlag
 
@@ -112,13 +113,13 @@ class FgcmComputeStepUnits(object):
 
         mp_ctx = multiprocessing.get_context("fork")
         proc = mp_ctx.Process()
-        workerIndex = proc._identity[0]+1
+        workerIndex = proc._identity[0] + 2
         proc = None
 
         self.totalHandleDict = {}
         for thisCore in range(self.nCore):
             self.totalHandleDict[workerIndex + thisCore] = (
-                snmm.createArray(self.nSums,dtype='f8'))
+                self.snmm.createArray(self.nSums,dtype='f8'))
 
         self._testing = workerIndex
 
@@ -139,18 +140,34 @@ class FgcmComputeStepUnits(object):
         # reverse sort so the longest running go first
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-        # make a pool
-        pool = mp_ctx.Pool(processes=self.nCore)
-        # Compute magnitudes
-        pool.map(self._stepWorker, workerList, chunksize=1)
+        with multiprocessing.Manager() as manager:
+            sharedDict = manager.dict()
+            sharedDict["holder"] = self.holder
+            sharedDict["fgcmStars"] = self.fgcmStars
+            sharedDict["fgcmLUT"] = self.fgcmLUT
+            sharedDict["fgcmPars"] = self.fgcmPars
+            sharedDict["ccdStartIndex"] = self.ccdStartIndex
+            sharedDict["bandFitIndex"] = self.bandFitIndex
+            sharedDict["stepUnitReference"] = self.stepUnitReference
+            sharedDict["nSums"] = self.nSums
+            sharedDict["useQuadraticPwv"] = self.useQuadraticPwv
+            sharedDict["instrumentParsPerBand"] = self.instrumentParsPerBand
+            sharedDict["totalHandleDict"] = self.totalHandleDict
 
-        pool.close()
-        pool.join()
+            inputs = [(input_, sharedDict) for input_ in workerList]
+
+            # make a pool
+            pool = mp_ctx.Pool(processes=self.nCore)
+            # Compute magnitudes
+            pool.starmap(_stepWorker, inputs, chunksize=1)
+
+            pool.close()
+            pool.join()
 
         # sum up the partial sums from the different jobs
         partialSums = np.zeros(self.nSums,dtype='f8')
         for thisCore in range(self.nCore):
-            partialSums[:] += snmm.getArray(
+            partialSums[:] += self.holder.getArray(
                 self.totalHandleDict[workerIndex + thisCore])[:]
 
         nonZero, = np.where((partialSums[self.fgcmPars.nFitPars: 2*self.fgcmPars.nFitPars] > 0) &
@@ -290,565 +307,578 @@ class FgcmComputeStepUnits(object):
 
         # free shared arrays
         for key in self.totalHandleDict.keys():
-            snmm.freeArray(self.totalHandleDict[key])
+            self.snmm.freeArray(self.totalHandleDict[key])
 
         if not self.quietMode:
             self.fgcmLog.info('Step size computation took %.2f seconds.' %
                               (time.time() - startTime))
-
-    def _stepWorker(self, goodStarsAndObs):
-        """
-        Multiprocessing worker to compute fake derivatives for FgcmComputeStepUnits.
-        Not to be called on its own.
-
-        Parameters
-        ----------
-        goodStarsAndObs: tuple[2]
-           (goodStars, goodObs)
-        """
-
-        goodStars = goodStarsAndObs[0]
-        goodObs = goodStarsAndObs[1]
-
-        thisCore = multiprocessing.current_process()._identity[0]
-
-        objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
-        objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
-        objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
-
-        obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
-
-        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
-        obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
-        obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
-        obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
-        obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
-        obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
-        obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
-
-        # cut these down now, faster later
-        obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
-        obsBandIndexGO = esutil.numpy_util.to_native(obsBandIndex[goodObs])
-        obsLUTFilterIndexGO = esutil.numpy_util.to_native(obsLUTFilterIndex[goodObs])
-        obsExpIndexGO = esutil.numpy_util.to_native(obsExpIndex[goodObs])
-        obsCCDIndexGO = esutil.numpy_util.to_native(obsCCDIndex[goodObs])
-
-        obsSecZenithGO = obsSecZenith[goodObs]
-        objMagStdMeanErr2GO = objMagStdMeanErr[obsObjIDIndexGO, obsBandIndexGO]**2.
-
-        lutIndicesGO = self.fgcmLUT.getIndices(obsLUTFilterIndexGO,
-                                               self.fgcmPars.expLnPwv[obsExpIndexGO],
-                                               self.fgcmPars.expO3[obsExpIndexGO],
-                                               self.fgcmPars.expLnTau[obsExpIndexGO],
-                                               self.fgcmPars.expAlpha[obsExpIndexGO],
-                                               obsSecZenithGO,
-                                               obsCCDIndexGO,
-                                               self.fgcmPars.expPmb[obsExpIndexGO])
-        I0GO = self.fgcmLUT.computeI0(self.fgcmPars.expLnPwv[obsExpIndexGO],
-                                      self.fgcmPars.expO3[obsExpIndexGO],
-                                      self.fgcmPars.expLnTau[obsExpIndexGO],
-                                      self.fgcmPars.expAlpha[obsExpIndexGO],
-                                      obsSecZenithGO,
-                                      self.fgcmPars.expPmb[obsExpIndexGO],
-                                      lutIndicesGO)
-        I10GO = self.fgcmLUT.computeI1(self.fgcmPars.expLnPwv[obsExpIndexGO],
-                                       self.fgcmPars.expO3[obsExpIndexGO],
-                                       self.fgcmPars.expLnTau[obsExpIndexGO],
-                                       self.fgcmPars.expAlpha[obsExpIndexGO],
-                                       obsSecZenithGO,
-                                       self.fgcmPars.expPmb[obsExpIndexGO],
-                                       lutIndicesGO) / I0GO
-
-        obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
-
-        # Note that we don't care if something is a refstar or not for this
-
-        # Default mask is not to mask
-        maskGO = np.ones(goodObs.size, dtype=bool)
-
-        # which observations are actually used in the fit?
-        useGO, = np.where(maskGO)
-        _, obsFitUseGO = esutil.numpy_util.match(self.bandFitIndex,
-                                                 obsBandIndexGO[useGO])
-        obsFitUseGO = useGO[obsFitUseGO]
-
-        deltaMagGO = np.zeros(goodObs.size) + self.stepUnitReference
-        obsWeightGO = 1. / obsMagErr2GO
-        deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
-
-        gsGOF, indGOF = esutil.numpy_util.match(goodStars, obsObjIDIndexGO[obsFitUseGO])
-
-        partialArray = np.zeros(self.nSums, dtype='f8')
-        partialArray[-1] = obsFitUseGO.size
-
-        (dLdLnPwvGO,dLdO3GO,dLdLnTauGO,dLdAlphaGO) = (
-            self.fgcmLUT.computeLogDerivatives(lutIndicesGO,
-                                               I0GO))
-
-        if (self.fgcmLUT.hasI1Derivatives):
-            (dLdLnPwvI1GO,dLdO3I1GO,dLdLnTauI1GO,dLdAlphaI1GO) = (
-                self.fgcmLUT.computeLogDerivativesI1(lutIndicesGO,
-                                                     I0GO,
-                                                     I10GO,
-                                                     objSEDSlope[obsObjIDIndexGO,
-                                                                 obsBandIndexGO]))
-            dLdLnPwvGO += dLdLnPwvI1GO
-            dLdO3GO += dLdO3I1GO
-            dLdLnTauGO += dLdLnTauI1GO
-            dLdAlphaGO += dLdAlphaI1GO
-
-        # Set up temporary storage and sub-indexed arrays
-        sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.nCampaignNights))
-        innerTermGOF = np.zeros(obsFitUseGO.size)
-
-        obsExpIndexGOF = obsExpIndexGO[obsFitUseGO]
-        expNightIndexGOF = esutil.numpy_util.to_native(self.fgcmPars.expNightIndex[obsExpIndexGOF])
-        obsBandIndexGOF = obsBandIndexGO[obsFitUseGO]
-        obsBandIndexGOFI = obsBandIndexGOF[indGOF]
-        expNightIndexGOFI = expNightIndexGOF[indGOF]
-        obsFitUseGOI = obsFitUseGO[indGOF]
-        obsMagErr2GOFI = obsMagErr2GO[obsFitUseGO[indGOF]]
-
-        ##########
-        ## O3
-        ##########
-
-        uNightIndex = np.unique(expNightIndexGOF)
-
-        obsBandIndexGOFI = obsBandIndexGOF[indGOF]
-        expNightIndexGOFI = expNightIndexGOF[indGOF]
-
-        sumNumerator[:, :, :] = 0.0
-        add_at_3d(sumNumerator,
-                  (gsGOF, obsBandIndexGOFI, expNightIndexGOFI),
-                  dLdO3GO[obsFitUseGOI] / obsMagErr2GOFI)
-
-        innerTermGOF[:] = 0.0
-        innerTermGOF[indGOF] = (dLdO3GO[obsFitUseGOI] -
-                                sumNumerator[gsGOF, obsBandIndexGOFI, expNightIndexGOFI] * objMagStdMeanErr2GO[obsFitUseGOI])
-
-        add_at_1d(partialArray[self.fgcmPars.parO3Loc:
-                                   (self.fgcmPars.parO3Loc +
-                                    self.fgcmPars.nCampaignNights)],
-                  expNightIndexGOF,
-                  2.0 * deltaMagWeightedGOF * innerTermGOF)
-
-        partialArray[self.fgcmPars.nFitPars +
-                     self.fgcmPars.parO3Loc +
-                     uNightIndex] += 1
-
-        ###########
-        ## Alpha
-        ###########
-
-        # Note that expNightIndexGOF, obsBandIndexGOF are the same as above
-
-        sumNumerator[:, :, :] =  0.0
-        add_at_3d(sumNumerator,
-                  (gsGOF, obsBandIndexGOFI, expNightIndexGOFI),
-                  dLdAlphaGO[obsFitUseGOI] / obsMagErr2GOFI)
-
-        innerTermGOF[:] = 0.0
-        innerTermGOF[indGOF] = (dLdAlphaGO[obsFitUseGOI] -
-                                sumNumerator[gsGOF, obsBandIndexGOFI, expNightIndexGOFI] * objMagStdMeanErr2GO[obsFitUseGOI])
-
-        add_at_1d(partialArray[self.fgcmPars.parAlphaLoc:
-                                   (self.fgcmPars.parAlphaLoc+
-                                    self.fgcmPars.nCampaignNights)],
-                  expNightIndexGOF,
-                  2.0 * deltaMagWeightedGOF * innerTermGOF)
-
-        partialArray[self.fgcmPars.nFitPars +
-                     self.fgcmPars.parAlphaLoc +
-                     uNightIndex] += 1
-
-        ###########
-        ## PWV External
-        ###########
-
-        if (self.fgcmPars.hasExternalPwv and not self.fgcmPars.useRetrievedPwv):
-            hasExtGOF, = np.where(self.fgcmPars.externalPwvFlag[obsExpIndexGOF])
-            uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
-            hasExtGOFG, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGOF[indGOF]])
-
-            # lnPwv Nightly Offset
-
-            sumNumerator[:, :, :] = 0.0
-            add_at_3d(sumNumerator,
-                      (gsGOF[hasExtGOFG],
-                       obsBandIndexGOFI[hasExtGOFG],
-                       expNightIndexGOFI[hasExtGOFG]),
-                      dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] /
-                      obsMagErr2GOFI[hasExtGOFG])
-
-            innerTermGOF[:] = 0.0
-            innerTermGOF[indGOF[hasExtGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] -
-                                                sumNumerator[gsGOF[hasExtGOFG],
-                                                             obsBandIndexGOFI[hasExtGOFG],
-                                                             expNightIndexGOFI[hasExtGOFG]] *
-                                                objMagStdMeanErr2GO[obsFitUseGOI[hasExtGOFG]])
-
-            add_at_1d(partialArray[self.fgcmPars.parExternalLnPwvOffsetLoc:
-                                       (self.fgcmPars.parExternalLnPwvOffsetLoc+
-                                        self.fgcmPars.nCampaignNights)],
-                      expNightIndexGOF[hasExtGOF],
-                      2.0 * deltaMagWeightedGOF[hasExtGOF] * innerTermGOF[hasExtGOF])
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parExternalLnPwvOffsetLoc +
-                         uNightIndexHasExt] += 1
-
-            # lnPwv Global Scale
-
-            # NOTE: this may be wrong.  Needs thought.
-
-            partialArray[self.fgcmPars.parExternalLnPwvScaleLoc] = 2.0 * (
-                np.sum(deltaMagWeightedGOF[hasExtGOF] * (
-                        self.fgcmPars.expLnPwv[obsExpIndexGOF[hasExtGOF]] *
-                        dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parExternalLnPwvScaleLoc] += 1
-
-        ################
-        ## PWV Retrieved
-        ################
-
-        if (self.fgcmPars.useRetrievedPwv):
-            hasRetrievedPwvGOF, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF] &
-                                            retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
-            hasRetrievedPWVGOFG, = np.where((self.fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF[indGOF]] &
-                                            retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
-
-            if hasRetrievedPwvGOF.size > 0:
-                # note this might be zero-size on first run
-
-                # lnPwv Retrieved Global Scale
-
-                # This may be wrong
-
-                partialArray[self.fgcmPars.parRetrievedLnPwvScaleLoc] = 2.0 * (
-                    np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                            self.fgcmPars.expLnPwv[obsExpIndexGOF[hasRetreivedPwvGOF]] *
-                            dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parRetrievedLnPwvScaleLoc] += 1
-
-                if self.fgcmPars.useNightlyRetrievedPwv:
-                    # lnPwv Retrieved Nightly Offset
-
-                    uNightIndexHasRetrievedPwv = np.unique(expNightIndexGOF[hasRetrievedPwvGOF])
-
-                    sumNumerator[:, :, :] = 0.0
-                    add_at_3d(sumNumerator,
-                              (gsGOF[hasRetrievedPwvGOFG],
-                               obsBandIndexGOFI[hasRetrievedPwvGOFG],
-                               expNightIndexGOFI[hasRetrievedPwvGOFG]),
-                              dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] /
-                              obsMagErr2GOFI[hasRetrievedPwvGOFG])
-
-                    innerTermGOF[:] = 0.0
-                    innerTermGOF[indGOF[hasRetrievedPwvGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] -
-                                                       sumNumerator[gsGOF[hasRetrievedPwvGOFG],
-                                                                    obsBandIndexGOFI[hasRetrievedPwvGOFG],
-                                                                    expNightIndexGOFI[hasRetrievedPwvGOFG]] *
-                                                       objMagStdMeanErr2GO[obsFitUseGOI[hasRetrievedPwvGOFG]])
-
-                    add_at_1d(partialArray[self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
-                                               (self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
-                                                self.fgcmPars.nCampaignNights)],
-                              2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * innerTermGOF[hasRetrievedPwvGOF])
-
-                    partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
-                                 uNightIndexHasRetrievedPwv] += 1
-
-                else:
-                    # lnPwv Retrieved Global Offset
-
-                    # This may be wrong
-
-                    partialArray[self.fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
-                        np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
-                                dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
-
-                    partialArray[self.fgcmPars.nFitPars +
-                                 self.fgcmPars.parRetrievedLnPwvOffsetLoc] += 1
-
-        else:
-            ###########
-            ## Pwv No External
-            ###########
-
-            noExtGOF, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGOF])
-            uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
-            noExtGOFG, = np.where(~self.fgcmPars.externalPwvFlag[obsExpIndexGOF[indGOF]])
-
-            # lnPwv Nightly Intercept
-
-            sumNumerator[:, :, :] = 0.0
-            add_at_3d(sumNumerator,
-                      (gsGOF[noExtGOFG],
-                       obsBandIndexGOFI[noExtGOFG],
-                       expNightIndexGOFI[noExtGOFG]),
-                      dLdLnPwvGO[obsFitUseGOI[noExtGOFG]] /
-                      obsMagErr2GOFI[noExtGOFG])
-
-            innerTermGOF[:] = 0.0
-            innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvGO[obsFitUseGOI[noExtGOFG]] -
-                                               sumNumerator[gsGOF[noExtGOFG],
-                                                            obsBandIndexGOFI[noExtGOFG],
-                                                            expNightIndexGOFI[noExtGOFG]] *
-                                               objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
-
-            add_at_1d(partialArray[self.fgcmPars.parLnPwvInterceptLoc:
-                                       (self.fgcmPars.parLnPwvInterceptLoc+
-                                        self.fgcmPars.nCampaignNights)],
-                      expNightIndexGOF[noExtGOF],
-                      2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parLnPwvInterceptLoc +
-                         uNightIndexNoExt] += 1
-
-            # lnPwv Nightly Slope
-
-            dLdLnPwvSlopeGOFI = self.fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]] * dLdLnPwvGO[obsFitUseGOI]
-
-            sumNumerator[:, :, :] = 0.0
-            add_at_3d(sumNumerator,
-                      (gsGOF[noExtGOFG],
-                       obsBandIndexGOFI[noExtGOFG],
-                       expNightIndexGOFI[noExtGOFG]),
-                      (dLdLnPwvSlopeGOFI[noExtGOFG] /
-                       obsMagErr2GOFI[noExtGOFG]))
-
-            innerTermGOF[:] = 0.0
-            innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvSlopeGOFI[noExtGOFG] -
-                                               sumNumerator[gsGOF[noExtGOFG],
-                                                            obsBandIndexGOFI[noExtGOFG],
-                                                            expNightIndexGOFI[noExtGOFG]] *
-                                               objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
-            add_at_1d(partialArray[self.fgcmPars.parLnPwvSlopeLoc:
-                                       (self.fgcmPars.parLnPwvSlopeLoc+
-                                        self.fgcmPars.nCampaignNights)],
-                      expNightIndexGOF[noExtGOF],
-                      2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parLnPwvSlopeLoc +
-                         uNightIndexNoExt] += 1
-
-            # lnPwv Nightly Quadratic
-            if self.useQuadraticPwv:
-
-                dLdLnPwvQuadraticGOFI = self.fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]]**2. * dLdLnPwvGO[obsFitUseGOI]
-
-                sumNumerator[:, :, :] = 0.0
-                add_at_3d(sumNumerator,
-                          (gsGOF[noExtGOFG],
-                           obsBandIndexGOFI[noExtGOFG],
-                           expNightIndexGOFI[noExtGOFG]),
-                          (dLdLnPwvQuadraticGOFI[noExtGOFG] /
-                           obsMagErr2GOFI[noExtGOFG]))
-
-                innerTermGOF[:] = 0.0
-                innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvQuadraticGOFI[noExtGOFG] -
-                                                   sumNumerator[gsGOF[noExtGOFG],
-                                                                obsBandIndexGOFI[noExtGOFG],
-                                                                expNightIndexGOFI[noExtGOFG]] *
-                                                   objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
-
-                add_at_1d(partialArray[self.fgcmPars.parLnPwvQuadraticLoc:
-                                           (self.fgcmPars.parLnPwvQuadraticLoc+
-                                            self.fgcmPars.nCampaignNights)],
-                          expNightIndexGOF[noExtGOF],
-                          2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
-
-                partialArray[self.fgcmPars.nFitPars +
-                             self.fgcmPars.parLnPwvQuadraticLoc +
-                             uNightIndexNoExt] += 1
-
-        #############
-        ## Tau External
-        #############
-
-        if (self.fgcmPars.hasExternalTau):
-            # NOT IMPLEMENTED PROPERLY YET
-
-            raise NotImplementedError("external tau not implemented.")
-
-        ###########
-        ## Tau No External
-        ###########
-
-        noExtGOF, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGOF])
-        uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
-        noExtGOFG, = np.where(~self.fgcmPars.externalTauFlag[obsExpIndexGOF[indGOF]])
-
-        # lnTau Nightly Intercept
-
-        sumNumerator[:, :, :] = 0.0
-        add_at_3d(sumNumerator,
-                  (gsGOF[noExtGOFG],
-                   obsBandIndexGOFI[noExtGOFG],
-                   expNightIndexGOFI[noExtGOFG]),
-                  dLdLnTauGO[obsFitUseGOI[noExtGOFG]] /
-                  obsMagErr2GOFI[noExtGOFG])
-
-        innerTermGOF[:] = 0.0
-        innerTermGOF[indGOF[noExtGOFG]] = (dLdLnTauGO[obsFitUseGOI[noExtGOFG]] -
-                                           sumNumerator[gsGOF[noExtGOFG],
-                                                        obsBandIndexGOFI[noExtGOFG],
-                                                        expNightIndexGOFI[noExtGOFG]] *
-                                           objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
-        add_at_1d(partialArray[self.fgcmPars.parLnTauInterceptLoc:
-                                   (self.fgcmPars.parLnTauInterceptLoc+
-                                    self.fgcmPars.nCampaignNights)],
-                  expNightIndexGOF[noExtGOF],
-                  2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
-
-        partialArray[self.fgcmPars.nFitPars +
-                     self.fgcmPars.parLnTauInterceptLoc +
-                     uNightIndexNoExt] += 1
-
-        # lnTau nightly slope
-
-        dLdLnTauSlopeGOFI = self.fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]] * dLdLnTauGO[obsFitUseGOI]
-
-        sumNumerator[:, :, :] = 0.0
-        add_at_3d(sumNumerator,
-                  (gsGOF[noExtGOFG],
-                   obsBandIndexGOFI[noExtGOFG],
-                   expNightIndexGOFI[noExtGOFG]),
-                  (dLdLnTauSlopeGOFI[noExtGOFG] /
-                   obsMagErr2GOFI[noExtGOFG]))
-
-        innerTermGOF[:] = 0.0
-        innerTermGOF[indGOF[noExtGOFG]] = (dLdLnTauSlopeGOFI[noExtGOFG] -
-                                           sumNumerator[gsGOF[noExtGOFG],
-                                                        obsBandIndexGOFI[noExtGOFG],
-                                                        expNightIndexGOFI[noExtGOFG]] *
-                                           objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
-
-        add_at_1d(partialArray[self.fgcmPars.parLnTauSlopeLoc:
-                                   (self.fgcmPars.parLnTauSlopeLoc+
-                                    self.fgcmPars.nCampaignNights)],
-                  expNightIndexGOF[noExtGOF],
-                  2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
-
-        partialArray[self.fgcmPars.nFitPars +
-                     self.fgcmPars.parLnTauSlopeLoc +
-                     uNightIndexNoExt] += 1
-
-        ##################
-        ## Washes (QE Sys)
-        ##################
-
-        # The washes don't need to worry about the limits ... 0.1 mag is 0.1 mag here.
-
-        expWashIndexGOF = self.fgcmPars.expWashIndex[obsExpIndexGOF]
-
-        # Wash Intercept
-
-        if self.instrumentParsPerBand:
-            # We have per-band intercepts
-            # Non-fit bands will be given the mean of the others (in fgcmParameters),
-            # because they aren't in the chi2.
-
-            uWashBandIndex = np.unique(np.ravel_multi_index((obsBandIndexGOF,
-                                                             expWashIndexGOF),
-                                                            self.fgcmPars.parQESysIntercept.shape))
-            ravelIndexGOF = np.ravel_multi_index((obsBandIndexGOF,
-                                                  expWashIndexGOF),
-                                                 self.fgcmPars.parQESysIntercept.shape)
-
-            sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.parQESysIntercept.size))
-            add_at_3d(sumNumerator,
-                      (gsGOF, obsBandIndexGOFI, ravelIndexGOF[indGOF]),
-                      1.0 / obsMagErr2GOFI)
-
-            innerTermGOF[:] = 0.0
-            innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
-                                                       obsBandIndexGOFI,
-                                                       ravelIndexGOF[indGOF]] *
-                                    objMagStdMeanErr2GO[obsFitUseGOI])
-
-            add_at_1d(partialArray[self.fgcmPars.parQESysInterceptLoc:
-                                       (self.fgcmPars.parQESysInterceptLoc +
-                                        self.fgcmPars.parQESysIntercept.size)],
-                      ravelIndexGOF,
-                      2.0 * deltaMagWeightedGOF * innerTermGOF)
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parQESysInterceptLoc +
-                         uWashBandIndex] += 1
-
-        else:
-            # We have one gray mirror term for all bands
-            uWashIndex = np.unique(expWashIndexGOF)
-            #t = time.time()
-            sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.nWashIntervals))
-            add_at_3d(sumNumerator,
-                      (gsGOF, obsBandIndexGOFI, expWashIndexGOF[indGOF]),
-                      1.0 / obsMagErr2GOFI)
-
-            innerTermGOF[:] = 0.0
-            innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
-                                                       obsBandIndexGOFI,
-                                                       expWashIndexGOF[indGOF]] *
-                                    objMagStdMeanErr2GO[obsFitUseGOI])
-
-            add_at_1d(partialArray[self.fgcmPars.parQESysInterceptLoc:
-                                       (self.fgcmPars.parQESysInterceptLoc +
-                                        self.fgcmPars.nWashIntervals)],
-                      expWashIndexGOF,
-                      2.0 * deltaMagWeightedGOF * innerTermGOF)
-
-            partialArray[self.fgcmPars.nFitPars +
-                         self.fgcmPars.parQESysInterceptLoc +
-                         uWashIndex] += 1
-
-        #################
-        ## Filter offset
-        #################
-
-        sumNumerator = np.zeros((goodStars.size, self.fgcmPars.nBands, self.fgcmPars.nLUTFilter))
-        add_at_3d(sumNumerator,
-                  (gsGOF, obsBandIndexGOFI, obsLUTFilterIndexGO[obsFitUseGOI]),
-                  1.0 / obsMagErr2GOFI)
-
-        innerTermGOF[:] = 0.0
-        innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
-                                                   obsBandIndexGOFI,
-                                                   obsLUTFilterIndexGO[obsFitUseGOI]] *
-                                objMagStdMeanErr2GO[obsFitUseGOI])
-
-        add_at_1d(partialArray[self.fgcmPars.parFilterOffsetLoc:
-                                   (self.fgcmPars.parFilterOffsetLoc +
-                                    self.fgcmPars.nLUTFilter)],
-                  obsLUTFilterIndexGO[obsFitUseGO],
-                  2.0 * deltaMagWeightedGOF * innerTermGOF)
-
-        # Now set those to zero the derivatives we aren't using
-        partialArray[self.fgcmPars.parFilterOffsetLoc:
-                         (self.fgcmPars.parFilterOffsetLoc +
-                          self.fgcmPars.nLUTFilter)][~self.fgcmPars.parFilterOffsetFitFlag] = 0.0
-        uOffsetIndex, = np.where(self.fgcmPars.parFilterOffsetFitFlag)
-        partialArray[self.fgcmPars.nFitPars +
-                     self.fgcmPars.parFilterOffsetLoc +
-                     uOffsetIndex] += 1
-
-        totalArr = snmm.getArray(self.totalHandleDict[thisCore])
-        totalArr[:] = totalArr[:] + partialArray
-
-        return None
 
     def __getstate__(self):
         # Don't try to pickle the logger.
 
         state = self.__dict__.copy()
         del state['fgcmLog']
+        del state['snmm']
         return state
 
+
+def _stepWorker(self, goodStarsAndObs, sharedDict):
+    """
+    Multiprocessing worker to compute fake derivatives for FgcmComputeStepUnits.
+    Not to be called on its own.
+
+    Parameters
+    ----------
+    goodStarsAndObs: tuple[2]
+       (goodStars, goodObs)
+    """
+
+    goodStars = goodStarsAndObs[0]
+    goodObs = goodStarsAndObs[1]
+
+    holder = sharedDict["holder"]
+    fgcmStars = sharedDict["fgcmStars"]
+    fgcmLUT = sharedDict["fgcmLUT"]
+    fgcmPars = sharedDict["fgcmPars"]
+    ccdStartIndex = sharedDict["ccdStartIndex"]
+    bandFitIndex = sharedDict["bandFitIndex"]
+    stepUnitReference = sharedDict["stepUnitReference"]
+    nSums = sharedDict["nSums"]
+    useQuadraticPwv = sharedDict["useQuadraticPwv"]
+    instrumentParsPerBand = sharedDict["instrumentParsPerBand"]
+    totalHandleDict = sharedDict["totalHandleDict"]
+
+    thisCore = multiprocessing.current_process()._identity[0]
+
+    objSEDSlope = holder.getArray(fgcmStars.objSEDSlopeHandle)
+    objFlag = holder.getArray(fgcmStars.objFlagHandle)
+    objMagStdMeanErr = holder.getArray(fgcmStars.objMagStdMeanErrHandle)
+
+    obsObjIDIndex = holder.getArray(fgcmStars.obsObjIDIndexHandle)
+
+    obsExpIndex = holder.getArray(fgcmStars.obsExpIndexHandle)
+    obsBandIndex = holder.getArray(fgcmStars.obsBandIndexHandle)
+    obsLUTFilterIndex = holder.getArray(fgcmStars.obsLUTFilterIndexHandle)
+    obsCCDIndex = holder.getArray(fgcmStars.obsCCDHandle) - ccdStartIndex
+    obsFlag = holder.getArray(fgcmStars.obsFlagHandle)
+    obsSecZenith = holder.getArray(fgcmStars.obsSecZenithHandle)
+    obsMagADUModelErr = holder.getArray(fgcmStars.obsMagADUModelErrHandle)
+
+    # cut these down now, faster later
+    obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
+    obsBandIndexGO = esutil.numpy_util.to_native(obsBandIndex[goodObs])
+    obsLUTFilterIndexGO = esutil.numpy_util.to_native(obsLUTFilterIndex[goodObs])
+    obsExpIndexGO = esutil.numpy_util.to_native(obsExpIndex[goodObs])
+    obsCCDIndexGO = esutil.numpy_util.to_native(obsCCDIndex[goodObs])
+
+    obsSecZenithGO = obsSecZenith[goodObs]
+    objMagStdMeanErr2GO = objMagStdMeanErr[obsObjIDIndexGO, obsBandIndexGO]**2.
+
+    lutIndicesGO = fgcmLUT.getIndices(obsLUTFilterIndexGO,
+                                      fgcmPars.expLnPwv[obsExpIndexGO],
+                                      fgcmPars.expO3[obsExpIndexGO],
+                                      fgcmPars.expLnTau[obsExpIndexGO],
+                                      fgcmPars.expAlpha[obsExpIndexGO],
+                                      obsSecZenithGO,
+                                      obsCCDIndexGO,
+                                      fgcmPars.expPmb[obsExpIndexGO])
+    I0GO = fgcmLUT.computeI0(fgcmPars.expLnPwv[obsExpIndexGO],
+                             fgcmPars.expO3[obsExpIndexGO],
+                             fgcmPars.expLnTau[obsExpIndexGO],
+                             fgcmPars.expAlpha[obsExpIndexGO],
+                             obsSecZenithGO,
+                             fgcmPars.expPmb[obsExpIndexGO],
+                             lutIndicesGO)
+    I10GO = fgcmLUT.computeI1(fgcmPars.expLnPwv[obsExpIndexGO],
+                              fgcmPars.expO3[obsExpIndexGO],
+                              fgcmPars.expLnTau[obsExpIndexGO],
+                              fgcmPars.expAlpha[obsExpIndexGO],
+                              obsSecZenithGO,
+                              fgcmPars.expPmb[obsExpIndexGO],
+                              lutIndicesGO) / I0GO
+
+    obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
+
+    # Note that we don't care if something is a refstar or not for this
+
+    # Default mask is not to mask
+    maskGO = np.ones(goodObs.size, dtype=bool)
+
+    # which observations are actually used in the fit?
+    useGO, = np.where(maskGO)
+    _, obsFitUseGO = esutil.numpy_util.match(bandFitIndex,
+                                             obsBandIndexGO[useGO])
+    obsFitUseGO = useGO[obsFitUseGO]
+
+    deltaMagGO = np.zeros(goodObs.size) + stepUnitReference
+    obsWeightGO = 1. / obsMagErr2GO
+    deltaMagWeightedGOF = deltaMagGO[obsFitUseGO] * obsWeightGO[obsFitUseGO]
+
+    gsGOF, indGOF = esutil.numpy_util.match(goodStars, obsObjIDIndexGO[obsFitUseGO])
+
+    partialArray = np.zeros(nSums, dtype='f8')
+    partialArray[-1] = obsFitUseGO.size
+
+    (dLdLnPwvGO,dLdO3GO,dLdLnTauGO,dLdAlphaGO) = (
+        fgcmLUT.computeLogDerivatives(lutIndicesGO,
+                                           I0GO))
+
+    if (fgcmLUT.hasI1Derivatives):
+        (dLdLnPwvI1GO,dLdO3I1GO,dLdLnTauI1GO,dLdAlphaI1GO) = (
+            fgcmLUT.computeLogDerivativesI1(lutIndicesGO,
+                                            I0GO,
+                                            I10GO,
+                                            objSEDSlope[obsObjIDIndexGO,
+                                                        obsBandIndexGO]))
+        dLdLnPwvGO += dLdLnPwvI1GO
+        dLdO3GO += dLdO3I1GO
+        dLdLnTauGO += dLdLnTauI1GO
+        dLdAlphaGO += dLdAlphaI1GO
+
+    # Set up temporary storage and sub-indexed arrays
+    sumNumerator = np.zeros((goodStars.size, fgcmPars.nBands, fgcmPars.nCampaignNights))
+    innerTermGOF = np.zeros(obsFitUseGO.size)
+
+    obsExpIndexGOF = obsExpIndexGO[obsFitUseGO]
+    expNightIndexGOF = esutil.numpy_util.to_native(fgcmPars.expNightIndex[obsExpIndexGOF])
+    obsBandIndexGOF = obsBandIndexGO[obsFitUseGO]
+    obsBandIndexGOFI = obsBandIndexGOF[indGOF]
+    expNightIndexGOFI = expNightIndexGOF[indGOF]
+    obsFitUseGOI = obsFitUseGO[indGOF]
+    obsMagErr2GOFI = obsMagErr2GO[obsFitUseGO[indGOF]]
+
+    ##########
+    ## O3
+    ##########
+
+    uNightIndex = np.unique(expNightIndexGOF)
+
+    obsBandIndexGOFI = obsBandIndexGOF[indGOF]
+    expNightIndexGOFI = expNightIndexGOF[indGOF]
+
+    sumNumerator[:, :, :] = 0.0
+    add_at_3d(sumNumerator,
+              (gsGOF, obsBandIndexGOFI, expNightIndexGOFI),
+              dLdO3GO[obsFitUseGOI] / obsMagErr2GOFI)
+
+    innerTermGOF[:] = 0.0
+    innerTermGOF[indGOF] = (dLdO3GO[obsFitUseGOI] -
+                            sumNumerator[gsGOF, obsBandIndexGOFI, expNightIndexGOFI] * objMagStdMeanErr2GO[obsFitUseGOI])
+
+    add_at_1d(partialArray[fgcmPars.parO3Loc:
+                               (fgcmPars.parO3Loc +
+                                fgcmPars.nCampaignNights)],
+              expNightIndexGOF,
+              2.0 * deltaMagWeightedGOF * innerTermGOF)
+
+    partialArray[fgcmPars.nFitPars +
+                 fgcmPars.parO3Loc +
+                 uNightIndex] += 1
+
+    ###########
+    ## Alpha
+    ###########
+
+    # Note that expNightIndexGOF, obsBandIndexGOF are the same as above
+
+    sumNumerator[:, :, :] =  0.0
+    add_at_3d(sumNumerator,
+              (gsGOF, obsBandIndexGOFI, expNightIndexGOFI),
+              dLdAlphaGO[obsFitUseGOI] / obsMagErr2GOFI)
+
+    innerTermGOF[:] = 0.0
+    innerTermGOF[indGOF] = (dLdAlphaGO[obsFitUseGOI] -
+                            sumNumerator[gsGOF, obsBandIndexGOFI, expNightIndexGOFI] * objMagStdMeanErr2GO[obsFitUseGOI])
+
+    add_at_1d(partialArray[fgcmPars.parAlphaLoc:
+                               (fgcmPars.parAlphaLoc+
+                                fgcmPars.nCampaignNights)],
+              expNightIndexGOF,
+              2.0 * deltaMagWeightedGOF * innerTermGOF)
+
+    partialArray[fgcmPars.nFitPars +
+                 fgcmPars.parAlphaLoc +
+                 uNightIndex] += 1
+
+    ###########
+    ## PWV External
+    ###########
+
+    if (fgcmPars.hasExternalPwv and not fgcmPars.useRetrievedPwv):
+        hasExtGOF, = np.where(fgcmPars.externalPwvFlag[obsExpIndexGOF])
+        uNightIndexHasExt = np.unique(expNightIndexGOF[hasExtGOF])
+        hasExtGOFG, = np.where(~fgcmPars.externalPwvFlag[obsExpIndexGOF[indGOF]])
+
+        # lnPwv Nightly Offset
+
+        sumNumerator[:, :, :] = 0.0
+        add_at_3d(sumNumerator,
+                  (gsGOF[hasExtGOFG],
+                   obsBandIndexGOFI[hasExtGOFG],
+                   expNightIndexGOFI[hasExtGOFG]),
+                  dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] /
+                  obsMagErr2GOFI[hasExtGOFG])
+
+        innerTermGOF[:] = 0.0
+        innerTermGOF[indGOF[hasExtGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasExtGOFG]] -
+                                            sumNumerator[gsGOF[hasExtGOFG],
+                                                         obsBandIndexGOFI[hasExtGOFG],
+                                                         expNightIndexGOFI[hasExtGOFG]] *
+                                            objMagStdMeanErr2GO[obsFitUseGOI[hasExtGOFG]])
+
+        add_at_1d(partialArray[fgcmPars.parExternalLnPwvOffsetLoc:
+                                   (fgcmPars.parExternalLnPwvOffsetLoc+
+                                    fgcmPars.nCampaignNights)],
+                  expNightIndexGOF[hasExtGOF],
+                  2.0 * deltaMagWeightedGOF[hasExtGOF] * innerTermGOF[hasExtGOF])
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parExternalLnPwvOffsetLoc +
+                     uNightIndexHasExt] += 1
+
+        # lnPwv Global Scale
+
+        # NOTE: this may be wrong.  Needs thought.
+
+        partialArray[fgcmPars.parExternalLnPwvScaleLoc] = 2.0 * (
+            np.sum(deltaMagWeightedGOF[hasExtGOF] * (
+                    fgcmPars.expLnPwv[obsExpIndexGOF[hasExtGOF]] *
+                    dLdLnPwvGO[obsFitUseGO[hasExtGOF]])))
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parExternalLnPwvScaleLoc] += 1
+
+    ################
+    ## PWV Retrieved
+    ################
+
+    if (fgcmPars.useRetrievedPwv):
+        hasRetrievedPwvGOF, = np.where((fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF] &
+                                        retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+        hasRetrievedPWVGOFG, = np.where((fgcmPars.compRetrievedLnPwvFlag[obsExpIndexGOF[indGOF]] &
+                                        retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
+
+        if hasRetrievedPwvGOF.size > 0:
+            # note this might be zero-size on first run
+
+            # lnPwv Retrieved Global Scale
+
+            # This may be wrong
+
+            partialArray[fgcmPars.parRetrievedLnPwvScaleLoc] = 2.0 * (
+                np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
+                        fgcmPars.expLnPwv[obsExpIndexGOF[hasRetreivedPwvGOF]] *
+                        dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
+
+            partialArray[fgcmPars.nFitPars +
+                         fgcmPars.parRetrievedLnPwvScaleLoc] += 1
+
+            if fgcmPars.useNightlyRetrievedPwv:
+                # lnPwv Retrieved Nightly Offset
+
+                uNightIndexHasRetrievedPwv = np.unique(expNightIndexGOF[hasRetrievedPwvGOF])
+
+                sumNumerator[:, :, :] = 0.0
+                add_at_3d(sumNumerator,
+                          (gsGOF[hasRetrievedPwvGOFG],
+                           obsBandIndexGOFI[hasRetrievedPwvGOFG],
+                           expNightIndexGOFI[hasRetrievedPwvGOFG]),
+                          dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] /
+                          obsMagErr2GOFI[hasRetrievedPwvGOFG])
+
+                innerTermGOF[:] = 0.0
+                innerTermGOF[indGOF[hasRetrievedPwvGOFG]] = (dLdLnPwvGO[obsFitUseGOI[hasRetrievedPwvGOFG]] -
+                                                   sumNumerator[gsGOF[hasRetrievedPwvGOFG],
+                                                                obsBandIndexGOFI[hasRetrievedPwvGOFG],
+                                                                expNightIndexGOFI[hasRetrievedPwvGOFG]] *
+                                                   objMagStdMeanErr2GO[obsFitUseGOI[hasRetrievedPwvGOFG]])
+
+                add_at_1d(partialArray[fgcmPars.parRetrievedLnPwvNightlyOffsetLoc:
+                                           (fgcmPars.parRetrievedLnPwvNightlyOffsetLoc+
+                                            fgcmPars.nCampaignNights)],
+                          2.0 * deltaMagWeightedGOF[hasRetrievedPwvGOF] * innerTermGOF[hasRetrievedPwvGOF])
+
+                partialArray[fgcmPars.nFitPars +
+                             fgcmPars.parRetrievedLnPwvNightlyOffsetLoc +
+                             uNightIndexHasRetrievedPwv] += 1
+
+            else:
+                # lnPwv Retrieved Global Offset
+
+                # This may be wrong
+
+                partialArray[fgcmPars.parRetrievedLnPwvOffsetLoc] = 2.0 * (
+                    np.sum(deltaMagWeightedGOF[hasRetrievedPwvGOF] * (
+                            dLdLnPwvGO[obsFitUseGO[hasRetrievedPwvGOF]])))
+
+                partialArray[fgcmPars.nFitPars +
+                             fgcmPars.parRetrievedLnPwvOffsetLoc] += 1
+
+    else:
+        ###########
+        ## Pwv No External
+        ###########
+
+        noExtGOF, = np.where(~fgcmPars.externalPwvFlag[obsExpIndexGOF])
+        uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
+        noExtGOFG, = np.where(~fgcmPars.externalPwvFlag[obsExpIndexGOF[indGOF]])
+
+        # lnPwv Nightly Intercept
+
+        sumNumerator[:, :, :] = 0.0
+        add_at_3d(sumNumerator,
+                  (gsGOF[noExtGOFG],
+                   obsBandIndexGOFI[noExtGOFG],
+                   expNightIndexGOFI[noExtGOFG]),
+                  dLdLnPwvGO[obsFitUseGOI[noExtGOFG]] /
+                  obsMagErr2GOFI[noExtGOFG])
+
+        innerTermGOF[:] = 0.0
+        innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvGO[obsFitUseGOI[noExtGOFG]] -
+                                           sumNumerator[gsGOF[noExtGOFG],
+                                                        obsBandIndexGOFI[noExtGOFG],
+                                                        expNightIndexGOFI[noExtGOFG]] *
+                                           objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
+
+        add_at_1d(partialArray[fgcmPars.parLnPwvInterceptLoc:
+                                   (fgcmPars.parLnPwvInterceptLoc+
+                                    fgcmPars.nCampaignNights)],
+                  expNightIndexGOF[noExtGOF],
+                  2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parLnPwvInterceptLoc +
+                     uNightIndexNoExt] += 1
+
+        # lnPwv Nightly Slope
+
+        dLdLnPwvSlopeGOFI = fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]] * dLdLnPwvGO[obsFitUseGOI]
+
+        sumNumerator[:, :, :] = 0.0
+        add_at_3d(sumNumerator,
+                  (gsGOF[noExtGOFG],
+                   obsBandIndexGOFI[noExtGOFG],
+                   expNightIndexGOFI[noExtGOFG]),
+                  (dLdLnPwvSlopeGOFI[noExtGOFG] /
+                   obsMagErr2GOFI[noExtGOFG]))
+
+        innerTermGOF[:] = 0.0
+        innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvSlopeGOFI[noExtGOFG] -
+                                           sumNumerator[gsGOF[noExtGOFG],
+                                                        obsBandIndexGOFI[noExtGOFG],
+                                                        expNightIndexGOFI[noExtGOFG]] *
+                                           objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
+        add_at_1d(partialArray[fgcmPars.parLnPwvSlopeLoc:
+                                   (fgcmPars.parLnPwvSlopeLoc+
+                                    fgcmPars.nCampaignNights)],
+                  expNightIndexGOF[noExtGOF],
+                  2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parLnPwvSlopeLoc +
+                     uNightIndexNoExt] += 1
+
+        # lnPwv Nightly Quadratic
+        if useQuadraticPwv:
+
+            dLdLnPwvQuadraticGOFI = fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]]**2. * dLdLnPwvGO[obsFitUseGOI]
+
+            sumNumerator[:, :, :] = 0.0
+            add_at_3d(sumNumerator,
+                      (gsGOF[noExtGOFG],
+                       obsBandIndexGOFI[noExtGOFG],
+                       expNightIndexGOFI[noExtGOFG]),
+                      (dLdLnPwvQuadraticGOFI[noExtGOFG] /
+                       obsMagErr2GOFI[noExtGOFG]))
+
+            innerTermGOF[:] = 0.0
+            innerTermGOF[indGOF[noExtGOFG]] = (dLdLnPwvQuadraticGOFI[noExtGOFG] -
+                                               sumNumerator[gsGOF[noExtGOFG],
+                                                            obsBandIndexGOFI[noExtGOFG],
+                                                            expNightIndexGOFI[noExtGOFG]] *
+                                               objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
+
+            add_at_1d(partialArray[fgcmPars.parLnPwvQuadraticLoc:
+                                       (fgcmPars.parLnPwvQuadraticLoc+
+                                        fgcmPars.nCampaignNights)],
+                      expNightIndexGOF[noExtGOF],
+                      2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
+
+            partialArray[fgcmPars.nFitPars +
+                         fgcmPars.parLnPwvQuadraticLoc +
+                         uNightIndexNoExt] += 1
+
+    #############
+    ## Tau External
+    #############
+
+    if (fgcmPars.hasExternalTau):
+        # NOT IMPLEMENTED PROPERLY YET
+
+        raise NotImplementedError("external tau not implemented.")
+
+    ###########
+    ## Tau No External
+    ###########
+
+    noExtGOF, = np.where(~fgcmPars.externalTauFlag[obsExpIndexGOF])
+    uNightIndexNoExt = np.unique(expNightIndexGOF[noExtGOF])
+    noExtGOFG, = np.where(~fgcmPars.externalTauFlag[obsExpIndexGOF[indGOF]])
+
+    # lnTau Nightly Intercept
+
+    sumNumerator[:, :, :] = 0.0
+    add_at_3d(sumNumerator,
+              (gsGOF[noExtGOFG],
+               obsBandIndexGOFI[noExtGOFG],
+               expNightIndexGOFI[noExtGOFG]),
+              dLdLnTauGO[obsFitUseGOI[noExtGOFG]] /
+              obsMagErr2GOFI[noExtGOFG])
+
+    innerTermGOF[:] = 0.0
+    innerTermGOF[indGOF[noExtGOFG]] = (dLdLnTauGO[obsFitUseGOI[noExtGOFG]] -
+                                       sumNumerator[gsGOF[noExtGOFG],
+                                                    obsBandIndexGOFI[noExtGOFG],
+                                                    expNightIndexGOFI[noExtGOFG]] *
+                                       objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
+    add_at_1d(partialArray[fgcmPars.parLnTauInterceptLoc:
+                               (fgcmPars.parLnTauInterceptLoc+
+                                fgcmPars.nCampaignNights)],
+              expNightIndexGOF[noExtGOF],
+              2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
+
+    partialArray[fgcmPars.nFitPars +
+                 fgcmPars.parLnTauInterceptLoc +
+                 uNightIndexNoExt] += 1
+
+    # lnTau nightly slope
+
+    dLdLnTauSlopeGOFI = fgcmPars.expDeltaUT[obsExpIndexGOF[indGOF]] * dLdLnTauGO[obsFitUseGOI]
+
+    sumNumerator[:, :, :] = 0.0
+    add_at_3d(sumNumerator,
+              (gsGOF[noExtGOFG],
+               obsBandIndexGOFI[noExtGOFG],
+               expNightIndexGOFI[noExtGOFG]),
+              (dLdLnTauSlopeGOFI[noExtGOFG] /
+               obsMagErr2GOFI[noExtGOFG]))
+
+    innerTermGOF[:] = 0.0
+    innerTermGOF[indGOF[noExtGOFG]] = (dLdLnTauSlopeGOFI[noExtGOFG] -
+                                       sumNumerator[gsGOF[noExtGOFG],
+                                                    obsBandIndexGOFI[noExtGOFG],
+                                                    expNightIndexGOFI[noExtGOFG]] *
+                                       objMagStdMeanErr2GO[obsFitUseGOI[noExtGOFG]])
+
+    add_at_1d(partialArray[fgcmPars.parLnTauSlopeLoc:
+                               (fgcmPars.parLnTauSlopeLoc+
+                                fgcmPars.nCampaignNights)],
+              expNightIndexGOF[noExtGOF],
+              2.0 * deltaMagWeightedGOF[noExtGOF] * innerTermGOF[noExtGOF])
+
+    partialArray[fgcmPars.nFitPars +
+                 fgcmPars.parLnTauSlopeLoc +
+                 uNightIndexNoExt] += 1
+
+    ##################
+    ## Washes (QE Sys)
+    ##################
+
+    # The washes don't need to worry about the limits ... 0.1 mag is 0.1 mag here.
+
+    expWashIndexGOF = fgcmPars.expWashIndex[obsExpIndexGOF]
+
+    # Wash Intercept
+
+    if instrumentParsPerBand:
+        # We have per-band intercepts
+        # Non-fit bands will be given the mean of the others (in fgcmParameters),
+        # because they aren't in the chi2.
+
+        uWashBandIndex = np.unique(np.ravel_multi_index((obsBandIndexGOF,
+                                                         expWashIndexGOF),
+                                                        fgcmPars.parQESysIntercept.shape))
+        ravelIndexGOF = np.ravel_multi_index((obsBandIndexGOF,
+                                              expWashIndexGOF),
+                                             fgcmPars.parQESysIntercept.shape)
+
+        sumNumerator = np.zeros((goodStars.size, fgcmPars.nBands, fgcmPars.parQESysIntercept.size))
+        add_at_3d(sumNumerator,
+                  (gsGOF, obsBandIndexGOFI, ravelIndexGOF[indGOF]),
+                  1.0 / obsMagErr2GOFI)
+
+        innerTermGOF[:] = 0.0
+        innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
+                                                   obsBandIndexGOFI,
+                                                   ravelIndexGOF[indGOF]] *
+                                objMagStdMeanErr2GO[obsFitUseGOI])
+
+        add_at_1d(partialArray[fgcmPars.parQESysInterceptLoc:
+                                   (fgcmPars.parQESysInterceptLoc +
+                                    fgcmPars.parQESysIntercept.size)],
+                  ravelIndexGOF,
+                  2.0 * deltaMagWeightedGOF * innerTermGOF)
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parQESysInterceptLoc +
+                     uWashBandIndex] += 1
+
+    else:
+        # We have one gray mirror term for all bands
+        uWashIndex = np.unique(expWashIndexGOF)
+        #t = time.time()
+        sumNumerator = np.zeros((goodStars.size, fgcmPars.nBands, fgcmPars.nWashIntervals))
+        add_at_3d(sumNumerator,
+                  (gsGOF, obsBandIndexGOFI, expWashIndexGOF[indGOF]),
+                  1.0 / obsMagErr2GOFI)
+
+        innerTermGOF[:] = 0.0
+        innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
+                                                   obsBandIndexGOFI,
+                                                   expWashIndexGOF[indGOF]] *
+                                objMagStdMeanErr2GO[obsFitUseGOI])
+
+        add_at_1d(partialArray[fgcmPars.parQESysInterceptLoc:
+                                   (fgcmPars.parQESysInterceptLoc +
+                                    fgcmPars.nWashIntervals)],
+                  expWashIndexGOF,
+                  2.0 * deltaMagWeightedGOF * innerTermGOF)
+
+        partialArray[fgcmPars.nFitPars +
+                     fgcmPars.parQESysInterceptLoc +
+                     uWashIndex] += 1
+
+    #################
+    ## Filter offset
+    #################
+
+    sumNumerator = np.zeros((goodStars.size, fgcmPars.nBands, fgcmPars.nLUTFilter))
+    add_at_3d(sumNumerator,
+              (gsGOF, obsBandIndexGOFI, obsLUTFilterIndexGO[obsFitUseGOI]),
+              1.0 / obsMagErr2GOFI)
+
+    innerTermGOF[:] = 0.0
+    innerTermGOF[indGOF] = (1.0 - sumNumerator[gsGOF,
+                                               obsBandIndexGOFI,
+                                               obsLUTFilterIndexGO[obsFitUseGOI]] *
+                            objMagStdMeanErr2GO[obsFitUseGOI])
+
+    add_at_1d(partialArray[fgcmPars.parFilterOffsetLoc:
+                               (fgcmPars.parFilterOffsetLoc +
+                                fgcmPars.nLUTFilter)],
+              obsLUTFilterIndexGO[obsFitUseGO],
+              2.0 * deltaMagWeightedGOF * innerTermGOF)
+
+    # Now set those to zero the derivatives we aren't using
+    partialArray[fgcmPars.parFilterOffsetLoc:
+                     (fgcmPars.parFilterOffsetLoc +
+                      fgcmPars.nLUTFilter)][~fgcmPars.parFilterOffsetFitFlag] = 0.0
+    uOffsetIndex, = np.where(fgcmPars.parFilterOffsetFitFlag)
+    partialArray[fgcmPars.nFitPars +
+                 fgcmPars.parFilterOffsetLoc +
+                 uOffsetIndex] += 1
+
+    totalArr = holder.getArray(totalHandleDict[thisCore])
+    totalArr[:] = totalArr[:] + partialArray
+
+    return None

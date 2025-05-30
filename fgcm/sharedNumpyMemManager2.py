@@ -1,17 +1,19 @@
 import numpy as np
 from multiprocessing import Lock, Manager
-from multiprocessing import shared_memory
-from multiprocessing.managers import SharedMemoryManager
+import multiprocessing
+# from multiprocessing import shared_memory
+# from multiprocessing.managers import SharedMemoryManager
+import ctypes
 
 
 class SharedNumpyMemHolder:
     def __init__(self):
         self._sharedArrayHandles = {}
 
-    def setHandle(self, handle, dimensions, dtype, lock=None):
+    def setHandle(self, handleName, handle, dimensions, dtype, syncAccess):
         """
         """
-        self._sharedArrayHandles[handle.name] = (handle, dimensions, dtype, lock)
+        self._sharedArrayHandles[handleName] = (handle, dimensions, dtype, syncAccess)
 
     def getArray(self, handleName):
         """
@@ -21,7 +23,10 @@ class SharedNumpyMemHolder:
 
         handle, dimensions, dtype, _ = self._sharedArrayHandles[handleName]
 
-        return np.ndarray(dimensions, dtype=dtype, buffer=handle.buf)
+        arr = np.frombuffer(handle.get_obj(), dtype=dtype)
+        arr.reshape(dimensions)
+
+        return arr
 
     def getArrayLock(self, handleName):
         """
@@ -29,16 +34,18 @@ class SharedNumpyMemHolder:
         if handleName not in self._sharedArrayHandles:
             raise ValueError("Unknown handle name %s.", handleName)
 
-        return self._sharedArrayHandles[handleName][3]
+        handle, _, _, syncAccess = self._sharedArrayHandles[handleName]
+
+        if not syncAccess:
+            raise ValueError("No lock associated with %s.", handleName)
+
+        return handle.get_lock()
 
     def getArrayHandle(self, handleName):
         """
         """
         if handleName not in self._sharedArrayHandles:
             raise ValueError("Unknown handle name %s.", handleName)
-
-        if handleName not in self._sharedArrayHandles:
-            raise valueError("Unknown handle name %s.", handleName)
 
         return self._sharedArrayHandles[handleName][0]
 
@@ -48,13 +55,17 @@ class SharedNumpyMemManager2:
     def __init__(self):
         self._holder = SharedNumpyMemHolder()
         self._lock = Lock()
-        self._smm = SharedMemoryManager()
-        self._smm.start()
+        # self._smm = SharedMemoryManager()
+        # self._smm.start()
         self._manager = Manager()
+        # self._manager.start()
+        self._counter = 0
 
     def __del__(self):
-        self._smm.shutdown()
-        del self._smm
+        # self._smm.shutdown()
+        # del self._smm
+        self._manager.shutdown()
+        del self._manager
         del self._lock
         del self._holder
 
@@ -62,21 +73,36 @@ class SharedNumpyMemManager2:
         """
         """
         dtype = np.dtype(dtype)
+        if (dtype == np.float32):
+            typecode = "f"
+        elif (dtype == np.float64):
+            typecode = "d"
+        elif (dtype == np.int32):
+            typecode = "i"
+        elif (dtype == np.int64):
+            typecode = "l"
+        elif (dtype == np.int16):
+            typecode = "h"
+        elif (dtype == bool):
+            typecode = "b"
+        else:
+            raise ValueError("Unsupported dtype")
 
         self._lock.acquire()
 
-        handle = self._smm.SharedMemory(int(np.prod(dimensions))*dtype.itemsize)
+        # Must have locks ...
+        # handle = self._manager.Array(typecode, range(int(np.prod(dimensions))))
+        handle = multiprocessing.Array(typecode, int(np.prod(dimensions)))
 
-        if syncAccess:
-            handleLock = self._manager.Lock()
-        else:
-            handleLock = None
+        index = self._counter
 
-        self._holder.setHandle(handle, dimensions, dtype, lock=handleLock)
+        self._holder.setHandle(index, handle, dimensions, dtype, syncAccess)
+
+        self._counter += 1
 
         self._lock.release()
 
-        return handle.name
+        return index
 
     def createArrayLike(self, inArray, syncAccess=False, dtype=None):
         """
