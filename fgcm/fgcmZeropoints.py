@@ -88,6 +88,7 @@ class FgcmZeropoints(object):
         self.outputFgcmcalZpts = fgcmConfig.outputFgcmcalZpts
         self.useExposureReferenceOffset = fgcmConfig.useExposureReferenceOffset
         self.quietMode = fgcmConfig.quietMode
+        self.rng = fgcmConfig.rng
 
     def computeZeropoints(self):
         """
@@ -597,7 +598,8 @@ class FgcmZeropoints(object):
                                            self.colorSplitIndices, self.colorSplitBands,
                                            self.plotPath, self.outfileBaseWithCycle,
                                            self.cycleNumber, self.fgcmLog,
-                                           butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+                                           butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict,
+                                           rng=self.rng)
 
             plotter.makeR1I1Plots()
             plotter.makeR1I1Maps(deltaMapperDefault, ccdField=self.ccdField)
@@ -874,7 +876,7 @@ class FgcmZeropointPlotter(object):
     def __init__(self, zpStruct, fgcmStars, fgcmPars,
                  I0StdBand, I1StdBand, I10StdBand,
                  colorSplitIndices, colorSplitBands, plotPath, outfileBase,
-                 cycleNumber, fgcmLog, butlerQC=None, plotHandleDict=None):
+                 cycleNumber, fgcmLog, butlerQC=None, plotHandleDict=None, rng=None):
         self.zpStruct = zpStruct
         self.bands = fgcmPars.bands
         self.filterNames = fgcmPars.lutFilterNames
@@ -893,6 +895,10 @@ class FgcmZeropointPlotter(object):
         self.plotHandleDict = plotHandleDict
 
         self.i1Conversions, self.blueString, self.redString = self.computeI1Conversions(fgcmStars)
+
+        self.rng = rng
+        if self.rng is None:
+            self.rng = np.random.RandomState()
 
     def computeI1Conversions(self, fgcmStars):
         """
@@ -1156,7 +1162,7 @@ class FgcmZeropointPlotter(object):
                 continue
 
             # Arbitrarily do 50 days...
-            binStruct = dataBinner(xValues, yValues, 50.0, xRange)
+            binStruct = dataBinner(xValues, yValues, 50.0, xRange, rng=self.rng)
             gd, = np.where(binStruct['Y_ERR'] > 0.0)
 
             if gd.size < 2:

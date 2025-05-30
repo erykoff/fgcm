@@ -68,6 +68,8 @@ class FgcmDeltaAper(object):
         self.njyZp = 8.9 + 9*2.5
         self.k = 2.5/np.log(10.)
 
+        self.rng = fgcmConfig.rng
+
     def computeDeltaAperExposures(self, doFullFit=False):
         """
         Compute deltaAper per-exposure quantities
@@ -206,7 +208,7 @@ class FgcmDeltaAper(object):
             # Sample for efficiency if necessary
             nsample = 1000000
             if mag_std.size > nsample:
-                r = np.random.choice(mag_std.size, size=nsample, replace=False)
+                r = self.rng.choice(mag_std.size, size=nsample, replace=False)
             else:
                 r = np.arange(mag_std.size)
 
@@ -672,7 +674,7 @@ class FgcmDeltaAper(object):
         mag_min = mag[st[int(0.01*st.size)]]
         mag_max = mag[st[int(0.95*st.size)]]
 
-        bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max])
+        bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max], rng=self.rng)
         u, = np.where(bin_struct['Y_ERR'] > 0.0)
 
         if u.size < 5:

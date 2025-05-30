@@ -5,7 +5,6 @@ import esutil
 import scipy.optimize
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from .fgcmUtilities import dataBinner
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
