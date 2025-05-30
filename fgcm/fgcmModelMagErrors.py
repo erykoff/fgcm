@@ -53,6 +53,7 @@ class FgcmModelMagErrors(object):
         self.outfileBaseWithCycle = fgcmConfig.outfileBaseWithCycle
         self.cycleNumber = fgcmConfig.cycleNumber
         self.quietMode = fgcmConfig.quietMode
+        self.rng = fgcmConfig.rng
 
     def computeMagErrorModel(self, fitName):
         """
@@ -98,7 +99,7 @@ class FgcmModelMagErrors(object):
                              (objNGoodObs[obsObjIDIndex[goodObs], bandIndex] >= self.minObsPerBand))
             # Sample down to the number of observations in config (for speed)
             if (use0.size > self.modelMagErrorNObs):
-                use = np.random.choice(use0, replace=False, size=self.modelMagErrorNObs)
+                use = self.rng.choice(use0, replace=False, size=self.modelMagErrorNObs)
             else:
                 use = use0
 
