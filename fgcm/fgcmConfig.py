@@ -139,6 +139,7 @@ class FgcmConfig(object):
     ccdGrayFocalPlaneChebyshevOrder = ConfigField(int, default=3)
     focalPlaneSigmaClip = ConfigField(float, default=4.0)
     ccdGrayFocalPlaneFitMinCcd = ConfigField(int, default=1)
+    ccdGrayFocalPlaneMaxStars = ConfigField(int, default=50_000)
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopeDict = ConfigField(dict, default={})
     illegalValue = ConfigField(float, default=-9999.0)

@@ -73,6 +73,7 @@ class FgcmGray(object):
         self.ccdGrayFocalPlane = fgcmConfig.ccdGrayFocalPlane
         self.ccdGrayFocalPlaneChebyshevOrder = fgcmConfig.ccdGrayFocalPlaneChebyshevOrder
         self.ccdGrayFocalPlaneFitMinCcd = fgcmConfig.ccdGrayFocalPlaneFitMinCcd
+        self.ccdGrayFocalPlaneMaxStars = fgcmConfig.ccdGrayFocalPlaneMaxStars
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -427,6 +428,10 @@ class FgcmGray(object):
                 if not self.ccdGrayFocalPlane[bInd]:
                     # We are not fitting the focal plane for this, skip.
                     continue
+
+                # Downsample if too many.
+                if len(i1a) > self.ccdGrayFocalPlaneMaxStars:
+                    i1a = self.rng.choice(i1a, replace=False, size=self.ccdGrayFocalPlaneMaxStars)
 
                 deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[eInd]))
 
