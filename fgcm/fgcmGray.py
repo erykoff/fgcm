@@ -432,6 +432,7 @@ class FgcmGray(object):
                 # Downsample if too many.
                 if len(i1a) > self.ccdGrayFocalPlaneMaxStars:
                     i1a = self.rng.choice(i1a, replace=False, size=self.ccdGrayFocalPlaneMaxStars)
+                    i1a = np.sort(i1a)
 
                 deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[eInd]))
 
