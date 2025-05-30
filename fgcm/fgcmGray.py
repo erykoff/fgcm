@@ -100,6 +100,8 @@ class FgcmGray(object):
         self.defaultCameraOrientation = fgcmConfig.defaultCameraOrientation
         self.deltaMapperDefault = None
 
+        self.rng = fgcmConfig.rng
+
         self._prepareGrayArrays()
 
     def _prepareGrayArrays(self):
