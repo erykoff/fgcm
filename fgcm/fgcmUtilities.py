@@ -673,8 +673,8 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
 
     cm = colormaps.get_cmap("rainbow")
 
-    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
-                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotRaRange = [np.max(deltaMapper['delta_ra']) + 0.02,
+                   np.min(deltaMapper['delta_ra']) - 0.02]
     plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
                     np.max(deltaMapper['delta_dec']) + 0.02]
 
