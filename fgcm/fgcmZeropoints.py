@@ -1025,7 +1025,7 @@ class FgcmZeropointPlotter(object):
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
-        plotTypes=['I1', 'R1', 'R1 - I1']
+        plotTypes = ['I1', 'R1', 'R1 - I1 (Matched scales)', 'R1 - I1']
 
         ccdMin = np.min(self.zpStruct[ccdField])
         ccdMax = np.max(self.zpStruct[ccdField])
@@ -1063,9 +1063,14 @@ class FgcmZeropointPlotter(object):
             meanR1[use] /= nPerCCD[use]
 
             # use the same range scale for all the plots
-            st = np.argsort(meanR1[use])
-            lo = meanR1[use[st[int(0.02*st.size)]]]
-            hi = meanR1[use[st[int(0.98*st.size)]]]
+            stMatchscale = np.argsort(meanR1[use])
+            loMatchscale = meanR1[use[stMatchscale[int(0.02*use.size)]]]
+            hiMatchscale = meanR1[use[stMatchscale[int(0.98*use.size)]]]
+
+            r1mI1 = meanR1 - meanI1
+            st = np.argsort(r1mI1[use])
+            lo = r1mI1[use[st[int(0.02*use.size)]]]
+            hi = r1mI1[use[st[int(0.98*use.size)]]]
 
             for plotType in plotTypes:
                 fig = makeFigure(figsize=(8, 6))
@@ -1075,16 +1080,27 @@ class FgcmZeropointPlotter(object):
 
                 try:
                     if (plotType == 'R1'):
-                        plotCCDMap(ax, deltaMapper[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
+                        plotCCDMap(ax, deltaMapper[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[loMatchscale, hiMatchscale])
                     elif (plotType == 'I1'):
-                        plotCCDMap(ax, deltaMapper[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
-                    else:
-                        # for the residuals, center at zero, but use lo/hi
+                        plotCCDMap(ax, deltaMapper[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[loMatchscale, hiMatchscale])
+                    elif "Matched" in plotType:
+                        # For the matched scale residuals, center at zero, but use lo/hi
                         amp = np.abs((hi - lo)/2.)
                         plotCCDMap(
                             ax,
                             deltaMapper[use],
-                            meanR1[use] - meanI1[use],
+                            r1mI1[use],
+                            "R1 - I1 (red-blue mmag)",
+                            loHi=[-amp, amp],
+                            cmap=colormaps.get_cmap("bwr"),
+                        )
+                    else:
+                        # For the rescaled residuals, center at zero, use rescaled lo/hi
+                        amp = np.abs((hi - lo)/2.)
+                        plotCCDMap(
+                            ax,
+                            deltaMapper[use],
+                            r1mI1[use],
                             "R1 - I1 (red-blue mmag)",
                             loHi=[-amp, amp],
                             cmap=colormaps.get_cmap("bwr"),
@@ -1101,10 +1117,14 @@ class FgcmZeropointPlotter(object):
                             ha='left',va='top',fontsize=18)
 
                 if self.butlerQC is not None:
-                    if plotType == "R1 - I1":
-                        name = "R1mI1"
+                    if "R1 - I1" in plotType:
+                        if "Match" in plotType:
+                            name = "R1mI1Matchscale"
+                        else:
+                            name = "R1mI1"
                     else:
                         name = plotType
+
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
