@@ -172,7 +172,7 @@ class FgcmSigmaCal(object):
                 continue
 
             ok, = np.where((objMagStdMean[goodStars, bandIndex] < 90.0) &
-                           (objMagStdMean[goodStars, bandIndex] != 0.0) &
+                           (objMagStdMean[goodStars, bandIndex] > 10.0) &
                            (objNGoodObs[goodStars, bandIndex] > 2))
             st = np.argsort(objMagStdMean[goodStars[ok], bandIndex])
             indices[band] = ok[st[int(self.sigmaCalFitPercentile[0] * st.size):
