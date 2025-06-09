@@ -295,13 +295,13 @@ class FgcmSuperStarFlat(object):
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = 0
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0: fit.size] = fit
 
-                if doPlots and self.plotPath is not None and self.superStarPlotCCDResiduals:
+                if doPlots and self.plotPath is not None and i1a.size > 0 and self.superStarPlotCCDResiduals:
                     # Compute the residuals and plot them.
                     superStar = -2.5 * np.log10(np.clip(field.evaluate(obsXGO[i1a], obsYGO[i1a]), 0.1, None))
                     resid = EGrayGO[i1a] - superStar
 
                     # Choose a gridsize appropriate for the number of stars.
-                    gridsize = int(np.clip(np.sqrt(i1a.size/10), 1, 100))
+                    gridsize = int(np.clip(np.sqrt(i1a.size/10), 2, 100))
 
                     fig = makeFigure(figsize=(8, 6))
                     fig.clf()
@@ -321,22 +321,24 @@ class FgcmSuperStarFlat(object):
                     # of the large number of plots that may be produced
                     # (one per filter per epoch per detector).
 
-                    # if self.butlerQC is not None:
-                    #     putButlerFigure(self.fgcmLog,
-                    #                     self.butlerQC,
-                    #                     self.plotHandleDict,
-                    #                     "SuperstarResidual",
-                    #                     self.cycleNumber,
-                    #                     fig,
-                    #                     filterName=self.fgcmPars.lutFilterNames[fiInd],
-                    #                     epochName=self.epochNames[epInd],
-                    #                     ccdName=str(cInd))
-                    # else:
-                    fig.savefig("%s/%s_superstar_resid_%s_%s_%s.png" % (self.plotPath,
-                                                                        self.outfileBaseWithCycle,
-                                                                        self.fgcmPars.lutFilterNames[fiInd],
-                                                                        self.epochNames[epInd],
-                                                                        str(cInd)))
+                    if self.butlerQC is not None:
+                        putButlerFigure(
+                            self.fgcmLog,
+                            self.butlerQC,
+                            self.plotHandleDict,
+                            "SuperstarResidual",
+                            self.cycleNumber,
+                            fig,
+                            filterName=self.fgcmPars.lutFilterNames[fiInd],
+                            epoch=self.epochNames[epInd],
+                            detector=str(cInd),
+                        )
+                    else:
+                        fig.savefig("%s/%s_superstar_resid_%s_%s_%s.png" % (self.plotPath,
+                                                                            self.outfileBaseWithCycle,
+                                                                            self.fgcmPars.lutFilterNames[fiInd],
+                                                                            self.epochNames[epInd],
+                                                                            str(cInd)))
 
                     def std_func(x):
                         return median_abs_deviation(x, scale="normal")
@@ -360,11 +362,24 @@ class FgcmSuperStarFlat(object):
                     ax.set_aspect("equal")
                     fig.colorbar(hb, label="SuperStar Residual Std Dev (mmag)")
                     fig.tight_layout()
-                    fig.savefig("%s/%s_superstar_residstd_%s_%s_%s.png" % (self.plotPath,
-                                                                           self.outfileBaseWithCycle,
-                                                                           self.fgcmPars.lutFilterNames[fiInd],
-                                                                           self.epochNames[epInd],
-                                                                           str(cInd)))
+                    if self.butlerQC is not None:
+                        putButlerFigure(
+                            self.fgcmLog,
+                            self.butlerQC,
+                            self.plotHandleDict,
+                            "SuperstarResidualStd",
+                            self.cycleNumber,
+                            fig,
+                            filterName=self.fgcmPars.lutFilterNames[fiInd],
+                            epoch=self.epochNames[epInd],
+                            detector=str(cInd),
+                        )
+                    else:
+                        fig.savefig("%s/%s_superstar_residstd_%s_%s_%s.png" % (self.plotPath,
+                                                                               self.outfileBaseWithCycle,
+                                                                               self.fgcmPars.lutFilterNames[fiInd],
+                                                                               self.epochNames[epInd],
+                                                                               str(cInd)))
 
             # And we need to flag those that have bad observations
             bad = np.where(superStarNGoodStars == 0)
