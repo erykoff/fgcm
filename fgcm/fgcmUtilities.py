@@ -1034,7 +1034,7 @@ def makeFigure(**kwargs):
     return fig
 
 
-def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None, epoch=None):
+def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None, epoch=None, detector=None):
     """Put a figure into the Butler.
 
     Parameters
@@ -1048,6 +1048,7 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
     band : `str`, optional
     filterName : `str`, optional
     epoch : `str`, optional
+    detector : `int`, optional
     """
     if filterName and band:
         raise RuntimeError("Cannot specify both filterName and band.")
@@ -1063,6 +1064,9 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
 
     if band:
         plotName += f"_{band}"
+
+    if detector:
+        plotName += f"_{detector}"
 
     if plotName not in plotHandleDict:
         logger.warning(f"Could not find plot {plotName} in plotHandleDict.")
