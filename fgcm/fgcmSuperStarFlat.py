@@ -301,7 +301,7 @@ class FgcmSuperStarFlat(object):
                     resid = EGrayGO[i1a] - superStar
 
                     # Choose a gridsize appropriate for the number of stars.
-                    gridsize = int(np.clip(np.sqrt(i1a.size/10), 2, 100))
+                    gridsize = int(np.clip(np.sqrt(i1a.size/5), 2, 150))
 
                     fig = makeFigure(figsize=(8, 6))
                     fig.clf()
