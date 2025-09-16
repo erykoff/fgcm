@@ -303,11 +303,13 @@ class FgcmSuperStarFlat(object):
                     # Choose a gridsize appropriate for the number of stars.
                     gridsize = int(np.clip(np.sqrt(i1a.size/5), 2, 150))
 
+                    vmin, vmax = np.percentile(resid*1000, [25, 75])
+
                     fig = makeFigure(figsize=(8, 6))
                     fig.clf()
                     ax = fig.add_subplot(111)
 
-                    hb = ax.hexbin(obsXGO[i1a], obsYGO[i1a], C=resid*1000, gridsize=gridsize, vmin=-10.0, vmax=10.0)
+                    hb = ax.hexbin(obsXGO[i1a], obsYGO[i1a], C=resid*1000, gridsize=gridsize, vmin=vmin, vmax=vmax)
                     ax.set_xlabel("X")
                     ax.set_ylabel("Y")
                     ax.set_title("%s %s %s" % (self.fgcmPars.lutFilterNames[fiInd],
