@@ -409,6 +409,7 @@ class FgcmGray(object):
         ccdGrayRMS[gd] = 0.0  # only used for per-ccd checks
 
         if np.any(self.ccdGrayFocalPlane):
+            self.fgcmLog.info("Computing CCDGray full focal-plane fits.")
 
             # We are doing our full focal plane fits for bands that are set.
             order = self.ccdGrayFocalPlaneChebyshevOrder
@@ -525,7 +526,6 @@ class FgcmGray(object):
 
                     if self.ccdGraySubCCD[bInd]:
                         # Do the sub-ccd fit
-
                         for cInd in ok:
                             draOff = deltaMapper['delta_ra'][cInd, :] - offsetRA
                             ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
@@ -551,6 +551,7 @@ class FgcmGray(object):
                         ccdGraySubCCDPars[eInd, ~ok, 0] = 1.0
 
         if not np.any(self.ccdGraySubCCD) and not np.any(self.ccdGrayFocalPlane):
+            self.fgcmLog.info("Computing CCDGray constants.")
             # This is when we _only_ have per-ccd gray, no focal plane, and
             # we can do all of this at once.
             np.add.at(ccdGray,
@@ -569,6 +570,7 @@ class FgcmGray(object):
             ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
 
         elif np.any(~np.array(self.ccdGrayFocalPlane)):
+            self.fgcmLog.info("Computing CCDGray sub-ccd fits (no focal plane).")
             # We are computing on the sub-ccd scale for some bands, and
             # at least 1 band does not have a focal plane fit
 
