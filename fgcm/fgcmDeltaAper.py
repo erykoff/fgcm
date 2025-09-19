@@ -124,7 +124,7 @@ class FgcmDeltaAper(object):
             if not doFullFit:
                 continue
 
-            fit, _ = self._fitEpsilonWithDataBinner(mag[ok], deltaAper[ok])
+            fit, _ = self._fitEpsilonWithDataBinner(mag[ok], deltaAper[ok], nTrial=20)
 
             if fit is not None:
                 self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
@@ -304,7 +304,13 @@ class FgcmDeltaAper(object):
                 mag_std = objMagStdMean[i1a[use], j]
                 delta = objDeltaAperMean[i1a[use], j]
 
-                fit, _ = self._fitEpsilonWithDataBinner(mag_std, delta)
+                nsample = 10000
+                if mag_std.size > nsample:
+                    r = self.rng.choice(mag_std.size, size=nsample, replace=False)
+                else:
+                    r = np.arange(mag_std.size)
+
+                fit, _ = self._fitEpsilonWithDataBinner(mag_std[r], delta[r], nTrial=20)
 
                 if fit is not None:
                     offsetMap['nstar_fit'][i, j] = len(mag_std)
@@ -648,7 +654,7 @@ class FgcmDeltaAper(object):
 
         return fit, ok.size
 
-    def _fitEpsilonWithDataBinner(self, mag, delta_aper, binsize=0.2):
+    def _fitEpsilonWithDataBinner(self, mag, delta_aper, binsize=0.2, nTrial=100):
         """
         Fit epsilon with binned data.
 
@@ -662,6 +668,8 @@ class FgcmDeltaAper(object):
             Delta-aper values.
         binsize : `float`, optional
             Magnitude bin size.
+        nTrial : `int`, optional
+            Number of bootstrap trials for data binner.
 
         Returns
         -------
@@ -674,7 +682,7 @@ class FgcmDeltaAper(object):
         mag_min = mag[st[int(0.01*st.size)]]
         mag_max = mag[st[int(0.95*st.size)]]
 
-        bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max], rng=self.rng)
+        bin_struct = dataBinner(mag, delta_aper, binsize, [mag_min, mag_max], rng=self.rng, nTrial=nTrial)
         u, = np.where(bin_struct['Y_ERR'] > 0.0)
 
         if u.size < 5:
