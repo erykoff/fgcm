@@ -432,6 +432,9 @@ class FgcmGray(object):
                     # We are not fitting the focal plane for this, skip.
                     continue
 
+                if ((i % 100) == 0) and not self.quietMode:
+                    self.fgcmLog.info("Working on full focal plane fit for %d" % (self.fgcmPars.expArray[eInd]))
+
                 # Downsample if too many.
                 if len(i1a) > self.ccdGrayFocalPlaneMaxStars:
                     i1a = self.rng.choice(i1a, replace=False, size=self.ccdGrayFocalPlaneMaxStars)
