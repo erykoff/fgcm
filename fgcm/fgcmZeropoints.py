@@ -1095,14 +1095,12 @@ class FgcmZeropointPlotter(object):
                             cmap=colormaps.get_cmap("bwr"),
                         )
                     else:
-                        # For the rescaled residuals, center at zero, use rescaled lo/hi
-                        amp = np.abs((hi - lo)/2.)
                         plotCCDMap(
                             ax,
                             deltaMapper[use],
                             r1mI1[use],
                             "R1 - I1 (red-blue mmag)",
-                            loHi=[-amp, amp],
+                            loHi=[lo, hi],
                             cmap=colormaps.get_cmap("bwr"),
                         )
                 except ValueError:
