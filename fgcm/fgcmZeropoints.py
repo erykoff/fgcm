@@ -937,6 +937,8 @@ class FgcmZeropointPlotter(object):
 
             i1Conversions[i] = 1000.0 * (deltaMagRed - deltaMagBlue) / deltaI1
 
+            self.fgcmLog.info("i1 conversion for %s band is %.2f" % (band, i1Conversions[i]))
+
         return i1Conversions, blueString, redString
 
     def makeR1I1Plots(self):
