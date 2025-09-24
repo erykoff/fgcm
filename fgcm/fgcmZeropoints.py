@@ -929,8 +929,21 @@ class FgcmZeropointPlotter(object):
         deltaI1 = 1.0
 
         for i, band in enumerate(fgcmStars.bands):
-            sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
-            sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])
+            # We need to make sure we only select valid stars if at all
+            # possible. This is particularly important for u band!
+            okBlue, = np.where(objMagStdMean[goodStars[blueStars], i] < 90.0)
+            okRed, = np.where(objMagStdMean[goodStars[redStars], i] < 90.0)
+
+            if okBlue.size < 3:
+                # This will just pick up the overall median SED slope
+                # which is better than nothing.
+                sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
+            else:
+                sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars[okBlue]], i])
+            if okRed.size < 3:
+                sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])
+            else:
+                sedSlopeRed = np.median(objSEDSlope[goodStars[redStars[okRed]], i])
 
             deltaMagBlue = 2.5 * np.log10((1.0 + sedSlopeBlue * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeBlue * self.I10StdBand[i]))
             deltaMagRed = 2.5 * np.log10((1.0 + sedSlopeRed * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeRed * self.I10StdBand[i]))
