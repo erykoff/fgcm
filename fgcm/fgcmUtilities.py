@@ -119,7 +119,7 @@ def histogram_rev_sorted(data, binsize=1.0, nbin=None, min=None, max=None):
     return b["hist"], b["rev"]
 
 
-def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
+def dataBinner(x, y, binSize, xRange, nTrial=100, xNorm=-1.0, minPerBin=5, rng=None):
     """
     Bin data and compute errors via bootstrap resampling.  All median statistics.
 
@@ -139,6 +139,8 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
        Set the y value == 0 when x is equan to xNorm.  if -1.0 then no norm.
     minPerBin: int, optional, default=5
        Minimum number of points per bin
+    rng : `np.random.RandomState`, optional
+        Random number generator.
 
     returns
     -------
@@ -184,7 +186,10 @@ def dataBinner(x,y,binSize,xRange,nTrial=100,xNorm=-1.0,minPerBin=5):
             medXWidths=np.zeros(nTrial,dtype='f8')
 
             for t in range(nTrial):
-                r=(np.random.random(i1a.size)*i1a.size).astype('i4')
+                if rng is not None:
+                    r = (rng.random(i1a.size)*i1a.size).astype('i4')
+                else:
+                    r = (np.random.random(i1a.size)*i1a.size).astype('i4')
 
                 medYs[t] = np.median(y[i1a[r]])
                 medYWidths[t] = 1.4826*np.median(np.abs(y[i1a[r]] - medYs[t]))
@@ -668,8 +673,8 @@ def plotCCDMapBinned2d(ax, deltaMapper, binnedArray, cbLabel, loHi=None, illegal
 
     cm = colormaps.get_cmap("rainbow")
 
-    plotRaRange = [np.min(deltaMapper['delta_ra']) - 0.02,
-                   np.max(deltaMapper['delta_ra']) + 0.02]
+    plotRaRange = [np.max(deltaMapper['delta_ra']) + 0.02,
+                   np.min(deltaMapper['delta_ra']) - 0.02]
     plotDecRange = [np.min(deltaMapper['delta_dec']) - 0.02,
                     np.max(deltaMapper['delta_dec']) + 0.02]
 
@@ -813,8 +818,10 @@ class FocalPlaneProjectorFromOffsets(object):
     ----------
     ccdOffsets : `np.ndarray`
         CCD offset table
+    rng : `np.random.RandomState`, optional
+        Random number generator.
     """
-    def __init__(self, ccdOffsets):
+    def __init__(self, ccdOffsets, rng=None):
         # Convert from input to internal format.
         dtype = ccdOffsets.dtype.descr
         dtype.extend([('XRA', bool),
@@ -826,6 +833,10 @@ class FocalPlaneProjectorFromOffsets(object):
 
         self._deltaMapper = None
         self._computedSigns = False
+
+        self.rng = rng
+        if self.rng is None:
+            self.rng = np.random.RandomState()
 
     def __call__(self, orientation, nstep=100):
         """
@@ -927,7 +938,7 @@ class FocalPlaneProjectorFromOffsets(object):
         obsDec = snmm.getArray(fgcmStars.obsDecHandle)
 
         if obsX.size > 10_000_000:
-            sub = np.random.choice(obsX.size, size=10_000_000, replace=False)
+            sub = self.rng.choice(obsX.size, size=10_000_000, replace=False)
         else:
             sub = np.arange(obsX.size)
 
@@ -1023,7 +1034,7 @@ def makeFigure(**kwargs):
     return fig
 
 
-def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None, epoch=None):
+def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=None, filterName=None, epoch=None, detector=None):
     """Put a figure into the Butler.
 
     Parameters
@@ -1037,6 +1048,7 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
     band : `str`, optional
     filterName : `str`, optional
     epoch : `str`, optional
+    detector : `int`, optional
     """
     if filterName and band:
         raise RuntimeError("Cannot specify both filterName and band.")
@@ -1052,6 +1064,9 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
 
     if band:
         plotName += f"_{band}"
+
+    if detector:
+        plotName += f"_{detector}"
 
     if plotName not in plotHandleDict:
         logger.warning(f"Could not find plot {plotName} in plotHandleDict.")

@@ -73,6 +73,7 @@ class FgcmGray(object):
         self.ccdGrayFocalPlane = fgcmConfig.ccdGrayFocalPlane
         self.ccdGrayFocalPlaneChebyshevOrder = fgcmConfig.ccdGrayFocalPlaneChebyshevOrder
         self.ccdGrayFocalPlaneFitMinCcd = fgcmConfig.ccdGrayFocalPlaneFitMinCcd
+        self.ccdGrayFocalPlaneMaxStars = fgcmConfig.ccdGrayFocalPlaneMaxStars
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.illegalValue = fgcmConfig.illegalValue
         self.expGrayInitialCut = fgcmConfig.expGrayInitialCut
@@ -98,6 +99,8 @@ class FgcmGray(object):
         self.focalPlaneProjector = fgcmConfig.focalPlaneProjector
         self.defaultCameraOrientation = fgcmConfig.defaultCameraOrientation
         self.deltaMapperDefault = None
+
+        self.rng = fgcmConfig.rng
 
         self._prepareGrayArrays()
 
@@ -406,6 +409,7 @@ class FgcmGray(object):
         ccdGrayRMS[gd] = 0.0  # only used for per-ccd checks
 
         if np.any(self.ccdGrayFocalPlane):
+            self.fgcmLog.info("Computing CCDGray full focal-plane fits.")
 
             # We are doing our full focal plane fits for bands that are set.
             order = self.ccdGrayFocalPlaneChebyshevOrder
@@ -427,6 +431,14 @@ class FgcmGray(object):
                 if not self.ccdGrayFocalPlane[bInd]:
                     # We are not fitting the focal plane for this, skip.
                     continue
+
+                if ((i % 100) == 0) and not self.quietMode:
+                    self.fgcmLog.info("Working on full focal plane fit for %d" % (self.fgcmPars.expArray[eInd]))
+
+                # Downsample if too many.
+                if len(i1a) > self.ccdGrayFocalPlaneMaxStars:
+                    i1a = self.rng.choice(i1a, replace=False, size=self.ccdGrayFocalPlaneMaxStars)
+                    i1a = np.sort(i1a)
 
                 deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[eInd]))
 
@@ -510,14 +522,13 @@ class FgcmGray(object):
                     np.add.at(ccdGrayEvalNStars,
                               obsCCDIndex[goodObs[i1a]],
                               1)
-                    ok, = np.where(ccdGrayEvalNStars > 0)
+                    ok, = np.where((ccdGrayEvalNStars > 0) & np.isfinite(ccdGrayEval))
                     ccdGrayEval[ok] /= ccdGrayEvalNStars[ok]
 
                     ccdGray[eInd, ok] = -2.5*np.log10(ccdGrayEval[ok])
 
                     if self.ccdGraySubCCD[bInd]:
                         # Do the sub-ccd fit
-
                         for cInd in ok:
                             draOff = deltaMapper['delta_ra'][cInd, :] - offsetRA
                             ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
@@ -543,6 +554,7 @@ class FgcmGray(object):
                         ccdGraySubCCDPars[eInd, ~ok, 0] = 1.0
 
         if not np.any(self.ccdGraySubCCD) and not np.any(self.ccdGrayFocalPlane):
+            self.fgcmLog.info("Computing CCDGray constants.")
             # This is when we _only_ have per-ccd gray, no focal plane, and
             # we can do all of this at once.
             np.add.at(ccdGray,
@@ -561,6 +573,7 @@ class FgcmGray(object):
             ccdGrayRMS[ok] = np.sqrt(tempRMS2[ok])
 
         elif np.any(~np.array(self.ccdGrayFocalPlane)):
+            self.fgcmLog.info("Computing CCDGray sub-ccd fits (no focal plane).")
             # We are computing on the sub-ccd scale for some bands, and
             # at least 1 band does not have a focal plane fit
 

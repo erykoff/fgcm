@@ -722,7 +722,9 @@ class FgcmMakeStars(object):
 
         # cut the density of stars down with sampling.
         if self.starConfig['randomSeed'] is not None:
-            np.random.seed(seed=self.starConfig['randomSeed'])
+            rng = np.random.RandomState(seed=self.starConfig['randomSeed'])
+        else:
+            rng = np.random.RandomState()
 
         ipring = hpg.angle_to_pixel(
             self.starConfig['densNSide'],
@@ -737,7 +739,7 @@ class FgcmMakeStars(object):
         self.fgcmLog.info("There are %d/%d pixels with high stellar density" % (high.size, ok.size))
         for i in range(high.size):
             i1a = rev[rev[high[i]]: rev[high[i] + 1]]
-            cut=np.random.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
+            cut = rng.choice(i1a,size=i1a.size-self.starConfig['densMaxPerPixel'],replace=False)
             objClass[gd[cut]] = 0
 
         # redo the good object selection after sampling

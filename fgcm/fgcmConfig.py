@@ -139,6 +139,7 @@ class FgcmConfig(object):
     ccdGrayFocalPlaneChebyshevOrder = ConfigField(int, default=3)
     focalPlaneSigmaClip = ConfigField(float, default=4.0)
     ccdGrayFocalPlaneFitMinCcd = ConfigField(int, default=1)
+    ccdGrayFocalPlaneMaxStars = ConfigField(int, default=50_000)
     aperCorrFitNBins = ConfigField(int, default=5)
     aperCorrInputSlopeDict = ConfigField(dict, default={})
     illegalValue = ConfigField(float, default=-9999.0)
@@ -268,7 +269,9 @@ class FgcmConfig(object):
 
         # First thing: set the random seed if desired
         if self.randomSeed is not None:
-            np.random.seed(seed=self.randomSeed)
+            self.rng = np.random.RandomState(seed=self.randomSeed)
+        else:
+            self.rng = np.random.RandomState()
 
         if self.outputPath is None:
             self.outputPath = os.path.abspath('.')
@@ -507,7 +510,7 @@ class FgcmConfig(object):
             self.focalPlaneProjector = focalPlaneProjector
         else:
             # Use old ccd offsets, so create a translator
-            self.focalPlaneProjector = FocalPlaneProjectorFromOffsets(ccdOffsets)
+            self.focalPlaneProjector = FocalPlaneProjectorFromOffsets(ccdOffsets, rng=self.rng)
 
         # based on mjdRange, look at epochs; also sort.
         # confirm that we cover all the exposures, and remove excess epochs
