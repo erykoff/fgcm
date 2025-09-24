@@ -88,6 +88,7 @@ class FgcmZeropoints(object):
         self.outputFgcmcalZpts = fgcmConfig.outputFgcmcalZpts
         self.useExposureReferenceOffset = fgcmConfig.useExposureReferenceOffset
         self.quietMode = fgcmConfig.quietMode
+        self.rng = fgcmConfig.rng
 
     def computeZeropoints(self):
         """
@@ -597,7 +598,8 @@ class FgcmZeropoints(object):
                                            self.colorSplitIndices, self.colorSplitBands,
                                            self.plotPath, self.outfileBaseWithCycle,
                                            self.cycleNumber, self.fgcmLog,
-                                           butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+                                           butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict,
+                                           rng=self.rng)
 
             plotter.makeR1I1Plots()
             plotter.makeR1I1Maps(deltaMapperDefault, ccdField=self.ccdField)
@@ -874,7 +876,7 @@ class FgcmZeropointPlotter(object):
     def __init__(self, zpStruct, fgcmStars, fgcmPars,
                  I0StdBand, I1StdBand, I10StdBand,
                  colorSplitIndices, colorSplitBands, plotPath, outfileBase,
-                 cycleNumber, fgcmLog, butlerQC=None, plotHandleDict=None):
+                 cycleNumber, fgcmLog, butlerQC=None, plotHandleDict=None, rng=None):
         self.zpStruct = zpStruct
         self.bands = fgcmPars.bands
         self.filterNames = fgcmPars.lutFilterNames
@@ -893,6 +895,10 @@ class FgcmZeropointPlotter(object):
         self.plotHandleDict = plotHandleDict
 
         self.i1Conversions, self.blueString, self.redString = self.computeI1Conversions(fgcmStars)
+
+        self.rng = rng
+        if self.rng is None:
+            self.rng = np.random.RandomState()
 
     def computeI1Conversions(self, fgcmStars):
         """
@@ -923,13 +929,28 @@ class FgcmZeropointPlotter(object):
         deltaI1 = 1.0
 
         for i, band in enumerate(fgcmStars.bands):
-            sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
-            sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])
+            # We need to make sure we only select valid stars if at all
+            # possible. This is particularly important for u band!
+            okBlue, = np.where(objMagStdMean[goodStars[blueStars], i] < 90.0)
+            okRed, = np.where(objMagStdMean[goodStars[redStars], i] < 90.0)
+
+            if okBlue.size < 3:
+                # This will just pick up the overall median SED slope
+                # which is better than nothing.
+                sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars], i])
+            else:
+                sedSlopeBlue = np.median(objSEDSlope[goodStars[blueStars[okBlue]], i])
+            if okRed.size < 3:
+                sedSlopeRed = np.median(objSEDSlope[goodStars[redStars], i])
+            else:
+                sedSlopeRed = np.median(objSEDSlope[goodStars[redStars[okRed]], i])
 
             deltaMagBlue = 2.5 * np.log10((1.0 + sedSlopeBlue * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeBlue * self.I10StdBand[i]))
             deltaMagRed = 2.5 * np.log10((1.0 + sedSlopeRed * ((self.I1StdBand[i] + deltaI1) / self.I0StdBand[i])) / (1.0 + sedSlopeRed * self.I10StdBand[i]))
 
             i1Conversions[i] = 1000.0 * (deltaMagRed - deltaMagBlue) / deltaI1
+
+            self.fgcmLog.info("i1 conversion for %s band is %.2f" % (band, i1Conversions[i]))
 
         return i1Conversions, blueString, redString
 
@@ -1019,7 +1040,7 @@ class FgcmZeropointPlotter(object):
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
-        plotTypes=['I1', 'R1', 'R1 - I1']
+        plotTypes = ['I1', 'R1', 'R1 - I1 (Matched scales)', 'R1 - I1']
 
         ccdMin = np.min(self.zpStruct[ccdField])
         ccdMax = np.max(self.zpStruct[ccdField])
@@ -1057,9 +1078,14 @@ class FgcmZeropointPlotter(object):
             meanR1[use] /= nPerCCD[use]
 
             # use the same range scale for all the plots
-            st = np.argsort(meanR1[use])
-            lo = meanR1[use[st[int(0.02*st.size)]]]
-            hi = meanR1[use[st[int(0.98*st.size)]]]
+            stMatchscale = np.argsort(meanR1[use])
+            loMatchscale = meanR1[use[stMatchscale[int(0.02*use.size)]]]
+            hiMatchscale = meanR1[use[stMatchscale[int(0.98*use.size)]]]
+
+            r1mI1 = meanR1 - meanI1
+            st = np.argsort(r1mI1[use])
+            lo = r1mI1[use[st[int(0.02*use.size)]]]
+            hi = r1mI1[use[st[int(0.98*use.size)]]]
 
             for plotType in plotTypes:
                 fig = makeFigure(figsize=(8, 6))
@@ -1069,18 +1095,27 @@ class FgcmZeropointPlotter(object):
 
                 try:
                     if (plotType == 'R1'):
-                        plotCCDMap(ax, deltaMapper[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[lo,hi])
+                        plotCCDMap(ax, deltaMapper[use], meanR1[use], 'R1 (red-blue mmag)', loHi=[loMatchscale, hiMatchscale])
                     elif (plotType == 'I1'):
-                        plotCCDMap(ax, deltaMapper[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[lo,hi])
-                    else:
-                        # for the residuals, center at zero, but use lo/hi
+                        plotCCDMap(ax, deltaMapper[use], meanI1[use], 'I1 (red-blue mmag)', loHi=[loMatchscale, hiMatchscale])
+                    elif "Matched" in plotType:
+                        # For the matched scale residuals, center at zero, but use lo/hi
                         amp = np.abs((hi - lo)/2.)
                         plotCCDMap(
                             ax,
                             deltaMapper[use],
-                            meanR1[use] - meanI1[use],
+                            r1mI1[use],
                             "R1 - I1 (red-blue mmag)",
                             loHi=[-amp, amp],
+                            cmap=colormaps.get_cmap("bwr"),
+                        )
+                    else:
+                        plotCCDMap(
+                            ax,
+                            deltaMapper[use],
+                            r1mI1[use],
+                            "R1 - I1 (red-blue mmag)",
+                            loHi=[lo, hi],
                             cmap=colormaps.get_cmap("bwr"),
                         )
                 except ValueError:
@@ -1095,10 +1130,14 @@ class FgcmZeropointPlotter(object):
                             ha='left',va='top',fontsize=18)
 
                 if self.butlerQC is not None:
-                    if plotType == "R1 - I1":
-                        name = "R1mI1"
+                    if "R1 - I1" in plotType:
+                        if "Match" in plotType:
+                            name = "R1mI1Matchscale"
+                        else:
+                            name = "R1mI1"
                     else:
                         name = plotType
+
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
                                     self.plotHandleDict,
@@ -1156,7 +1195,7 @@ class FgcmZeropointPlotter(object):
                 continue
 
             # Arbitrarily do 50 days...
-            binStruct = dataBinner(xValues, yValues, 50.0, xRange)
+            binStruct = dataBinner(xValues, yValues, 50.0, xRange, rng=self.rng)
             gd, = np.where(binStruct['Y_ERR'] > 0.0)
 
             if gd.size < 2:

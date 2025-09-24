@@ -49,6 +49,8 @@ class FgcmApertureCorrection(object):
         self.cycleNumber = fgcmConfig.cycleNumber
         self.quietMode = fgcmConfig.quietMode
 
+        self.rng = fgcmConfig.rng
+
     def computeApertureCorrections(self):
         """
         Compute aperture corrections if aperCorrFitNBins > 0
@@ -129,7 +131,8 @@ class FgcmApertureCorrection(object):
             binStruct = dataBinner(self.fgcmPars.expSeeingVariable[expIndexUse[use]],
                                    expGrayTemp[expIndexUse[use]],
                                    binSize,
-                                   self.fgcmPars.compAperCorrRange[:,i])
+                                   self.fgcmPars.compAperCorrRange[:,i],
+                                   rng=self.rng)
             # remove any empty bins...
             gd,=np.where(binStruct['Y_ERR'] > 0.0)
             if (gd.size < 3):

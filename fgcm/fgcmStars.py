@@ -131,6 +131,8 @@ class FgcmStars(object):
 
         self.deltaMapperDefault = None
 
+        self.rng = fgcmConfig.rng
+
         self.starsLoaded = False
         self.starsPrepped = False
 
@@ -601,9 +603,9 @@ class FgcmStars(object):
                 objFlag = snmm.getArray(self.objFlagHandle)
 
                 nReserve = int(self.reserveFraction * objFlag.size)
-                reserve = np.random.choice(objFlag.size,
-                                           size=nReserve,
-                                           replace=False)
+                reserve = self.rng.choice(objFlag.size,
+                                          size=nReserve,
+                                          replace=False)
 
                 self.fgcmLog.info('Reserving %d stars from the fit.' % (nReserve))
                 objFlag[reserve] |= objFlagDict['RESERVED']
@@ -722,9 +724,9 @@ class FgcmStars(object):
                 nMatch = refMatches.size
                 nToRemove = nMatch - nTarget
 
-                remove = np.random.choice(refMatches.size,
-                                          size=nToRemove,
-                                          replace=False)
+                remove = self.rng.choice(refMatches.size,
+                                         size=nToRemove,
+                                         replace=False)
                 # Flag these as REFSTAR_RESERVED
                 objFlag[refMatches[remove]] |= objFlagDict['REFSTAR_RESERVED']
 
