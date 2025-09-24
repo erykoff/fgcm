@@ -522,7 +522,7 @@ class FgcmGray(object):
                     np.add.at(ccdGrayEvalNStars,
                               obsCCDIndex[goodObs[i1a]],
                               1)
-                    ok, = np.where(ccdGrayEvalNStars > 0)
+                    ok, = np.where((ccdGrayEvalNStars > 0) & np.isfinite(ccdGrayEval))
                     ccdGrayEval[ok] /= ccdGrayEvalNStars[ok]
 
                     ccdGray[eInd, ok] = -2.5*np.log10(ccdGrayEval[ok])
