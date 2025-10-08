@@ -437,8 +437,9 @@ class FgcmGray(object):
 
                 # Downsample if too many.
                 if len(i1a) > self.ccdGrayFocalPlaneMaxStars:
-                    i1a = self.rng.choice(i1a, replace=False, size=self.ccdGrayFocalPlaneMaxStars)
-                    i1a = np.sort(i1a)
+                    subsample = self.rng.choice(len(i1a), replace=False, size=self.ccdGrayFocalPlaneMaxStars)
+                else:
+                    subsample = np.arange(len(i1a))
 
                 deltaMapper = self.focalPlaneProjector(int(self.fgcmPars.expTelRot[eInd]))
 
@@ -466,10 +467,17 @@ class FgcmGray(object):
                         field = Cheb2dField.fit(np.max(deltaRA - offsetRA),
                                                 np.max(deltaDec - offsetDec),
                                                 order,
-                                                deltaRA - offsetRA, deltaDec - offsetDec,
-                                                FGrayGO[i1a],
-                                                valueErr=FGrayErrGO[i1a],
+                                                deltaRA[subsample] - offsetRA, deltaDec[subsample] - offsetDec,
+                                                FGrayGO[i1a][subsample],
+                                                valueErr=FGrayErrGO[i1a][subsample],
                                                 triangular=False)
+
+                        # Check that solution didn't end up in crazy town.
+                        fieldEval = field.evaluate(deltaRA - offsetRA, deltaDec - offsetDec)
+                        if np.any(~np.isfinite(fieldEval)) or np.any(fieldEval < 0.0):
+                            self.fgcmLog.warning("Full focal-plane fit produced illegal values on exposure %d" %
+                                                 (self.fgcmPars.expArray[eInd]))
+                            fitFailed = True
                     except (ValueError, RuntimeError, TypeError):
                         # Log a warn and set to a single value...
                         self.fgcmLog.warning("Full focal-plane fit failed on exposure %d" %
