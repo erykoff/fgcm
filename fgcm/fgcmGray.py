@@ -471,6 +471,13 @@ class FgcmGray(object):
                                                 FGrayGO[i1a][subsample],
                                                 valueErr=FGrayErrGO[i1a][subsample],
                                                 triangular=False)
+
+                        # Check that solution didn't end up in crazy town.
+                        fieldEval = field.evaluate(deltaRA - offsetRA, deltaDec - offsetDec)
+                        if np.any(~np.isfinite(fieldEval)) or np.any(fieldEval < 0.0):
+                            self.fgcmLog.warning("Full focal-plane fit produced illegal values on exposure %d" %
+                                                 (self.fgcmPars.expArray[eInd]))
+                            fitFailed = True
                     except (ValueError, RuntimeError, TypeError):
                         # Log a warn and set to a single value...
                         self.fgcmLog.warning("Full focal-plane fit failed on exposure %d" %
