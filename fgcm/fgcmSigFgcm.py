@@ -56,18 +56,20 @@ class FgcmSigFgcm(object):
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
         self.quietMode = fgcmConfig.quietMode
 
-    def computeSigFgcm(self, reserved=False, save=True, crunch=False):
+    def computeSigFgcm(self, reserved=False, save=True, crunch=False, nonphotometric=False):
         """
         Compute sigFgcm for all bands
 
         parameters
         ----------
-        reserved: bool, default=False
-           Use reserved stars instead of fit stars?
-        save: bool, default=True
-           Save computed values to fgcmPars?
-        crunch: bool, default=False
-           Compute based on ccd-crunched values?
+        reserved : `bool`, optional
+            Use reserved stars instead of fit stars?
+        save : `bool`, optional
+            Save computed values to fgcmPars?
+        crunch : `bool`, optional
+            Compute based on ccd-crunched values?
+        nonphotometric : `bool`, optional
+            Include non-photometric exposures?
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -96,7 +98,12 @@ class FgcmSigFgcm(object):
         else:
             goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=True, checkMinObs=True)
 
-        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag, checkBadMag=True)
+        if nonphotometric:
+            expFlagTemp = None
+        else:
+            expFlagTemp = self.fgcmPars.expFlag
+
+        _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=expFlagTemp, checkBadMag=True)
 
         # we need to compute E_gray == <mstd> - mstd for each observation
         # this statistic is internal only, no reference stars.
@@ -143,6 +150,10 @@ class FgcmSigFgcm(object):
             sigTypes.append('crunched')
             extraName += '_crunched'
             extraNameButler += "Crunched"
+        if nonphotometric:
+            sigTypes.append('nonphotometric')
+            extraName += "_nonphot"
+            extraNameButler += "NonPhotom"
 
         sigType = '/'.join(sigTypes)
 
@@ -212,11 +223,11 @@ class FgcmSigFgcm(object):
                     # only save if we're doing the full color range
                     self.fgcmPars.compSigFgcm[bandIndex] = sigFgcm[bandIndex]
 
-                if (reserved and not crunch and (c == 0)):
+                if (reserved and not crunch and (c == 0) and not nonphotometric):
                     # Save the reserved raw repeatability.  Used for
                     # convergence testing in LSST stack.
                     self.fgcmPars.compReservedRawRepeatability[bandIndex] = coeff[2]
-                elif (reserved and crunch and (c == 0)):
+                elif (reserved and crunch and (c == 0)) and not nonphotometric:
                     self.fgcmPars.compReservedRawCrunchedRepeatability[bandIndex] = coeff[2]
 
                 if self.plotPath is None:

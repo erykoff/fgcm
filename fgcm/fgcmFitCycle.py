@@ -677,6 +677,7 @@ class FgcmFitCycle(object):
                            fgcmGray=self.fgcmGray)
 
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True, nonphotometric=True)
 
         repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
         for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
