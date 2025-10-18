@@ -411,6 +411,12 @@ class FgcmGray(object):
         if np.any(self.ccdGrayFocalPlane):
             self.fgcmLog.info("Computing CCDGray full focal-plane fits.")
 
+            # This config will compute full focal plane gray corrections _instead_
+            # of per-ccd gray corrections (except in the case of insufficient
+            # good ccds). Note that the "sub-ccd" part of this is only a convenience
+            # to translate the full focal plane fit into per-ccd chebyshevs.
+            # This could/should be revisited in the future.
+
             # We are doing our full focal plane fits for bands that are set.
             order = self.ccdGrayFocalPlaneChebyshevOrder
             pars = np.zeros((order + 1, order + 1))
@@ -517,8 +523,8 @@ class FgcmGray(object):
                 else:
                     # Sucessful fit
 
-                    # Eval for all the points, and take the mean of the model for the overall
-                    # value
+                    # We evaluate the field for all the stars and we use the *model*
+                    # for the ccd gray value.
 
                     ccdGrayEvalStars = field.evaluate(deltaRA - offsetRA,
                                                       deltaDec - offsetDec)
@@ -536,7 +542,9 @@ class FgcmGray(object):
                     ccdGray[eInd, ok] = -2.5*np.log10(ccdGrayEval[ok])
 
                     if self.ccdGraySubCCD[bInd]:
-                        # Do the sub-ccd fit
+                        # This sub-ccd fit is merely doing a sub-ccd approximation
+                        # to the full focal plane fit.  It is not additionally
+                        # performing a per-ccd correction.
                         for cInd in ok:
                             draOff = deltaMapper['delta_ra'][cInd, :] - offsetRA
                             ddecOff = deltaMapper['delta_dec'][cInd, :] - offsetDec
@@ -554,7 +562,7 @@ class FgcmGray(object):
                                 self.fgcmLog.warning("Focal plane to ccd mapping fit failed on %d/%d" %
                                                      (self.fgcmPars.expArray[eInd], cInd + self.ccdStartIndex))
                                 # Put in a filler here
-                                ccdGraySubCCDPars[eInd, cInd, 0] = ccdGrayEval
+                                ccdGraySubCCDPars[eInd, cInd, 0] = ccdGrayEval[cInd]
 
                     elif np.any(self.ccdGraySubCCD):
                         # Do one number per ccd in the parameters if we need to set any.
