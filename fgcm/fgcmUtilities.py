@@ -224,20 +224,23 @@ def gaussFunction(x, *p):
     A, mu, sigma = p
     return A*np.exp(-(x-mu)**2./(2.*sigma**2))
 
-def histoGauss(ax,array):
+def histoGauss(ax, array, rangeNSig=5.0):
     """
     Plot a histogram and fit a Gaussian to it.  Modeled after IDL histogauss.pro.
 
-    parameters
+    Parameters
     ----------
-    ax: Plot axis object
-       If None, return coefficients but do not plot
-    array: float array to plot
+    ax : `matplotlib.axis`
+        If None, return coefficients but do not plot
+    array : `np.ndarray`
+        Array to plot.
+    rangeNSig : `float`, optional
+        Number of sigma to use for the range.
 
-    returns
+    Returns
     -------
-    coeff: tuple (A, mu, sigma, fail)
-       Fail is 0 if the fit succeeded
+    coeff: `tuple` (A, mu, sigma, fail)
+        Fail is 0 if the fit succeeded
     """
 
     import scipy.optimize
@@ -275,8 +278,8 @@ def histoGauss(ax,array):
     hcenter=hist['center']
     hhist=hist['hist']
 
-    rangeLo = coeff[1] - 5*coeff[2]
-    rangeHi = coeff[1] + 5*coeff[2]
+    rangeLo = coeff[1] - rangeNSig*coeff[2]
+    rangeHi = coeff[1] + rangeNSig*coeff[2]
 
     lo,=np.where(hcenter < rangeLo)
     ok,=np.where(hcenter > rangeLo)
