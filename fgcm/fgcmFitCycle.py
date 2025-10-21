@@ -672,11 +672,15 @@ class FgcmFitCycle(object):
         self.fgcmZpts.computeZeropoints()
 
         # And finally compute the stars and test repeatability *after* the crunch
-        self.fgcmLog.debug('Using FgcmChisq to compute mags with CCD crunch')
+        self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (photometric)')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
-
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
+
+        self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (all exposures)')
+        _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
+                           fgcmGray=self.fgcmGray, allExposures=True)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True, nonphotometric=True)
 
         repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
         for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
