@@ -660,16 +660,6 @@ class FgcmFitCycle(object):
 
             self.fgcmGray.computeExposureReferenceOffsets()
 
-        # Make Zeropoints
-        # We always want to compute these because of the plots
-        # In the future we might want to streamline if something is bogging down.
-
-        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
-                                       self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval, self.fgcmStars,
-                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
-        self.fgcmLog.debug('FitCycle computing zeropoints.')
-        self.fgcmZpts.computeZeropoints()
 
         # And finally compute the stars and test repeatability *after* the crunch
         self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (photometric)')
@@ -681,6 +671,17 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray, allExposures=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True, nonphotometric=True)
+
+        # Make Zeropoints
+        # We always want to compute these because of the plots
+        # In the future we might want to streamline if something is bogging down.
+
+        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
+                                       self.fgcmLUT, self.fgcmGray,
+                                       self.fgcmRetrieval, self.fgcmStars,
+                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+        self.fgcmLog.debug('FitCycle computing zeropoints.')
+        self.fgcmZpts.computeZeropoints()
 
         repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
         for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
