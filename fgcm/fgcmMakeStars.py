@@ -6,7 +6,6 @@ import glob
 import hpgeom as hpg
 
 from .fgcmLogger import FgcmLogger
-from .fgcmUtilities import histogram_rev_sorted
 
 
 class FgcmMakeStars(object):
@@ -337,7 +336,7 @@ class FgcmMakeStars(object):
 
         # Split into pixels
         ipring = hpg.angle_to_pixel(self.starConfig['coarseNSide'], raArray, decArray, nest=False)
-        hpix, revpix = histogram_rev_sorted(ipring)
+        hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         gdpix, = np.where(hpix > 0)
         self.fgcmLog.info("Matching primary stars in %d pixels" % (gdpix.size))
@@ -446,7 +445,7 @@ class FgcmMakeStars(object):
 
                 # This is the official working version, but slower
                 fakeId = np.arange(p1a.size)
-                hist, rev = histogram_rev_sorted(fakeId[i1])
+                hist, rev = esutil.stat.histogram(fakeId[i1], rev=True)
 
                 if (hist.max() == 1):
                     self.fgcmLog.warning("  No matches found for pixel %d, %s band" %
@@ -682,7 +681,7 @@ class FgcmMakeStars(object):
             i1 = matches[1]
 
         self.fgcmLog.info("Collating observations")
-        nObsPerObj, obsInd = histogram_rev_sorted(i1)
+        nObsPerObj, obsInd = esutil.stat.histogram(i1, rev=True)
 
         if (nObsPerObj.size != self.objCat.size):
             raise ValueError("Number of primary stars (%d) does not match observations (%d)." %
@@ -732,7 +731,7 @@ class FgcmMakeStars(object):
             self.objCat['dec'][gd],
             nest=False
         )
-        hist, rev = histogram_rev_sorted(ipring)
+        hist, rev = esutil.stat.histogram(ipring, rev=True)
 
         high,=np.where(hist > self.starConfig['densMaxPerPixel'])
         ok,=np.where(hist > 0)
@@ -813,7 +812,7 @@ class FgcmMakeStars(object):
             self.objIndexCat['dec'],
             nest=False
         )
-        hpix, revpix = histogram_rev_sorted(ipring)
+        hpix, revpix = esutil.stat.histogram(ipring, rev=True)
 
         pixelCats = []
         nBands = len(self.starConfig['referenceFilterNames'])

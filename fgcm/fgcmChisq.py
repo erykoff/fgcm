@@ -8,7 +8,6 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import objFlagDict
-from .fgcmUtilities import histogram_rev_sorted
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
@@ -607,7 +606,7 @@ class FgcmChisq(object):
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
                 expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
                               obsCCDIndexGO[ok])
-                h, rev = histogram_rev_sorted(expCcdHash)
+                h, rev = esutil.stat.histogram(expCcdHash, rev=True)
                 use, = np.where(h > 0)
                 for i in use:
                     i1a = rev[rev[i]: rev[i + 1]]

@@ -6,7 +6,6 @@ import time
 import scipy.optimize
 from astropy.time import Time
 
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
@@ -87,7 +86,7 @@ class FgcmQeSysSlope(object):
         obsMagStdGO -= deltaQESlopeGO
 
         # split per wash interval
-        washH, washRev = histogram_rev_sorted(self.fgcmPars.expWashIndex[obsExpIndexGO], min=0)
+        washH, washRev = esutil.stat.histogram(self.fgcmPars.expWashIndex[obsExpIndexGO], min=0, rev=True)
         washIndices, = np.where(washH > 0)
 
         for washIndex in washIndices:
@@ -95,7 +94,7 @@ class FgcmQeSysSlope(object):
 
             # Split per band, and compute the delta-T and delta-Mag
 
-            bandH, bandRev = histogram_rev_sorted(obsBandIndex[goodObs[i1a]], min=0)
+            bandH, bandRev = esutil.stat.histogram(obsBandIndex[goodObs[i1a]], min=0, rev=True)
             bandIndices, = np.where(bandH > 0)
 
             deltaTAll = None

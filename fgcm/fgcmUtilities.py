@@ -158,11 +158,12 @@ def dataBinner(x, y, binSize, xRange, nTrial=100, xNorm=-1.0, minPerBin=5, rng=N
 
     import esutil
 
-    hist, rev = histogram_rev_sorted(
+    hist, rev = esutil.stat.histogram(
         x,
         binsize=binSize,
         min=xRange[0],
         max=xRange[1] - 0.0001,
+        rev=True,
     )
     binStruct=np.zeros(hist.size,dtype=[('X_BIN','f4'),
                                         ('X','f4'),
@@ -945,7 +946,7 @@ class FocalPlaneProjectorFromOffsets(object):
         else:
             sub = np.arange(obsX.size)
 
-        h, rev = histogram_rev_sorted(obsCCDIndex[sub])
+        h, rev = esutil.stat.histogram(obsCCDIndex[sub], rev=True)
 
         for i in range(h.size):
             if h[i] == 0: continue
@@ -956,7 +957,7 @@ class FocalPlaneProjectorFromOffsets(object):
 
             if self.ccdOffsets['RASIGN'][cInd] == 0:
                 # choose a good exposure to work with
-                hTest, revTest = histogram_rev_sorted(obsExpIndex[i1a])
+                hTest, revTest = esutil.stat.histogram(obsExpIndex[i1a], rev=True)
                 # Exclude the first index which will be invalid exposures.
                 maxInd = np.argmax(hTest[1: ]) + 1
                 testStars = revTest[revTest[maxInd]: revTest[maxInd + 1]]

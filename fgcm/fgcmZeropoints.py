@@ -7,7 +7,6 @@ from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import dataBinner
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 from matplotlib import colormaps
@@ -309,7 +308,7 @@ class FgcmZeropoints(object):
         # need secZenith for each exp/ccd pair
         deltaRA = np.zeros(zpStruct.size)
         deltaDec = np.zeros(zpStruct.size)
-        h, rev = histogram_rev_sorted(zpExpIndex)
+        h, rev = esutil.stat.histogram(zpExpIndex, rev=True)
         ok, = np.where(h > 0)
         for i in ok:
             i1a = rev[rev[i]: rev[i + 1]]
@@ -771,7 +770,7 @@ class FgcmZeropoints(object):
                            (self.fgcmPars.nCCD + 1) +
                            zpCCDIndex)
 
-        h, rev = histogram_rev_sorted(epochFilterHash)
+        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
         for i in range(h.size):
             if h[i] == 0: continue
