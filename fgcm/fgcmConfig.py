@@ -195,6 +195,7 @@ class FgcmConfig(object):
 
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
+    nStarPerGrayRun = ConfigField(int, default=50000)
     nExpPerRun = ConfigField(int, default=1000)
     varNSig = ConfigField(float, default=100.0)
     varMinBand = ConfigField(int, default=2)

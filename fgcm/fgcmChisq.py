@@ -60,6 +60,7 @@ class FgcmChisq(object):
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nStarPerGrayRun = fgcmConfig.nStarPerGrayRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
@@ -175,6 +176,10 @@ class FgcmChisq(object):
         self.fgcmGray = fgcmGray    # may be None
         self.computeAbsThroughput = computeAbsThroughput
         self.ignoreRef = ignoreRef
+
+        nStarPerRun = self.nStarPerRun
+        if fgcmGray is not None:
+            nStarPerRun = self.nStarPerGrayRun
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -350,7 +355,7 @@ class FgcmChisq(object):
             # split goodStars into a list of arrays of roughly equal size
 
             prepStartTime = time.time()
-            nSections = goodStars.size // self.nStarPerRun + 1
+            nSections = goodStars.size // nStarPerRun + 1
             goodStarsList = np.array_split(goodStars,nSections)
 
             # is there a better way of getting all the first elements from the list?
