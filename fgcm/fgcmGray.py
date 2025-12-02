@@ -146,6 +146,39 @@ class FgcmGray(object):
 
         self.arraysPrepared = True
 
+    def resetArrays(self):
+        """Reset arrays"""
+        snmm.getArray(self.expGrayForInitialSelectionHandle)[:] = 0.0
+        snmm.getArray(self.expGrayRMSForInitialSelectionHandle)[:] = 0.0
+        snmm.getArray(self.expNGoodStarForInitialSelectionHandle)[:] = 0
+
+        snmm.getArray(self.ccdGrayHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdDeltaStdHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdGrayRMSHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdGrayErrHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdNGoodObsHandle)[:, :] = 0
+        snmm.getArray(self.ccdNGoodStarsHandle)[:, :] = 0
+        snmm.getArray(self.ccdNGoodTilingsHandle)[:, :] = 0
+
+        if np.any(self.ccdGraySubCCD):
+            snmm.getArray(self.ccdGraySubCCDParsHandle)[:, :, :] = 0.0
+
+        snmm.getArray(self.expGrayHandle)[:] = 0.0
+        snmm.getArray(self.expDeltaStdHandle)[:] = 0.0
+        snmm.getArray(self.expGrayRMSHandle)[:] = 0.0
+        snmm.getArray(self.expGrayErrHandle)[:] = 0.0
+        snmm.getArray(self.expNGoodStarsHandle)[:] = 0
+        snmm.getArray(self.expNGoodCCDsHandle)[:] = 0
+        snmm.getArray(self.expNGoodTilingsHandle)[:] = 0
+
+        snmm.getArray(self.expGrayColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayRMSColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayErrColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayNGoodStarsColorSplitHandle)[:, :] = 0
+
+        snmm.getArray(self.ccdDeltaMagBkgHandle)[:, :] = 0.0
+        snmm.getArray(self.expDeltaMagBkgHandle)[:] = 0.0
+
     def setDeltaMapperDefault(self, deltaMapperDefault):
         """
         Set the deltaMapperDefault array.
