@@ -8,7 +8,6 @@ from scipy.stats import median_abs_deviation
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 from .fgcmUtilities import Cheb2dField
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 
@@ -202,7 +201,7 @@ class FgcmSuperStarFlat(object):
                                (self.fgcmPars.nCCD+1) +
                                obsCCDIndex[goodObs])
 
-            h, rev = histogram_rev_sorted(epochFilterHash)
+            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
             for i in range(h.size):
                 if h[i] == 0: continue

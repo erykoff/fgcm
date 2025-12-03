@@ -6,7 +6,6 @@ import warnings
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import obsFlagDict
 from .fgcmUtilities import getMemoryString
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
@@ -47,12 +46,41 @@ class FgcmStars(object):
 
     def __init__(self, fgcmConfig, butlerQC=None, plotHandleDict=None):
 
+        self.reloadConfig(fgcmConfig, butlerQC=butlerQC, plotHandleDict=plotHandleDict)
+
+        self.magStdComputed = False
+        self.allMagStdComputed = False
+        self.sedSlopeComputed = False
+
+        self.hasXY = False
+        self.hasDeltaAper = False
+        self.hasRefstars = False
+        self.nRefStars = 0
+        self.hasPsfCandidate = False
+        self.hasDeltaMagBkg = False
+
+        self.deltaMapperDefault = None
+
+        self.rng = fgcmConfig.rng
+
+        self.missingSedValues = np.zeros(self.nBands)
+
+        self.starsLoaded = False
+        self.starsPrepped = False
+
+    def reloadConfig(self, fgcmConfig, butlerQC=None, plotHandleDict=None):
+        """Reload config + friends.
+
+        Parameters
+        ----------
+        fgcmConfig : `fgcm.FgcmConfig`
+        butlerQC : `lsst.daf.butler.ButlerQuantumContext`
+        plotHandleDict : `dict`
+        """
         self.fgcmLog = fgcmConfig.fgcmLog
 
         self.butlerQC = butlerQC
         self.plotHandleDict = plotHandleDict
-
-        self.fgcmLog.debug('Initializing stars.')
 
         self.obsFile = fgcmConfig.obsFile
         self.indexFile = fgcmConfig.indexFile
@@ -104,10 +132,6 @@ class FgcmStars(object):
 
         self.focalPlaneSigmaClip = fgcmConfig.focalPlaneSigmaClip
 
-        self.magStdComputed = False
-        self.allMagStdComputed = False
-        self.sedSlopeComputed = False
-
         self.magConstant = 2.5/np.log(10)
         self.zptABNoThroughput = fgcmConfig.zptABNoThroughput
         self.approxThroughput = fgcmConfig.approxThroughput
@@ -116,25 +140,44 @@ class FgcmStars(object):
         self.refStarMaxFracUse = fgcmConfig.refStarMaxFracUse
         self.applyRefStarColorCuts = fgcmConfig.applyRefStarColorCuts
 
-        self.hasXY = False
-        self.hasDeltaAper = False
-        self.hasRefstars = False
-        self.nRefStars = 0
-        self.hasPsfCandidate = False
-        self.hasDeltaMagBkg = False
-
         self.seeingSubExposure = fgcmConfig.seeingSubExposure
 
         self.secZenithRange = 1. / np.cos(np.radians(fgcmConfig.zenithRange))
 
-        self.missingSedValues = np.zeros(self.nBands)
-
-        self.deltaMapperDefault = None
-
         self.rng = fgcmConfig.rng
 
-        self.starsLoaded = False
-        self.starsPrepped = False
+    def updateFlags(self, flagID, flagFlag):
+        """
+        Update flagged stars.
+
+        Parameters
+        ----------
+        flagID : `np.ndarray`
+            Array of flagged object IDs
+        flagFlag : `np.ndarray`
+            Array of flagged star flag values.
+        """
+        objID = snmm.getArray(self.objIDHandle)
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        a, b = esutil.numpy_util.match(flagID, objID)
+
+        test = ((flagFlag[a] & objFlagDict['VARIABLE']) > 0)
+        self.fgcmLog.info('Flagging %d stars as variable from previous cycles.' %
+                          (test.sum()))
+        test = ((flagFlag[a] & objFlagDict['RESERVED']) > 0)
+        self.fgcmLog.info('Flagging %d stars as reserved from previous cycles.' %
+                          (test.sum()))
+        test = ((flagFlag[a] & objFlagDict['REFSTAR_OUTLIER']) > 0)
+        if test.sum() > 0:
+            self.fgcmLog.info('Flagging %d stars as reference star outliers from previous cycles.' %
+                              (test.sum()))
+        test = ((flagFlag[a] & objFlagDict['REFSTAR_RESERVED']) > 0)
+        if test.sum() > 0:
+            self.fgcmLog.info('Flagging %d stars as reference star reserved from previous cycles.' %
+                              (test.sum()))
+
+        objFlag[b] = flagFlag[a]
 
     def setDeltaMapperDefault(self, deltaMapperDefault):
         """
@@ -382,10 +425,12 @@ class FgcmStars(object):
         #  obsSecZenith: secant(zenith) of individual observation
         self.obsSecZenithHandle = snmm.createArray(self.nStarObs,dtype='f8')
         #  obsMagADU: log raw ADU counts of individual observation
-        ## FIXME: need to know default zeropoint?
         self.obsMagADUHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsMagADUErr: raw ADU counts error of individual observation
         self.obsMagADUErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
+        # We also store the original values which helps with repeat runs.
+        self.obsMagADUOrigHandle = snmm.createArray(self.nStarObs, dtype='f4')
+        self.obsMagADUErrOrigHandle = snmm.createArray(self.nStarObs, dtype='f4')
         #  obsMagADUModelErr: modeled ADU counts error of individual observation
         self.obsMagADUModelErrHandle = snmm.createArray(self.nStarObs,dtype='f4')
         #  obsSuperStarApplied: SuperStar correction that was applied
@@ -455,6 +500,8 @@ class FgcmStars(object):
         # and is arbitrary anyway and doesn't enter the fits.
         snmm.getArray(self.obsMagADUHandle)[:] = obsMag + self.zptABNoThroughput
         snmm.getArray(self.obsMagADUErrHandle)[:] = obsMagErr
+        snmm.getArray(self.obsMagADUOrigHandle)[:] = obsMag
+        snmm.getArray(self.obsMagADUErrOrigHandle)[:] = obsMagErr
         snmm.getArray(self.obsMagStdHandle)[:] = obsMag + self.zptABNoThroughput  # same as raw at first
         snmm.getArray(self.obsDeltaStdHandle)[:] = 0.0
         snmm.getArray(self.obsSuperStarAppliedHandle)[:] = 0.0
@@ -575,28 +622,7 @@ class FgcmStars(object):
 
         # and read in the previous bad stars if available
         if (flagID is not None):
-            # the objFlag contains information on RESERVED stars
-            objID = snmm.getArray(self.objIDHandle)
-            objFlag = snmm.getArray(self.objFlagHandle)
-
-            a,b=esutil.numpy_util.match(flagID, objID)
-
-            test,=np.where((flagFlag[a] & objFlagDict['VARIABLE']) > 0)
-            self.fgcmLog.info('Flagging %d stars as variable from previous cycles.' %
-                             (test.size))
-            test,=np.where((flagFlag[a] & objFlagDict['RESERVED']) > 0)
-            self.fgcmLog.info('Flagging %d stars as reserved from previous cycles.' %
-                             (test.size))
-            test, = np.where((flagFlag[a] & objFlagDict['REFSTAR_OUTLIER']) > 0)
-            if test.size > 0:
-                self.fgcmLog.info('Flagging %d stars as reference star outliers from previous cycles.' %
-                                  (test.size))
-            test, = np.where((flagFlag[a] & objFlagDict['REFSTAR_RESERVED']) > 0)
-            if test.size > 0:
-                self.fgcmLog.info('Flagging %d stars as reference star reserved from previous cycles.' %
-                                  (test.size))
-
-            objFlag[b] = flagFlag[a]
+            self.updateFlags(flagID, flagFlag)
         else:
             # we want to reserve stars, if necessary
             if self.reserveFraction > 0.0:
@@ -621,6 +647,8 @@ class FgcmStars(object):
         Parameters
         ----------
         fgcmPars : `fgcm.FgcmParameters`
+        allocate : `bool`, optional
+            Allocate shared memory?
         """
         self.fgcmLog.debug('Applying sigma0Phot = %.4f to mag errs' %
                            (self.sigma0Phot))
@@ -681,7 +709,8 @@ class FgcmStars(object):
 
         startTime = time.time()
         self.fgcmLog.debug('Indexing star observations...')
-        self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs,dtype='i8')
+        self.obsObjIDIndexHandle = snmm.createArray(self.nStarObs, dtype='i8')
+
         obsObjIDIndex = snmm.getArray(self.obsObjIDIndexHandle)
         objID = snmm.getArray(self.objIDHandle)
         obsIndex = snmm.getArray(self.obsIndexHandle)
@@ -817,28 +846,29 @@ class FgcmStars(object):
         self.starsPrepped = True
 
         if (self._needToComputeNobs):
-            self.fgcmLog.debug('Checking stars with all exposure numbers')
-            allExpsIndex = np.arange(fgcmPars.expArray.size)
-            self.selectStarsMinObsExpIndex(allExpsIndex)
-
-            self.computeNTotalStats(fgcmPars)
+            self.computeAllNobs(fgcmPars)
 
         self._needToComputeNobs = False
 
-    def reloadStarMagnitudes(self, obsMag, obsMagErr):
+    def reloadStarMagnitudes(self, obsMag=None, obsMagErr=None):
         """
         Reload star magnitudes, used when automating multiple fit cycles in memory.
 
         Parameters
         ----------
-        obsMag: float array
-           Raw ADU magnitude for each observation
-        obsMagErr: float array
-           Raw ADU magnitude error for each observation
+        obsMag : `np.ndarray`, optional
+            Raw ADU magnitude for each observation
+        obsMagErr : `np.ndarray`, optional
+            Raw ADU magnitude error for each observation
         """
 
         if not self.starsLoaded or not self.starsPrepped:
             raise RuntimeError("Cannot call reloadStarMagnitudes until stars have been loaded and prepped.")
+
+        if obsMag is None:
+            obsMag = snmm.getArray(self.obsMagADUOrigHandle)
+        if obsMagErr is None:
+            obsMagErr = snmm.getArray(self.obsMagADUErrOrigHandle)
 
         if len(obsMag) != self.nStarObs:
             raise RuntimeError("Replacement star magnitude has wrong length.")
@@ -869,6 +899,47 @@ class FgcmStars(object):
         snmm.getArray(self.objMagStdMeanErrHandle)[:, :] = 0.0
         snmm.getArray(self.objSEDSlopeHandle)[:, :] = 0.0
         snmm.getArray(self.objMagStdMeanNoChromHandle)[:, :] = 0.0
+
+        # Reset the observation flags.
+        obsFlag = snmm.getArray(self.obsFlagHandle)
+        obsFlag[:] = 0
+
+        bad, = np.where(~np.isfinite(obsMagADU))
+        obsFlag[bad] |= obsFlagDict["BAD_MAG"]
+        if bad.size > 0:
+            self.fgcmLog.debug("Flagging %d observations with bad magnitudes." %
+                               (bad.size))
+
+        bad, = np.where((np.nan_to_num(obsMagADUErr) <= 0.0) | ~np.isfinite(obsMagADUErr))
+        obsFlag[bad] |= obsFlagDict["BAD_ERROR"]
+        if (bad.size > 0):
+            self.fgcmLog.debug("Flagging %d observations with bad errors." %
+                               (bad.size))
+
+        # Reset the object flags.
+        # We only keep VARIABLE and RESERVED stars.
+        objFlag = snmm.getArray(self.objFlagHandle)
+
+        flagMask = (objFlagDict['VARIABLE'] |
+                    objFlagDict['RESERVED'] |
+                    objFlagDict['REFSTAR_OUTLIER'] |
+                    objFlagDict['REFSTAR_RESERVED'])
+
+        objFlag[:] &= flagMask
+
+    def computeAllNobs(self, fgcmPars):
+        """Compute all the Nobs arrays.
+
+        Parameters
+        ----------
+        fgcmPars : `fgcm.fgcmParameters`
+        """
+        self.fgcmLog.debug("Checking stars with all exposure numbers")
+
+        allExpsIndex = np.arange(fgcmPars.expArray.size)
+        self.selectStarsMinObsExpIndex(allExpsIndex)
+
+        self.computeNTotalStats(fgcmPars)
 
     def selectStarsMinObsExpIndex(self, goodExpsIndex, temporary=False,
                                   minObsPerBand=None, reset=True):
@@ -1643,7 +1714,7 @@ class FgcmStars(object):
                            (fgcmPars.nCCD+1) +
                            obsCCDIndex[goodObs])
 
-        h, rev = histogram_rev_sorted(epochFilterHash)
+        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
         nbad = 0
 
@@ -1715,7 +1786,7 @@ class FgcmStars(object):
         # compute EGray, GO for Good Obs
         EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
 
-        h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
+        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
 
         nbad = 0
 
@@ -1774,7 +1845,7 @@ class FgcmStars(object):
                                (fgcmPars.nCCD+1) +
                                obsCCDIndex)
 
-            h, rev = histogram_rev_sorted(epochFilterHash)
+            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
 
             for i in range(h.size):
                 if h[i] == 0: continue

@@ -10,7 +10,6 @@ from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
 from .fgcmUtilities import expFlagDict
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
@@ -146,6 +145,39 @@ class FgcmGray(object):
         self.expDeltaMagBkgHandle = snmm.createArray(self.fgcmPars.nExp, dtype='f8')
 
         self.arraysPrepared = True
+
+    def resetArrays(self):
+        """Reset arrays"""
+        snmm.getArray(self.expGrayForInitialSelectionHandle)[:] = 0.0
+        snmm.getArray(self.expGrayRMSForInitialSelectionHandle)[:] = 0.0
+        snmm.getArray(self.expNGoodStarForInitialSelectionHandle)[:] = 0
+
+        snmm.getArray(self.ccdGrayHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdDeltaStdHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdGrayRMSHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdGrayErrHandle)[:, :] = 0.0
+        snmm.getArray(self.ccdNGoodObsHandle)[:, :] = 0
+        snmm.getArray(self.ccdNGoodStarsHandle)[:, :] = 0
+        snmm.getArray(self.ccdNGoodTilingsHandle)[:, :] = 0
+
+        if np.any(self.ccdGraySubCCD):
+            snmm.getArray(self.ccdGraySubCCDParsHandle)[:, :, :] = 0.0
+
+        snmm.getArray(self.expGrayHandle)[:] = 0.0
+        snmm.getArray(self.expDeltaStdHandle)[:] = 0.0
+        snmm.getArray(self.expGrayRMSHandle)[:] = 0.0
+        snmm.getArray(self.expGrayErrHandle)[:] = 0.0
+        snmm.getArray(self.expNGoodStarsHandle)[:] = 0
+        snmm.getArray(self.expNGoodCCDsHandle)[:] = 0
+        snmm.getArray(self.expNGoodTilingsHandle)[:] = 0
+
+        snmm.getArray(self.expGrayColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayRMSColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayErrColorSplitHandle)[:, :] = 0.0
+        snmm.getArray(self.expGrayNGoodStarsColorSplitHandle)[:, :] = 0
+
+        snmm.getArray(self.ccdDeltaMagBkgHandle)[:, :] = 0.0
+        snmm.getArray(self.expDeltaMagBkgHandle)[:] = 0.0
 
     def setDeltaMapperDefault(self, deltaMapperDefault):
         """
@@ -425,7 +457,7 @@ class FgcmGray(object):
             FGrayGO = 10.**(EGrayGO/(-2.5))
             FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
-            h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
+            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
 
             use, = np.where(h >= 3)
             for i in use:
@@ -612,68 +644,72 @@ class FgcmGray(object):
 
             # Need to split up...
             # And then do the fit, provided we have enough stars.
-            expCcdHash = (obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) +
-                          obsCCDIndex[goodObs])
 
-            h, rev = histogram_rev_sorted(expCcdHash)
+            # Split by CCD first.
+            # Note that anything with 2 or fewer observations will be
+            # marked bad.
+            h0, rev0 = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
+            use0, = np.where(h0 >= 3)
+            for i0 in use0:
+                i0a = rev0[rev0[i0]: rev0[i0 + 1]]
 
-            # Anything with 2 or fewer stars will be marked bad
-            use, = np.where(h >= 3)
-            for i in use:
-                i1a = rev[rev[i]: rev[i + 1]]
+                h1, rev1 = esutil.stat.histogram(obsExpIndex[goodObs][i0a], rev=True)
+                use1, = np.where(h1 >= 3)
+                for i1 in use1:
+                    i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
 
-                eInd = obsExpIndex[goodObs[i1a[0]]]
-                cInd = obsCCDIndex[goodObs[i1a[0]]]
-                bInd = obsBandIndex[goodObs[i1a[0]]]
+                    eInd = obsExpIndex[goodObs[i1a[0]]]
+                    cInd = obsCCDIndex[goodObs[i1a[0]]]
+                    bInd = obsBandIndex[goodObs[i1a[0]]]
 
-                if self.ccdGrayFocalPlane[bInd]:
-                    # We already fit this above, so we can skip to the next.
-                    continue
+                    if self.ccdGrayFocalPlane[bInd]:
+                        # We already fit this above, so we can skip to the next.
+                        continue
 
-                ccdNGoodStars[eInd, cInd] = i1a.size
+                    ccdNGoodStars[eInd, cInd] = i1a.size
 
-                computeMean = False
-                skip = False
+                    computeMean = False
+                    skip = False
 
-                if not self.ccdGraySubCCD[bInd]:
-                    fit = pars.flatten()
-                    computeMean = True
-                elif i1a.size < 10 * pars.size:
-                    # insufficient stars for chebyshev fit
-                    fit = pars.flatten()
-                    computeMean = True
-                else:
-                    try:
-                        field = Cheb2dField.fit(self.deltaMapperDefault['x_size'][cInd],
-                                                self.deltaMapperDefault['y_size'][cInd],
-                                                order,
-                                                obsXGO[i1a], obsYGO[i1a],
-                                                FGrayGO[i1a],
-                                                valueErr=FGrayErrGO[i1a],
-                                                triangular=self.ccdGraySubCCDTriangular)
-                        fit = field.pars.flatten()
-                    except (ValueError, RuntimeError, TypeError):
+                    if not self.ccdGraySubCCD[bInd]:
                         fit = pars.flatten()
                         computeMean = True
-
-                    if (fit[0] <= 0.0 or fit[0] == 1.0):
-                        # The fit failed...
+                    elif i1a.size < 10 * pars.size:
+                        # insufficient stars for chebyshev fit
                         fit = pars.flatten()
                         computeMean = True
+                    else:
+                        try:
+                            field = Cheb2dField.fit(self.deltaMapperDefault['x_size'][cInd],
+                                                    self.deltaMapperDefault['y_size'][cInd],
+                                                    order,
+                                                    obsXGO[i1a], obsYGO[i1a],
+                                                    FGrayGO[i1a],
+                                                    valueErr=FGrayErrGO[i1a],
+                                                    triangular=self.ccdGraySubCCDTriangular)
+                            fit = field.pars.flatten()
+                        except (ValueError, RuntimeError, TypeError):
+                            fit = pars.flatten()
+                            computeMean = True
 
-                if computeMean:
-                    fit = pars.flatten()
-                    fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
-                              np.sum(1./EGrayErr2GO[i1a]))
-                    fit[0] = 10.**(fit[0] / (-2.5))
+                        if (fit[0] <= 0.0 or fit[0] == 1.0):
+                            # The fit failed...
+                            fit = pars.flatten()
+                            computeMean = True
 
-                ccdGraySubCCDPars[eInd, cInd, :] = fit
-                # Set the CCD Gray in the center
-                # unsure if this should be the mean over all the stars...
-                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
-                                    self.deltaMapperDefault['y_size'][cInd],
-                                    fit)
-                ccdGray[eInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
+                    if computeMean:
+                        fit = pars.flatten()
+                        fit[0] = (np.sum(EGrayGO[i1a]/EGrayErr2GO[i1a]) /
+                                  np.sum(1./EGrayErr2GO[i1a]))
+                        fit[0] = 10.**(fit[0] / (-2.5))
+
+                    ccdGraySubCCDPars[eInd, cInd, :] = fit
+                    # Set the CCD Gray in the center
+                    # unsure if this should be the mean over all the stars...
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                        self.deltaMapperDefault['y_size'][cInd],
+                                        fit)
+                    ccdGray[eInd, cInd] = -2.5 * np.log10(field.evaluateCenter())
 
         self.fgcmLog.debug('Computed CCDGray for %d CCDs' % (gd[0].size))
 
@@ -1319,7 +1355,7 @@ class FgcmGray(object):
         goodObs, = np.where(obsFlag == 0)
 
         # Do the exposures first
-        h, rev = histogram_rev_sorted(obsExpIndex[goodObs])
+        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
 
         expDeltaMagBkg[:] = self.illegalValue
 
@@ -1339,23 +1375,27 @@ class FgcmGray(object):
         ccdDeltaMagBkg[:, :] = np.repeat(expDeltaMagBkg, self.fgcmPars.nCCD).reshape(ccdDeltaMagBkg.shape)
 
         # Do the exp/ccd second
-        expCcdHash = obsExpIndex[goodObs]*(self.fgcmPars.nCCD + 1) + obsCCDIndex[goodObs]
+        # Split by CCD first.
+        # Note that we need at least 3 for a median, and more for percentiles.
+        h0, rev0 = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
+        min_val = int(3./self.deltaMagBkgOffsetPercentile)
+        use0, = np.where(h0 > min_val)
+        for i0 in use0:
+            i0a = rev0[rev0[i0]: rev0[i0 + 1]]
 
-        h, rev = histogram_rev_sorted(expCcdHash)
+            h1, rev1 = esutil.stat.histogram(obsExpIndex[goodObs][i0a], rev=True)
+            use1, = np.where(h1 > min_val)
+            for i1 in use1:
+                i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
 
-        # We need at least 3 for a median, and of those from the percentile...
-        use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
-        for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+                eInd = obsExpIndex[goodObs[i1a[0]]]
+                cInd = obsCCDIndex[goodObs[i1a[0]]]
 
-            eInd = obsExpIndex[goodObs[i1a[0]]]
-            cInd = obsCCDIndex[goodObs[i1a[0]]]
+                mag = obsMagADU[goodObs[i1a]]
 
-            mag = obsMagADU[goodObs[i1a]]
-
-            st = np.argsort(mag)
-            bright, = np.where(mag < mag[st[int(self.deltaMagBkgOffsetPercentile*st.size)]])
-            ccdDeltaMagBkg[eInd, cInd] = np.median(obsDeltaMagBkg[goodObs[i1a[bright]]])
+                st = np.argsort(mag)
+                bright, = np.where(mag < mag[st[int(self.deltaMagBkgOffsetPercentile*st.size)]])
+                ccdDeltaMagBkg[eInd, cInd] = np.median(obsDeltaMagBkg[goodObs[i1a[bright]]])
 
         self.fgcmPars.compExpDeltaMagBkg[:] = expDeltaMagBkg
 
@@ -1400,19 +1440,25 @@ class FgcmGray(object):
         if np.any(self.ccdGraySubCCD):
             obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
-            expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
-                          obsCCDIndexGO[ok])
-            h, rev = histogram_rev_sorted(expCcdHash)
-            use, = np.where(h > 0)
-            for i in use:
-                i1a = rev[rev[i]: rev[i + 1]]
-                eInd = obsExpIndexGO[ok[i1a[0]]]
-                cInd = obsCCDIndexGO[ok[i1a[0]]]
-                field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
-                                    self.deltaMapperDefault['y_size'][cInd],
-                                    ccdGraySubCCDPars[eInd, cInd, :])
-                fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
-                obsMagStdGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+
+            # Split by CCD first.
+            h0, rev0 = esutil.stat.histogram(obsCCDIndexGO[ok], rev=True)
+            use0, = np.where(h0 > 0)
+            for i0 in use0:
+                i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+
+                h1, rev1 = esutil.stat.histogram(obsExpIndexGO[ok][i0a], rev=True)
+                use1, = np.where(h1 > 0)
+                for i1 in use1:
+                    i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+
+                    eInd = obsExpIndexGO[ok[i1a[0]]]
+                    cInd = obsCCDIndexGO[ok[i1a[0]]]
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                        self.deltaMapperDefault['y_size'][cInd],
+                                        ccdGraySubCCDPars[eInd, cInd, :])
+                    fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                    obsMagStdGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
         else:
             # Regular non-sub-ccd
             obsMagStdGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
@@ -1435,7 +1481,7 @@ class FgcmGray(object):
 
         # And then this can be split per exposure.
 
-        h, rev = histogram_rev_sorted(obsExpIndexGO[goodRefObsGO])
+        h, rev = esutil.stat.histogram(obsExpIndexGO[goodRefObsGO], rev=True)
 
         use, = np.where(h >= self.minStarPerExp)
 

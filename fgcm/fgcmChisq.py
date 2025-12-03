@@ -8,7 +8,6 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import objFlagDict
-from .fgcmUtilities import histogram_rev_sorted
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
@@ -61,6 +60,7 @@ class FgcmChisq(object):
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nStarPerGrayRun = fgcmConfig.nStarPerGrayRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
@@ -176,6 +176,10 @@ class FgcmChisq(object):
         self.fgcmGray = fgcmGray    # may be None
         self.computeAbsThroughput = computeAbsThroughput
         self.ignoreRef = ignoreRef
+
+        nStarPerRun = self.nStarPerRun
+        if fgcmGray is not None:
+            nStarPerRun = self.nStarPerGrayRun
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -351,7 +355,7 @@ class FgcmChisq(object):
             # split goodStars into a list of arrays of roughly equal size
 
             prepStartTime = time.time()
-            nSections = goodStars.size // self.nStarPerRun + 1
+            nSections = goodStars.size // nStarPerRun + 1
             goodStarsList = np.array_split(goodStars,nSections)
 
             # is there a better way of getting all the first elements from the list?
@@ -605,19 +609,23 @@ class FgcmChisq(object):
             if np.any(self.ccdGraySubCCD):
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
-                expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
-                              obsCCDIndexGO[ok])
-                h, rev = histogram_rev_sorted(expCcdHash)
-                use, = np.where(h > 0)
-                for i in use:
-                    i1a = rev[rev[i]: rev[i + 1]]
-                    eInd = obsExpIndexGO[ok[i1a[0]]]
-                    cInd = obsCCDIndexGO[ok[i1a[0]]]
-                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
-                                        self.deltaMapperDefault['y_size'][cInd],
-                                        ccdGraySubCCDPars[eInd, cInd, :])
-                    fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
-                    obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+
+                h0, rev0 = esutil.stat.histogram(obsCCDIndexGO[ok], rev=True)
+                use0, = np.where(h0 > 0)
+                for i0 in use0:
+                    i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+
+                    h1, rev1 = esutil.stat.histogram(obsExpIndexGO[ok][i0a], rev=True)
+                    use1, = np.where(h1 > 0)
+                    for i1 in use1:
+                        i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+                        eInd = obsExpIndexGO[ok[i1a[0]]]
+                        cInd = obsCCDIndexGO[ok[i1a[0]]]
+                        field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                            self.deltaMapperDefault['y_size'][cInd],
+                                            ccdGraySubCCDPars[eInd, cInd, :])
+                        fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                        obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
             else:
                 # Regular non-sub-ccd
                 obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]

@@ -4,7 +4,6 @@ import sys
 import esutil
 
 from .fgcmUtilities import expFlagDict, logFlaggedExposuresPerBand, checkFlaggedExposuresPerBand
-from .fgcmUtilities import histogram_rev_sorted
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -157,10 +156,11 @@ class FgcmExposureSelector(object):
         self.fgcmLog.info('Flagging exposures on %d bad nights with too few photometric exposures.' % (badNights.size))
 
         # and we need to use *all* the exposures to flag bad nights
-        h, rev = histogram_rev_sorted(
+        h, rev = esutil.stat.histogram(
             self.fgcmPars.expNightIndex,
             min=0,
             max=self.fgcmPars.nCampaignNights - 1,
+            rev=True,
         )
 
         for badNight in badNights:

@@ -142,7 +142,8 @@ class FgcmFitCycle(object):
         # this has to be done outside for memory issues
 
         self.fgcmStars = fgcmStars
-        self.fgcmStars.prepStars(fgcmPars)
+        if not fgcmStars.starsPrepped:
+            self.fgcmStars.prepStars(fgcmPars)
 
     def setLUT(self, fgcmLUT):
         """
@@ -253,6 +254,42 @@ class FgcmFitCycle(object):
         self.setupComplete = True
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('FitCycle Prepared'))
+
+    def finishReset(self, butlerQC=None, plotHandleDict=None):
+        """Finish fit cycle reset.
+        """
+        self.fgcmChisq = FgcmChisq(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            self.fgcmLUT,
+        )
+
+        self.fgcmComputeStepUnits = FgcmComputeStepUnits(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            self.fgcmLUT,
+        )
+
+        self.expSelector = FgcmExposureSelector(
+            self.fgcmConfig,
+            self.fgcmPars,
+        )
+
+        # We re-use fgcmGray because of the high memory.
+        self.fgcmGray.butlerQC = butlerQC
+        self.fgcmGray.plotHandleDict = plotHandleDict
+        self.fgcmGray.fgcmPars = self.fgcmPars
+        self.fgcmGray.resetArrays()
+
+        self.fgcmQeSysSlope = FgcmQeSysSlope(
+            self.fgcmConfig,
+            self.fgcmPars,
+            self.fgcmStars,
+            butlerQC=self.butlerQC,
+            plotHandleDict=self.plotHandleDict,
+        )
 
     def run(self):
         """
@@ -660,16 +697,6 @@ class FgcmFitCycle(object):
 
             self.fgcmGray.computeExposureReferenceOffsets()
 
-        # Make Zeropoints
-        # We always want to compute these because of the plots
-        # In the future we might want to streamline if something is bogging down.
-
-        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
-                                       self.fgcmLUT, self.fgcmGray,
-                                       self.fgcmRetrieval, self.fgcmStars,
-                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
-        self.fgcmLog.debug('FitCycle computing zeropoints.')
-        self.fgcmZpts.computeZeropoints()
 
         # And finally compute the stars and test repeatability *after* the crunch
         self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (photometric)')
@@ -681,6 +708,17 @@ class FgcmFitCycle(object):
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray, allExposures=True)
         self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True, nonphotometric=True)
+
+        # Make Zeropoints
+        # We always want to compute these because of the plots
+        # In the future we might want to streamline if something is bogging down.
+
+        self.fgcmZpts = FgcmZeropoints(self.fgcmConfig, self.fgcmPars,
+                                       self.fgcmLUT, self.fgcmGray,
+                                       self.fgcmRetrieval, self.fgcmStars,
+                                       butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
+        self.fgcmLog.debug('FitCycle computing zeropoints.')
+        self.fgcmZpts.computeZeropoints()
 
         repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
         for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
@@ -815,10 +853,85 @@ class FgcmFitCycle(object):
         # record new parameters
         self.fgcmPars.reloadParArray(pars, fitterUnits=True)
 
-    def freeSharedMemory(self):
-        """Free all shared memory."""
-        self.fgcmLUT.freeSharedMemory()
-        self.fgcmGray.freeSharedMemory()
-        self.fgcmRetrieval.freeSharedMemory()
-        self.sigCal.freeSharedMemory()
-        self.fgcmStars.freeSharedMemory()
+    def updateConfigNextCycle(
+        self,
+        cycleNumber,
+        maxIter=None,
+        resetParameters=None,
+        outputStandards=None,
+        outputZeropoints=None,
+        freezeStdAtmosphere=None,
+        expGrayPhotometricCutDict=None,
+        expGrayHighCutDict=None,
+    ):
+        """
+        Update key configs for next cycle.
+
+        Parameters
+        ----------
+        cycleNumber : `int`
+        maxIter : `int`, optional
+        resetParameters : `bool`, optional
+        outputStandards : `bool`, optional
+        outputZeropoints : `bool`, optional
+        freezeStdAtmosphere : `bool`, optional
+        expGrayPhotometricCutDict : `dict`, optional
+        expGrayHighCutDict : `dict`, optional
+        """
+        self.fgcmConfig.updateCycleNumber(cycleNumber)
+
+        if maxIter is not None:
+            self.fgcmConfig.maxIter = maxIter
+
+        if resetParameters is not None:
+            self.fgcmConfig.resetParameters = resetParameters
+
+        if outputStandards is not None:
+            self.fgcmConfig.outputStandards = outputStandards
+
+        if outputZeropoints is not None:
+            self.fgcmConfig.outputZeropoints = outputZeropoints
+
+        if freezeStdAtmosphere is not None:
+            self.fgcmConfig.freezeStdAtmosphere = freezeStdAtmosphere
+
+        if expGrayPhotometricCutDict is not None:
+            self.fgcmConfig.updateExpGrayPhotometricCut(expGrayPhotometricCutDict)
+
+        if expGrayHighCutDict is not None:
+            self.fgcmConfig.updateExpGrayHighCut(expGrayHighCutDict)
+
+        self.initialCycle = False
+        if self.fgcmConfig.cycleNumber == 0:
+            self.initialCycle = True
+
+        self.finalCycle = False
+        if not self.fgcmConfig.resetParameters and self.fgcmConfig.maxIter == 0:
+            self.finalCycle = True
+
+    def freeSharedMemory(self, lut=True, gray=True, retrieval=True, cal=True, stars=True):
+        """Free all shared memory.
+
+        Parameters
+        ----------
+        lut : `bool`, optional
+            Free fgcmLUT shared memory.
+        gray : `bool`, optional
+            Free fgcmGray shared memory.
+        retrieval : `bool`, optional
+            Free fgcmRetrieval shared memory.
+        cal : `bool`, optional
+            Free sigCal shared memory.
+        stars : `bool`, optional
+            Free fgcmStars shared memory.
+        """
+        if lut:
+            self.fgcmLUT.freeSharedMemory()
+        if gray:
+            self.fgcmGray.freeSharedMemory()
+        if retrieval:
+            self.fgcmRetrieval.freeSharedMemory()
+        if cal:
+            self.sigCal.freeSharedMemory()
+        if stars:
+            self.fgcmStars.freeSharedMemory()

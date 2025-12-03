@@ -6,7 +6,6 @@ import esutil
 import time
 
 from .fgcmUtilities import dataBinner
-from .fgcmUtilities import histogram_rev_sorted
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 
@@ -99,7 +98,7 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compMedDeltaAper[:] = self.illegalValue
         self.fgcmPars.compEpsilon[:] = self.illegalValue
 
-        h, rev = histogram_rev_sorted(obsExpIndex[goodObs], min=0)
+        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], min=0, rev=True)
         expIndices, = np.where(h >= self.minStarPerExp)
 
         for expIndex in expIndices:
@@ -276,10 +275,11 @@ class FgcmDeltaAper(object):
         # Do the mapping
         self.fgcmLog.info("Computing delta-aper epsilon spatial map at nside %d" % self.deltaAperFitSpatialNside)
         ipring = hpg.angle_to_pixel(self.deltaAperFitSpatialNside, objRA, objDec, nest=False)
-        h, rev = histogram_rev_sorted(
+        h, rev = esutil.stat.histogram(
             ipring,
             min=0,
             max=hpg.nside_to_npixel(self.deltaAperFitSpatialNside) - 1,
+            rev=True,
         )
 
         mask = (objFlagDict['TOO_FEW_OBS'] |
@@ -422,7 +422,7 @@ class FgcmDeltaAper(object):
 
         filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
-        h, rev = histogram_rev_sorted(filterCcdHash)
+        h, rev = esutil.stat.histogram(filterCcdHash, rev=True)
 
         # Arbitrary minimum number here
         gdHash, = np.where(h > 10)
@@ -449,7 +449,7 @@ class FgcmDeltaAper(object):
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
-            h2, rev2 = histogram_rev_sorted(xyBinHash)
+            h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
 
             gdHash2, = np.where(h2 > 10)
             for j in gdHash2:

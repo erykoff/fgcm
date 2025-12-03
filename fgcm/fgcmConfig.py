@@ -195,6 +195,7 @@ class FgcmConfig(object):
 
     mapNSide = ConfigField(int, default=256)
     nStarPerRun = ConfigField(int, default=200000)
+    nStarPerGrayRun = ConfigField(int, default=50000)
     nExpPerRun = ConfigField(int, default=1000)
     varNSig = ConfigField(float, default=100.0)
     varMinBand = ConfigField(int, default=2)
@@ -717,6 +718,42 @@ class FgcmConfig(object):
                 os.makedirs(self.plotPath)
             except:
                 raise IOError("Could not create plot path: %s" % (self.plotPath))
+
+    def updateExpGrayPhotometricCut(self, expGrayPhotometricCutDict):
+        """
+        Update the exp gray photometric cuts.
+
+        Parameters
+        ----------
+        expGrayPhotometricCutDict : `dict` [`str`, `float`]
+        """
+        self.expGrayPhotometricCutDict = expGrayPhotometricCutDict
+        self.expGrayPhotometricCut = self._convertDictToBandList(
+            self.expGrayPhotometricCutDict,
+            float,
+            -0.05,
+            ndarray=True,
+            required=True,
+            dictName='expGrayPhotometricCutDict',
+        )
+
+    def updateExpGrayHighCut(self, expGrayHighCutDict):
+        """
+        Update the exp gray high cuts.
+
+        Parameters
+        ----------
+        expGrayPhotometricCutDict : `dict` [`str`, `float`]
+        """
+        self.expGrayHighCutDict = expGrayHighCutDict
+        self.expGrayHighCut = self._convertDictToBandList(
+            self.expGrayHighCutDict,
+            float,
+            0.10,
+            ndarray=True,
+            required=True,
+            dictName='expGrayHighCutDict',
+        )
 
     @staticmethod
     def _readConfigDict(configFile):
