@@ -294,7 +294,7 @@ class FgcmSuperStarFlat(object):
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, :] = 0
                 self.fgcmPars.parSuperStarFlat[epInd, fiInd, cInd, 0: fit.size] = fit
 
-                if doPlots and self.plotPath is not None and i1a.size > 0 and self.superStarPlotCCDResiduals:
+                if doPlots and i1a.size > 0 and self.superStarPlotCCDResiduals:
                     # Compute the residuals and plot them.
                     superStar = -2.5 * np.log10(np.clip(field.evaluate(obsXGO[i1a], obsYGO[i1a]), 0.1, None))
                     resid = EGrayGO[i1a] - superStar
@@ -334,7 +334,7 @@ class FgcmSuperStarFlat(object):
                             epoch=self.epochNames[epInd],
                             detector=str(cInd),
                         )
-                    else:
+                    elif self.plotPath is not None:
                         fig.savefig("%s/%s_superstar_resid_%s_%s_%s.png" % (self.plotPath,
                                                                             self.outfileBaseWithCycle,
                                                                             self.fgcmPars.lutFilterNames[fiInd],
@@ -375,7 +375,7 @@ class FgcmSuperStarFlat(object):
                             epoch=self.epochNames[epInd],
                             detector=str(cInd),
                         )
-                    else:
+                    elif self.plotPath is not None:
                         fig.savefig("%s/%s_superstar_residstd_%s_%s_%s.png" % (self.plotPath,
                                                                                self.outfileBaseWithCycle,
                                                                                self.fgcmPars.lutFilterNames[fiInd],
@@ -423,7 +423,7 @@ class FgcmSuperStarFlat(object):
             self.fgcmLog.info('Computed SuperStarFlats in %.2f seconds.' %
                               (time.time() - startTime))
 
-        if doPlots and self.plotPath is not None:
+        if doPlots:
             self.fgcmLog.debug('Making SuperStarFlat plots')
 
             self.plotSuperStarFlatsAndDelta(self.fgcmPars.parSuperStarFlat,
@@ -519,7 +519,7 @@ class FgcmSuperStarFlat(object):
                                     fig,
                                     filterName=self.fgcmPars.lutFilterNames[f],
                                     epoch=self.epochNames[e])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig("%s/%s_%s_%s_%s.png" % (self.plotPath,
                                                         self.outfileBaseWithCycle,
                                                         "superstar",

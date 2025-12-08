@@ -45,14 +45,15 @@ class FgcmQeSysSlope(object):
         self.instrumentSlopeMinDeltaT = fgcmConfig.instrumentSlopeMinDeltaT
         self.ccdGrayMaxStarErr = fgcmConfig.ccdGrayMaxStarErr
 
-    def computeQeSysSlope(self, name):
+    def computeQeSysSlope(self, name, doPlots=False):
         """
         Compute QE system slope
 
         Parameters
         ----------
-        name: `str`
-           Name to put on filenames
+        name : `str`
+            Name to put on filenames
+        doPlots : `bool`, optional
         """
 
         objID = snmm.getArray(self.fgcmStars.objIDHandle)
@@ -187,7 +188,7 @@ class FgcmQeSysSlope(object):
                                   (washIndex, slopeMeanAll*1000.0, slopeMeanErrAll*1000.0, extraString))
                 self.fgcmPars.compQESysSlope[:, washIndex] = slopeMeanAll
 
-        if self.plotPath is not None:
+        if doPlots:
             # Make the plots
             firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
 
@@ -241,26 +242,27 @@ class FgcmQeSysSlope(object):
                                 f"QESysWashes{name.title()}",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_qesys_washes_%s.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle,
                                                            name))
 
-    def plotQeSysRefStars(self, name):
+    def plotQeSysRefStars(self, name, doPlots=False):
         """
         Plot reference stars (if available).  Compare residuals.
 
         Parameters
         ----------
-        name: `str`
-           name to give the files
+        name : `str`
+            Name to give the files.
+        doPlots : `bool`, optional
         """
 
         if not self.fgcmStars.hasRefstars:
             self.fgcmLog.info("No reference stars for QE sys plots.")
             return
 
-        if self.plotPath is None:
+        if not doPlots:
             return
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
@@ -366,7 +368,7 @@ class FgcmQeSysSlope(object):
                                 self.cycleNumber,
                                 fig,
                                 band=band)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_qesys_refstars-std_%s_%s.png' % (self.plotPath,
                                                                     self.outfileBaseWithCycle,
                                                                     name, band))
@@ -397,7 +399,7 @@ class FgcmQeSysSlope(object):
                                 self.cycleNumber,
                                 fig,
                                 band=band)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_qesys_refstars-obs_%s_%s.png' % (self.plotPath,
                                                                     self.outfileBaseWithCycle,
                                                                     name, band))

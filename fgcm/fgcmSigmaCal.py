@@ -65,9 +65,15 @@ class FgcmSigmaCal(object):
 
         self.objChi2Handle = snmm.createArray((self.fgcmStars.nStars, self.fgcmPars.nBands), dtype='f8')
 
-    def run(self, applyGray=True):
+    def run(self, applyGray=True, doPlots=False):
         """
         Run the sigma_cal computation code.
+
+        Parameters
+        ----------
+        applyGray : `bool`, optional
+            Apply gray corrections?
+        doPlots : `bool`, optional
         """
 
         self.applyGray = applyGray
@@ -137,10 +143,9 @@ class FgcmSigmaCal(object):
 
         sigmaCals = np.linspace(self.sigmaCalRange[0], self.sigmaCalRange[1], nStep)
 
-        if self.plotPath is not None:
+        if doPlots:
             from matplotlib.colors import Normalize
             from matplotlib.cm import ScalarMappable
-
 
             use_inset = False
             try:
@@ -179,7 +184,7 @@ class FgcmSigmaCal(object):
             plotIndices[band] = ok[st[int(self.sigmaCalPlotPercentile[0] * st.size):
                                           int(self.sigmaCalPlotPercentile[1] * st.size)]]
 
-        if self.plotPath is not None:
+        if doPlots:
             plotMags = np.zeros((sigmaCals.size, self.fgcmPars.nBands, nPlotBin))
             plotChi2s = np.zeros_like(plotMags)
 
@@ -202,7 +207,7 @@ class FgcmSigmaCal(object):
                 if ok.size > 0:
                     medChi2s[i, bandIndex] = np.median(objChi2[goodStars[indices[band][ok]], bandIndex])
 
-            if self.plotPath is not None:
+            if doPlots:
                 for bandIndex, band in enumerate(self.fgcmPars.bands):
                     if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                         continue
@@ -238,7 +243,7 @@ class FgcmSigmaCal(object):
             self.fgcmLog.info('Best sigmaCal (%s band) = %.2f mmag' % (band, sigmaCals[mininds[bandIndex]]*1000.0))
 
         # And do the plots if desired
-        if self.plotPath is not None:
+        if doPlots:
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                     continue
@@ -288,7 +293,7 @@ class FgcmSigmaCal(object):
                                     self.cycleNumber,
                                     fig,
                                     band=band)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_sigmacal_%s.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle,
                                                            band))

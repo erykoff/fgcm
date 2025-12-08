@@ -51,9 +51,13 @@ class FgcmApertureCorrection(object):
 
         self.rng = fgcmConfig.rng
 
-    def computeApertureCorrections(self):
+    def computeApertureCorrections(self, doPlots=False):
         """
         Compute aperture corrections if aperCorrFitNBins > 0
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         if (self.aperCorrFitNBins == 0):
@@ -190,7 +194,7 @@ class FgcmApertureCorrection(object):
                                   self.fgcmPars.compAperCorrSlope[i]*1000.0,
                                   self.fgcmPars.compAperCorrSlopeErr[i]*1000.0))
 
-            if self.plotPath is not None:
+            if doPlots:
                 from matplotlib import colormaps
 
                 fig = makeFigure(figsize=(8, 6))
@@ -233,7 +237,7 @@ class FgcmApertureCorrection(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_apercorr_%s.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle,
                                                            self.fgcmPars.bands[i]))

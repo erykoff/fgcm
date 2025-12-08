@@ -69,9 +69,15 @@ class FgcmDeltaAper(object):
 
         self.rng = fgcmConfig.rng
 
-    def computeDeltaAperExposures(self, doFullFit=False):
+    def computeDeltaAperExposures(self, doFullFit=False, doPlots=False):
         """
         Compute deltaAper per-exposure quantities
+
+        Parameters
+        ----------
+        doFullFit : `bool`, optional
+           Do the full (expensive + slow) fit?
+        doPlots : `bool`, optional
         """
         if not self.quietMode:
             if doFullFit:
@@ -128,9 +134,15 @@ class FgcmDeltaAper(object):
             if fit is not None:
                 self.fgcmPars.compEpsilon[expIndex] = self._normalizeEpsilon(fit)
 
-    def computeDeltaAperStars(self, debug=False):
+    def computeDeltaAperStars(self, debug=False, doPlots=False):
         """
-        Compute deltaAper per-star quantities
+        Compute deltaAper per-star quantities.
+
+        Parameters
+        ----------
+        debug : `bool`, optional
+            Debugging (no multiprocessing) mode.
+        doPlots : `bool`, optional
         """
         self.debug = debug
 
@@ -222,7 +234,7 @@ class FgcmDeltaAper(object):
             self.fgcmLog.info('Global background offset in %s band: %.5f nJy/arcsec2' %
                               (band, globalEpsilon[i]))
 
-            if self.plotPath is not None and fit is not None:
+            if doPlots and fit is not None:
                 # Do plots
 
                 st = np.argsort(mag_std[r])
@@ -255,14 +267,18 @@ class FgcmDeltaAper(object):
                                     self.cycleNumber,
                                     fig,
                                     band=band)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_epsilon_global_%s.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle,
                                                                  band))
 
-    def computeEpsilonMap(self):
+    def computeEpsilonMap(self, doPlots=False):
         """
         Compute global epsilon and local maps.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
         objRA = snmm.getArray(self.fgcmStars.objRAHandle)
@@ -320,7 +336,7 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compEpsilonMap[:, :] = offsetMap['epsilon']
         self.fgcmPars.compEpsilonNStarMap[:, :] = offsetMap['nstar_fit']
 
-        if self.plotPath is not None:
+        if doPlots:
             for j, band in enumerate(self.fgcmStars.bands):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
                 if hpix.size < 2:
@@ -366,14 +382,18 @@ class FgcmDeltaAper(object):
                                     self.cycleNumber,
                                     fig,
                                     band=band)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_epsilon_map_%s.png' % (self.plotPath,
                                                               self.outfileBaseWithCycle,
                                                               band))
 
-    def computeEpsilonPerCcd(self):
+    def computeEpsilonPerCcd(self, doPlots=False):
         """
         Compute epsilon binned per ccd.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
         if not self.fgcmStars.hasXY:
             self.fgcmLog.info("Cannot compute background x/y correlations without x/y information")
@@ -498,7 +518,7 @@ class FgcmDeltaAper(object):
             # If they all have big variance, just use that.
             matchedDelta = np.max(deltaRange)
 
-        if self.plotPath is not None:
+        if doPlots:
             for j, filterName in enumerate(self.fgcmPars.lutFilterNames):
                 if self.fgcmPars.filterToBand[filterName] not in self.fgcmPars.bands:
                     continue
@@ -525,7 +545,7 @@ class FgcmDeltaAper(object):
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_epsilon_perccd_%s.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle,
                                                                  filterName))
@@ -558,7 +578,7 @@ class FgcmDeltaAper(object):
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_epsilon_perccd_%s_matchscale.png' % (self.plotPath,
                                                                             self.outfileBaseWithCycle,
                                                                             filterName))

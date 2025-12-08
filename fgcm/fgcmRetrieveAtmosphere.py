@@ -45,13 +45,14 @@ class FgcmRetrieveAtmosphere(object):
         self.tauRetrievalMinCCDPerNight = fgcmConfig.tauRetrievalMinCCDPerNight
         self.quietMode = fgcmConfig.quietMode
 
-    def r1ToPwv(self, fgcmRetrieval):
+    def r1ToPwv(self, fgcmRetrieval, doPlots=False):
         """
         Convert R1 values to Pwv.  Experimental.
 
         parameters
         ----------
         fgcmRetrieval: FgcmRetrieval
+        doPlots : `bool`, optional
         """
 
         if not self.quietMode:
@@ -213,7 +214,7 @@ class FgcmRetrieveAtmosphere(object):
             self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] &= ~retrievalFlagDict['EXPOSURE_STANDARD']
             self.fgcmPars.compRetrievedLnPwvFlag[i1a[noLnPwv]] |= retrievalFlagDict['EXPOSURE_INTERPOLATED']
 
-        if self.plotPath is not None:
+        if doPlots:
             # if there are fewer than ... 3000 do points, more than do hexbin
             hasPwv, = np.where((self.fgcmPars.compRetrievedLnPwvFlag & retrievalFlagDict['EXPOSURE_RETRIEVED']) > 0)
 
@@ -245,7 +246,7 @@ class FgcmRetrieveAtmosphere(object):
                                 "RpwvVsRpwvInput",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_rpwv_vs_rpwv_in.png' % (self.plotPath,
                                                            self.outfileBaseWithCycle))
 
@@ -276,7 +277,7 @@ class FgcmRetrieveAtmosphere(object):
                                 "RpwvVsRpwvSmooth",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_rpwv_vs_rpwv_smooth.png' % (self.plotPath,
                                                                self.outfileBaseWithCycle))
 
@@ -306,26 +307,25 @@ class FgcmRetrieveAtmosphere(object):
                                 "ModelPwvVsRpwv",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_pwv_vs_rpwv.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 
         # and we're done!  Everything is filled in!
         self.fgcmLog.debug('Done computing retrieved PWV values')
 
-    def r0ToNightlyTau(self, fgcmRetrieval):
+    def r0ToNightlyTau(self, fgcmRetrieval, doPlots=False):
         """
         Convert R0 values to nightly Tau, using airmass.  Experimental.
 
         parameters
         ----------
         fgcmRetrieval: FgcmRetrieval
+        doPlots : `bool`, optional
         """
 
         if not self.quietMode:
             self.fgcmLog.info('Retrieving Nightly Tau Values...')
-
-        #bandIndex, = np.where(self.fgcmPars.bands == 'g')[0]
 
         r0 = snmm.getArray(fgcmRetrieval.r0Handle)
 
@@ -406,7 +406,7 @@ class FgcmRetrieveAtmosphere(object):
         # this code is not used/tested currently.  I am leaving
         # in the code in case it gets resurrected in the future.
         """
-        if self.plotPath is not None:
+        if doPlots:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
             fig = makeFigure(figsize=(8, 6))
@@ -440,13 +440,14 @@ class FgcmRetrieveAtmosphere(object):
                                                            self.outfileBaseWithCycle))
         """
 
-    def expGrayToNightlyTau(self, fgcmGray):
+    def expGrayToNightlyTau(self, fgcmGray, doPlots=False):
         """
         Convert exposure gray to nightly Tau, using airmass.  Experimental.
 
         parameters
         ----------
         fgcmGray: FgcmGray
+        doPlots : `bool`, optional
         """
 
         if not self.quietMode:
@@ -558,7 +559,7 @@ class FgcmRetrieveAtmosphere(object):
 
         # And the plots
         """
-        if self.plotPath is not None:
+        if doPlots:
             hasTau, = np.where((self.fgcmPars.compRetrievedTauNight != self.fgcmPars.tauStd) &
                                (self.fgcmPars.compRetrievedTauNightInput != self.fgcmPars.tauStd))
             fig = makeFigure(figsize=(8, 6))

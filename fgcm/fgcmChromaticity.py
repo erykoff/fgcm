@@ -52,9 +52,13 @@ class FgcmMirrorChromaticity(object):
 
         self.magConst = 2.5 / np.log(10.0)
 
-    def computeMirrorChromaticity(self):
+    def computeMirrorChromaticity(self, doPlots=False):
         """
         Compute the mirror chromaticity terms.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         startTime = time.time()
@@ -145,7 +149,7 @@ class FgcmMirrorChromaticity(object):
             # Record the values
             self.fgcmPars.compMirrorChromaticity[filterIndex, :] = parFinal
 
-            if self.plotPath is not None:
+            if doPlots:
                 from matplotlib import colormaps
 
                 firstMJD = np.floor(np.min(self.fgcmPars.expMJD))
@@ -199,7 +203,7 @@ class FgcmMirrorChromaticity(object):
                                         self.cycleNumber,
                                         fig,
                                         filterName=self.fgcmPars.lutFilterNames[filterIndex])
-                    else:
+                    elif self.plotPath is not None:
                         fig.savefig('%s/%s_compare-redblue-mirrorchrom_%s.png' % (self.plotPath,
                                                                                   self.outfileBaseWithCycle,
                                                                                   self.fgcmPars.lutFilterNames[filterIndex]))
@@ -337,9 +341,13 @@ class FgcmCCDChromaticity:
 
         self.magConst = 2.5 / np.log(10.0)
 
-    def computeCCDChromaticity(self):
+    def computeCCDChromaticity(self, doPlots=False):
         """
         Compute the CCD Chromaticity terms.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
         startTime = time.time()
         self.fgcmLog.info("Fitting CCD chromaticity terms...")
@@ -407,7 +415,7 @@ class FgcmCCDChromaticity:
             cWasFit[self.cInd, self.fInd] = True
 
         # And make plots if necessary.
-        if self.plotPath is not None:
+        if doPlots:
             from .fgcmUtilities import plotCCDMap
             from matplotlib import colormaps
 
@@ -461,7 +469,7 @@ class FgcmCCDChromaticity:
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle,
                                                      'ccdchromaticity',
