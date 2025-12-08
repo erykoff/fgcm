@@ -89,9 +89,14 @@ class FgcmZeropoints(object):
         self.quietMode = fgcmConfig.quietMode
         self.rng = fgcmConfig.rng
 
-    def computeZeropoints(self):
+    def computeZeropoints(self, doPlots=False):
         """
         Compute the zeropoints from all the fits that have been performed.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
+            Make plots?
 
         Output attributes
         -----------------
@@ -588,7 +593,7 @@ class FgcmZeropoints(object):
         ## plots
         ############
 
-        if self.plotPath is not None:
+        if doPlots:
             if not self.quietMode:
                 self.fgcmLog.info('Making I1/R1 plots...')
 
@@ -687,7 +692,7 @@ class FgcmZeropoints(object):
                                 "Zeropoints",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_zeropoints.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
 
@@ -957,10 +962,6 @@ class FgcmZeropointPlotter(object):
         """
         Make R1 vs I1 plots.
         """
-
-        if self.plotPath is None:
-            return
-
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
         for filterName in self.filterNames:
@@ -1015,7 +1016,7 @@ class FgcmZeropointPlotter(object):
                                 self.cycleNumber,
                                 fig,
                                 filterName=filterName)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_i1r1_%s.png' % (self.plotPath,
                                                    self.outfileBase,
                                                    filterName))
@@ -1029,10 +1030,6 @@ class FgcmZeropointPlotter(object):
         deltaMapper: ccd offset struct
         ccdField: string, default='CCDNUM'
         """
-
-        if self.plotPath is None:
-            return
-
         from .fgcmUtilities import plotCCDMap
         from matplotlib import colormaps
 
@@ -1144,7 +1141,7 @@ class FgcmZeropointPlotter(object):
                                     self.cycleNumber,
                                     fig,
                                     filterName=filterName)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_%s_%s.png' % (self.plotPath,
                                                      self.outfileBase,
                                                      plotType.replace(" ",""),
@@ -1156,10 +1153,6 @@ class FgcmZeropointPlotter(object):
         """
         Make R1 - I1 vs time plots.
         """
-
-        if self.plotPath is None:
-            return
-
         acceptMask = (zpFlagDict['PHOTOMETRIC_FIT_EXPOSURE'] |
                       zpFlagDict['PHOTOMETRIC_NOTFIT_EXPOSURE'])
 
@@ -1232,7 +1225,7 @@ class FgcmZeropointPlotter(object):
                                 self.cycleNumber,
                                 fig,
                                 filterName=filterName)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_r1-i1_vs_mjd_%s.png' % (self.plotPath,
                                                            self.outfileBase,
                                                            filterName))

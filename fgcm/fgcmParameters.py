@@ -1914,11 +1914,6 @@ class FgcmParameters(object):
         """
         Plot nightly average parameters
         """
-
-        if self.plotPath is None:
-            # configured not to make plots
-            return
-
         # want nightly averages, on calibratable nights (duh)
 
         # this is fixed here
@@ -1989,7 +1984,7 @@ class FgcmParameters(object):
                             "NightlyAlpha",
                             self.cycleNumber,
                             fig)
-        else:
+        elif self.plotPath is not None:
             fig.savefig('%s/%s_nightly_alpha.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle))
 
@@ -2035,7 +2030,7 @@ class FgcmParameters(object):
                                 "NightlyTau",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_nightly_tau.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 
@@ -2064,7 +2059,7 @@ class FgcmParameters(object):
                                 "NightlyPwv",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_nightly_pwv.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 
@@ -2093,7 +2088,7 @@ class FgcmParameters(object):
                                 "NightlyO3",
                                 self.cycleNumber,
                                 fig)
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_nightly_o3.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
         # FIXME: make configurable
@@ -2132,7 +2127,7 @@ class FgcmParameters(object):
                             "FilterOffsets",
                             self.cycleNumber,
                             fig)
-        else:
+        elif self.plotPath is not None:
             fig.savefig('%s/%s_filter_offsets.png' % (self.plotPath,
                                                       self.outfileBaseWithCycle))
 
@@ -2158,7 +2153,7 @@ class FgcmParameters(object):
                             "AbsThroughputs",
                             self.cycleNumber,
                             fig)
-        else:
+        elif self.plotPath is not None:
             fig.savefig('%s/%s_abs_throughputs.png' % (self.plotPath,
                                                        self.outfileBaseWithCycle))
 

@@ -56,7 +56,7 @@ class FgcmSigFgcm(object):
         self.bandNotRequiredIndex = fgcmConfig.bandNotRequiredIndex
         self.quietMode = fgcmConfig.quietMode
 
-    def computeSigFgcm(self, reserved=False, save=True, crunch=False, nonphotometric=False):
+    def computeSigFgcm(self, reserved=False, save=True, crunch=False, nonphotometric=False, doPlots=False):
         """
         Compute sigFgcm for all bands
 
@@ -70,6 +70,7 @@ class FgcmSigFgcm(object):
             Compute based on ccd-crunched values?
         nonphotometric : `bool`, optional
             Include non-photometric exposures?
+        doPlots : `bool`, optional
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -230,7 +231,7 @@ class FgcmSigFgcm(object):
                 elif (reserved and crunch and (c == 0)) and not nonphotometric:
                     self.fgcmPars.compReservedRawCrunchedRepeatability[bandIndex] = coeff[2]
 
-                if self.plotPath is None:
+                if not doPlots:
                     continue
 
                 ax.tick_params(axis='both',which='major',labelsize=14)
@@ -253,7 +254,7 @@ class FgcmSigFgcm(object):
                 else:
                     ax.set_xlim(plotXRange)
 
-            if self.plotPath is not None:
+            if doPlots:
                 fig.tight_layout()
 
                 if self.butlerQC is not None:
@@ -264,7 +265,7 @@ class FgcmSigFgcm(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_sigfgcm_%s_%s.png' % (self.plotPath,
                                                              self.outfileBaseWithCycle,
                                                              extraName,
@@ -324,7 +325,7 @@ class FgcmSigFgcm(object):
                         name,
                         coeff[2]))
 
-                if self.plotPath is None:
+                if not doPlots:
                     continue
 
                 ax.tick_params(axis='both',which='major',labelsize=14)
@@ -346,7 +347,7 @@ class FgcmSigFgcm(object):
                 else:
                     ax.set_xlim(plotXRange)
 
-            if self.plotPath is not None:
+            if doPlots:
                 fig.tight_layout()
 
                 if self.butlerQC is not None:
@@ -357,7 +358,7 @@ class FgcmSigFgcm(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_sigfgcmpulls_%s_%s.png' % (self.plotPath,
                                                                   self.outfileBaseWithCycle,
                                                                   extraName,
@@ -369,6 +370,3 @@ class FgcmSigFgcm(object):
         if not self.quietMode:
             self.fgcmLog.info('Done computing sigFgcm in %.2f sec.' %
                               (time.time() - startTime))
-
-
-

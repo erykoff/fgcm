@@ -55,14 +55,15 @@ class FgcmModelMagErrors(object):
         self.quietMode = fgcmConfig.quietMode
         self.rng = fgcmConfig.rng
 
-    def computeMagErrorModel(self, fitName):
+    def computeMagErrorModel(self, fitName, doPlots=False):
         """
         Compute magnitude error model
 
         parameters
         ----------
-        fitName: `str`
-           Name of the fit to put in plot labeling
+        fitName : `str`
+            Name of the fit to put in plot labeling
+        doPlots : `bool`, optional
         """
 
         if not self.modelMagErrors:
@@ -184,7 +185,7 @@ class FgcmModelMagErrors(object):
             self.fgcmPars.compModelErrPars[:, bandIndex] = pars
 
             # And also plots (if necessary)
-            if self.plotPath is not None:
+            if doPlots:
                 ymod = (pars[0] + pars[1] * obsMagADUMeanGOu + pars[2] * obsMagADUMeanGOu**2. +
                         pars[3] * np.log10(obsFwhmGOu / medFwhm) +
                         pars[4] * np.log10(obsSkyBrightnessGOu / medSkyBrightness) +
@@ -266,7 +267,7 @@ class FgcmModelMagErrors(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_%s_modelmagerr_%s.png' % (self.plotPath,
                                                                  self.outfileBaseWithCycle,
                                                                  fitName,

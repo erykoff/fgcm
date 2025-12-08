@@ -46,9 +46,13 @@ class FgcmSigmaRef(object):
         if not self.fgcmStars.hasRefstars:
             raise RuntimeError("Cannot use FgcmSigmaRef without reference stars!")
 
-    def computeSigmaRef(self):
+    def computeSigmaRef(self, doPlots=False):
         """
         Compute sigmaRef for all bands
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         startTime = time.time()
@@ -206,7 +210,7 @@ class FgcmSigmaRef(object):
                         else:
                             message = None
 
-                    if self.plotPath is None:
+                    if not doPlots:
                         continue
 
                     ax.tick_params(axis='both', which='major', labelsize=14)
@@ -225,7 +229,7 @@ class FgcmSigmaRef(object):
                     else:
                         ax.set_xlim(plotXRange)
 
-                if self.plotPath is not None:
+                if doPlots:
                     fig.tight_layout()
 
                     if self.butlerQC is not None:
@@ -236,7 +240,7 @@ class FgcmSigmaRef(object):
                                         self.cycleNumber,
                                         fig,
                                         band=band)
-                    else:
+                    elif self.plotPath is not None:
                         fig.savefig('%s/%s_sigmaref_%s.png' % (self.plotPath,
                                                                self.outfileBaseWithCycle,
                                                                band))

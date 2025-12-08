@@ -1282,10 +1282,6 @@ class FgcmStars(object):
            A key for labeling the map.
         """
 
-        if self.plotPath is None:
-            # Requested not to do plots
-            return
-
         # This is not currently used.
         # FIXME: add skyproj plotting.
         return
@@ -2206,9 +2202,6 @@ class FgcmStars(object):
             self.fgcmLog.info("No reference stars for color term residual plots.")
             return
 
-        if self.plotPath is None:
-            return
-
         objMagStdMean = snmm.getArray(self.objMagStdMeanHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
         objFlag = snmm.getArray(self.objFlagHandle)
@@ -2293,7 +2286,7 @@ class FgcmStars(object):
                                     self.cycleNumber,
                                     fig,
                                     band=band)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_refresidvscol_%s_%s.png' % (self.plotPath,
                                                                    self.outfileBaseWithCycle,
                                                                    band,

@@ -189,10 +189,13 @@ class FgcmGray(object):
         """
         self.deltaMapperDefault = deltaMapperDefault
 
-    def computeExpGrayForInitialSelection(self):
+    def computeExpGrayForInitialSelection(self, doPlots=False):
         """
         Compute exposure gray using bright star magnitudes to get initial estimates.
 
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -268,7 +271,7 @@ class FgcmGray(object):
             self.fgcmLog.info('Computed ExpGray for initial selection in %.2f seconds.' %
                               (time.time() - startTime))
 
-        if self.plotPath is None:
+        if not doPlots:
             return
 
         expUse,=np.where((self.fgcmPars.expFlag == 0) &
@@ -312,19 +315,20 @@ class FgcmGray(object):
                                 self.cycleNumber,
                                 fig,
                                 band=self.fgcmPars.bands[i])
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_initial_expgray_%s.png' % (self.plotPath,
                                                               self.outfileBaseWithCycle,
                                                               self.fgcmPars.bands[i]))
 
-    def computeCCDAndExpGray(self, onlyObsErr=False):
+    def computeCCDAndExpGray(self, onlyObsErr=False, doPlots=False):
         """
         Compute CCD and exposure gray using calibrated magnitudes.
 
         parameters
         ----------
-        onlyObsErr: bool, default=False
-           Only use observational error.  Used when making initial superstarflat estimate.
+        onlyObsErr : `bool`, optional
+            Only use observational error.  Used when making initial superstarflat estimate.
+        doPlots : `bool`, optional
         """
 
         if (not self.fgcmStars.allMagStdComputed):
@@ -823,11 +827,15 @@ class FgcmGray(object):
             self.fgcmLog.info('Computed CCDGray and ExpGray in %.2f seconds.' %
                               (time.time() - startTime))
 
-        self.makeExpGrayPlots()
+        self.makeExpGrayPlots(doPlots=doPlots)
 
-    def computeExpGrayColorSplit(self):
+    def computeExpGrayColorSplit(self, doPlots=False):
         """
         Do a comparison of expGray splitting red/blue stars
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         if (not self.fgcmStars.magStdComputed):
@@ -912,7 +920,7 @@ class FgcmGray(object):
             expGrayRMSColorSplit[bd, c] = self.illegalValue
             expGrayErrColorSplit[bd, c] = self.illegalValue
 
-        if self.plotPath is not None:
+        if doPlots:
             # main plots:
             #  per band, plot expGray for red vs blue stars!
 
@@ -954,7 +962,7 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_compare-redblue-expgray_%s.png' % (self.plotPath,
                                                                           self.outfileBaseWithCycle,
                                                                           self.fgcmPars.bands[bandIndex]))
@@ -997,16 +1005,20 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_compare-mjd-redblue-expgray_%s.png' % (self.plotPath,
                                                                               self.outfileBaseWithCycle,
                                                                               self.fgcmPars.bands[bandIndex]))
 
         # and we're done...
 
-    def makeExpGrayPlots(self):
+    def makeExpGrayPlots(self, doPlots=False):
         """
         Make exposure gray plots.
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
 
         # We run this all the time because it has useful logging, but
@@ -1053,7 +1065,7 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
             ax.set_ylabel(r'# of Exposures',fontsize=14)
 
-            if self.plotPath is not None:
+            if doPlots:
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
@@ -1062,7 +1074,7 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_expgray_%s.png' % (self.plotPath,
                                                           self.outfileBaseWithCycle,
                                                           self.fgcmPars.bands[i]))
@@ -1100,7 +1112,7 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\mathrm{sec}(\mathrm{zd})$',fontsize=16)
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
-            if self.plotPath is not None:
+            if doPlots:
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
@@ -1109,7 +1121,7 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_airmass_expgray_%s.png' % (self.plotPath,
                                                                   self.outfileBaseWithCycle,
                                                                   self.fgcmPars.bands[i]))
@@ -1130,7 +1142,7 @@ class FgcmGray(object):
             ax.set_xlabel(r'$\Delta \mathrm{UT}$',fontsize=16)
             ax.set_ylabel(r'$\mathrm{EXP}^{\mathrm{gray}}\,(\mathrm{mmag})$',fontsize=16)
 
-            if self.plotPath is not None:
+            if doPlots:
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
@@ -1139,7 +1151,7 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[i])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_UT_expgray_%s.png' % (self.plotPath,
                                                              self.outfileBaseWithCycle,
                                                              self.fgcmPars.bands[i]))
@@ -1162,7 +1174,7 @@ class FgcmGray(object):
 
             ax.set_title(r'$\mathrm{Deep Fields}$')
 
-            if self.plotPath is not None:
+            if doPlots:
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
@@ -1170,7 +1182,7 @@ class FgcmGray(object):
                                     "ExpgrayDeepMjd",
                                     self.cycleNumber,
                                     fig)
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_mjd_deep_expgray.png' % (self.plotPath,
                                                                 self.outfileBaseWithCycle))
 
@@ -1223,7 +1235,7 @@ class FgcmGray(object):
             ax.annotate(text, (0.95, 0.93), xycoords='axes fraction', ha='right',
                         va='top', fontsize=16, color='r')
 
-            if self.plotPath is not None:
+            if doPlots:
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
                                     self.butlerQC,
@@ -1232,7 +1244,7 @@ class FgcmGray(object):
                                     self.cycleNumber,
                                     fig,
                                     band=self.fgcmPars.bands[bandIndex0])
-                else:
+                elif self.plotPath is not None:
                     fig.savefig('%s/%s_expgray-compare_%s_%s.png' % (self.plotPath,
                                                                      self.outfileBaseWithCycle,
                                                                      self.fgcmPars.bands[bandIndex0],
@@ -1403,11 +1415,15 @@ class FgcmGray(object):
             self.fgcmLog.info('Computed ccdDeltaBkg and expDeltaBkg in %.2f seconds.' %
                               (time.time() - startTime))
 
-    def computeExposureReferenceOffsets(self):
+    def computeExposureReferenceOffsets(self, doPlots=False):
         """Compute exposure reference offsets.
 
         This method computes per-exposure offsets between the calibrated stars and the reference
         stars for an end-of-calibration "fixup".
+
+        Parameters
+        ----------
+        doPlots : `bool`, optional
         """
         if not self.fgcmStars.hasRefstars:
             # Nothing to do here
@@ -1495,7 +1511,7 @@ class FgcmGray(object):
             self.fgcmPars.compExpRefOffset[eInd] = np.median(EGrayGRO[i1a])
 
         # Do plots if necessary.
-        if self.plotPath is None:
+        if not doPlots:
             return
 
         rejectMask = (expFlagDict['TOO_FEW_STARS'] |
@@ -1539,7 +1555,7 @@ class FgcmGray(object):
                                 self.cycleNumber,
                                 fig,
                                 band=self.fgcmPars.bands[i])
-            else:
+            elif self.plotPath is not None:
                 fig.savefig('%s/%s_expref_%s.png' % (self.plotPath,
                                                      self.outfileBaseWithCycle,
                                                      self.fgcmPars.bands[i]))

@@ -409,7 +409,7 @@ class FgcmFitCycle(object):
             self.fgcmStars.performColorCuts()
 
             # get expGray for the initial selection
-            self.fgcmGray.computeExpGrayForInitialSelection()
+            self.fgcmGray.computeExpGrayForInitialSelection(doPlots=self.fgcmConfig.doPlots)
 
             # and select good exposures/flag bad exposures
             self.expSelector.selectGoodExposuresInitialSelection(self.fgcmGray)
@@ -433,8 +433,8 @@ class FgcmFitCycle(object):
                                       (band, self.fgcmPars.compAbsThroughput[i]))
 
             # Compute the slopes (initial guess).  Don't plot here, offsets make no sense.
-            self.fgcmQeSysSlope.computeQeSysSlope('initial')
-            self.fgcmQeSysSlope.plotQeSysRefStars('initial')
+            self.fgcmQeSysSlope.computeQeSysSlope('initial', doPlots=self.fgcmConfig.doPlots)
+            self.fgcmQeSysSlope.plotQeSysRefStars('initial', doPlots=self.fgcmConfig.doPlots)
 
             if (self.fgcmConfig.precomputeSuperStarInitialCycle):
                 # we want to precompute the superstar flat here...
@@ -459,7 +459,7 @@ class FgcmFitCycle(object):
                 self.fgcmStars.applySuperStarFlat(self.fgcmPars)
 
             # Last thing: fit the mag errors (if configured)...
-            self.fgcmModelMagErrs.computeMagErrorModel('initial')
+            self.fgcmModelMagErrs.computeMagErrorModel('initial', doPlots=self.fgcmConfig.doPlots)
 
         # Select calibratable nights
         self.expSelector.selectCalibratableNights()
@@ -503,7 +503,8 @@ class FgcmFitCycle(object):
             self.fgcmLog.info('FitCycle skipping fit because maxIter == 0')
 
         # Plot the parameters whether or not we did a fit!
-        self.fgcmPars.plotParameters()
+        if self.fgcmConfig.doPlots:
+            self.fgcmPars.plotParameters()
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('FitCycle Post-Fit'))
@@ -545,8 +546,8 @@ class FgcmFitCycle(object):
 
         # Compute CCD^gray and EXP^gray
         self.fgcmLog.debug('FitCycle computing Exp and CCD Gray')
-        self.fgcmGray.computeCCDAndExpGray()
-        self.fgcmGray.computeExpGrayColorSplit()
+        self.fgcmGray.computeCCDAndExpGray(doPlots=self.fgcmConfig.doPlots)
+        self.fgcmGray.computeExpGrayColorSplit(doPlots=self.fgcmConfig.doPlots)
 
         # We can compute this now...
         self.updatedPhotometricCut, self.updatedHighCut = self.fgcmGray.computeExpGrayCuts()
@@ -561,14 +562,15 @@ class FgcmFitCycle(object):
                                                butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
             self.fgcmDeltaAper.computeDeltaAperExposures(
                 doFullFit=self.fgcmConfig.doComputeDeltaAperExposures,
+                doPlots=self.fgcmConfig.doPlots,
             )
             if self.fgcmConfig.doComputeDeltaAperStars:
-                self.fgcmDeltaAper.computeDeltaAperStars()
+                self.fgcmDeltaAper.computeDeltaAperStars(doPlots=self.fgcmConfig.doPlots)
                 # Only run if we have the values per star.
                 if self.fgcmConfig.doComputeDeltaAperMap:
-                    self.fgcmDeltaAper.computeEpsilonMap()
+                    self.fgcmDeltaAper.computeEpsilonMap(doPlots=self.fgcmConfig.doPlots)
             if self.fgcmConfig.doComputeDeltaAperPerCcd:
-                self.fgcmDeltaAper.computeEpsilonPerCcd()
+                self.fgcmDeltaAper.computeEpsilonPerCcd(doPlots=self.fgcmConfig.doPlots)
 
         # Compute sigFgcm
         self.fgcmLog.debug('FitCycle computing sigFgcm')
@@ -576,8 +578,8 @@ class FgcmFitCycle(object):
                                        self.fgcmStars, butlerQC=self.butlerQC,
                                        plotHandleDict=self.plotHandleDict)
         # first compute with all...(better stats)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=False, save=True, doPlots=self.fgcmConfig.doPlots)
+        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, doPlots=self.fgcmConfig.doPlots)
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('After computing sigFGCM'))
@@ -609,10 +611,10 @@ class FgcmFitCycle(object):
         self.fgcmRetrieveAtmosphere = FgcmRetrieveAtmosphere(self.fgcmConfig, self.fgcmLUT,
                                                              self.fgcmPars, butlerQC=self.butlerQC,
                                                              plotHandleDict=self.plotHandleDict)
-        self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval)
+        self.fgcmRetrieveAtmosphere.r1ToPwv(self.fgcmRetrieval, doPlots=self.fgcmConfig.doPlots)
         # NOTE that neither of these are correct, nor do I think they help at the moment.
-        #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval)
-        #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray)
+        #self.fgcmRetrieveAtmosphere.r0ToNightlyTau(self.fgcmRetrieval, doPlots=self.fgcmConfig.doPlots)
+        #self.fgcmRetrieveAtmosphere.expGrayToNightlyTau(self.fgcmGray, doPlots=self.fgcmConfig.doPlots)
 
         # Compute SuperStar Flats
         if not self.finalCycle:
@@ -625,7 +627,10 @@ class FgcmFitCycle(object):
                 plotHandleDict=self.plotHandleDict,
             )
             superStarFlat.setDeltaMapperDefault(self.deltaMapperDefault)
-            superStarFlat.computeSuperStarFlats(forceZeroMean=self.fgcmConfig.superStarForceZeroMean)
+            superStarFlat.computeSuperStarFlats(
+                doPlots=self.fgcmConfig.doPlots,
+                forceZeroMean=self.fgcmConfig.superStarForceZeroMean,
+            )
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing superstar flats'))
@@ -655,7 +660,7 @@ class FgcmFitCycle(object):
                     butlerQC=self.butlerQC,
                     plotHandleDict=self.plotHandleDict,
                 )
-                mirChrom.computeMirrorChromaticity()
+                mirChrom.computeMirrorChromaticity(doPlots=self.fgcmConfig.doPlots)
 
             # Compute CCD chromaticity, but only after the first cycle.
             if np.any(self.fgcmConfig.fitCCDChromaticity) and not self.initialCycle:
@@ -668,18 +673,18 @@ class FgcmFitCycle(object):
                     butlerQC=self.butlerQC,
                     plotHandleDict=self.plotHandleDict,
                 )
-                ccdChrom.computeCCDChromaticity()
+                ccdChrom.computeCCDChromaticity(doPlots=self.fgcmConfig.doPlots)
 
             # Compute QE sys slope
             self.fgcmLog.debug('FitCycle computing qe sys slope')
-            self.fgcmQeSysSlope.computeQeSysSlope('final')
-            self.fgcmQeSysSlope.plotQeSysRefStars('final')
+            self.fgcmQeSysSlope.computeQeSysSlope('final', doPlots=self.fgcmConfig.doPlots)
+            self.fgcmQeSysSlope.plotQeSysRefStars('final', doPlots=self.fgcmConfig.doPlots)
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing qe sys slope'))
 
             # Compute mag error model (if configured)
-            self.fgcmModelMagErrs.computeMagErrorModel('postfit')
+            self.fgcmModelMagErrs.computeMagErrorModel('postfit', doPlots=self.fgcmConfig.doPlots)
 
         ## MAYBE:
         #   apply superstar and aperture corrections to grays
@@ -688,29 +693,40 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('FitCycle computing SigmaCal')
         self.sigCal = FgcmSigmaCal(self.fgcmConfig, self.fgcmPars, self.fgcmStars, self.fgcmGray,
                                    butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
-        self.sigCal.run()
+        self.sigCal.run(doPlots=self.fgcmConfig.doPlots)
 
         if self.fgcmStars.hasRefstars:
             self.fgcmLog.debug('FitCycle computing SigmaRef')
             sigRef = FgcmSigmaRef(self.fgcmConfig, self.fgcmPars, self.fgcmStars,
                                   butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
-            sigRef.computeSigmaRef()
+            sigRef.computeSigmaRef(doPlots=self.fgcmConfig.doPlots)
 
-            self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
+            if self.fgcmConfig.doPlots:
+                self.fgcmStars.plotRefStarColorTermResiduals(self.fgcmPars)
 
-            self.fgcmGray.computeExposureReferenceOffsets()
-
+            self.fgcmGray.computeExposureReferenceOffsets(doPlots=self.fgcmConfig.doPlots)
 
         # And finally compute the stars and test repeatability *after* the crunch
         self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (photometric)')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True)
+        self.fgcmSigFgcm.computeSigFgcm(
+            reserved=True,
+            save=False,
+            crunch=True,
+            doPlots=self.fgcmConfig.doPlots,
+        )
 
         self.fgcmLog.info('Using FgcmChisq to compute mags with CCD crunch (all exposures)')
         _ = self.fgcmChisq(self.fgcmPars.getParArray(), includeReserve=True,
                            fgcmGray=self.fgcmGray, allExposures=True)
-        self.fgcmSigFgcm.computeSigFgcm(reserved=True, save=False, crunch=True, nonphotometric=True)
+        self.fgcmSigFgcm.computeSigFgcm(
+            reserved=True,
+            save=False,
+            crunch=True,
+            nonphotometric=True,
+            doPlots=self.fgcmConfig.doPlots,
+        )
 
         # Make Zeropoints
         # We always want to compute these because of the plots
@@ -721,7 +737,7 @@ class FgcmFitCycle(object):
                                        self.fgcmRetrieval, self.fgcmStars,
                                        butlerQC=self.butlerQC, plotHandleDict=self.plotHandleDict)
         self.fgcmLog.debug('FitCycle computing zeropoints.')
-        self.fgcmZpts.computeZeropoints()
+        self.fgcmZpts.computeZeropoints(doPlots=self.fgcmConfig.doPlots)
 
         repPhotometricCut, repHighCut = self.fgcmGray.computeExpGrayCutsFromRepeatability()
         for i, useRep in enumerate(self.fgcmConfig.useRepeatabilityForExpGrayCuts):
