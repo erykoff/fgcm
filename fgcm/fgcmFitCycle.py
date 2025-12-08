@@ -258,6 +258,9 @@ class FgcmFitCycle(object):
     def finishReset(self, butlerQC=None, plotHandleDict=None):
         """Finish fit cycle reset.
         """
+        self.butlerQC = butlerQC
+        self.plotHandleDict = plotHandleDict
+
         self.fgcmChisq = FgcmChisq(
             self.fgcmConfig,
             self.fgcmPars,
@@ -863,6 +866,7 @@ class FgcmFitCycle(object):
         freezeStdAtmosphere=None,
         expGrayPhotometricCutDict=None,
         expGrayHighCutDict=None,
+        doPlots=None,
     ):
         """
         Update key configs for next cycle.
@@ -877,6 +881,7 @@ class FgcmFitCycle(object):
         freezeStdAtmosphere : `bool`, optional
         expGrayPhotometricCutDict : `dict`, optional
         expGrayHighCutDict : `dict`, optional
+        doPlots : `bool`, optional
         """
         self.fgcmConfig.updateCycleNumber(cycleNumber)
 
@@ -900,6 +905,9 @@ class FgcmFitCycle(object):
 
         if expGrayHighCutDict is not None:
             self.fgcmConfig.updateExpGrayHighCut(expGrayHighCutDict)
+
+        if doPlots is not None:
+            self.fgcmConfig.doPlots = doPlots
 
         self.initialCycle = False
         if self.fgcmConfig.cycleNumber == 0:
