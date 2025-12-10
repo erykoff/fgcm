@@ -283,8 +283,14 @@ class FgcmFitCycle(object):
         # We re-use fgcmGray because of the high memory.
         self.fgcmGray.butlerQC = butlerQC
         self.fgcmGray.plotHandleDict = plotHandleDict
+        self.fgcmGray.cycleNumber = self.fgcmConfig.cycleNumber
         self.fgcmGray.fgcmPars = self.fgcmPars
         self.fgcmGray.resetArrays()
+
+        # And we re-use fgcmStars because of the high memory.
+        self.fgcmStars.butlerQC = butlerQC
+        self.fgcmStars.plotHandleDict = plotHandleDict
+        self.fgcmStars.cycleNumber = self.fgcmConfig.cycleNumber
 
         self.fgcmQeSysSlope = FgcmQeSysSlope(
             self.fgcmConfig,
@@ -644,7 +650,7 @@ class FgcmFitCycle(object):
                 butlerQC=self.butlerQC,
                 plotHandleDict=self.plotHandleDict,
             )
-            aperCorr.computeApertureCorrections()
+            aperCorr.computeApertureCorrections(doPlots=self.fgcmConfig.doPlots)
 
             if not self.quietMode:
                 self.fgcmLog.info(getMemoryString('After computing aperture corrections'))
