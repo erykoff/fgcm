@@ -71,7 +71,7 @@ def getMemoryString(location):
     """
 
     status = None
-    result = {'peak':0, 'rss':0}
+    result = {'hwm': 0, 'rss': 0}
     memoryString = ''
     try:
         with open('/proc/self/status') as status:
@@ -82,7 +82,8 @@ def getMemoryString(location):
                     result[key] = int(parts[1])/1000
 
             memoryString = 'Memory usage at %s: %d MB current; %d MB peak.' % (
-                location, result['rss'], result['peak'])
+                location, result['rss'], result['hwm'],
+            )
     except:
         memoryString = 'Could not get process status for memory usage at %s!' % (location)
 
