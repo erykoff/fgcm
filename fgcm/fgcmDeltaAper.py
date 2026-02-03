@@ -4,6 +4,7 @@ import os
 import sys
 import esutil
 import time
+import skyproj
 
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import objFlagDict
@@ -342,7 +343,7 @@ class FgcmDeltaAper(object):
                 if hpix.size < 2:
                     self.fgcmLog.info("Not enough sky coverage for epsilon map in %s band" % (band))
                     continue
-                ra, dec = hpg.pixel_to_angle(self.deltaAperFitSpatialNside, hpix, nest=False)
+
                 st = np.argsort(offsetMap['epsilon'][hpix, j])
                 vmin = offsetMap['epsilon'][hpix[st[int(0.02*st.size)]], j]
                 vmax = offsetMap['epsilon'][hpix[st[int(0.98*st.size)]], j]
@@ -350,29 +351,21 @@ class FgcmDeltaAper(object):
                 self.fgcmLog.info('Background offset in %s band 2%% to 98%%: %.5f, %.5f nJy/arcsec2' %
                                   (band, vmin, vmax))
 
-                # Rotate RA, and flip
-                hi, = np.where(ra > 180.0)
-                ra[hi] -= 360.0
-
                 fig = makeFigure(figsize=(10, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
 
-                # Make a dummy image for the colorbar (below).
-                Z = [[0, 0], [0, 0]]
-                levels = np.linspace(vmin, vmax, num=150)
-                CS3 = ax.contourf(Z, levels)
-                ax.clear()
-
-                ax.hexbin(ra, dec, offsetMap['epsilon'][hpix, j], vmin=vmin, vmax=vmax)
-                ax.set_xlabel('RA')
-                ax.set_ylabel('Dec')
-                ax.set_title('%s band' % (band))
-                ax.set_aspect('equal')
-                xlim = ax.get_xlim()
-                ax.set_xlim(xlim[1], xlim[0])
-                cb = fig.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5), ax=ax)
-                cb.set_label('epsilon (nJy/arcsec2)')
+                sp = skyproj.McBrydeSkyproj(ax=ax)
+                sp.draw_hpxpix(
+                    self.deltaAperFitSpatialNside,
+                    hpix,
+                    offsetMap['epsilon'][hpix, j],
+                    nest=False,
+                    vmin=vmin,
+                    vmax=vmax,
+                )
+                sp.draw_colorbar(label="epsilon (nJy/arcsec2)")
+                fig.suptitle("%s band" % (band))
 
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
