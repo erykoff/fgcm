@@ -197,6 +197,8 @@ class FgcmDeltaAper(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
         globalEpsilon = np.zeros(self.fgcmStars.nBands) + self.illegalValue
         globalOffset = np.zeros(self.fgcmPars.nBands) + self.illegalValue
 
@@ -205,6 +207,9 @@ class FgcmDeltaAper(object):
                 objFlagDict['VARIABLE'] |
                 objFlagDict['TEMPORARY_BAD_STAR'] |
                 objFlagDict['RESERVED'])
+
+        nside_density_cut = 32
+        density_percentile = 50
 
         # Compute global offsets here.
         for i, band in enumerate(self.fgcmStars.bands):
@@ -216,6 +221,23 @@ class FgcmDeltaAper(object):
 
             mag_std = objMagStdMean[use, i]
             delta = objDeltaAperMean[use, i]
+
+            pix = hpg.angle_to_pixel(nside_density_cut, objRA[use], objDec[use])
+            count = np.zeros(hpg.nside_to_npixel(nside_density_cut), dtype=np.int32)
+            np.add.at(count, pix, 1)
+
+            covered_pixels, = np.where(count > 0)
+            density_cut = np.percentile(count[covered_pixels], density_percentile)
+
+            # Now we can quickly down-select those that are too dense.
+            sub_use = (count[pix] <= density_cut)
+
+            if sub_use.sum() == 0:
+                self.fgcmLog.warning("Down-selected density to none?  Seems not possible.")
+                continue
+
+            mag_std = mag_std[sub_use]
+            delta = delta[sub_use]
 
             # Sample for efficiency if necessary
             nsample = 1000000
