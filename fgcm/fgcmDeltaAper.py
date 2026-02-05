@@ -70,6 +70,9 @@ class FgcmDeltaAper(object):
 
         self.rng = fgcmConfig.rng
 
+        self.nside_density_cut = 32
+        self.density_percentile = 50
+
     def computeDeltaAperExposures(self, doFullFit=False, doPlots=False):
         """
         Compute deltaAper per-exposure quantities
@@ -208,9 +211,6 @@ class FgcmDeltaAper(object):
                 objFlagDict['TEMPORARY_BAD_STAR'] |
                 objFlagDict['RESERVED'])
 
-        nside_density_cut = 32
-        density_percentile = 50
-
         # Compute global offsets here.
         for i, band in enumerate(self.fgcmStars.bands):
             use, = np.where((objNGoodObs[:, i] >= self.deltaAperFitMinNgoodObs) &
@@ -222,12 +222,12 @@ class FgcmDeltaAper(object):
             mag_std = objMagStdMean[use, i]
             delta = objDeltaAperMean[use, i]
 
-            pix = hpg.angle_to_pixel(nside_density_cut, objRA[use], objDec[use])
-            count = np.zeros(hpg.nside_to_npixel(nside_density_cut), dtype=np.int32)
+            pix = hpg.angle_to_pixel(self.nside_density_cut, objRA[use], objDec[use])
+            count = np.zeros(hpg.nside_to_npixel(self.nside_density_cut), dtype=np.int32)
             np.add.at(count, pix, 1)
 
             covered_pixels, = np.where(count > 0)
-            density_cut = np.percentile(count[covered_pixels], density_percentile)
+            density_cut = np.percentile(count[covered_pixels], self.density_percentile)
 
             # Now we can quickly down-select those that are too dense.
             sub_use = (count[pix] <= density_cut)
@@ -416,6 +416,8 @@ class FgcmDeltaAper(object):
 
         from .fgcmUtilities import plotCCDMapBinned2d
 
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -434,6 +436,16 @@ class FgcmDeltaAper(object):
 
         # Use only good observations of good stars
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
+
+        # Downsample to less dense regions before continuing.
+        pix = hpg.angle_to_pixel(self.nside_density_cut, objRA[goodStars], objDec[goodStars])
+        count = np.zeros(hpg.nside_to_npixel(self.nside_density_cut), dtype=np.int32)
+        np.add.at(count, pix, 1)
+
+        coveredPixels, = np.where(count > 0)
+        densityCut = np.percentile(count[coveredPixels], self.density_percentile)
+        goodStars = goodStars[count[pix] <= densityCut]
+
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
         magGO = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
