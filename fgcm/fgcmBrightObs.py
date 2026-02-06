@@ -3,6 +3,7 @@ import os
 import sys
 import esutil
 import time
+import threading
 
 from .fgcmChisq import FgcmChisq
 
@@ -107,6 +108,11 @@ class FgcmBrightObs(object):
         self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
                            (time.time() - preStartTime))
 
+        self.objMagStdMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objNGoodObsTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objNGoodObsHandle))
+        self.objMagStdMeanTempLock = threading.Lock()
+
         if (self.debug):
             self._worker((goodStars,goodObs))
         else:
@@ -144,7 +150,7 @@ class FgcmBrightObs(object):
             # make a pool
             with ThreadPoolExecutor(max_workers=self.nCore) as pool:
                 pool.map(self._worker, workerList, chunksize=1)
-\
+
         if not self.quietMode:
             self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
                               (time.time() - startTime))
@@ -206,51 +212,54 @@ class FgcmBrightObs(object):
 
         # new version using fmin.at()
 
-        # start with the mean temp var, set to 99s.
-        objMagStdMeanTemp = np.zeros_like(objMagStdMean)
-        objMagStdMeanTemp[:,:] = 99.0
+        self.objMagStdMeanTempLock.acquire()
+        self.objMagStdMeanTemp[goodStars, :] = 99.0
 
         # find the brightest (minmag) object at each index
-        np.fmin.at(objMagStdMeanTemp,
+        np.fmin.at(self.objMagStdMeanTemp,
                    (obsObjIDIndexGO, obsBandIndexGO),
-                   obsMagStdGO.astype(objMagStdMeanTemp.dtype))
+                   obsMagStdGO.astype(self.objMagStdMeanTemp.dtype))
+
+        self.objMagStdMeanTempLock.release()
 
         # now which observations are bright *enough* to consider?
         brightEnoughGO, = np.where((obsMagStdGO -
-                                    objMagStdMeanTemp[obsObjIDIndexGO,
-                                                      obsBandIndexGO]) <=
+                                    self.objMagStdMeanTemp[obsObjIDIndexGO,
+                                                           obsBandIndexGO]) <=
                                    self.brightObsGrayMax)
 
-        # need to take the weighted mean, so a temp array here
-        #  (memory issues?)
-        wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        objNGoodObsTemp = np.zeros_like(objNGoodObs)
-        objMagStdMeanTemp[:,:] = 0
+        self.objMagStdMeanTempLock.acquire()
+
+        self.objMagStdMeanTemp[goodStars, :] = 0.0
+        self.objNGoodObsTemp[goodStars, :] = 0.0
 
         obsMagErr2GOBE = obsMagErr2GO[brightEnoughGO]
 
-        np.add.at(wtSum,
+        np.add.at(self.wtSumTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  1./obsMagErr2GOBE.astype(wtSum.dtype))
-        np.add.at(objMagStdMeanTemp,
+                  1./obsMagErr2GOBE.astype(self.wtSumTemp.dtype))
+        np.add.at(self.objMagStdMeanTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  (obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE).astype(objMagStdMeanTemp.dtype))
-        np.add.at(objNGoodObsTemp,
+                  (obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE).astype(self.objMagStdMeanTemp.dtype))
+        np.add.at(self.objNGoodObsTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
                   1)
 
+        self.objMagStdMeanTempLock.release()
+
         # these are good object/bands that were observed
-        gd=np.where(wtSum > 0.0)
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
 
         # acquire lock to save values
         objMagStdMeanLock.acquire()
 
-        objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-        objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
-        objNGoodObs[gd] = objNGoodObsTemp[gd]
+        objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
+        objNGoodObs[gd] = self.objNGoodObsTemp[gd]
 
         # and release
         objMagStdMeanLock.release()
