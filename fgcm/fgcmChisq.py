@@ -10,6 +10,7 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import getMemoryString
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
@@ -174,6 +175,7 @@ class FgcmChisq(object):
         fgcmGray: FgcmGray, default=None
            CCD Gray information for computing with "ccd crunch"
         """
+        self.fgcmLog.info(getMemoryString("Start chisq"))
 
         # computeDerivatives: do we want to compute the derivatives?
         # computeSEDSlope: compute SED Slope and recompute mean mags?
@@ -280,7 +282,9 @@ class FgcmChisq(object):
             snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)[:] = 99.0
             snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
+        self.fgcmLog.info(getMemoryString("Before goodStars"))
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=self.includeReserve)
+        self.fgcmLog.info(getMemoryString("After goodStars"))
 
         if self._nIterations == 0:
             self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
@@ -303,6 +307,8 @@ class FgcmChisq(object):
             goodObs = self.goodObs
             goodStarsSub = self.goodStarsSub
         else:
+            self.fgcmLog.info(getMemoryString("Before prematch"))
+
             # we need to do matching
             preStartTime=time.time()
             self.fgcmLog.debug('Pre-matching stars and observations...')
@@ -322,6 +328,8 @@ class FgcmChisq(object):
                 self.matchesCached = True
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
+
+            self.fgcmLog.info(getMemoryString("after prematch"))
 
         self.nSums = 4 # chisq, chisq_ref, nobs, nobs_ref
         if self.computeDerivatives:
@@ -352,6 +360,8 @@ class FgcmChisq(object):
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
             # regular multi-threaded
+
+            self.fgcmLog.info(getMemoryString("Before magworkers"))
 
             self.totalHandleDict = {}
             for thisThread in range(self.nCore):
@@ -393,6 +403,8 @@ class FgcmChisq(object):
                 # Compute magnitudes
                 pool.map(self._magWorker, workerList, chunksize=1)
 
+            self.fgcmLog.info(getMemoryString("After magworkers"))
+
             # And compute absolute offset if desired...
             if self.computeAbsThroughput:
                 self.applyDelta = True
@@ -403,8 +415,12 @@ class FgcmChisq(object):
             if not self.allExposures:
                 self.resetThreadIds()
 
+                self.fgcmLog.info(getMemoryString("Before chisq workers"))
+
                 with ThreadPoolExecutor(max_workers=self.nCore) as pool:
                     pool.map(self._chisqWorker, workerList, chunksize=1)
+
+                self.fgcmLog.info(getMemoryString("After chisq workers"))
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
