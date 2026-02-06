@@ -642,7 +642,7 @@ class FgcmParameters(object):
         # Load in the expSeeingVariable
         if len(expInfo[self.seeingField].shape) == 2:
             if expInfo[self.seeingField].shape[1] != self.nCCD:
-                raise ValueError('ExpINfo %s field has the wrong number of ccds (%d != %d)' % (self.seeingField, self.expSeeingVariable.shape[1], self.nCCD))
+                raise ValueError('ExpInfo %s field has the wrong number of ccds (%d != %d)' % (self.seeingField, self.expSeeingVariable.shape[1], self.nCCD))
 
             self.expSeeingVariablePerCCD = expInfo[self.seeingField]
 

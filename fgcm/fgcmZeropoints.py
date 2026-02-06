@@ -935,8 +935,15 @@ class FgcmZeropointPlotter(object):
         for i, band in enumerate(fgcmStars.bands):
             # We need to make sure we only select valid stars if at all
             # possible. This is particularly important for u band!
-            okBlue, = np.where(objMagStdMean[goodStars[blueStars], i] < 90.0)
-            okRed, = np.where(objMagStdMean[goodStars[redStars], i] < 90.0)
+            # We also want to avoid stars that have "default" SED slopes.
+            okBlue, = np.where(
+                (objMagStdMean[goodStars[blueStars], i] < 90.0)
+                & (objSEDSlope[goodStars[blueStars], i] != np.median(objSEDSlope[goodStars[blueStars], i]))
+            )
+            okRed, = np.where(
+                (objMagStdMean[goodStars[redStars], i] < 90.0)
+                & (objSEDSlope[goodStars[redStars], i] != np.median(objSEDSlope[goodStars[redStars], i]))
+            )
 
             if okBlue.size < 3:
                 # This will just pick up the overall median SED slope

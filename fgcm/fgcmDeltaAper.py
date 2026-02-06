@@ -4,6 +4,7 @@ import os
 import sys
 import esutil
 import time
+import skyproj
 
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import objFlagDict
@@ -68,6 +69,9 @@ class FgcmDeltaAper(object):
         self.k = 2.5/np.log(10.)
 
         self.rng = fgcmConfig.rng
+
+        self.nside_density_cut = 32
+        self.density_percentile = 50
 
     def computeDeltaAperExposures(self, doFullFit=False, doPlots=False):
         """
@@ -196,6 +200,8 @@ class FgcmDeltaAper(object):
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objDeltaAperMean = snmm.getArray(self.fgcmStars.objDeltaAperMeanHandle)
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
         globalEpsilon = np.zeros(self.fgcmStars.nBands) + self.illegalValue
         globalOffset = np.zeros(self.fgcmPars.nBands) + self.illegalValue
 
@@ -215,6 +221,23 @@ class FgcmDeltaAper(object):
 
             mag_std = objMagStdMean[use, i]
             delta = objDeltaAperMean[use, i]
+
+            pix = hpg.angle_to_pixel(self.nside_density_cut, objRA[use], objDec[use])
+            count = np.zeros(hpg.nside_to_npixel(self.nside_density_cut), dtype=np.int32)
+            np.add.at(count, pix, 1)
+
+            covered_pixels, = np.where(count > 0)
+            density_cut = np.percentile(count[covered_pixels], self.density_percentile)
+
+            # Now we can quickly down-select those that are too dense.
+            sub_use = (count[pix] <= density_cut)
+
+            if sub_use.sum() == 0:
+                self.fgcmLog.warning("Down-selected density to none?  Seems not possible.")
+                continue
+
+            mag_std = mag_std[sub_use]
+            delta = delta[sub_use]
 
             # Sample for efficiency if necessary
             nsample = 1000000
@@ -342,7 +365,7 @@ class FgcmDeltaAper(object):
                 if hpix.size < 2:
                     self.fgcmLog.info("Not enough sky coverage for epsilon map in %s band" % (band))
                     continue
-                ra, dec = hpg.pixel_to_angle(self.deltaAperFitSpatialNside, hpix, nest=False)
+
                 st = np.argsort(offsetMap['epsilon'][hpix, j])
                 vmin = offsetMap['epsilon'][hpix[st[int(0.02*st.size)]], j]
                 vmax = offsetMap['epsilon'][hpix[st[int(0.98*st.size)]], j]
@@ -350,29 +373,21 @@ class FgcmDeltaAper(object):
                 self.fgcmLog.info('Background offset in %s band 2%% to 98%%: %.5f, %.5f nJy/arcsec2' %
                                   (band, vmin, vmax))
 
-                # Rotate RA, and flip
-                hi, = np.where(ra > 180.0)
-                ra[hi] -= 360.0
-
                 fig = makeFigure(figsize=(10, 6))
                 fig.clf()
                 ax = fig.add_subplot(111)
 
-                # Make a dummy image for the colorbar (below).
-                Z = [[0, 0], [0, 0]]
-                levels = np.linspace(vmin, vmax, num=150)
-                CS3 = ax.contourf(Z, levels)
-                ax.clear()
-
-                ax.hexbin(ra, dec, offsetMap['epsilon'][hpix, j], vmin=vmin, vmax=vmax)
-                ax.set_xlabel('RA')
-                ax.set_ylabel('Dec')
-                ax.set_title('%s band' % (band))
-                ax.set_aspect('equal')
-                xlim = ax.get_xlim()
-                ax.set_xlim(xlim[1], xlim[0])
-                cb = fig.colorbar(CS3, ticks=np.linspace(vmin, vmax, 5), ax=ax)
-                cb.set_label('epsilon (nJy/arcsec2)')
+                sp = skyproj.McBrydeSkyproj(ax=ax)
+                sp.draw_hpxpix(
+                    self.deltaAperFitSpatialNside,
+                    hpix,
+                    offsetMap['epsilon'][hpix, j],
+                    nest=False,
+                    vmin=vmin,
+                    vmax=vmax,
+                )
+                sp.draw_colorbar(label="epsilon (nJy/arcsec2)")
+                fig.suptitle("%s band" % (band))
 
                 if self.butlerQC is not None:
                     putButlerFigure(self.fgcmLog,
@@ -401,6 +416,8 @@ class FgcmDeltaAper(object):
 
         from .fgcmUtilities import plotCCDMapBinned2d
 
+        objRA = snmm.getArray(self.fgcmStars.objRAHandle)
+        objDec = snmm.getArray(self.fgcmStars.objDecHandle)
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
         objMagStdMeanErr = snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)
         objNGoodObs = snmm.getArray(self.fgcmStars.objNGoodObsHandle)
@@ -419,6 +436,16 @@ class FgcmDeltaAper(object):
 
         # Use only good observations of good stars
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=False, checkMinObs=True)
+
+        # Downsample to less dense regions before continuing.
+        pix = hpg.angle_to_pixel(self.nside_density_cut, objRA[goodStars], objDec[goodStars])
+        count = np.zeros(hpg.nside_to_npixel(self.nside_density_cut), dtype=np.int32)
+        np.add.at(count, pix, 1)
+
+        coveredPixels, = np.where(count > 0)
+        densityCut = np.percentile(count[coveredPixels], self.density_percentile)
+        goodStars = goodStars[count[pix] <= densityCut]
+
         _, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
         magGO = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
