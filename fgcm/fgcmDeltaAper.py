@@ -5,6 +5,7 @@ import sys
 import esutil
 import time
 import skyproj
+import threading
 
 from .fgcmUtilities import dataBinner
 from .fgcmUtilities import objFlagDict
@@ -164,6 +165,10 @@ class FgcmDeltaAper(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
+
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objDeltaAperMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objMagStdMeanTempLock = threading.Lock()
 
         if self.debug:
             self._starWorker((goodStars, goodObs))
@@ -639,22 +644,27 @@ class FgcmDeltaAper(object):
 
         obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
 
-        wtSum = np.zeros_like(objMagStdMean, dtype='f8')
-        objDeltaAperMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
+        self.objMagStdMeanTempLock.acquire()
 
-        np.add.at(objDeltaAperMeanTemp,
-                  (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(objDeltaAperMeanTemp.dtype))
-        np.add.at(wtSum,
-                  (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  (1./obsMagErr2GO).astype(wtSum.dtype))
+        self.wtSumTemp[goodStars, :] = 0.0
+        self.objDeltaAperMeanTemp[goodStars, :] = 0.0
 
-        gd = np.where(wtSum > 0.0)
+        np.add.at(self.objDeltaAperMeanTemp,
+                  (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
+                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(self.objDeltaAperMeanTemp.dtype))
+        np.add.at(self.wtSumTemp,
+                  (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
+                  (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
+
+        self.objMagStdMeanTempLock.release()
+
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
 
         objDeltaAperMeanLock = snmm.getArrayLock(self.fgcmStars.objDeltaAperMeanHandle)
         objDeltaAperMeanLock.acquire()
 
-        objDeltaAperMean[gd] = objDeltaAperMeanTemp[gd] / wtSum[gd]
+        objDeltaAperMean[gd] = self.objDeltaAperMeanTemp[gd] / self.wtSumTemp[gd]
 
         objDeltaAperMeanLock.release()
 
