@@ -341,6 +341,11 @@ class FgcmChisq(object):
 
         self.applyDelta = False
 
+        self.objMagStdMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objMagStdMeanNoChromTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objMagStdMeanTempLock = threading.Lock()
+
         self.debug = debug
         if (self.debug):
             # debug mode: single thread
@@ -662,26 +667,29 @@ class FgcmChisq(object):
         if (self.computeSEDSlopes):
             # first, compute mean mags (code same as below.  FIXME: consolidate, but how?)
 
-            # make temp vars.  With memory overhead
+            self.objMagStdMeanTempLock.acquire()
 
-            wtSum = np.zeros_like(objMagStdMean, dtype='f8')
-            objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
+            self.wtSumTemp[goodStars, :] = 0.0
+            self.objMagStdMeanTemp[goodStars, :] = 0.0
 
-            add_at_2d(wtSum,
+            add_at_2d(self.wtSumTemp,
                    (obsObjIDIndexGO,obsBandIndexGO),
-                   (1./obsMagErr2GO).astype(wtSum.dtype))
-            add_at_2d(objMagStdMeanTemp,
+                   (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
+            add_at_2d(self.objMagStdMeanTemp,
                    (obsObjIDIndexGO,obsBandIndexGO),
-                   (obsMagGO/obsMagErr2GO).astype(objMagStdMeanTemp.dtype))
+                   (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanTemp.dtype))
+
+            self.objMagStdMeanTempLock.release()
 
             # these are good object/bands that were observed
-            gd=np.where(wtSum > 0.0)
+            gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+            gd = (goodStars[gd[0]], gd[1])
 
             # and acquire lock to save the values
             objMagStdMeanLock.acquire()
 
-            objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-            objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
+            objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+            objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
 
             # and release the lock.
             objMagStdMeanLock.release()
@@ -730,32 +738,37 @@ class FgcmChisq(object):
         #  array just for the stars under consideration, but this would make the
         #  indexing in the np.add.at() more difficult
 
-        wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
-        objMagStdMeanNoChromTemp = np.zeros_like(objMagStdMeanNoChrom, dtype='f8')
+        self.objMagStdMeanTempLock.acquire()
 
-        add_at_2d(wtSum,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (1./obsMagErr2GO).astype(wtSum.dtype))
+        self.wtSumTemp[goodStars, :] = 0.0
+        self.objMagStdMeanTemp[goodStars, :] = 0.0
+        self.objMagStdMeanNoChromTemp[goodStars, :] = 0.0
 
-        add_at_2d(objMagStdMeanTemp,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (obsMagStdGO/obsMagErr2GO).astype(objMagStdMeanTemp.dtype))
+        add_at_2d(self.wtSumTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
+
+        add_at_2d(self.objMagStdMeanTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (obsMagStdGO/obsMagErr2GO).astype(self.objMagStdMeanTemp.dtype))
 
         # And the same thing with the non-chromatic corrected values
-        add_at_2d(objMagStdMeanNoChromTemp,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (obsMagGO/obsMagErr2GO).astype(objMagStdMeanNoChromTemp.dtype))
+        add_at_2d(self.objMagStdMeanNoChromTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanNoChromTemp.dtype))
+
+        self.objMagStdMeanTempLock.release()
 
         # which objects/bands have observations?
-        gd=np.where(wtSum > 0.0)
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
 
         # and acquire lock to save the values
         objMagStdMeanLock.acquire()
 
-        objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-        objMagStdMeanNoChrom[gd] = objMagStdMeanNoChromTemp[gd] / wtSum[gd]
-        objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
+        objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanNoChrom[gd] = self.objMagStdMeanNoChromTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
 
         # and release the lock.
         objMagStdMeanLock.release()
