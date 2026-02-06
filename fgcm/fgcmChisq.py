@@ -3,6 +3,8 @@ import os
 import sys
 import esutil
 import time
+from itertools import count
+import threading
 
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
@@ -11,7 +13,7 @@ from .fgcmUtilities import objFlagDict
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -98,6 +100,16 @@ class FgcmChisq(object):
         self.maxIterations = -1
 
         numba_test(0)
+
+    def resetThreadIds(self):
+        self._threadIds = {}
+        self._threadCounter = count()
+        self._threadCounterLock = threading.Lock()
+
+    def getThreadId(self):
+        tid = threading.get_ident()
+        with self._threadCounterLock:
+            return self._threadIds.setdefault(tid, next(self._threadCounter))
 
     def resetFitChisqList(self):
         """
@@ -323,7 +335,7 @@ class FgcmChisq(object):
 
         self.debug = debug
         if (self.debug):
-            # debug mode: single core
+            # debug mode: single thread
             self.totalHandleDict = {}
             self.totalHandleDict[0] = snmm.createArray(self.nSums,dtype='f8')
 
@@ -339,18 +351,11 @@ class FgcmChisq(object):
 
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
-            # regular multi-core
-
-            mp_ctx = multiprocessing.get_context('fork')
-            # make a dummy process to discover starting child number
-            proc = mp_ctx.Process()
-            workerIndex = proc._identity[0]+1
-            proc = None
+            # regular multi-threaded
 
             self.totalHandleDict = {}
-            for thisCore in range(self.nCore):
-                self.totalHandleDict[workerIndex + thisCore] = (
-                    snmm.createArray(self.nSums,dtype='f8'))
+            for thisThread in range(self.nCore):
+                self.totalHandleDict[thisThread] = snmm.createArray(self.nSums, dtype='f8')
 
             # split goodStars into a list of arrays of roughly equal size
 
@@ -382,10 +387,11 @@ class FgcmChisq(object):
 
             self.fgcmLog.debug('Running chisq on %d cores' % (self.nCore))
 
-            # make a pool
-            pool = mp_ctx.Pool(processes=self.nCore)
-            # Compute magnitudes
-            pool.map(self._magWorker, workerList, chunksize=1)
+            self.resetThreadIds()
+
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                # Compute magnitudes
+                pool.map(self._magWorker, workerList, chunksize=1)
 
             # And compute absolute offset if desired...
             if self.computeAbsThroughput:
@@ -395,16 +401,15 @@ class FgcmChisq(object):
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
-                pool.map(self._chisqWorker, workerList, chunksize=1)
+                self.resetThreadIds()
 
-            pool.close()
-            pool.join()
+                with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                    pool.map(self._chisqWorker, workerList, chunksize=1)
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
-            for thisCore in range(self.nCore):
-                partialSums[:] += snmm.getArray(
-                    self.totalHandleDict[workerIndex + thisCore])[:]
+            for thisThread in range(self.nCore):
+                partialSums[:] += snmm.getArray(self.totalHandleDict[thisThread])[:]
 
         if (not self.allExposures):
             # we get the number of fit parameters by counting which of the parameters
@@ -550,8 +555,8 @@ class FgcmChisq(object):
                 ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
         # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
-        obsMagStdLock = snmm.getArrayBase(self.fgcmStars.obsMagStdHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
+        obsMagStdLock = snmm.getArrayLock(self.fgcmStars.obsMagStdHandle)
 
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
@@ -761,9 +766,9 @@ class FgcmChisq(object):
         goodObs = goodStarsAndObs[1]
 
         if self.debug:
-            thisCore = 0
+            thisThread = 0
         else:
-            thisCore = multiprocessing.current_process()._identity[0]
+            thisThread = self.getThreadId()
 
         # Set things up
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
@@ -785,8 +790,8 @@ class FgcmChisq(object):
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
         # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
-        obsMagStdLock = snmm.getArrayBase(self.fgcmStars.obsMagStdHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
+        obsMagStdLock = snmm.getArrayLock(self.fgcmStars.obsMagStdHandle)
 
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
@@ -1710,11 +1715,8 @@ class FgcmChisq(object):
         # note that this store doesn't need locking because we only access
         #  a given array from a single process
 
-        totalArr = snmm.getArray(self.totalHandleDict[thisCore])
+        totalArr = snmm.getArray(self.totalHandleDict[thisThread])
         totalArr[:] = totalArr[:] + partialArray
-
-        # and we're done
-        return None
 
     def __getstate__(self):
         # Don't try to pickle the logger.

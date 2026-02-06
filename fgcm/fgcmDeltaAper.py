@@ -10,7 +10,7 @@ from .fgcmUtilities import dataBinner
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -186,11 +186,8 @@ class FgcmDeltaAper(object):
             # reverse sort so the longest running go first
             workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-            mp_ctx = multiprocessing.get_context('fork')
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._starWorker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._starWorker, workerList, chunksize=1)
 
         if not self.quietMode:
             self.fgcmLog.info('Finished DeltaAper in %.2f seconds.' %
@@ -654,7 +651,7 @@ class FgcmDeltaAper(object):
 
         gd = np.where(wtSum > 0.0)
 
-        objDeltaAperMeanLock = snmm.getArrayBase(self.fgcmStars.objDeltaAperMeanHandle).get_lock()
+        objDeltaAperMeanLock = snmm.getArrayLock(self.fgcmStars.objDeltaAperMeanHandle)
         objDeltaAperMeanLock.acquire()
 
         objDeltaAperMean[gd] = objDeltaAperMeanTemp[gd] / wtSum[gd]

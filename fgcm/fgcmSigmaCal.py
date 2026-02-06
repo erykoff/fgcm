@@ -8,7 +8,7 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -192,11 +192,8 @@ class FgcmSigmaCal(object):
         for i, s in enumerate(sigmaCals):
             self.sigmaCal = s
 
-            mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._worker, workerList, chunksize=1)
 
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:

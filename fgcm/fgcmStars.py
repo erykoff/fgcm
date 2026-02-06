@@ -1303,8 +1303,8 @@ class FgcmStars(object):
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
 
-        objMagStdMeanLock = snmm.getArrayBase(self.objMagStdMeanHandle).get_lock()
-        objSEDSlopeLock = snmm.getArrayBase(self.objSEDSlopeHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.objMagStdMeanHandle)
+        objSEDSlopeLock = snmm.getArrayLock(self.objSEDSlopeHandle)
 
         # protect access when copying to local
         objMagStdMeanLock.acquire()

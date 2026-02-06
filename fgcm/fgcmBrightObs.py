@@ -6,7 +6,7 @@ import time
 
 from .fgcmChisq import FgcmChisq
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -142,13 +142,9 @@ class FgcmBrightObs(object):
                                (nSections,time.time() - prepStartTime))
 
             # make a pool
-            mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker,workerList,chunksize=1)
-            pool.close()
-            pool.join()
-
-
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._worker, workerList, chunksize=1)
+\
         if not self.quietMode:
             self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
                               (time.time() - startTime))
@@ -183,7 +179,7 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
 
         # and cut to those exposures that are not flagged
         if (self.debug):
