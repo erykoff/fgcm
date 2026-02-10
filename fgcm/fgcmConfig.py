@@ -194,8 +194,10 @@ class FgcmConfig(object):
     useExposureReferenceOffset = ConfigField(bool, default=False)
 
     mapNSide = ConfigField(int, default=256)
+    nObsPerRun = ConfigField(int, default=500000)
     nStarPerRun = ConfigField(int, default=200000)
     nStarPerGrayRun = ConfigField(int, default=50000)
+    nObsPerGrayRun = ConfigField(int, default=100000)
     nExpPerRun = ConfigField(int, default=1000)
     varNSig = ConfigField(float, default=100.0)
     varMinBand = ConfigField(int, default=2)
