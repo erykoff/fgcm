@@ -47,7 +47,7 @@ class FgcmComputeStepUnits(object):
 
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
@@ -126,22 +126,23 @@ class FgcmComputeStepUnits(object):
         for thisThread in range(self.nCore):
             self.totalHandleDict[thisThread] = snmm.createArray(self.nSums, dtype='f8')
 
-        nSections = goodStars.size // self.nStarPerRun + 1
-        goodStarsList = np.array_split(goodStars,nSections)
+        nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-        splitValues = np.zeros(nSections-1,dtype='i4')
-        for i in range(1,nSections):
-            splitValues[i-1] = goodStarsList[i][0]
+        nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+        sectionSize = nObsCumSum[-1] // nSections
 
+        goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+        goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+        splitValues = np.zeros(nSections - 1, dtype='i4')
+        for i in range(1, nSections):
+            splitValues[i - 1] = goodStarsList[i][0]
+
+        # get the indices from the goodStarsSub matched list (matched to goodStars)
         splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-        # and split along the indices
-        goodObsList = np.split(goodObs,splitIndices)
+        goodObsList = np.split(goodObs, splitIndices)
 
         workerList = list(zip(goodStarsList,goodObsList))
-
-        # reverse sort so the longest running go first
-        workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
         self.resetThreadIds()
 

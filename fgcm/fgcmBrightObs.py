@@ -34,8 +34,6 @@ class FgcmBrightObs(object):
        Maximum gray compared to mean to consider averaging
     nCore: int
        Number of cores to run on (via multiprocessing)
-    nStarPerRun: int
-       Number of stars per run (too many uses more memory)
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
@@ -52,7 +50,7 @@ class FgcmBrightObs(object):
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.quietMode = fgcmConfig.quietMode
 
@@ -122,27 +120,24 @@ class FgcmBrightObs(object):
             # split goodStars into a list of arrays of roughly equal size
 
             prepStartTime = time.time()
-            nSections = goodStars.size // self.nStarPerRun + 1
-            goodStarsList = np.array_split(goodStars,nSections)
 
-            # is there a better way of getting all the first elements from the list?
-            #  note that we need to skip the first which should be zero (checked above)
-            #  see also fgcmChisq.py
-            # splitValues is the first of the goodStars in each list
-            splitValues = np.zeros(nSections-1,dtype='i4')
-            for i in range(1,nSections):
-                splitValues[i-1] = goodStarsList[i][0]
+            nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-            # get the indices from the goodStarsSub matched list
+            nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+            sectionSize = nObsCumSum[-1] // nSections
+
+            goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+            goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+            splitValues = np.zeros(nSections - 1, dtype='i4')
+            for i in range(1, nSections):
+                splitValues[i - 1] = goodStarsList[i][0]
+
+            # get the indices from the goodStarsSub matched list (matched to goodStars)
             splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-            # and split along these indices
-            goodObsList = np.split(goodObs,splitIndices)
+            goodObsList = np.split(goodObs, splitIndices)
 
             workerList = list(zip(goodStarsList,goodObsList))
-
-            # reverse sort so the longest running go first
-            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
             self.fgcmLog.debug('Using %d sections (%.1f seconds)' %
                                (nSections,time.time() - prepStartTime))
