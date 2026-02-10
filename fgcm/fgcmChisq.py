@@ -1367,7 +1367,7 @@ class FgcmChisq(object):
                                   (2.0 * deltaRefMagWeightedGROF[noExtGROF] *
                                   dLdLnPwvGO[goodRefObsGOF[noExtGROF]]).astype(np.float64))
 
-                        partialArray[2*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] = units[self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt]
+                        partialArray[2*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] /= units[self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt]
                         partialArray[3*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] += 1
 
                     # lnPwv Nightly Slope
