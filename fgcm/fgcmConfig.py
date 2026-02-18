@@ -210,6 +210,7 @@ class FgcmConfig(object):
     useNightlyRetrievedPwv = ConfigField(bool, default=False)
     useQuadraticPwv = ConfigField(bool, default=False)
     pwvRetrievalSmoothBlock = ConfigField(int, default=25)
+    retrievedPwvBands = ConfigField(list, default=["z", "y"])
     fitMirrorChromaticity = ConfigField(bool, default=False)
     fitCCDChromaticityDict = ConfigField(dict, default={})
     useRetrievedTauInit = ConfigField(bool, default=False)
