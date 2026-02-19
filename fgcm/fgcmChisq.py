@@ -611,22 +611,20 @@ class FgcmChisq(object):
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
-                values0, counts0, inds0 = scipy_histogram(obsCCDIndexGO[ok])
-                use0, = np.where(counts0 > 0)
-                for i0 in use0:
-                    i0a = inds0[values0[i0]][0]
+                expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
+                              obsCCDIndexGO[ok])
 
-                    values1, counts1, inds1 = scipy_histogram(obsExpIndexGO[ok][i0a])
-                    use1, = np.where(counts1 > 0)
-                    for i1 in use1:
-                        i1a = i0a[inds1[values1[i1]][0]]
-                        eInd = obsExpIndexGO[ok[i1a[0]]]
-                        cInd = obsCCDIndexGO[ok[i1a[0]]]
-                        field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
-                                            self.deltaMapperDefault['y_size'][cInd],
-                                            ccdGraySubCCDPars[eInd, cInd, :])
-                        fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
-                        obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+                values, counts, inds = scipy_histogram(expCcdHash)
+                use, = np.where(counts > 0)
+                for i in use:
+                    i1a = inds[values[i]][0]
+                    eInd = obsExpIndexGO[ok[i1a[0]]]
+                    cInd = obsCCDIndexGO[ok[i1a[0]]]
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                        self.deltaMapperDefault['y_size'][cInd],
+                                        ccdGraySubCCDPars[eInd, cInd, :])
+                    fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                    obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
             else:
                 # Regular non-sub-ccd
                 obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
