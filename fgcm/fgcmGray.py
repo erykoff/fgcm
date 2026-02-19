@@ -5,7 +5,7 @@ import esutil
 import time
 import scipy.optimize
 
-from .fgcmUtilities import gaussFunction
+from .fgcmUtilities import gaussFunction, scipy_histogram
 from .fgcmUtilities import histoGauss
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import computeDeltaRA
@@ -461,11 +461,11 @@ class FgcmGray(object):
             FGrayGO = 10.**(EGrayGO/(-2.5))
             FGrayErrGO = (np.log(10.)/2.5)*np.sqrt(EGrayErr2GO)*FGrayGO
 
-            h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+            values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
 
-            use, = np.where(h >= 3)
+            use, = np.where(counts >= 3)
             for i in use:
-                i1a = rev[rev[i]: rev[i + 1]]
+                i1a = inds[values[i]][0]
 
                 eInd = obsExpIndex[goodObs[i1a[0]]]
                 bInd = obsBandIndex[goodObs[i1a[0]]]
@@ -652,15 +652,15 @@ class FgcmGray(object):
             # Split by CCD first.
             # Note that anything with 2 or fewer observations will be
             # marked bad.
-            h0, rev0 = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
-            use0, = np.where(h0 >= 3)
+            values0, counts0, inds0 = scipy_histogram(obsCCDIndex[goodObs])
+            use0, = np.where(counts0 >= 3)
             for i0 in use0:
-                i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+                i0a = inds0[values0[i0]][0]
 
-                h1, rev1 = esutil.stat.histogram(obsExpIndex[goodObs][i0a], rev=True)
-                use1, = np.where(h1 >= 3)
+                values1, counts1, inds1 = scipy_histogram(obsExpIndex[goodObs][i0a])
+                use1, = np.where(counts1 >= 3)
                 for i1 in use1:
-                    i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+                    i1a = i0a[inds1[values1[i1]][0]]
 
                     eInd = obsExpIndex[goodObs[i1a[0]]]
                     cInd = obsCCDIndex[goodObs[i1a[0]]]
@@ -1367,13 +1367,13 @@ class FgcmGray(object):
         goodObs, = np.where(obsFlag == 0)
 
         # Do the exposures first
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
 
         expDeltaMagBkg[:] = self.illegalValue
 
-        use, = np.where(h > int(3./self.deltaMagBkgOffsetPercentile))
+        use, = np.where(counts > int(3./self.deltaMagBkgOffsetPercentile))
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             eInd = obsExpIndex[goodObs[i1a[0]]]
 
@@ -1389,16 +1389,16 @@ class FgcmGray(object):
         # Do the exp/ccd second
         # Split by CCD first.
         # Note that we need at least 3 for a median, and more for percentiles.
-        h0, rev0 = esutil.stat.histogram(obsCCDIndex[goodObs], rev=True)
+        values0, counts0, inds0 = scipy_histogram(obsCCDIndex[goodObs])
         min_val = int(3./self.deltaMagBkgOffsetPercentile)
-        use0, = np.where(h0 > min_val)
+        use0, = np.where(counts0 > min_val)
         for i0 in use0:
-            i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+            i0a = inds0[values0[i0]][0]
 
-            h1, rev1 = esutil.stat.histogram(obsExpIndex[goodObs][i0a], rev=True)
-            use1, = np.where(h1 > min_val)
+            values1, counts1, inds1 = scipy_histogram(obsExpIndex[goodObs][i0a])
+            use1, = np.where(counts1 > min_val)
             for i1 in use1:
-                i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+                i1a = i0a[inds1[values1[i1]][0]]
 
                 eInd = obsExpIndex[goodObs[i1a[0]]]
                 cInd = obsCCDIndex[goodObs[i1a[0]]]
@@ -1458,15 +1458,15 @@ class FgcmGray(object):
             obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
             # Split by CCD first.
-            h0, rev0 = esutil.stat.histogram(obsCCDIndexGO[ok], rev=True)
-            use0, = np.where(h0 > 0)
+            values0, counts0, inds0 = scipy_histogram(obsCCDIndexGO[ok])
+            use0, = np.where(counts0 > 0)
             for i0 in use0:
-                i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+                i0a = inds0[values0[i0]][0]
 
-                h1, rev1 = esutil.stat.histogram(obsExpIndexGO[ok][i0a], rev=True)
-                use1, = np.where(h1 > 0)
+                values1, counts1, inds1 = scipy_histogram(obsExpIndexGO[ok][i0a])
+                use1, = np.where(counts1 > 0)
                 for i1 in use1:
-                    i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+                    i1a = i0a[inds1[values1[i1]][0]]
 
                     eInd = obsExpIndexGO[ok[i1a[0]]]
                     cInd = obsCCDIndexGO[ok[i1a[0]]]
@@ -1497,13 +1497,13 @@ class FgcmGray(object):
 
         # And then this can be split per exposure.
 
-        h, rev = esutil.stat.histogram(obsExpIndexGO[goodRefObsGO], rev=True)
+        values, counts, inds = scipy_histogram(obsExpIndexGO[goodRefObsGO])
 
-        use, = np.where(h >= self.minStarPerExp)
+        use, = np.where(counts >= self.minStarPerExp)
 
         self.fgcmPars.compExpRefOffset[:] = self.illegalValue
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             eInd = obsExpIndexGO[goodRefObsGO[i1a[0]]]
             bInd = obsBandIndexGO[goodRefObsGO[i1a[0]]]

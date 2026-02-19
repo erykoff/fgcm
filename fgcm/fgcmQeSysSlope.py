@@ -7,6 +7,7 @@ import scipy.optimize
 from astropy.time import Time
 
 from .fgcmUtilities import makeFigure, putButlerFigure
+from .fgcmUtilities import scipy_histogram
 from matplotlib import colormaps
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -87,23 +88,23 @@ class FgcmQeSysSlope(object):
         obsMagStdGO -= deltaQESlopeGO
 
         # split per wash interval
-        washH, washRev = esutil.stat.histogram(self.fgcmPars.expWashIndex[obsExpIndexGO], min=0, rev=True)
-        washIndices, = np.where(washH > 0)
+        washValues, washCounts, washInds = scipy_histogram(self.fgcmPars.expWashIndex[obsExpIndexGO])
+        washIndices, = np.where(washCounts > 0)
 
         for washIndex in washIndices:
-            i1a = washRev[washRev[washIndex]: washRev[washIndex + 1]]
+            i1a = washInds[washValues[washIndex]][0]
 
             # Split per band, and compute the delta-T and delta-Mag
 
-            bandH, bandRev = esutil.stat.histogram(obsBandIndex[goodObs[i1a]], min=0, rev=True)
-            bandIndices, = np.where(bandH > 0)
+            bandValues, bandCounts, bandInds = scipy_histogram(obsBandIndex[goodObs[i1a]])
+            bandIndices, = np.where(bandCounts > 0)
 
             deltaTAll = None
 
             for bandIndex in bandIndices:
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:
                     continue
-                i2a = bandRev[bandRev[bandIndex]: bandRev[bandIndex + 1]]
+                i2a = bandInds[bandValues[bandIndex]][0]
 
                 # Now lump the stars together
 

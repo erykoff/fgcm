@@ -6,7 +6,7 @@ import esutil
 from .fgcmUtilities import zpFlagDict
 from .fgcmUtilities import expFlagDict
 from .fgcmUtilities import Cheb2dField
-from .fgcmUtilities import dataBinner
+from .fgcmUtilities import dataBinner, scipy_histogram
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 from matplotlib import colormaps
@@ -313,10 +313,10 @@ class FgcmZeropoints(object):
         # need secZenith for each exp/ccd pair
         deltaRA = np.zeros(zpStruct.size)
         deltaDec = np.zeros(zpStruct.size)
-        h, rev = esutil.stat.histogram(zpExpIndex, rev=True)
-        ok, = np.where(h > 0)
+        values, counts, inds = scipy_histogram(zpExpIndex)
+        ok, = np.where(counts > 0)
         for i in ok:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
             # rot = self.fgcmPars.expTelRot[zpExpIndex[i1a[0]]]
             # ccdIndex = zpCCDIndex[i1a]
 
@@ -775,12 +775,11 @@ class FgcmZeropoints(object):
                            (self.fgcmPars.nCCD + 1) +
                            zpCCDIndex)
 
-        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+        values, counts, inds = scipy_histogram(epochFilterHash)
+        use, = np.where(counts > 0)
 
-        for i in range(h.size):
-            if h[i] == 0: continue
-
-            i1a = rev[rev[i]: rev[i + 1]]
+        for i in use:
+            i1a = inds[values[i]][0]
 
             epInd = self.fgcmPars.expEpochIndex[zpExpIndex[i1a[0]]]
             fiInd = self.fgcmPars.expLUTFilterIndex[zpExpIndex[i1a[0]]]

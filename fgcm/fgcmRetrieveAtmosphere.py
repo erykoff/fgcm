@@ -7,7 +7,7 @@ import scipy.optimize
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
-from .fgcmUtilities import retrievalFlagDict
+from .fgcmUtilities import retrievalFlagDict, scipy_histogram
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
@@ -132,10 +132,9 @@ class FgcmRetrieveAtmosphere(object):
 
 
             # next, we median together each exposure...
-            minExpIndex = np.min(expIndexArray[use])
-            h, rev = esutil.stat.histogram(expIndexArray[use], min=minExpIndex, rev=True)
+            values, counts, inds = scipy_histogram(expIndexArray[use])
 
-            gd, = np.where(h >= self.minCCDPerExp)
+            gd, = np.where(counts >= self.minCCDPerExp)
             if gd.size == 0:
                 continue
 
@@ -144,10 +143,10 @@ class FgcmRetrieveAtmosphere(object):
                                                     ('RLNPWV_SMOOTH', 'f8'),
                                                     ('MJD', 'f8')])
 
-            rLnPwvStruct['EXPINDEX'] = minExpIndex + gd
+            rLnPwvStruct['EXPINDEX'] = values[gd]
 
             for i in range(gd.size):
-                i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
+                i1a = inds[values[i]][0]
 
                 rLnPwvStruct['RLNPWV_MED'][i] = np.mean(rLnPwvU[i1a])
 
@@ -167,13 +166,13 @@ class FgcmRetrieveAtmosphere(object):
             return
 
         # next, we do the median smoothing using pwvRetrievalSmoothBlock
-        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']], rev=True)
+        values, counts, inds = scipy_histogram(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']])
 
         # we do this on any night that we have at least 1
-        gd, = np.where(h > 0)
+        gd, = np.where(counts > 0)
 
         for i in range(gd.size):
-            i1a = rev[rev[gd[i]]:rev[gd[i]+1]]
+            i1a = inds[values[i]][0]
 
             if (i1a.size == 1):
                 rLnPwvStruct['RLNPWV_SMOOTH'][i1a[0]] = rLnPwvStruct['RLNPWV_MED'][i1a[0]]
@@ -200,12 +199,12 @@ class FgcmRetrieveAtmosphere(object):
         nightIndexWithLnPwv = np.unique(self.fgcmPars.expNightIndex[rLnPwvStruct['EXPINDEX']])
 
         a, b = esutil.numpy_util.match(nightIndexWithLnPwv, self.fgcmPars.expNightIndex)
-        h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[b], rev=True)
+        values, counts, inds = scipy_histogram(self.fgcmPars.expNightIndex[b])
 
-        gd, = np.where(h > 0)
+        gd, = np.where(counts > 0)
 
         for i in range(gd.size):
-            i1a = b[rev[rev[gd[i]]:rev[gd[i]+1]]]
+            i1a = inds[values[i]][0]
 
             # sort by MJD
             st = np.argsort(self.fgcmPars.expMJD[i1a])
@@ -393,15 +392,15 @@ class FgcmRetrieveAtmosphere(object):
             extDelta = (-2.5*np.log10(r0[expIndexArray[use], ccdIndexArray[use]]) +
                          2.5*np.log10(I0Ref))
 
-            h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[expIndexArray[use]], min=0, rev=True)
+            values, counts, inds = scipy_histogram(self.fgcmPars.expNightIndex[expIndexArray[use]])
 
-            gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
+            gd, = np.where(counts > self.tauRetrievalMinCCDPerNight)
             if not self.quietMode:
                 self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
                                   (gd.size, tauBands[i]))
 
             for j in range(gd.size):
-                i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
+                i1a = inds[values[j]][0]
                 fit=np.polyfit(expSecZenith[use[i1a]], extDelta[i1a], 1.0)
 
                 tauRetrievedBands[i, gd[j]] = fit[0] / tauScale
@@ -546,15 +545,15 @@ class FgcmRetrieveAtmosphere(object):
             extDelta = (-2.5*np.log10(r0Gray[use]) +
                          2.5*np.log10(I0Ref))
 
-            h, rev = esutil.stat.histogram(self.fgcmPars.expNightIndex[expIndexArray[use]], min=0, rev=True)
+            values, counts, inds = scipy_histogram(self.fgcmPars.expNightIndex[expIndexArray[use]])
 
-            gd, = np.where(h > self.tauRetrievalMinCCDPerNight)
+            gd, = np.where(counts > self.tauRetrievalMinCCDPerNight)
             if not self.quietMode:
                 self.fgcmLog.info('Found %d nights to retrieve tau in %s band' %
                                   (gd.size, tauBands[i]))
 
             for j in range(gd.size):
-                i1a = rev[rev[gd[j]]:rev[gd[j] + 1]]
+                i1a = inds[values[j]][0]
                 fit, cov = scipy.optimize.curve_fit(slopeFunc, expSecZenith[use[i1a]],
                                                     extDelta[i1a])
                 tauRetrievedBands[i, gd[j]] = fit[0] / tauScale

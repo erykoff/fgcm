@@ -7,7 +7,7 @@ import time
 import skyproj
 import threading
 
-from .fgcmUtilities import dataBinner
+from .fgcmUtilities import dataBinner, scipy_histogram
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 
@@ -109,11 +109,11 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compMedDeltaAper[:] = self.illegalValue
         self.fgcmPars.compEpsilon[:] = self.illegalValue
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], min=0, rev=True)
-        expIndices, = np.where(h >= self.minStarPerExp)
+        values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
+        expIndices, = np.where(counts >= self.minStarPerExp)
 
         for expIndex in expIndices:
-            i1a = rev[rev[expIndex]: rev[expIndex + 1]]
+            i1a = inds[values[expIndex]][0]
             mag = objMagStdMean[obsObjIDIndex[goodObs[i1a]],
                                 obsBandIndex[goodObs[i1a]]]
 
@@ -474,10 +474,10 @@ class FgcmDeltaAper(object):
 
         filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
-        h, rev = esutil.stat.histogram(filterCcdHash, rev=True)
+        values, counts, inds = scipy_histogram(filterCcdHash)
 
         # Arbitrary minimum number here
-        gdHash, = np.where(h > 10)
+        gdHash, = np.where(counts > 10)
 
         epsilonCcdMap = np.zeros((self.fgcmPars.nLUTFilter, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
@@ -486,9 +486,8 @@ class FgcmDeltaAper(object):
                                        self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
                                       dtype=np.int32)
 
-
         for i in gdHash:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
             cInd = ccdIndexGO[i1a[0]]
             fInd = lutFilterIndexGO[i1a[0]]
 
@@ -501,11 +500,11 @@ class FgcmDeltaAper(object):
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
-            h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
+            values2, counts2, inds2 = scipy_histogram(xyBinHash)
 
-            gdHash2, = np.where(h2 > 10)
+            gdHash2, = np.where(counts2 > 10)
             for j in gdHash2:
-                i2a = rev2[rev2[j]: rev2[j + 1]]
+                i2a = inds2[values2[j]][0]
 
                 if len(i2a) == 0:
                     continue

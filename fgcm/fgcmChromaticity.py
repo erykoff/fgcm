@@ -5,7 +5,7 @@ import esutil
 import time
 
 import scipy.optimize as optimize
-from .fgcmUtilities import makeFigure, putButlerFigure
+from .fgcmUtilities import makeFigure, putButlerFigure, scipy_histogram
 
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
@@ -384,14 +384,15 @@ class FgcmCCDChromaticity:
                          obsCCDIndexGO.astype(np.int64))
 
         h, rev = esutil.stat.histogram(ccdFilterHash, rev=True)
+        values, counts, inds = scipy_histogram(ccdFilterHash)
 
         # Make a simple cut here.
-        use, = np.where(h >= 10)
+        use, = np.where(counts >= 10)
 
         cWasFit = np.zeros_like(self.fgcmPars.compCCDChromaticity, dtype=bool)
 
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             self.cInd = obsCCDIndexGO[i1a[0]]
             self.fInd = obsLUTFilterIndexGO[i1a[0]]

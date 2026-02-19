@@ -3,7 +3,7 @@ import esutil
 import time
 import warnings
 
-from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import objFlagDict, scipy_histogram
 from .fgcmUtilities import obsFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import makeFigure, putButlerFigure
@@ -1710,13 +1710,13 @@ class FgcmStars(object):
                            (fgcmPars.nCCD+1) +
                            obsCCDIndex[goodObs])
 
-        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+        values, counts, inds = scipy_histogram(epochFilterHash)
 
         nbad = 0
 
-        use, = np.where(h > 0)
+        use, = np.where(counts > 0)
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             med = np.median(EGrayGO[i1a])
             sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
@@ -1782,13 +1782,13 @@ class FgcmStars(object):
         # compute EGray, GO for Good Obs
         EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
 
         nbad = 0
 
-        use, = np.where(h > 0)
+        use, = np.where(counts > 0)
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             med = np.median(EGrayGO[i1a])
             sig = 1.4826*np.median(np.abs(EGrayGO[i1a] - med))
@@ -1841,12 +1841,10 @@ class FgcmStars(object):
                                (fgcmPars.nCCD+1) +
                                obsCCDIndex)
 
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
-
-            for i in range(h.size):
-                if h[i] == 0: continue
-
-                i1a = rev[rev[i]:rev[i+1]]
+            values, counts, inds = scipy_histogram(epochFilterHash)
+            use, = np.where(counts > 0)
+            for i in use:
+                i1a = inds[values[i]][0]
 
                 # get the indices for this epoch/filter/ccd
                 epInd = fgcmPars.expEpochIndex[obsExpIndex[i1a[0]]]

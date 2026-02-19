@@ -11,6 +11,7 @@ from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import getMemoryString
+from .fgcmUtilities import scipy_histogram
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
@@ -173,8 +174,6 @@ class FgcmChisq(object):
         fgcmGray: FgcmGray, default=None
            CCD Gray information for computing with "ccd crunch"
         """
-        self.fgcmLog.info(getMemoryString("Start chisq"))
-
         # computeDerivatives: do we want to compute the derivatives?
         # computeSEDSlope: compute SED Slope and recompute mean mags?
         # fitterUnits: units of th fitter or "true" units?
@@ -280,9 +279,7 @@ class FgcmChisq(object):
             snmm.getArray(self.fgcmStars.objMagStdMeanNoChromHandle)[:] = 99.0
             snmm.getArray(self.fgcmStars.objMagStdMeanErrHandle)[:] = 99.0
 
-        self.fgcmLog.info(getMemoryString("Before goodStars"))
         goodStars = self.fgcmStars.getGoodStarIndices(includeReserve=self.includeReserve)
-        self.fgcmLog.info(getMemoryString("After goodStars"))
 
         if self._nIterations == 0:
             self.fgcmLog.info('Found %d good stars for chisq' % (goodStars.size))
@@ -305,8 +302,6 @@ class FgcmChisq(object):
             goodObs = self.goodObs
             goodStarsSub = self.goodStarsSub
         else:
-            self.fgcmLog.info(getMemoryString("Before prematch"))
-
             # we need to do matching
             preStartTime=time.time()
             self.fgcmLog.debug('Pre-matching stars and observations...')
@@ -326,8 +321,6 @@ class FgcmChisq(object):
                 self.matchesCached = True
                 self.goodObs = goodObs
                 self.goodStarsSub = goodStarsSub
-
-            self.fgcmLog.info(getMemoryString("after prematch"))
 
         self.nSums = 4 # chisq, chisq_ref, nobs, nobs_ref
         if self.computeDerivatives:
@@ -363,8 +356,6 @@ class FgcmChisq(object):
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
             # regular multi-threaded
-
-            self.fgcmLog.info(getMemoryString("Before magworkers"))
 
             self.totalHandleDict = {}
             for thisThread in range(self.nCore):
@@ -402,8 +393,6 @@ class FgcmChisq(object):
                 # Compute magnitudes
                 pool.map(self._magWorker, workerList, chunksize=1)
 
-            self.fgcmLog.info(getMemoryString("After magworkers"))
-
             # And compute absolute offset if desired...
             if self.computeAbsThroughput:
                 self.applyDelta = True
@@ -414,12 +403,8 @@ class FgcmChisq(object):
             if not self.allExposures:
                 self.resetThreadIds()
 
-                self.fgcmLog.info(getMemoryString("Before chisq workers"))
-
                 with ThreadPoolExecutor(max_workers=self.nCore) as pool:
                     pool.map(self._chisqWorker, workerList, chunksize=1)
-
-                self.fgcmLog.info(getMemoryString("After chisq workers"))
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
@@ -518,6 +503,7 @@ class FgcmChisq(object):
         if not self.quietMode:
             self.fgcmLog.info('Chisq computation took %.2f seconds.' %
                               (time.time() - startTime))
+            self.fgcmLog.info(getMemoryString("end of chisq"))
 
         self.fgcmStars.magStdComputed = True
         if (self.allExposures):
@@ -630,15 +616,15 @@ class FgcmChisq(object):
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
-                h0, rev0 = esutil.stat.histogram(obsCCDIndexGO[ok], rev=True)
-                use0, = np.where(h0 > 0)
+                values0, counts0, inds0 = scipy_histogram(obsCCDIndexGO[ok])
+                use0, = np.where(counts0 > 0)
                 for i0 in use0:
-                    i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+                    i0a = inds0[values0[i0]][0]
 
-                    h1, rev1 = esutil.stat.histogram(obsExpIndexGO[ok][i0a], rev=True)
-                    use1, = np.where(h1 > 0)
+                    values1, counts1, inds1 = scipy_histogram(obsExpIndexGO[ok][i0a])
+                    use1, = np.where(counts1 > 0)
                     for i1 in use1:
-                        i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
+                        i1a = i0a[inds1[values1[i1]][0]]
                         eInd = obsExpIndexGO[ok[i1a[0]]]
                         cInd = obsCCDIndexGO[ok[i1a[0]]]
                         field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
