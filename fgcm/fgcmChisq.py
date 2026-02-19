@@ -335,7 +335,6 @@ class FgcmChisq(object):
         self.objMagStdMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
         self.objMagStdMeanNoChromTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
         self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
-        self.objMagStdMeanTempLock = threading.Lock()
 
         self.debug = debug
         if (self.debug):
@@ -555,10 +554,6 @@ class FgcmChisq(object):
             if np.any(self.ccdGraySubCCD):
                 ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
 
-        # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
-        obsMagStdLock = snmm.getArrayLock(self.fgcmStars.obsMagStdHandle)
-
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
         obsBandIndexGO = esutil.numpy_util.to_native(obsBandIndex[goodObs])
@@ -647,8 +642,6 @@ class FgcmChisq(object):
         if (self.computeSEDSlopes):
             # first, compute mean mags (code same as below.  FIXME: consolidate, but how?)
 
-            self.objMagStdMeanTempLock.acquire()
-
             self.wtSumTemp[goodStars, :] = 0.0
             self.objMagStdMeanTemp[goodStars, :] = 0.0
 
@@ -659,20 +652,12 @@ class FgcmChisq(object):
                    (obsObjIDIndexGO,obsBandIndexGO),
                    (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanTemp.dtype))
 
-            self.objMagStdMeanTempLock.release()
-
             # these are good object/bands that were observed
             gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
             gd = (goodStars[gd[0]], gd[1])
 
-            # and acquire lock to save the values
-            objMagStdMeanLock.acquire()
-
             objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
             objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
-
-            # and release the lock.
-            objMagStdMeanLock.release()
 
             if (self.useSedLUT):
                 self.fgcmStars.computeObjectSEDSlopesLUT(goodStars,self.fgcmLUT)
@@ -694,17 +679,11 @@ class FgcmChisq(object):
         # we can only do this for calibration stars.
         #  must reference the full array to save
 
-        # acquire lock when we write to and retrieve from full array
-        obsMagStdLock.acquire()
-
         obsMagStd[goodObs] = obsMagGO + deltaStdGO
         obsDeltaStd[goodObs] = deltaStdGO
 
         # this is cut here
         obsMagStdGO = obsMagStd[goodObs]
-
-        # we now have a local cut copy, so release
-        obsMagStdLock.release()
 
         # kick out if we're just computing magstd for all exposures
         if (self.allExposures) :
@@ -717,8 +696,6 @@ class FgcmChisq(object):
         #  take up the full memory footprint.  MAYBE look at making a smaller
         #  array just for the stars under consideration, but this would make the
         #  indexing in the np.add.at() more difficult
-
-        self.objMagStdMeanTempLock.acquire()
 
         self.wtSumTemp[goodStars, :] = 0.0
         self.objMagStdMeanTemp[goodStars, :] = 0.0
@@ -737,21 +714,13 @@ class FgcmChisq(object):
                   (obsObjIDIndexGO, obsBandIndexGO),
                   (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanNoChromTemp.dtype))
 
-        self.objMagStdMeanTempLock.release()
-
         # which objects/bands have observations?
         gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
         gd = (goodStars[gd[0]], gd[1])
 
-        # and acquire lock to save the values
-        objMagStdMeanLock.acquire()
-
         objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
         objMagStdMeanNoChrom[gd] = self.objMagStdMeanNoChromTemp[gd] / self.wtSumTemp[gd]
         objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
-
-        # and release the lock.
-        objMagStdMeanLock.release()
 
         # this is the end of the _magWorker
 
@@ -798,10 +767,6 @@ class FgcmChisq(object):
         obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
 
-        # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
-        obsMagStdLock = snmm.getArrayLock(self.fgcmStars.obsMagStdHandle)
-
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
         obsBandIndexGO = esutil.numpy_util.to_native(obsBandIndex[goodObs])
@@ -841,8 +806,6 @@ class FgcmChisq(object):
         # Compute the sub-selected error-squared, using model error when available
         obsMagErr2GO = obsMagADUModelErr[goodObs].astype(np.float64)**2.
 
-        obsMagStdLock.acquire()
-
         # If we want to apply the deltas, do it here
         if self.applyDelta:
             obsMagStd[goodObs] -= self.deltaAbsOffset[obsBandIndexGO]
@@ -850,19 +813,12 @@ class FgcmChisq(object):
         # Make local copy of mags
         obsMagStdGO = obsMagStd[goodObs]
 
-        obsMagStdLock.release()
-
-        # and acquire lock to save the values
-        objMagStdMeanLock.acquire()
-
         if self.applyDelta:
             gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
             objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= self.deltaAbsOffset[gdMeanBand]
 
         objMagStdMeanGO = objMagStdMean[obsObjIDIndexGO,obsBandIndexGO]
         objMagStdMeanErr2GO = objMagStdMeanErr[obsObjIDIndexGO,obsBandIndexGO]**2.
-
-        objMagStdMeanLock.release()
 
         # New logic:
         #  Select out reference stars (if desired)
