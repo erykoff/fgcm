@@ -8,7 +8,7 @@ from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 from matplotlib import colormaps
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -42,7 +42,7 @@ class FgcmSigmaCal(object):
 
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.sigma0Phot = fgcmConfig.sigma0Phot
         self.sigmaCalRange = fgcmConfig.sigmaCalRange
         self.sigmaCalFitPercentile = fgcmConfig.sigmaCalFitPercentile
@@ -100,23 +100,23 @@ class FgcmSigmaCal(object):
         self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
                            (time.time() - preStartTime))
 
-        nSections = goodStars.size // self.nStarPerRun + 1
-        goodStarsList = np.array_split(goodStars, nSections)
+        nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-        splitValues = np.zeros(nSections-1,dtype='i4')
+        nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+        sectionSize = nObsCumSum[-1] // nSections
+
+        goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+        goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+        splitValues = np.zeros(nSections - 1, dtype='i4')
         for i in range(1, nSections):
-            splitValues[i-1] = goodStarsList[i][0]
+            splitValues[i - 1] = goodStarsList[i][0]
 
         # get the indices from the goodStarsSub matched list (matched to goodStars)
         splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-        # and split along the indices
         goodObsList = np.split(goodObs, splitIndices)
 
-        workerList = list(zip(goodStarsList, goodObsList))
-
-        # reverse sort so the longest running go first
-        workerList.sort(key=lambda elt:elt[1].size, reverse=True)
+        workerList = list(zip(goodStarsList,goodObsList))
 
         if not self.quietMode:
             self.fgcmLog.info('Running SigmaCal on %d cores' % (self.nCore))
@@ -192,11 +192,8 @@ class FgcmSigmaCal(object):
         for i, s in enumerate(sigmaCals):
             self.sigmaCal = s
 
-            mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._worker, workerList, chunksize=1)
 
             for bandIndex, band in enumerate(self.fgcmPars.bands):
                 if not self.fgcmPars.hasExposuresInBand[bandIndex]:

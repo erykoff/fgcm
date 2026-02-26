@@ -3,15 +3,19 @@ import os
 import sys
 import esutil
 import time
+from itertools import count
+import threading
 
 from .fgcmUtilities import retrievalFlagDict
 from .fgcmUtilities import MaxFitIterations
 from .fgcmUtilities import Cheb2dField
 from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import getMemoryString
+from .fgcmUtilities import scipy_histogram
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -35,8 +39,6 @@ class FgcmChisq(object):
     ----------------
     nCore: int
        Number of cores to run in multiprocessing
-    nStarPerRun: int
-       Number of stars per run.  More can use more memory.
     noChromaticCorrections: bool
        If set to True, then no chromatic corrections are applied.  (bad idea).
     """
@@ -59,8 +61,8 @@ class FgcmChisq(object):
         # need to configure
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
-        self.nStarPerRun = fgcmConfig.nStarPerRun
-        self.nStarPerGrayRun = fgcmConfig.nStarPerGrayRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
+        self.nObsPerGrayRun = fgcmConfig.nObsPerGrayRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
@@ -98,6 +100,16 @@ class FgcmChisq(object):
         self.maxIterations = -1
 
         numba_test(0)
+
+    def resetThreadIds(self):
+        self._threadIds = {}
+        self._threadCounter = count()
+        self._threadCounterLock = threading.Lock()
+
+    def getThreadId(self):
+        tid = threading.get_ident()
+        with self._threadCounterLock:
+            return self._threadIds.setdefault(tid, next(self._threadCounter))
 
     def resetFitChisqList(self):
         """
@@ -162,7 +174,6 @@ class FgcmChisq(object):
         fgcmGray: FgcmGray, default=None
            CCD Gray information for computing with "ccd crunch"
         """
-
         # computeDerivatives: do we want to compute the derivatives?
         # computeSEDSlope: compute SED Slope and recompute mean mags?
         # fitterUnits: units of th fitter or "true" units?
@@ -177,9 +188,9 @@ class FgcmChisq(object):
         self.computeAbsThroughput = computeAbsThroughput
         self.ignoreRef = ignoreRef
 
-        nStarPerRun = self.nStarPerRun
+        nObsPerRun = self.nObsPerRun
         if fgcmGray is not None:
-            nStarPerRun = self.nStarPerGrayRun
+            nObsPerRun = self.nObsPerGrayRun
 
         self.fgcmLog.debug('FgcmChisq: computeDerivatives = %d' %
                          (int(computeDerivatives)))
@@ -321,9 +332,13 @@ class FgcmChisq(object):
 
         self.applyDelta = False
 
+        self.objMagStdMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objMagStdMeanNoChromTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+
         self.debug = debug
         if (self.debug):
-            # debug mode: single core
+            # debug mode: single thread
             self.totalHandleDict = {}
             self.totalHandleDict[0] = snmm.createArray(self.nSums,dtype='f8')
 
@@ -339,53 +354,43 @@ class FgcmChisq(object):
 
             partialSums = snmm.getArray(self.totalHandleDict[0])[:]
         else:
-            # regular multi-core
-
-            mp_ctx = multiprocessing.get_context('fork')
-            # make a dummy process to discover starting child number
-            proc = mp_ctx.Process()
-            workerIndex = proc._identity[0]+1
-            proc = None
+            # regular multi-threaded
 
             self.totalHandleDict = {}
-            for thisCore in range(self.nCore):
-                self.totalHandleDict[workerIndex + thisCore] = (
-                    snmm.createArray(self.nSums,dtype='f8'))
+            for thisThread in range(self.nCore):
+                self.totalHandleDict[thisThread] = snmm.createArray(self.nSums, dtype='f8')
 
             # split goodStars into a list of arrays of roughly equal size
-
             prepStartTime = time.time()
-            nSections = goodStars.size // nStarPerRun + 1
-            goodStarsList = np.array_split(goodStars,nSections)
 
-            # is there a better way of getting all the first elements from the list?
-            #  note that we need to skip the first which should be zero (checked above)
-            #  see also fgcmBrightObs.py
-            # splitValues is the first of the goodStars in each list
-            splitValues = np.zeros(nSections-1,dtype='i4')
-            for i in range(1,nSections):
-                splitValues[i-1] = goodStarsList[i][0]
+            nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
+
+            nSections = nObsCumSum[-1] // nObsPerRun + 1
+            sectionSize = nObsCumSum[-1] // nSections
+
+            goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+            goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+            splitValues = np.zeros(nSections - 1, dtype='i4')
+            for i in range(1, nSections):
+                splitValues[i - 1] = goodStarsList[i][0]
 
             # get the indices from the goodStarsSub matched list (matched to goodStars)
             splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-            # and split along the indices
-            goodObsList = np.split(goodObs,splitIndices)
+            goodObsList = np.split(goodObs, splitIndices)
 
             workerList = list(zip(goodStarsList,goodObsList))
-
-            # reverse sort so the longest running go first
-            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
             self.fgcmLog.debug('Using %d sections (%.1f seconds)' %
                                (nSections,time.time()-prepStartTime))
 
             self.fgcmLog.debug('Running chisq on %d cores' % (self.nCore))
 
-            # make a pool
-            pool = mp_ctx.Pool(processes=self.nCore)
-            # Compute magnitudes
-            pool.map(self._magWorker, workerList, chunksize=1)
+            self.resetThreadIds()
+
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                # Compute magnitudes
+                pool.map(self._magWorker, workerList, chunksize=1)
 
             # And compute absolute offset if desired...
             if self.computeAbsThroughput:
@@ -395,16 +400,15 @@ class FgcmChisq(object):
 
             # And the follow-up chisq and derivatives
             if not self.allExposures:
-                pool.map(self._chisqWorker, workerList, chunksize=1)
+                self.resetThreadIds()
 
-            pool.close()
-            pool.join()
+                with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                    pool.map(self._chisqWorker, workerList, chunksize=1)
 
             # sum up the partial sums from the different jobs
             partialSums = np.zeros(self.nSums,dtype='f8')
-            for thisCore in range(self.nCore):
-                partialSums[:] += snmm.getArray(
-                    self.totalHandleDict[workerIndex + thisCore])[:]
+            for thisThread in range(self.nCore):
+                partialSums[:] += snmm.getArray(self.totalHandleDict[thisThread])[:]
 
         if (not self.allExposures):
             # we get the number of fit parameters by counting which of the parameters
@@ -498,6 +502,7 @@ class FgcmChisq(object):
         if not self.quietMode:
             self.fgcmLog.info('Chisq computation took %.2f seconds.' %
                               (time.time() - startTime))
+            self.fgcmLog.info(getMemoryString("end of chisq"))
 
         self.fgcmStars.magStdComputed = True
         if (self.allExposures):
@@ -548,10 +553,6 @@ class FgcmChisq(object):
             # same sign as FGCM_DUST (QESys)
             if np.any(self.ccdGraySubCCD):
                 ccdGraySubCCDPars = snmm.getArray(self.fgcmGray.ccdGraySubCCDParsHandle)
-
-        # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
-        obsMagStdLock = snmm.getArrayBase(self.fgcmStars.obsMagStdHandle).get_lock()
 
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
@@ -610,22 +611,20 @@ class FgcmChisq(object):
                 obsXGO = snmm.getArray(self.fgcmStars.obsXHandle)[goodObs]
                 obsYGO = snmm.getArray(self.fgcmStars.obsYHandle)[goodObs]
 
-                h0, rev0 = esutil.stat.histogram(obsCCDIndexGO[ok], rev=True)
-                use0, = np.where(h0 > 0)
-                for i0 in use0:
-                    i0a = rev0[rev0[i0]: rev0[i0 + 1]]
+                expCcdHash = (obsExpIndexGO[ok] * (self.fgcmPars.nCCD + 1) +
+                              obsCCDIndexGO[ok])
 
-                    h1, rev1 = esutil.stat.histogram(obsExpIndexGO[ok][i0a], rev=True)
-                    use1, = np.where(h1 > 0)
-                    for i1 in use1:
-                        i1a = i0a[rev1[rev1[i1]: rev1[i1 + 1]]]
-                        eInd = obsExpIndexGO[ok[i1a[0]]]
-                        cInd = obsCCDIndexGO[ok[i1a[0]]]
-                        field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
-                                            self.deltaMapperDefault['y_size'][cInd],
-                                            ccdGraySubCCDPars[eInd, cInd, :])
-                        fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
-                        obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
+                values, counts, inds = scipy_histogram(expCcdHash)
+                use, = np.where(counts > 0)
+                for i in use:
+                    i1a = inds[values[i]][0]
+                    eInd = obsExpIndexGO[ok[i1a[0]]]
+                    cInd = obsCCDIndexGO[ok[i1a[0]]]
+                    field = Cheb2dField(self.deltaMapperDefault['x_size'][cInd],
+                                        self.deltaMapperDefault['y_size'][cInd],
+                                        ccdGraySubCCDPars[eInd, cInd, :])
+                    fluxScale = field.evaluate(obsXGO[ok[i1a]], obsYGO[ok[i1a]])
+                    obsMagGO[ok[i1a]] += -2.5 * np.log10(np.clip(fluxScale, 0.1, None))
             else:
                 # Regular non-sub-ccd
                 obsMagGO[ok] += ccdGray[obsExpIndexGO[ok], obsCCDIndexGO[ok]]
@@ -641,29 +640,22 @@ class FgcmChisq(object):
         if (self.computeSEDSlopes):
             # first, compute mean mags (code same as below.  FIXME: consolidate, but how?)
 
-            # make temp vars.  With memory overhead
+            self.wtSumTemp[goodStars, :] = 0.0
+            self.objMagStdMeanTemp[goodStars, :] = 0.0
 
-            wtSum = np.zeros_like(objMagStdMean, dtype='f8')
-            objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
-
-            add_at_2d(wtSum,
+            add_at_2d(self.wtSumTemp,
                    (obsObjIDIndexGO,obsBandIndexGO),
-                   (1./obsMagErr2GO).astype(wtSum.dtype))
-            add_at_2d(objMagStdMeanTemp,
+                   (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
+            add_at_2d(self.objMagStdMeanTemp,
                    (obsObjIDIndexGO,obsBandIndexGO),
-                   (obsMagGO/obsMagErr2GO).astype(objMagStdMeanTemp.dtype))
+                   (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanTemp.dtype))
 
             # these are good object/bands that were observed
-            gd=np.where(wtSum > 0.0)
+            gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+            gd = (goodStars[gd[0]], gd[1])
 
-            # and acquire lock to save the values
-            objMagStdMeanLock.acquire()
-
-            objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-            objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
-
-            # and release the lock.
-            objMagStdMeanLock.release()
+            objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+            objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
 
             if (self.useSedLUT):
                 self.fgcmStars.computeObjectSEDSlopesLUT(goodStars,self.fgcmLUT)
@@ -685,17 +677,11 @@ class FgcmChisq(object):
         # we can only do this for calibration stars.
         #  must reference the full array to save
 
-        # acquire lock when we write to and retrieve from full array
-        obsMagStdLock.acquire()
-
         obsMagStd[goodObs] = obsMagGO + deltaStdGO
         obsDeltaStd[goodObs] = deltaStdGO
 
         # this is cut here
         obsMagStdGO = obsMagStd[goodObs]
-
-        # we now have a local cut copy, so release
-        obsMagStdLock.release()
 
         # kick out if we're just computing magstd for all exposures
         if (self.allExposures) :
@@ -709,35 +695,30 @@ class FgcmChisq(object):
         #  array just for the stars under consideration, but this would make the
         #  indexing in the np.add.at() more difficult
 
-        wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        objMagStdMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
-        objMagStdMeanNoChromTemp = np.zeros_like(objMagStdMeanNoChrom, dtype='f8')
+        self.wtSumTemp[goodStars, :] = 0.0
+        self.objMagStdMeanTemp[goodStars, :] = 0.0
+        self.objMagStdMeanNoChromTemp[goodStars, :] = 0.0
 
-        add_at_2d(wtSum,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (1./obsMagErr2GO).astype(wtSum.dtype))
+        add_at_2d(self.wtSumTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
 
-        add_at_2d(objMagStdMeanTemp,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (obsMagStdGO/obsMagErr2GO).astype(objMagStdMeanTemp.dtype))
+        add_at_2d(self.objMagStdMeanTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (obsMagStdGO/obsMagErr2GO).astype(self.objMagStdMeanTemp.dtype))
 
         # And the same thing with the non-chromatic corrected values
-        add_at_2d(objMagStdMeanNoChromTemp,
-               (obsObjIDIndexGO,obsBandIndexGO),
-               (obsMagGO/obsMagErr2GO).astype(objMagStdMeanNoChromTemp.dtype))
+        add_at_2d(self.objMagStdMeanNoChromTemp,
+                  (obsObjIDIndexGO, obsBandIndexGO),
+                  (obsMagGO/obsMagErr2GO).astype(self.objMagStdMeanNoChromTemp.dtype))
 
         # which objects/bands have observations?
-        gd=np.where(wtSum > 0.0)
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
 
-        # and acquire lock to save the values
-        objMagStdMeanLock.acquire()
-
-        objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-        objMagStdMeanNoChrom[gd] = objMagStdMeanNoChromTemp[gd] / wtSum[gd]
-        objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
-
-        # and release the lock.
-        objMagStdMeanLock.release()
+        objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanNoChrom[gd] = self.objMagStdMeanNoChromTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
 
         # this is the end of the _magWorker
 
@@ -761,9 +742,9 @@ class FgcmChisq(object):
         goodObs = goodStarsAndObs[1]
 
         if self.debug:
-            thisCore = 0
+            thisThread = 0
         else:
-            thisCore = multiprocessing.current_process()._identity[0]
+            thisThread = self.getThreadId()
 
         # Set things up
         objMagStdMean = snmm.getArray(self.fgcmStars.objMagStdMeanHandle)
@@ -783,10 +764,6 @@ class FgcmChisq(object):
         obsMagADU = snmm.getArray(self.fgcmStars.obsMagADUHandle)
         obsMagADUModelErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsMagStd = snmm.getArray(self.fgcmStars.obsMagStdHandle)
-
-        # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
-        obsMagStdLock = snmm.getArrayBase(self.fgcmStars.obsMagStdHandle).get_lock()
 
         # cut these down now, faster later
         obsObjIDIndexGO = esutil.numpy_util.to_native(obsObjIDIndex[goodObs])
@@ -827,8 +804,6 @@ class FgcmChisq(object):
         # Compute the sub-selected error-squared, using model error when available
         obsMagErr2GO = obsMagADUModelErr[goodObs].astype(np.float64)**2.
 
-        obsMagStdLock.acquire()
-
         # If we want to apply the deltas, do it here
         if self.applyDelta:
             obsMagStd[goodObs] -= self.deltaAbsOffset[obsBandIndexGO]
@@ -836,19 +811,12 @@ class FgcmChisq(object):
         # Make local copy of mags
         obsMagStdGO = obsMagStd[goodObs]
 
-        obsMagStdLock.release()
-
-        # and acquire lock to save the values
-        objMagStdMeanLock.acquire()
-
         if self.applyDelta:
             gdMeanStar, gdMeanBand = np.where(objMagStdMean[goodStars, :] < 90.0)
             objMagStdMean[goodStars[gdMeanStar], gdMeanBand] -= self.deltaAbsOffset[gdMeanBand]
 
         objMagStdMeanGO = objMagStdMean[obsObjIDIndexGO,obsBandIndexGO]
         objMagStdMeanErr2GO = objMagStdMeanErr[obsObjIDIndexGO,obsBandIndexGO]**2.
-
-        objMagStdMeanLock.release()
 
         # New logic:
         #  Select out reference stars (if desired)
@@ -1333,7 +1301,7 @@ class FgcmChisq(object):
                                   (2.0 * deltaRefMagWeightedGROF[noExtGROF] *
                                   dLdLnPwvGO[goodRefObsGOF[noExtGROF]]).astype(np.float64))
 
-                        partialArray[2*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] = units[self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt]
+                        partialArray[2*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] /= units[self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt]
                         partialArray[3*self.fgcmPars.nFitPars + self.fgcmPars.parLnPwvInterceptLoc + uRefNightIndexNoExt] += 1
 
                     # lnPwv Nightly Slope
@@ -1710,11 +1678,8 @@ class FgcmChisq(object):
         # note that this store doesn't need locking because we only access
         #  a given array from a single process
 
-        totalArr = snmm.getArray(self.totalHandleDict[thisCore])
+        totalArr = snmm.getArray(self.totalHandleDict[thisThread])
         totalArr[:] = totalArr[:] + partialArray
-
-        # and we're done
-        return None
 
     def __getstate__(self):
         # Don't try to pickle the logger.

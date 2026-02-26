@@ -1,7 +1,5 @@
 import numpy as np
-import multiprocessing
-
-import ctypes
+from threading import Lock
 
 # Adapted from http://stackoverflow.com/questions/10721915/shared-memory-objects-in-python-multiprocessing
 
@@ -57,16 +55,15 @@ class SharedNumpyMemManager(object):
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(SharedNumpyMemManager, cls).__new__(
-                                cls, *args, **kwargs)
+                cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self):
         """ Create the singleton """
 
-        self.lock = multiprocessing.Lock()
+        self.lock = Lock()
         self.cur = 0
         self.cnt = 0
-        self.sharedArrayBases = [None] * SharedNumpyMemManager._initSize
         self.sharedArrays = [None] * SharedNumpyMemManager._initSize
 
     def __createArrayLike(self, inArray, syncAccess=False, dtype=None):
@@ -85,22 +82,6 @@ class SharedNumpyMemManager(object):
         """
         Create an array
         """
-        # convert to dtype type (in case short code)
-        dtype = np.dtype(dtype)
-        if (dtype == np.float32):
-            ctype = ctypes.c_float
-        elif (dtype == np.float64):
-            ctype = ctypes.c_double
-        elif (dtype == np.int32):
-            ctype = ctypes.c_int32
-        elif (dtype == np.int64):
-            ctype = ctypes.c_int64
-        elif (dtype == np.int16):
-            ctype = ctypes.c_int16
-        elif (dtype == bool):
-            ctype = ctypes.c_bool
-        else:
-            raise ValueError("Unsupported dtype")
 
         # This lock is only needed when creating the array, which is fast
         # It is not used when accessing data
@@ -109,7 +90,6 @@ class SharedNumpyMemManager(object):
         # double size if necessary
         if (self.cnt >= len(self.sharedArrays)):
             self.sharedArrays = self.sharedArrays + [None] * len(self.sharedArrays)
-            self.sharedArrayBases = self.sharedArrayBases + [None] * len(self.sharedArrayBases)
 
         # next handle
         self.__getNextFreeHdl()
@@ -117,23 +97,15 @@ class SharedNumpyMemManager(object):
         # create array in shared memory segment
         if (syncAccess):
             try:
-                self.sharedArrayBases[self.cur] = multiprocessing.Array(ctype,
-                                                                        int(np.prod(dimensions)))
+                self.sharedArrays[self.cur] = (np.zeros(dimensions, dtype=dtype), Lock())
             except:
-                raise MemoryError("Failed to allocate memory for shared array.  Note that $TMPDIR must have more space than allocated shared memory.")
-            self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur].get_obj(),dtype=dtype)
+                raise MemoryError("Failed to allocate memory for shared array.")
         else:
             try:
-                self.sharedArrayBases[self.cur] = multiprocessing.RawArray(ctype,
-                                                                           int(np.prod(dimensions)))
+                self.sharedArrays[self.cur] = (np.zeros(dimensions, dtype=dtype), None)
             except:
-                raise MemoryError("Failed to allocate memory for shared array.  Note that $TMPDIR must have more space than allocated shared memory.")
-            self.sharedArrays[self.cur] = np.frombuffer(self.sharedArrayBases[self.cur],dtype=dtype)
+                raise MemoryError("Failed to allocate memory for shared array.")
 
-        # do a reshape for correct dimensions
-        # Returns a masked array containing the same data, but with a new shape.
-        # The result is a view on the original array
-        self.sharedArrays[self.cur] = self.sharedArrays[self.cur].reshape(dimensions)
 
         # update cnt
         self.cnt += 1
@@ -162,15 +134,11 @@ class SharedNumpyMemManager(object):
         # set reference to None
         if self.sharedArrays[hdl] is not None: # consider multiple calls to free
             self.sharedArrays[hdl] = None
-            self.sharedArrayBases[hdl] = None
             self.cnt -= 1
         self.lock.release()
 
     def __getArray(self, i):
         return self.sharedArrays[i]
-
-    def __getArrayBase(self, i):
-        return self.sharedArrayBases[i]
 
     @staticmethod
     def getInstance():
@@ -224,24 +192,11 @@ class SharedNumpyMemManager(object):
         -------
         Reference to numpy array
         """
-        return SharedNumpyMemManager.getInstance().__getArray(*args, **kwargs)
+        return SharedNumpyMemManager.getInstance().__getArray(*args, **kwargs)[0]
 
     @staticmethod
-    def getArrayBase(*args, **kwargs):
-        """
-        Get a reference to an array base (multiprocessing.Array,
-        and not just wrapped numpy array)
-
-        Parameters
-        ----------
-        handle: integer
-           Array handle
-
-        Returns
-        -------
-        Reterence to multiprocessing.Array base
-        """
-        return SharedNumpyMemManager.getInstance().__getArrayBase(*args, **kwargs)
+    def getArrayLock(*args, **kwargs):
+        return SharedNumpyMemManager.getInstance().__getArray(*args, **kwargs)[1]
 
     @staticmethod
     def freeArray(*args, **kwargs):

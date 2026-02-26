@@ -3,12 +3,14 @@ import os
 import sys
 import esutil
 import time
+from itertools import count
+import threading
 
 from .fgcmUtilities import objFlagDict
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -45,7 +47,7 @@ class FgcmComputeStepUnits(object):
 
         self.nCore = fgcmConfig.nCore
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.noChromaticCorrections = fgcmConfig.noChromaticCorrections
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.useQuadraticPwv = fgcmConfig.useQuadraticPwv
@@ -73,6 +75,16 @@ class FgcmComputeStepUnits(object):
             self.useSedLUT = False
 
         numba_test(0)
+
+    def resetThreadIds(self):
+        self._threadIds = {}
+        self._threadCounter = count()
+        self._threadCounterLock = threading.Lock()
+
+    def getThreadId(self):
+        tid = threading.get_ident()
+        with self._threadCounterLock:
+            return self._threadIds.setdefault(tid, next(self._threadCounter))
 
     def run(self, fitParams):
         """
@@ -110,48 +122,39 @@ class FgcmComputeStepUnits(object):
         # going to have one or the other, and this doesn't care which is which
         self.nSums += 2 * self.fgcmPars.nFitPars
 
-        mp_ctx = multiprocessing.get_context("fork")
-        proc = mp_ctx.Process()
-        workerIndex = proc._identity[0]+1
-        proc = None
-
         self.totalHandleDict = {}
-        for thisCore in range(self.nCore):
-            self.totalHandleDict[workerIndex + thisCore] = (
-                snmm.createArray(self.nSums,dtype='f8'))
+        for thisThread in range(self.nCore):
+            self.totalHandleDict[thisThread] = snmm.createArray(self.nSums, dtype='f8')
 
-        self._testing = workerIndex
+        nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-        nSections = goodStars.size // self.nStarPerRun + 1
-        goodStarsList = np.array_split(goodStars,nSections)
+        nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+        sectionSize = nObsCumSum[-1] // nSections
 
-        splitValues = np.zeros(nSections-1,dtype='i4')
-        for i in range(1,nSections):
-            splitValues[i-1] = goodStarsList[i][0]
+        goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+        goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
 
+        splitValues = np.zeros(nSections - 1, dtype='i4')
+        for i in range(1, nSections):
+            splitValues[i - 1] = goodStarsList[i][0]
+
+        # get the indices from the goodStarsSub matched list (matched to goodStars)
         splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-        # and split along the indices
-        goodObsList = np.split(goodObs,splitIndices)
+        goodObsList = np.split(goodObs, splitIndices)
 
         workerList = list(zip(goodStarsList,goodObsList))
 
-        # reverse sort so the longest running go first
-        workerList.sort(key=lambda elt:elt[1].size, reverse=True)
+        self.resetThreadIds()
 
-        # make a pool
-        pool = mp_ctx.Pool(processes=self.nCore)
-        # Compute magnitudes
-        pool.map(self._stepWorker, workerList, chunksize=1)
-
-        pool.close()
-        pool.join()
+        with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+            # Compute magnitudes
+            pool.map(self._stepWorker, workerList, chunksize=1)
 
         # sum up the partial sums from the different jobs
         partialSums = np.zeros(self.nSums,dtype='f8')
         for thisCore in range(self.nCore):
             partialSums[:] += snmm.getArray(
-                self.totalHandleDict[workerIndex + thisCore])[:]
+                self.totalHandleDict[thisCore])[:]
 
         nonZero, = np.where((partialSums[self.fgcmPars.nFitPars: 2*self.fgcmPars.nFitPars] > 0) &
                             (partialSums[0: self.fgcmPars.nFitPars] != 0.0))
@@ -310,7 +313,7 @@ class FgcmComputeStepUnits(object):
         goodStars = goodStarsAndObs[0]
         goodObs = goodStarsAndObs[1]
 
-        thisCore = multiprocessing.current_process()._identity[0]
+        thisThread = self.getThreadId()
 
         objSEDSlope = snmm.getArray(self.fgcmStars.objSEDSlopeHandle)
         objFlag = snmm.getArray(self.fgcmStars.objFlagHandle)
@@ -840,7 +843,7 @@ class FgcmComputeStepUnits(object):
                      self.fgcmPars.parFilterOffsetLoc +
                      uOffsetIndex] += 1
 
-        totalArr = snmm.getArray(self.totalHandleDict[thisCore])
+        totalArr = snmm.getArray(self.totalHandleDict[thisThread])
         totalArr[:] = totalArr[:] + partialArray
 
         return None

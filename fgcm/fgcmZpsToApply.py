@@ -4,7 +4,7 @@ import os
 
 from .fgcmNumbaUtilities import numba_test, add_at_1d, add_at_2d, add_at_3d
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -137,11 +137,6 @@ class FgcmZpsToApply(object):
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars, expFlag=self.fgcmPars.expFlag)
 
-        mp_ctx = multiprocessing.get_context('fork')
-        proc = mp_ctx.Process()
-        workerIndex = proc._identity[0] + 1
-        proc = None
-
         nSections = goodStars.size // self.nStarPerRun + 1
         goodStarsList = np.array_split(goodStars, nSections)
 
@@ -157,11 +152,8 @@ class FgcmZpsToApply(object):
 
         workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
-        pool = mp_ctx.Pool(processes=self.nCore)
-        pool.map(self._worker, workerList, chunksize=1)
-
-        pool.close()
-        pool.join()
+        with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+            pool.map(self._worker, workerList, chunksize=1)
 
         self.fgcmStars.magStdComputed = True
 

@@ -6,7 +6,7 @@ import esutil
 import time
 import matplotlib.pyplot as plt
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -148,12 +148,8 @@ class FgcmRetrieval(object):
             uExpIndexList = np.array_split(uExpIndex,nSections)
 
             # may want to sort by nObservations, but only if we pre-split
-            mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker, uExpIndexList, chunksize=1)
-            pool.close()
-            pool.join()
-            #map(self._worker, uExpIndexList)
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._worker, uExpIndexList, chunksize=1)
 
         # free memory!
         snmm.freeArray(self.goodObsHandle)

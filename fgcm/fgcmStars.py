@@ -3,7 +3,7 @@ import esutil
 import time
 import warnings
 
-from .fgcmUtilities import objFlagDict
+from .fgcmUtilities import objFlagDict, scipy_histogram
 from .fgcmUtilities import obsFlagDict
 from .fgcmUtilities import getMemoryString
 from .fgcmUtilities import makeFigure, putButlerFigure
@@ -1272,19 +1272,59 @@ class FgcmStars(object):
 
         return goodStarsSub[okFlag], goodObs[okFlag]
 
-    def plotStarMap(self,mapType='initial'):
+    def plotStarMap(self, mapType="all"):
         """
         Plot star map.
 
-        parameters
+        Parameters
         ----------
-        mapType: string, default='initial'
-           A key for labeling the map.
+        mapType: str
+           Will either be "all" stars or "good" stars.
         """
+        import skyproj
 
-        # This is not currently used.
-        # FIXME: add skyproj plotting.
-        return
+        objRA = snmm.getArray(self.objRAHandle)
+        objDec = snmm.getArray(self.objDecHandle)
+        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+
+        for j, band in enumerate(self.bands):
+            if mapType == "all":
+                use = (objNTotalObs[:, j] > 0)
+            else:
+                use = (objNGoodObs[:, j] > 0)
+
+            if use.sum() == 0:
+                continue
+
+            fig = makeFigure(figsize=(10, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            sp = skyproj.McBrydeSkyproj(ax=ax)
+            sp.draw_hpxbin(
+                objRA[use],
+                objDec[use],
+                nside=self.mapNSide,
+            )
+            sp.draw_colorbar(label=f"Density (#/{self.mapNSide} pixel)")
+            fig.suptitle("%s band" % (band))
+
+            if self.butlerQC is not None:
+                putButlerFigure(
+                    self.fgcmLog,
+                    self.butlerQC,
+                    self.plotHandleDict,
+                    f"Density{mapType.title()}StarMap",
+                    self.cycleNumber,
+                    fig,
+                    band=band,
+                )
+            elif self.plotPath is not None:
+                fig.savefig('%s/%s_density_%s_star_map_%s.png' % (self.plotPath,
+                                                                  self.outfileBaseWithCycle,
+                                                                  mapType,
+                                                                  band))
 
     def computeObjectSEDSlopes(self,objIndicesIn):
         """
@@ -1303,8 +1343,8 @@ class FgcmStars(object):
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
         objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
 
-        objMagStdMeanLock = snmm.getArrayBase(self.objMagStdMeanHandle).get_lock()
-        objSEDSlopeLock = snmm.getArrayBase(self.objSEDSlopeHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.objMagStdMeanHandle)
+        objSEDSlopeLock = snmm.getArrayLock(self.objSEDSlopeHandle)
 
         # protect access when copying to local
         objMagStdMeanLock.acquire()
@@ -1710,13 +1750,13 @@ class FgcmStars(object):
                            (fgcmPars.nCCD+1) +
                            obsCCDIndex[goodObs])
 
-        h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+        values, counts, inds = scipy_histogram(epochFilterHash)
 
         nbad = 0
 
-        use, = np.where(h > 0)
+        use, = np.where(counts > 0)
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             med = np.median(EGrayGO[i1a])
             sig = 1.4826 * np.median(np.abs(EGrayGO[i1a] - med))
@@ -1782,13 +1822,13 @@ class FgcmStars(object):
         # compute EGray, GO for Good Obs
         EGrayGO, EGrayErr2GO = self.computeEGray(goodObs, onlyObsErr=True, ignoreRef=ignoreRef)
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], rev=True)
+        values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
 
         nbad = 0
 
-        use, = np.where(h > 0)
+        use, = np.where(counts > 0)
         for i in use:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
 
             med = np.median(EGrayGO[i1a])
             sig = 1.4826*np.median(np.abs(EGrayGO[i1a] - med))
@@ -1841,12 +1881,10 @@ class FgcmStars(object):
                                (fgcmPars.nCCD+1) +
                                obsCCDIndex)
 
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
-
-            for i in range(h.size):
-                if h[i] == 0: continue
-
-                i1a = rev[rev[i]:rev[i+1]]
+            values, counts, inds = scipy_histogram(epochFilterHash)
+            use, = np.where(counts > 0)
+            for i in use:
+                i1a = inds[values[i]][0]
 
                 # get the indices for this epoch/filter/ccd
                 epInd = fgcmPars.expEpochIndex[obsExpIndex[i1a[0]]]

@@ -7,7 +7,7 @@ import scipy.optimize
 from scipy.stats import median_abs_deviation
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
-from .fgcmUtilities import Cheb2dField
+from .fgcmUtilities import Cheb2dField, scipy_histogram
 from .fgcmUtilities import makeFigure, putButlerFigure
 
 
@@ -201,12 +201,11 @@ class FgcmSuperStarFlat(object):
                                (self.fgcmPars.nCCD+1) +
                                obsCCDIndex[goodObs])
 
-            h, rev = esutil.stat.histogram(epochFilterHash, rev=True)
+            values, counts, inds = scipy_histogram(epochFilterHash)
+            use, = np.where(counts > 0)
 
-            for i in range(h.size):
-                if h[i] == 0: continue
-
-                i1a = rev[rev[i]:rev[i+1]]
+            for i in use:
+                i1a = inds[values[i]][0]
 
                 # get the indices for this epoch/filter/ccd
                 epInd = self.fgcmPars.expEpochIndex[obsExpIndex[goodObs[i1a[0]]]]

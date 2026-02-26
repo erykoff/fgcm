@@ -128,6 +128,7 @@ class FgcmSigFgcm(object):
                             (objMagStdMean[obsObjIDIndex[goodObs], self.colorSplitIndices[1]] < 90.0))
         # sort these
         st = np.argsort(gmiGO[okColor])
+
         gmiCutLow = np.array([0.0,
                               gmiGO[okColor[st[0]]],
                               gmiGO[okColor[st[int(0.25 * st.size)]]],

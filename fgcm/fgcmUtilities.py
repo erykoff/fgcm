@@ -1078,3 +1078,31 @@ def putButlerFigure(logger, butlerQC, plotHandleDict, name, cycle, figure, band=
         return
 
     butlerQC.put(figure, plotHandleDict[plotName])
+
+
+def scipy_histogram(values):
+    """Use new scipy value_indices for a histogram with reverse-indices.
+
+    Parameters
+    ----------
+    values : `np.ndarray`
+        Right now an integer array.
+
+    Returns
+    -------
+    values : `np.ndarray`
+        Array of values.
+    counts : `np.ndarray`
+        Array of counts.
+    inds : `dict` [`int`, `np.ndarray`]
+        Dictionary, keyed by value, of indices.
+    """
+    from scipy.ndimage import value_indices
+
+    inds = value_indices(values)
+
+    counts = np.zeros(len(inds), dtype=np.int64)
+    for i, (key, value) in enumerate(inds.items()):
+        counts[i] = len(value[0])
+
+    return np.asarray(list(inds.keys())), counts, inds

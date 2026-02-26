@@ -3,10 +3,11 @@ import os
 import sys
 import esutil
 import time
+import threading
 
 from .fgcmChisq import FgcmChisq
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -33,8 +34,6 @@ class FgcmBrightObs(object):
        Maximum gray compared to mean to consider averaging
     nCore: int
        Number of cores to run on (via multiprocessing)
-    nStarPerRun: int
-       Number of stars per run (too many uses more memory)
     """
     def __init__(self,fgcmConfig,fgcmPars,fgcmStars,fgcmLUT):
 
@@ -51,7 +50,7 @@ class FgcmBrightObs(object):
 
         self.brightObsGrayMax = fgcmConfig.brightObsGrayMax
         self.nCore = fgcmConfig.nCore
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.bandFitIndex = fgcmConfig.bandFitIndex
         self.quietMode = fgcmConfig.quietMode
 
@@ -107,6 +106,11 @@ class FgcmBrightObs(object):
         self.fgcmLog.debug('Pre-matching done in %.1f sec.' %
                            (time.time() - preStartTime))
 
+        self.objMagStdMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objNGoodObsTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objNGoodObsHandle))
+        self.objMagStdMeanTempLock = threading.Lock()
+
         if (self.debug):
             self._worker((goodStars,goodObs))
         else:
@@ -116,38 +120,31 @@ class FgcmBrightObs(object):
             # split goodStars into a list of arrays of roughly equal size
 
             prepStartTime = time.time()
-            nSections = goodStars.size // self.nStarPerRun + 1
-            goodStarsList = np.array_split(goodStars,nSections)
 
-            # is there a better way of getting all the first elements from the list?
-            #  note that we need to skip the first which should be zero (checked above)
-            #  see also fgcmChisq.py
-            # splitValues is the first of the goodStars in each list
-            splitValues = np.zeros(nSections-1,dtype='i4')
-            for i in range(1,nSections):
-                splitValues[i-1] = goodStarsList[i][0]
+            nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-            # get the indices from the goodStarsSub matched list
+            nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+            sectionSize = nObsCumSum[-1] // nSections
+
+            goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+            goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+            splitValues = np.zeros(nSections - 1, dtype='i4')
+            for i in range(1, nSections):
+                splitValues[i - 1] = goodStarsList[i][0]
+
+            # get the indices from the goodStarsSub matched list (matched to goodStars)
             splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
-
-            # and split along these indices
-            goodObsList = np.split(goodObs,splitIndices)
+            goodObsList = np.split(goodObs, splitIndices)
 
             workerList = list(zip(goodStarsList,goodObsList))
-
-            # reverse sort so the longest running go first
-            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
 
             self.fgcmLog.debug('Using %d sections (%.1f seconds)' %
                                (nSections,time.time() - prepStartTime))
 
             # make a pool
-            mp_ctx = multiprocessing.get_context("fork")
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._worker,workerList,chunksize=1)
-            pool.close()
-            pool.join()
-
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._worker, workerList, chunksize=1)
 
         if not self.quietMode:
             self.fgcmLog.info('Finished BrightObs in %.2f seconds.' %
@@ -183,7 +180,7 @@ class FgcmBrightObs(object):
         obsFlag = snmm.getArray(self.fgcmStars.obsFlagHandle)
 
         # and the arrays for locking access
-        objMagStdMeanLock = snmm.getArrayBase(self.fgcmStars.objMagStdMeanHandle).get_lock()
+        objMagStdMeanLock = snmm.getArrayLock(self.fgcmStars.objMagStdMeanHandle)
 
         # and cut to those exposures that are not flagged
         if (self.debug):
@@ -210,51 +207,54 @@ class FgcmBrightObs(object):
 
         # new version using fmin.at()
 
-        # start with the mean temp var, set to 99s.
-        objMagStdMeanTemp = np.zeros_like(objMagStdMean)
-        objMagStdMeanTemp[:,:] = 99.0
+        self.objMagStdMeanTempLock.acquire()
+        self.objMagStdMeanTemp[goodStars, :] = 99.0
 
         # find the brightest (minmag) object at each index
-        np.fmin.at(objMagStdMeanTemp,
+        np.fmin.at(self.objMagStdMeanTemp,
                    (obsObjIDIndexGO, obsBandIndexGO),
-                   obsMagStdGO.astype(objMagStdMeanTemp.dtype))
+                   obsMagStdGO.astype(self.objMagStdMeanTemp.dtype))
+
+        self.objMagStdMeanTempLock.release()
 
         # now which observations are bright *enough* to consider?
         brightEnoughGO, = np.where((obsMagStdGO -
-                                    objMagStdMeanTemp[obsObjIDIndexGO,
-                                                      obsBandIndexGO]) <=
+                                    self.objMagStdMeanTemp[obsObjIDIndexGO,
+                                                           obsBandIndexGO]) <=
                                    self.brightObsGrayMax)
 
-        # need to take the weighted mean, so a temp array here
-        #  (memory issues?)
-        wtSum = np.zeros_like(objMagStdMean,dtype='f8')
-        objNGoodObsTemp = np.zeros_like(objNGoodObs)
-        objMagStdMeanTemp[:,:] = 0
+        self.objMagStdMeanTempLock.acquire()
+
+        self.objMagStdMeanTemp[goodStars, :] = 0.0
+        self.objNGoodObsTemp[goodStars, :] = 0.0
 
         obsMagErr2GOBE = obsMagErr2GO[brightEnoughGO]
 
-        np.add.at(wtSum,
+        np.add.at(self.wtSumTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  1./obsMagErr2GOBE.astype(wtSum.dtype))
-        np.add.at(objMagStdMeanTemp,
+                  1./obsMagErr2GOBE.astype(self.wtSumTemp.dtype))
+        np.add.at(self.objMagStdMeanTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
-                  (obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE).astype(objMagStdMeanTemp.dtype))
-        np.add.at(objNGoodObsTemp,
+                  (obsMagStdGO[brightEnoughGO]/obsMagErr2GOBE).astype(self.objMagStdMeanTemp.dtype))
+        np.add.at(self.objNGoodObsTemp,
                   (obsObjIDIndexGO[brightEnoughGO],
                    obsBandIndexGO[brightEnoughGO]),
                   1)
 
+        self.objMagStdMeanTempLock.release()
+
         # these are good object/bands that were observed
-        gd=np.where(wtSum > 0.0)
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
 
         # acquire lock to save values
         objMagStdMeanLock.acquire()
 
-        objMagStdMean[gd] = objMagStdMeanTemp[gd] / wtSum[gd]
-        objMagStdMeanErr[gd] = np.sqrt(1./wtSum[gd])
-        objNGoodObs[gd] = objNGoodObsTemp[gd]
+        objMagStdMean[gd] = self.objMagStdMeanTemp[gd] / self.wtSumTemp[gd]
+        objMagStdMeanErr[gd] = np.sqrt(1./self.wtSumTemp[gd])
+        objNGoodObs[gd] = self.objNGoodObsTemp[gd]
 
         # and release
         objMagStdMeanLock.release()

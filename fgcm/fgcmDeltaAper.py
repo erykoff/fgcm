@@ -4,13 +4,13 @@ import os
 import sys
 import esutil
 import time
-import skyproj
+import threading
 
-from .fgcmUtilities import dataBinner
+from .fgcmUtilities import dataBinner, scipy_histogram
 from .fgcmUtilities import objFlagDict
 from .fgcmUtilities import makeFigure, putButlerFigure
 
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 
 from .sharedNumpyMemManager import SharedNumpyMemManager as snmm
 
@@ -50,7 +50,7 @@ class FgcmDeltaAper(object):
         self.illegalValue = fgcmConfig.illegalValue
         self.quietMode = fgcmConfig.quietMode
         self.nCore = fgcmConfig.nCore
-        self.nStarPerRun = fgcmConfig.nStarPerRun
+        self.nObsPerRun = fgcmConfig.nObsPerRun
         self.ccdStartIndex = fgcmConfig.ccdStartIndex
         self.deltaAperFitPerCcdNx = fgcmConfig.deltaAperFitPerCcdNx
         self.deltaAperFitPerCcdNy = fgcmConfig.deltaAperFitPerCcdNy
@@ -108,11 +108,11 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compMedDeltaAper[:] = self.illegalValue
         self.fgcmPars.compEpsilon[:] = self.illegalValue
 
-        h, rev = esutil.stat.histogram(obsExpIndex[goodObs], min=0, rev=True)
-        expIndices, = np.where(h >= self.minStarPerExp)
+        values, counts, inds = scipy_histogram(obsExpIndex[goodObs])
+        expIndices, = np.where(counts >= self.minStarPerExp)
 
         for expIndex in expIndices:
-            i1a = rev[rev[expIndex]: rev[expIndex + 1]]
+            i1a = inds[values[expIndex]][0]
             mag = objMagStdMean[obsObjIDIndex[goodObs[i1a]],
                                 obsBandIndex[goodObs[i1a]]]
 
@@ -165,32 +165,36 @@ class FgcmDeltaAper(object):
 
         goodStarsSub, goodObs = self.fgcmStars.getGoodObsIndices(goodStars)
 
+        self.wtSumTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objDeltaAperMeanTemp = np.zeros_like(snmm.getArray(self.fgcmStars.objMagStdMeanHandle))
+        self.objMagStdMeanTempLock = threading.Lock()
+
         if self.debug:
             self._starWorker((goodStars, goodObs))
         else:
             if not self.quietMode:
                 self.fgcmLog.info('Running DeltaAper on %d cores' % (self.nCore))
 
-            nSections = goodStars.size // self.nStarPerRun + 1
-            goodStarsList = np.array_split(goodStars, nSections)
+            nObsCumSum = np.cumsum(snmm.getArray(self.fgcmStars.objNobsHandle)[goodStars])
 
-            splitValues = np.zeros(nSections - 1,dtype='i4')
+            nSections = nObsCumSum[-1] // self.nObsPerRun + 1
+            sectionSize = nObsCumSum[-1] // nSections
+
+            goodStarsSplitValues = np.searchsorted(nObsCumSum, np.arange(nSections) * sectionSize)[1: ]
+            goodStarsList = np.array_split(goodStars, goodStarsSplitValues)
+
+            splitValues = np.zeros(nSections - 1, dtype='i4')
             for i in range(1, nSections):
                 splitValues[i - 1] = goodStarsList[i][0]
 
+            # get the indices from the goodStarsSub matched list (matched to goodStars)
             splitIndices = np.searchsorted(goodStars[goodStarsSub], splitValues)
             goodObsList = np.split(goodObs, splitIndices)
 
             workerList = list(zip(goodStarsList,goodObsList))
 
-            # reverse sort so the longest running go first
-            workerList.sort(key=lambda elt:elt[1].size, reverse=True)
-
-            mp_ctx = multiprocessing.get_context('fork')
-            pool = mp_ctx.Pool(processes=self.nCore)
-            pool.map(self._starWorker, workerList, chunksize=1)
-            pool.close()
-            pool.join()
+            with ThreadPoolExecutor(max_workers=self.nCore) as pool:
+                pool.map(self._starWorker, workerList, chunksize=1)
 
         if not self.quietMode:
             self.fgcmLog.info('Finished DeltaAper in %.2f seconds.' %
@@ -360,6 +364,8 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compEpsilonNStarMap[:, :] = offsetMap['nstar_fit']
 
         if doPlots:
+            import skyproj
+
             for j, band in enumerate(self.fgcmStars.bands):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
                 if hpix.size < 2:
@@ -469,10 +475,10 @@ class FgcmDeltaAper(object):
 
         filterCcdHash = ccdIndexGO*(self.fgcmPars.nLUTFilter + 1) + lutFilterIndexGO
 
-        h, rev = esutil.stat.histogram(filterCcdHash, rev=True)
+        values, counts, inds = scipy_histogram(filterCcdHash)
 
         # Arbitrary minimum number here
-        gdHash, = np.where(h > 10)
+        gdHash, = np.where(counts > 10)
 
         epsilonCcdMap = np.zeros((self.fgcmPars.nLUTFilter, self.fgcmPars.nCCD,
                                   self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
@@ -481,9 +487,8 @@ class FgcmDeltaAper(object):
                                        self.deltaAperFitPerCcdNx, self.deltaAperFitPerCcdNy),
                                       dtype=np.int32)
 
-
         for i in gdHash:
-            i1a = rev[rev[i]: rev[i + 1]]
+            i1a = inds[values[i]][0]
             cInd = ccdIndexGO[i1a[0]]
             fInd = lutFilterIndexGO[i1a[0]]
 
@@ -496,11 +501,11 @@ class FgcmDeltaAper(object):
 
             xyBinHash = xBin[i1a]*(self.deltaAperFitPerCcdNy + 1) + yBin[i1a]
 
-            h2, rev2 = esutil.stat.histogram(xyBinHash, rev=True)
+            values2, counts2, inds2 = scipy_histogram(xyBinHash)
 
-            gdHash2, = np.where(h2 > 10)
+            gdHash2, = np.where(counts2 > 10)
             for j in gdHash2:
-                i2a = rev2[rev2[j]: rev2[j + 1]]
+                i2a = inds2[values2[j]][0]
 
                 if len(i2a) == 0:
                     continue
@@ -642,22 +647,27 @@ class FgcmDeltaAper(object):
 
         obsMagErr2GO = obsMagADUModelErr[goodObs]**2.
 
-        wtSum = np.zeros_like(objMagStdMean, dtype='f8')
-        objDeltaAperMeanTemp = np.zeros_like(objMagStdMean, dtype='f8')
+        self.objMagStdMeanTempLock.acquire()
 
-        np.add.at(objDeltaAperMeanTemp,
+        self.wtSumTemp[goodStars, :] = 0.0
+        self.objDeltaAperMeanTemp[goodStars, :] = 0.0
+
+        np.add.at(self.objDeltaAperMeanTemp,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(objDeltaAperMeanTemp.dtype))
-        np.add.at(wtSum,
+                  ((obsDeltaAper[goodObs] - self.fgcmPars.compMedDeltaAper[obsExpIndex[goodObs]])/obsMagErr2GO).astype(self.objDeltaAperMeanTemp.dtype))
+        np.add.at(self.wtSumTemp,
                   (obsObjIDIndex[goodObs], obsBandIndex[goodObs]),
-                  (1./obsMagErr2GO).astype(wtSum.dtype))
+                  (1./obsMagErr2GO).astype(self.wtSumTemp.dtype))
 
-        gd = np.where(wtSum > 0.0)
+        self.objMagStdMeanTempLock.release()
 
-        objDeltaAperMeanLock = snmm.getArrayBase(self.fgcmStars.objDeltaAperMeanHandle).get_lock()
+        gd = np.where(self.wtSumTemp[goodStars, :] > 0.0)
+        gd = (goodStars[gd[0]], gd[1])
+
+        objDeltaAperMeanLock = snmm.getArrayLock(self.fgcmStars.objDeltaAperMeanHandle)
         objDeltaAperMeanLock.acquire()
 
-        objDeltaAperMean[gd] = objDeltaAperMeanTemp[gd] / wtSum[gd]
+        objDeltaAperMean[gd] = self.objDeltaAperMeanTemp[gd] / self.wtSumTemp[gd]
 
         objDeltaAperMeanLock.release()
 
