@@ -1065,7 +1065,8 @@ class FgcmParameters(object):
                ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8', (self.parRetrievedLnPwvNightlyOffset.size, )),
                ('COMPRETRIEVEDTAUNIGHT', 'f8', (self.compRetrievedTauNight.size, )),
                ('EPOCHMJDSTART', 'f8', (self.epochMJDs.size - 1, )),
-               ('EPOCHMJDEND', 'f8', (self.epochMJDs.size - 1, ))]
+               ('EPOCHMJDEND', 'f8', (self.epochMJDs.size - 1, )),
+               ('EXPFLAG', 'i2', (self.expFlag.size, ))]
 
         if (self.hasExternalPwv):
             dtype.extend([('PAREXTERNALLNPWVSCALE', 'f8'),
@@ -1146,6 +1147,8 @@ class FgcmParameters(object):
 
         pars['EPOCHMJDSTART'][:] = self.epochMJDs[0: -1]
         pars['EPOCHMJDEND'][:] = self.epochMJDs[1: ]
+
+        pars['EXPFLAG'][:] = self.expFlag
 
         return parInfo, pars
 
