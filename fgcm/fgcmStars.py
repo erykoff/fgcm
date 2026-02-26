@@ -1272,19 +1272,59 @@ class FgcmStars(object):
 
         return goodStarsSub[okFlag], goodObs[okFlag]
 
-    def plotStarMap(self,mapType='initial'):
+    def plotStarMap(self, mapType="all"):
         """
         Plot star map.
 
-        parameters
+        Parameters
         ----------
-        mapType: string, default='initial'
-           A key for labeling the map.
+        mapType: str
+           Will either be "all" stars or "good" stars.
         """
+        import skyproj
 
-        # This is not currently used.
-        # FIXME: add skyproj plotting.
-        return
+        objRA = snmm.getArray(self.objRAHandle)
+        objDec = snmm.getArray(self.objDecHandle)
+        objNTotalObs = snmm.getArray(self.objNTotalObsHandle)
+        objNGoodObs = snmm.getArray(self.objNGoodObsHandle)
+
+        for j, band in enumerate(self.bands):
+            if mapType == "all":
+                use = (objNTotalObs[:, j] > 0)
+            else:
+                use = (objNGoodObs[:, j] > 0)
+
+            if use.sum() == 0:
+                continue
+
+            fig = makeFigure(figsize=(10, 6))
+            fig.clf()
+            ax = fig.add_subplot(111)
+
+            sp = skyproj.McBrydeSkyproj(ax=ax)
+            sp.draw_hpxbin(
+                objRA[use],
+                objDec[use],
+                nside=self.mapNSide,
+            )
+            sp.draw_colorbar(label=f"Density (#/{self.mapNSide} pixel)")
+            fig.suptitle("%s band" % (band))
+
+            if self.butlerQC is not None:
+                putButlerFigure(
+                    self.fgcmLog,
+                    self.butlerQC,
+                    self.plotHandleDict,
+                    f"Density{mapType.title()}StarMap",
+                    self.cycleNumber,
+                    fig,
+                    band=band,
+                )
+            elif self.plotPath is not None:
+                fig.savefig('%s/%s_density_%s_star_map_%s.png' % (self.plotPath,
+                                                                  self.outfileBaseWithCycle,
+                                                                  mapType,
+                                                                  band))
 
     def computeObjectSEDSlopes(self,objIndicesIn):
         """

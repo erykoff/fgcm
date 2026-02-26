@@ -367,7 +367,8 @@ class FgcmFitCycle(object):
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmLog.debug('FitCycle is finding good stars from %d good exposures' % (goodExpsIndex.size))
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
-        self.fgcmStars.plotStarMap(mapType='initial')
+        if self.fgcmConfig.doPlots:
+            self.fgcmStars.plotStarMap(mapType="all")
         self.fgcmLog.info(getMemoryString("After select"))
 
         # Set up the magnitude error modeler
@@ -838,7 +839,8 @@ class FgcmFitCycle(object):
         self.fgcmLog.debug('Making map of coverage')
         goodExpsIndex, = np.where(self.fgcmPars.expFlag == 0)
         self.fgcmStars.selectStarsMinObsExpIndex(goodExpsIndex)
-        self.fgcmStars.plotStarMap(mapType='final')
+        if self.fgcmConfig.doPlots:
+            self.fgcmStars.plotStarMap(mapType="good")
 
         if not self.quietMode:
             self.fgcmLog.info(getMemoryString('FitCycle Completed'))
