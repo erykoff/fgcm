@@ -4,7 +4,6 @@ import os
 import sys
 import esutil
 import time
-import skyproj
 import threading
 
 from .fgcmUtilities import dataBinner, scipy_histogram
@@ -365,6 +364,8 @@ class FgcmDeltaAper(object):
         self.fgcmPars.compEpsilonNStarMap[:, :] = offsetMap['nstar_fit']
 
         if doPlots:
+            import skyproj
+
             for j, band in enumerate(self.fgcmStars.bands):
                 hpix, = np.where(offsetMap['nstar_fit'][:, j] >= self.deltaAperFitSpatialMinStar)
                 if hpix.size < 2:
