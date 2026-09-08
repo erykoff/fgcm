@@ -406,9 +406,9 @@ class FgcmCCDChromaticity:
 
             self.sel = i1a[use]
 
-            res = optimize.least_squares(self, np.zeros(1), bounds=([-1.0], [1.0]))
+            res = optimize.least_squares(self, np.zeros(1), bounds=([-10.0], [10.0]))
 
-            if res.x <= -0.99 or res.x >= 0.99:
+            if res.x <= -9.99 or res.x >= 9.99:
                 self.fgcmLog.warning("Found out-of-bounds value for chromaticity for filter %s, detector %d." % (self.fgcmPars.lutFilterNames[self.fInd], self.cInd + self.ccdStartIndex))
                 continue
 
