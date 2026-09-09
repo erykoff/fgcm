@@ -360,6 +360,8 @@ class FgcmCCDChromaticity:
         obsMagErr = snmm.getArray(self.fgcmStars.obsMagADUModelErrHandle)
         obsBandIndex = snmm.getArray(self.fgcmStars.obsBandIndexHandle)
         obsLUTFilterIndex = snmm.getArray(self.fgcmStars.obsLUTFilterIndexHandle)
+        obsExpIndex = snmm.getArray(self.fgcmStars.obsExpIndexHandle)
+        obsSecZenith = snmm.getArray(self.fgcmStars.obsSecZenithHandle)
 
         obsObjIDIndex = snmm.getArray(self.fgcmStars.obsObjIDIndexHandle)
         obsCCDIndex = snmm.getArray(self.fgcmStars.obsCCDHandle) - self.ccdStartIndex
@@ -379,6 +381,36 @@ class FgcmCCDChromaticity:
         self.objMagStdMeanGO = objMagStdMean[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
         self.objSEDSlopeGO = objSEDSlope[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]
         self.EGrayErr2GO = obsMagErr[goodObs]**2. - objMagStdMeanErr[obsObjIDIndex[goodObs], obsBandIndex[goodObs]]**2.
+
+        lutIndicesGO = self.fgcmLUT.getIndices(
+            obsLUTFilterIndexGO,
+            self.fgcmPars.expLnPwv[obsExpIndex[goodObs]],
+            self.fgcmPars.expO3[obsExpIndex[goodObs]],
+            self.fgcmPars.expLnTau[obsExpIndex[goodObs]],
+            self.fgcmPars.expAlpha[obsExpIndex[goodObs]],
+            obsSecZenith[goodObs],
+            obsCCDIndexGO,
+            self.fgcmPars.expPmb[obsExpIndex[goodObs]],
+        )
+        self.I0GO = self.fgcmLUT.computeI0(
+            self.fgcmPars.expLnPwv[obsExpIndex[goodObs]],
+            self.fgcmPars.expO3[obsExpIndex[goodObs]],
+            self.fgcmPars.expLnTau[obsExpIndex[goodObs]],
+            self.fgcmPars.expAlpha[obsExpIndex[goodObs]],
+            obsSecZenith[goodObs],
+            self.fgcmPars.expPmb[obsExpIndex[goodObs]],
+            lutIndicesGO,
+        )
+        self.I1GO = self.fgcmLUT.computeI1(
+            self.fgcmPars.expLnPwv[obsExpIndex[goodObs]],
+            self.fgcmPars.expO3[obsExpIndex[goodObs]],
+            self.fgcmPars.expLnTau[obsExpIndex[goodObs]],
+            self.fgcmPars.expAlpha[obsExpIndex[goodObs]],
+            obsSecZenith[goodObs],
+            self.fgcmPars.expPmb[obsExpIndex[goodObs]],
+            lutIndicesGO,
+        )
+        self.I10GO = self.I1GO / self.I0GO
 
         ccdFilterHash = (obsLUTFilterIndexGO.astype(np.int64)*(self.fgcmPars.nCCD + 1) +
                          obsCCDIndexGO.astype(np.int64))
@@ -479,9 +511,9 @@ class FgcmCCDChromaticity:
     def __call__(self, pars):
         c = pars[0]
 
-        termOne = 1.0 + (c / self.fgcmLUT.lambdaStd[self.fInd]) * self.fgcmLUT.I10Std[self.fInd]
-        termTwo = 1.0 + (((c / self.fgcmLUT.lambdaStd[self.fInd]) * (self.fgcmLUT.I1Std[self.fInd] + self.objSEDSlopeGO[self.sel] * self.fgcmLUT.I2Std[self.fInd])) /
-                         (self.fgcmLUT.I0Std[self.fInd] + self.objSEDSlopeGO[self.sel] * self.fgcmLUT.I1Std[self.fInd]))
+        termOne = 1.0 + (c / self.fgcmLUT.lambdaStd[self.fInd]) * self.I10GO[self.sel]
+        termTwo = 1.0 + (((c / self.fgcmLUT.lambdaStd[self.fInd]) * (self.I1GO[self.sel] + self.objSEDSlopeGO[self.sel] * self.fgcmLUT.I2Std[self.fInd])) /
+                         (self.I0GO[self.sel] + self.objSEDSlopeGO[self.sel] * self.I1GO[self.sel]))
         chromDelta = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
 
         delta = self.objMagStdMeanGO[self.sel] - (self.obsMagStdGO[self.sel] + chromDelta)

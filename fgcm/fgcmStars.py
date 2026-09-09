@@ -2078,6 +2078,8 @@ class FgcmStars(object):
         obsCCDIndex = snmm.getArray(self.obsCCDHandle) - self.ccdStartIndex
         obsBandIndex = snmm.getArray(self.obsBandIndexHandle)
         obsLUTFilterIndex = snmm.getArray(self.obsLUTFilterIndexHandle)
+        obsExpIndex = snmm.getArray(self.obsExpIndexHandle)
+        obsSecZenith = snmm.getArray(self.obsSecZenithHandle)
         obsMagADU = snmm.getArray(self.obsMagADUHandle)
 
         objSEDSlope = snmm.getArray(self.objSEDSlopeHandle)
@@ -2085,10 +2087,40 @@ class FgcmStars(object):
 
         c = fgcmPars.compCCDChromaticity[obsCCDIndex, obsLUTFilterIndex]
 
-        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * fgcmLUT.I10Std[obsLUTFilterIndex]
+        lutIndices = fgcmLUT.getIndices(
+            obsLUTFilterIndex,
+            fgcmPars.expLnPwv[obsExpIndex],
+            fgcmPars.expO3[obsExpIndex],
+            fgcmPars.expLnTau[obsExpIndex],
+            fgcmPars.expAlpha[obsExpIndex],
+            obsSecZenith,
+            obsCCDIndex,
+            fgcmPars.expPmb[obsExpIndex],
+        )
+        I0 = fgcmLUT.computeI0(
+            fgcmPars.expLnPwv[obsExpIndex],
+            fgcmPars.expO3[obsExpIndex],
+            fgcmPars.expLnTau[obsExpIndex],
+            fgcmPars.expAlpha[obsExpIndex],
+            obsSecZenith,
+            fgcmPars.expPmb[obsExpIndex],
+            lutIndices,
+        )
+        I1 = fgcmLUT.computeI1(
+            fgcmPars.expLnPwv[obsExpIndex],
+            fgcmPars.expO3[obsExpIndex],
+            fgcmPars.expLnTau[obsExpIndex],
+            fgcmPars.expAlpha[obsExpIndex],
+            obsSecZenith,
+            fgcmPars.expPmb[obsExpIndex],
+            lutIndices,
+        )
+        I10 = I1 / I0
+
+        termOne = 1.0 + (c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * I10
         obsSEDSlope = objSEDSlope[obsObjIDIndex, obsBandIndex]
-        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * (fgcmLUT.I1Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I2Std[obsLUTFilterIndex])) /
-                         (fgcmLUT.I0Std[obsLUTFilterIndex] + obsSEDSlope * fgcmLUT.I1Std[obsLUTFilterIndex]))
+        termTwo = 1.0 + (((c / fgcmLUT.lambdaStd[obsLUTFilterIndex]) * (I1 + obsSEDSlope * fgcmLUT.I2Std[obsLUTFilterIndex])) /
+                         (I0 + obsSEDSlope * I1))
         deltaMag = -2.5 * np.log10(termOne) + 2.5 * np.log10(termTwo)
 
         if returnCorrections:
